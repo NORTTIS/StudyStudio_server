@@ -23,11 +23,17 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Folder Include="Models\DTOs\" />
     <Folder Include="Repositories\" />
     <Folder Include="Configurations\" />
-    <Folder Include="Middlewares\" />
     <Folder Include="Services\Interfaces\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EditorConfigFiles Remove="C:\Users\2132k\OneDrive\Desktop\StudyStudio_backend\StudioStudio_Server\.editorconfig" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="C:\Users\2132k\OneDrive\Desktop\StudyStudio_backend\StudioStudio_Server\.editorconfig" />
   </ItemGroup>
 
 </Project>
