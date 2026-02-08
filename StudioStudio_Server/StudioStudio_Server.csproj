@@ -23,11 +23,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Folder Include="Models\DTOs\" />
-    <Folder Include="Repositories\" />
     <Folder Include="Configurations\" />
     <Folder Include="Middlewares\" />
-    <Folder Include="Services\Interfaces\" />
   </ItemGroup>
 
 </Project>

@@ -18,6 +18,7 @@
 
         public string Language { get; set; } = "vi";
         public bool EmailNotificationEnabled { get; set; } = true;
+        public RefreshToken? RefreshToken { get; set; }
 
         public ICollection<GroupParticipant> GroupParticipants { get; set; } = new List<GroupParticipant>();
     }

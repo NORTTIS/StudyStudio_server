@@ -29,6 +29,7 @@ namespace StudioStudio_Server.Data
         public DbSet<AIRequestLog> AIRequestLogs => Set<AIRequestLog>();
         public DbSet<ActivityLog> ActivityLogs => Set<ActivityLog>();
         public DbSet<Report> Reports => Set<Report>();
+        public DbSet<RefreshToken> RefreshToken => Set<RefreshToken>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -44,6 +45,15 @@ namespace StudioStudio_Server.Data
                 e.Property(x => x.Email).IsRequired();
                 e.Property(x => x.PasswordHash).IsRequired();
                 e.Property(x => x.FullName).IsRequired();
+                e.HasOne(u => u.RefreshToken)
+                    .WithOne(r => r.User)
+                    .HasForeignKey<RefreshToken>(r => r.UserId)
+                    .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            modelBuilder.Entity<RefreshToken>(e =>
+            {
+                e.HasKey(x => x.Id);
             });
 
             // STUDIO
