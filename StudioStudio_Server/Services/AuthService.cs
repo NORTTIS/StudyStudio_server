@@ -1,7 +1,9 @@
-﻿using Microsoft.AspNetCore.Http.HttpResults;
+﻿using Google.Apis.Auth;
+using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using StudioStudio_Server.Models.DTOs;
 using StudioStudio_Server.Models.Entities;
 using StudioStudio_Server.Repositories.Interfaces;
 using StudioStudio_Server.Services.Interfaces;
@@ -168,6 +170,41 @@ namespace StudioStudio_Server.Services
             {
                 await _refreshTokenRepository.RevokeAsync(token);
             }
+        }
+
+        public async Task<string> GoogleLoginAsync(GoogleLoginRequest request, HttpResponse response)
+        {
+            var payload = await GoogleJsonWebSignature.ValidateAsync(request.IdToken);
+
+            var email = payload.Email;
+            var googleId = payload.Subject;
+
+            var user = await _userRepository.GetByEmailAsync(email);
+            if (user == null)
+            {
+                user = new User
+                {
+                    UserId = Guid.NewGuid(),
+                    Email = email,
+                    GoogleId = googleId,
+                };
+
+                await _userRepository.AddAsync(user);
+            }
+
+            if (user.RefreshToken != null)
+            {
+                await _refreshTokenRepository.RevokeAsync(user.RefreshToken);
+            }
+
+            var accessToken = GenerateJWTToken(user);
+            var refreshToken = CreateRefreshToken(user);
+
+            await _refreshTokenRepository.AddAsync(refreshToken);
+
+            SetRefreshTokenCookie(response, refreshToken.Token);
+
+            return accessToken;
         }
     }
 }

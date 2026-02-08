@@ -60,5 +60,12 @@ namespace StudioStudio_Server.Controllers
             }
             return Ok();
         }
+
+        [HttpPost("google")]
+        public async Task<IActionResult> GoogleLogin([FromBody] GoogleLoginRequest request)
+        {
+            var result = await _authService.GoogleLoginAsync(request, Response);
+            return Ok(result);
+        }
     }
 }
