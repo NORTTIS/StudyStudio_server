@@ -33,8 +33,6 @@ namespace StudioStudio_Server.Controllers
         [HttpPost("user")]
         public async Task<IActionResult> CreateUser()
         {
-            throw new AppException(ErrorCodes.AuthInvalidCredential, StatusCodes.Status401Unauthorized);
-
             var user = new User
             {
                 UserId = Guid.NewGuid(),
