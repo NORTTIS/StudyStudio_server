@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using StudioStudio_Server.Data;
+using StudioStudio_Server.Exceptions;
 using StudioStudio_Server.Models.Entities;
 
 namespace StudioStudio_Server.Controllers
@@ -32,6 +33,8 @@ namespace StudioStudio_Server.Controllers
         [HttpPost("user")]
         public async Task<IActionResult> CreateUser()
         {
+            throw new AppException(ErrorCodes.AuthInvalidCredential, StatusCodes.Status401Unauthorized);
+
             var user = new User
             {
                 UserId = Guid.NewGuid(),

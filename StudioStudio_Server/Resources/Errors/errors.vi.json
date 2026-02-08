@@ -1,0 +1,12 @@
+{
+  "AUTH001": "Email hoặc mật khẩu không đúng",
+  "AUTH002": "Phiên đăng nhập đã hết hạn",
+  "AUTH003": "Bạn không có quyền truy cập",
+
+  "USER001": "Không tìm thấy người dùng",
+
+  "TASK001": "Không tìm thấy công việc",
+  "TASK002": "Bạn không có quyền truy cập công việc này",
+
+  "SYS001": "Lỗi hệ thống không xác định"
+}
