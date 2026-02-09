@@ -17,8 +17,11 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.Configure<EmailOptions>(
     builder.Configuration.GetSection("Email"));
 
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<IMessageService, MessageService>();
 builder.Services.AddScoped<IEmailService, SMTPEmailService>();
 builder.Services.AddScoped<IUserRepository, UserRepository>();
+builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
 builder.Services.AddScoped<IPasswordHasher<User>, PasswordHasher<User>>();
