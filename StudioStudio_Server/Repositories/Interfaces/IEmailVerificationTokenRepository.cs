@@ -8,6 +8,8 @@ namespace StudioStudio_Server.Repositories.Interfaces
         Task AddAsync(EmailVerificationToken token);
         Task<EmailVerificationToken?> GetValidAsync(string token, EmailTokenType type);
         Task MarkAsUsedAsync(EmailVerificationToken token);
+        Task InvalidateAllAsync(Guid userId, EmailTokenType type);
+        Task<EmailVerificationToken?> GetLatestAsync(Guid userId, EmailTokenType type);
     }
 
 }

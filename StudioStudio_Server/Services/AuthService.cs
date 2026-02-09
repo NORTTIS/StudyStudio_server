@@ -74,7 +74,7 @@ namespace StudioStudio_Server.Services
                 UserId = user.UserId,
                 Token = Convert.ToBase64String(RandomNumberGenerator.GetBytes(64)),
                 Type = EmailTokenType.VerifyEmail,
-                ExpiresAt = DateTime.UtcNow.AddMinutes(5)
+                ExpiresAt = DateTime.UtcNow.AddMinutes(15)
             };
 
             await _emailToken.AddAsync(token);
@@ -253,7 +253,7 @@ namespace StudioStudio_Server.Services
         public async Task SendResetPasswordLinkAsync(string email)
         {
             var user = await _userRepository.GetByEmailAsync(email);
-            if (user == null) return; // tránh lộ user tồn tại
+            if (user == null) return;
 
             var token = new EmailVerificationToken
             {
@@ -261,13 +261,95 @@ namespace StudioStudio_Server.Services
                 UserId = user.UserId,
                 Token = Convert.ToBase64String(RandomNumberGenerator.GetBytes(64)),
                 Type = EmailTokenType.ResetPassword,
-                ExpiresAt = DateTime.UtcNow.AddMinutes(5)
+                ExpiresAt = DateTime.UtcNow.AddMinutes(15)
             };
 
             await _emailToken.AddAsync(token);
 
             var url = $"{_configuration["Frontend:ResetPassURL"]}?token={token.Token}";
             await _emailService.SendLinkAsync(user.Email, "Reset password", EmailTemplate.ResetPasswordEmail(url));
+        }
+
+        public async Task ResendEmailAsync(ResendEmailRequest request)
+        {
+            if (!IsValidEmail(request.Email))
+                throw new AppException(
+                    ErrorCodes.AuthInvalidCredential,
+                    StatusCodes.Status400BadRequest
+                );
+
+            var user = await _userRepository.GetByEmailAsync(request.Email);
+
+            // chống user enumeration
+            if (user == null)
+                return;
+
+            if (request.Purpose == EmailTokenType.VerifyEmail &&
+                user.Status == UserStatus.Active)
+            {
+                throw new AppException(
+                    ErrorCodes.AccountAlreadyVerified,
+                    StatusCodes.Status400BadRequest
+                );
+            }
+
+            // rate limit resend (60s)
+            var lastToken = await _emailToken.GetLatestAsync(user.UserId, request.Purpose);
+            if (lastToken != null &&
+                DateTime.UtcNow - lastToken.CreatedAt < TimeSpan.FromSeconds(60))
+            {
+                throw new AppException(
+                    ErrorCodes.TooManyRequests,
+                    StatusCodes.Status429TooManyRequests
+                );
+            }
+
+            await _emailToken.InvalidateAllAsync(user.UserId, request.Purpose);
+
+            var token = new EmailVerificationToken
+            {
+                Id = Guid.NewGuid(),
+                UserId = user.UserId,
+                Token = Convert.ToBase64String(RandomNumberGenerator.GetBytes(64)),
+                Type = request.Purpose,
+                CreatedAt = DateTime.UtcNow,
+                ExpiresAt = DateTime.UtcNow.AddMinutes(15),
+                IsUsed = false
+            };
+
+            await _emailToken.AddAsync(token);
+
+            try
+            {
+                string url;
+                string subject;
+                string html;
+
+                if (request.Purpose == EmailTokenType.VerifyEmail)
+                {
+                    url = $"{_configuration["Frontend:VerifyURL"]}?token={token.Token}";
+                    subject = "Xác thực tài khoản";
+                    html = EmailTemplate.VerifyLinkEmail(url);
+                }
+                else
+                {
+                    url = $"{_configuration["Frontend:ResetPassURL"]}?token={token.Token}";
+                    subject = "Cài lại mật khẩu";
+                    html = EmailTemplate.ResetPasswordEmail(url);
+                }
+
+                await _emailService.SendLinkAsync(user.Email, subject, html);
+            }
+            catch
+            {
+                // rollback token if mail send failed
+                token.IsUsed = true;
+                await _emailToken.MarkAsUsedAsync(token);
+                throw new AppException(
+                    ErrorCodes.EmailSendFailed,
+                    StatusCodes.Status500InternalServerError
+                );
+            }
         }
 
         private bool IsValidEmail(string email)

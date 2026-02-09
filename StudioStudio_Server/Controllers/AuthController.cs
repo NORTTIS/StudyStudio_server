@@ -72,5 +72,15 @@ namespace StudioStudio_Server.Controllers
                 accessToken
             });
         }
+
+        [HttpPost("resend-email")]
+        public async Task<IActionResult> ResendEmail([FromBody] ResendEmailRequest request)
+        {
+            await _authService.ResendEmailAsync(request);
+            return Ok(new
+            {
+                message = "Email đã được gửi"
+            });
+        }
     }
 }

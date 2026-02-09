@@ -2,11 +2,15 @@
   "AUTH001": "Email hoặc mật khẩu không đúng",
   "AUTH002": "Phiên đăng nhập đã hết hạn",
   "AUTH003": "Bạn không có quyền truy cập",
+  "AUTH004" "Tài khoản đã được xác minh",
 
   "USER001": "Không tìm thấy người dùng",
 
   "TASK001": "Không tìm thấy công việc",
   "TASK002": "Bạn không có quyền truy cập công việc này",
 
-  "SYS001": "Lỗi hệ thống không xác định"
+  "SYS001": "Lỗi hệ thống không xác định",
+  "SYS002": "Bạn gửi yêu cầu quá nhiều lần",
+
+  "EMAIL001": "Email gửi bị lỗi",
 }
