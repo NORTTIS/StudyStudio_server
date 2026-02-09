@@ -3,6 +3,8 @@ using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using Newtonsoft.Json.Linq;
+using StudioStudio_Server.Configurations;
 using StudioStudio_Server.Models.DTOs;
 using StudioStudio_Server.Models.Entities;
 using StudioStudio_Server.Repositories.Interfaces;
@@ -12,28 +14,48 @@ using System.Runtime.InteropServices;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.RegularExpressions;
 
 namespace StudioStudio_Server.Services
 {
     public class AuthService : IAuthService
     {
+        private readonly Regex EmailRegex = new(@"^[^@\s]+@[^@\s]+\.[^@\s]+$", RegexOptions.Compiled);
+        private readonly Regex PasswordRegex = new(@"^(?=.*[A-Z])(?=.*\\d)(?=.*[^A-Za-z\\d]).{8,}$", RegexOptions.Compiled);
+
         private readonly IUserRepository _userRepository;
         private readonly IRefreshTokenRepository _refreshTokenRepository;
         private readonly IPasswordHasher<User> _passwordHasher;
         private readonly IConfiguration _configuration;
+        private readonly IEmailService _emailService;
+        private readonly IEmailVerificationTokenRepository _emailToken;
         public AuthService(
             IUserRepository userRepository,
             IPasswordHasher<User> passwordHasher,
             IConfiguration configuration,
-            IRefreshTokenRepository refreshTokenRepository)
+            IRefreshTokenRepository refreshTokenRepository,
+            IEmailService emailService,
+            IEmailVerificationTokenRepository emailToken)
         {
             _userRepository = userRepository;
             _passwordHasher = passwordHasher;
             _configuration = configuration;
             _refreshTokenRepository = refreshTokenRepository;
+            _emailService = emailService;
+            _emailToken = emailToken;
         }
         public async Task RegisterAsync(Models.DTOs.RegisterRequest registerRequest)
         {
+            if (!IsValidEmail(registerRequest.Email))
+            {
+                throw new Exception("This email address does not in right format");
+            }
+
+            if (!IsValidPass(registerRequest.Password))
+            {
+                throw new Exception("Password need to have at least 8 letters, 1 uppercase, 1 special character");
+            }
+
             //check if user email have used or not
             User? existUser = await _userRepository.GetByEmailAsync(registerRequest.Email);
 
@@ -53,7 +75,8 @@ namespace StudioStudio_Server.Services
             {
                 UserId = Guid.NewGuid(),
                 Email = registerRequest.Email,
-                FullName = registerRequest.FirstName + " " + registerRequest.LastName
+                FullName = registerRequest.FirstName + " " + registerRequest.LastName,
+                Status = UserStatus.Inactive
             };
 
             //hashpassword using .net PasswordHasher
@@ -61,9 +84,48 @@ namespace StudioStudio_Server.Services
             registedUser.CreatedAt = DateTime.UtcNow;
 
             await _userRepository.AddAsync(registedUser);
+
+            var emailToken = new EmailVerificationToken
+            {
+                Id = Guid.NewGuid(),
+                UserId = registedUser.UserId,
+                Token = Convert.ToBase64String(RandomNumberGenerator.GetBytes(64)),
+                ExpiresAt = DateTime.UtcNow.AddMinutes(5),
+            };
+
+            await _emailToken.AddAsync(emailToken);
+
+            //Fe verify code url
+            string verifyUrl = $"http://3000/verify-email?token={emailToken.Token}";
+
+            string html = EmailTemplate.VerifyLinkEmail(verifyUrl);
+
+            await _emailService.SendLinkAsync(
+                registedUser.Email,
+                "verify yor account",
+                html
+            );
         }
+
+        public async Task VerifyEmailLinkAsync(string token)
+        {
+            var verifyToken = await _emailToken.GetValidAsync(token);
+            if (verifyToken == null)
+            {
+                throw new UnauthorizedAccessException("Invalid token");
+            }
+            verifyToken.User.Status = UserStatus.Active;
+
+            await _emailToken.MaskAsUsed(verifyToken);
+        }
+
         public async Task<string> LoginAsync(Models.DTOs.LoginRequest loginRequest, HttpResponse response)
         {
+            if (!IsValidEmail(loginRequest.Email))
+            {
+                throw new Exception("Invalid email or password");
+            }
+
             //find user and check if user exist or not
             User? user = await _userRepository.GetByEmailAsync(loginRequest.Email);
 
@@ -181,10 +243,16 @@ namespace StudioStudio_Server.Services
 
         public async Task<string> GoogleLoginAsync(GoogleLoginRequest request, HttpResponse response)
         {
-            var payload = await GoogleJsonWebSignature.ValidateAsync(request.IdToken);
+            var settings = new GoogleJsonWebSignature.ValidationSettings
+            {
+                Audience = new[] { _configuration["Google:ClientId"] }
+            };
+            var payload = await GoogleJsonWebSignature.ValidateAsync(request.IdToken, settings);
 
             var email = payload.Email;
             var googleId = payload.Subject;
+            var fullName = payload.GivenName + " " + payload.FamilyName;
+            var imgURL = payload.Picture;
 
             var user = await _userRepository.GetByEmailAsync(email);
             if (user == null)
@@ -194,10 +262,21 @@ namespace StudioStudio_Server.Services
                     UserId = Guid.NewGuid(),
                     Email = email,
                     GoogleId = googleId,
+                    FullName = fullName,
+                    AvatarUrl = imgURL,
                     Status = UserStatus.Active,
                 };
 
                 await _userRepository.AddAsync(user);
+            }
+            else
+            {
+                user.GoogleId ??= googleId;
+                user.FullName ??= fullName;
+                user.AvatarUrl ??= imgURL;
+                user.Status = UserStatus.Active;
+
+                await _userRepository.UpdateAsync(user);
             }
 
             if (user.RefreshToken != null)
@@ -213,6 +292,16 @@ namespace StudioStudio_Server.Services
             SetRefreshTokenCookie(response, refreshToken.Token);
 
             return accessToken;
+        }
+
+        private bool IsValidEmail(string email)
+        {
+            return EmailRegex.IsMatch(email);
+        }
+
+        private bool IsValidPass(string pass)
+        {
+            return PasswordRegex.IsMatch(pass);
         }
     }
 }

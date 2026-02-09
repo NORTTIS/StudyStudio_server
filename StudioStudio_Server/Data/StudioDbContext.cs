@@ -30,6 +30,7 @@ namespace StudioStudio_Server.Data
         public DbSet<ActivityLog> ActivityLogs => Set<ActivityLog>();
         public DbSet<Report> Reports => Set<Report>();
         public DbSet<RefreshToken> RefreshToken => Set<RefreshToken>();
+        public DbSet<EmailVerificationToken> EmailVerificationTokens => Set<EmailVerificationToken>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -49,9 +50,20 @@ namespace StudioStudio_Server.Data
                     .WithOne(r => r.User)
                     .HasForeignKey<RefreshToken>(r => r.UserId)
                     .OnDelete(DeleteBehavior.Cascade);
+                e.HasOne(u => u.EmailVerificationToken)
+                    .WithOne(e => e.User)
+                    .HasForeignKey<EmailVerificationToken>(e => e.UserId)
+                    .OnDelete(DeleteBehavior.Cascade);
             });
 
+            //Refresh Token
             modelBuilder.Entity<RefreshToken>(e =>
+            {
+                e.HasKey(x => x.Id);
+            });
+
+            //Email verify token
+            modelBuilder.Entity<EmailVerificationToken>(e =>
             {
                 e.HasKey(x => x.Id);
             });

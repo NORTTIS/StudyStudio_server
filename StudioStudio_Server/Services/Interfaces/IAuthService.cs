@@ -10,5 +10,6 @@ namespace StudioStudio_Server.Services.Interfaces
         Task<string> RefreshTokenAsync(string refreshToken, HttpResponse response);
         Task LogoutAsync(string refreshToken, HttpResponse response);
         Task<string> GoogleLoginAsync(GoogleLoginRequest request, HttpResponse response);
+        Task VerifyEmailLinkAsync(string token);
     }
 }

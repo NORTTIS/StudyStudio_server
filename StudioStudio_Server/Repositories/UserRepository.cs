@@ -31,5 +31,11 @@ namespace StudioStudio_Server.Repositories
                 .Include(u => u.RefreshToken)
                 .FirstOrDefaultAsync(u => u.UserId == id);
         }
+
+        public async Task UpdateAsync(User user)
+        {
+            _context.Users.Update(user);
+            await _context.SaveChangesAsync();
+        }
     }
 }
