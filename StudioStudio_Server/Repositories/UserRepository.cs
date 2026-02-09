@@ -21,7 +21,7 @@ namespace StudioStudio_Server.Repositories
         public async Task<User?> GetByEmailAsync(string email)
         {
             return await _context.Users
-                .Include(u => u.RefreshToken)
+                .Include(u => u.RefreshTokens)
                 .FirstOrDefaultAsync(u =>
                     u.Email.Equals(email) &&
                     u.Status.Equals("Active"));
@@ -30,7 +30,7 @@ namespace StudioStudio_Server.Repositories
         public async Task<User?> GetByIdAsync(Guid id)
         {
             return await _context.Users
-                .Include(u => u.RefreshToken)
+                .Include(u => u.RefreshTokens)
                 .FirstOrDefaultAsync(u => u.UserId == id);
         }
 
