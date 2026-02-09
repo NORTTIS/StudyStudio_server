@@ -8,6 +8,7 @@ using StudioStudio_Server.Configurations;
 using StudioStudio_Server.Exceptions;
 using StudioStudio_Server.Models.DTOs.Request;
 using StudioStudio_Server.Models.Entities;
+using StudioStudio_Server.Models.Enums;
 using StudioStudio_Server.Repositories.Interfaces;
 using StudioStudio_Server.Services.Interfaces;
 using System.IdentityModel.Tokens.Jwt;
@@ -45,120 +46,76 @@ namespace StudioStudio_Server.Services
             _emailService = emailService;
             _emailToken = emailToken;
         }
-        public async Task RegisterAsync(RegisterRequests registerRequest)
+        public async Task RegisterAsync(RegisterRequests request)
         {
-            if (!IsValidEmail(registerRequest.Email) || !IsValidPass(registerRequest.Password))
-            {
-                throw new AppException(ErrorCodes.AuthInvalidCredential, StatusCodes.Status401Unauthorized);
-            }
+            if (!IsValidEmail(request.Email) || !IsValidPass(request.Password))
+                throw new Exception("Invalid input");
 
-            //check if user email have used or not
-            User? existUser = await _userRepository.GetByEmailAsync(registerRequest.Email);
+            if (await _userRepository.GetByEmailAsync(request.Email) != null)
+                throw new Exception("Email already exists");
 
-            //if email used, throw exception
-            if (existUser != null)
-            {
-                throw new AppException(ErrorCodes.AuthInvalidCredential, StatusCodes.Status401Unauthorized);
-            }
-
-            if (registerRequest.Password != registerRequest.ConfirmPassword)
-            {
-                throw new AppException(ErrorCodes.AuthInvalidCredential, StatusCodes.Status401Unauthorized);
-            }
-
-            //else create new user
-            User registedUser = new User
+            var user = new User
             {
                 UserId = Guid.NewGuid(),
-                Email = registerRequest.Email,
-                FullName = registerRequest.FirstName + " " + registerRequest.LastName,
-                Status = UserStatus.Inactive
+                Email = request.Email,
+                FullName = request.FirstName + " " + request.LastName,
+                Status = UserStatus.Inactive,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
             };
 
-            //hashpassword using .net PasswordHasher
-            registedUser.PasswordHash = _passwordHasher.HashPassword(registedUser, registerRequest.Password);
-            registedUser.CreatedAt = DateTime.UtcNow;
+            user.PasswordHash = _passwordHasher.HashPassword(user, request.Password);
 
-            await _userRepository.AddAsync(registedUser);
+            await _userRepository.AddAsync(user);
 
-            //create eamil token for user to validate
-            var emailToken = new EmailVerificationToken
+            var token = new EmailVerificationToken
             {
                 Id = Guid.NewGuid(),
-                UserId = registedUser.UserId,
+                UserId = user.UserId,
                 Token = Convert.ToBase64String(RandomNumberGenerator.GetBytes(64)),
-                ExpiresAt = DateTime.UtcNow.AddMinutes(5),
+                Type = EmailTokenType.VerifyEmail,
+                ExpiresAt = DateTime.UtcNow.AddMinutes(5)
             };
 
-            await _emailToken.AddAsync(emailToken);
+            await _emailToken.AddAsync(token);
 
-            //Fe verify code url
-            string verifyUrl = $"{_configuration["Frontend:VerfyURL"]}?token={emailToken.Token}";
-
-            string html = EmailTemplate.VerifyLinkEmail(verifyUrl);
-
-            await _emailService.SendLinkAsync(
-                registedUser.Email,
-                "Xác thực tài khoản của bạn",
-                html
-            );
+            var url = $"{_configuration["Frontend:VerifyURL"]}?token={token.Token}";
+            await _emailService.SendLinkAsync(user.Email, "Verify account", EmailTemplate.VerifyLinkEmail(url));
         }
 
-        public async Task VerifyEmailLinkAsync(string token)
+
+        public async Task VerifyEmailAsync(string token)
         {
-            var verifyToken = await _emailToken.GetValidAsync(token);
+            var verifyToken = await _emailToken.GetValidAsync(token, EmailTokenType.VerifyEmail);
             if (verifyToken == null)
-            {
                 throw new UnauthorizedAccessException("Invalid token");
-            }
-            if (verifyToken.User.Status == UserStatus.Active)
-            {
-                throw new Exception("Already verified");
-            }
-            verifyToken.User.Status = UserStatus.Active;
 
-            await _emailToken.MaskAsUsed(verifyToken);
+            verifyToken.User.Status = UserStatus.Active;
+            verifyToken.User.UpdatedAt = DateTime.UtcNow;
+
+            await _emailToken.MarkAsUsedAsync(verifyToken);
         }
 
-        public async Task<string> LoginAsync(LoginRequests loginRequest, HttpResponse response)
+        public async Task<string> LoginAsync(LoginRequests request, HttpResponse response)
         {
-            if (!IsValidEmail(loginRequest.Email))
-            {
-                throw new Exception("Invalid email or password");
-            }
-
-            //find user and check if user exist or not
-            User? user = await _userRepository.GetByEmailAsync(loginRequest.Email);
-
+            var user = await _userRepository.GetByEmailAsync(request.Email);
             if (user == null)
-            {
-                throw new Exception("Invalid email or password");
-            }
+                throw new Exception("Invalid credentials");
 
-            //check user password has match
-            var result = _passwordHasher.VerifyHashedPassword(user, user.PasswordHash, loginRequest.Password);
+            if (_passwordHasher.VerifyHashedPassword(user, user.PasswordHash!, request.Password)
+                != PasswordVerificationResult.Success)
+                throw new Exception("Invalid credentials");
 
-            if (result != PasswordVerificationResult.Success)
-            {
-                throw new Exception("Invalid email or password");
-            }
+            var accessToken = GenerateJWTToken(user);
 
-            //get access token by JWT
-            string accessToken = GenerateJWTToken(user);
-
-            //create new refresh token each time user login
-            if (user.RefreshToken != null)
-            {
-                user.RefreshToken.IsRevoked = true;
-            }
-
-            RefreshToken refreshToken = CreateRefreshToken(user);
+            var refreshToken = CreateRefreshToken(user);
             await _refreshTokenRepository.AddAsync(refreshToken);
 
             SetRefreshTokenCookie(response, refreshToken.Token);
 
             return accessToken;
         }
+
 
         private string GenerateJWTToken(User user)
         {
@@ -207,40 +164,29 @@ namespace StudioStudio_Server.Services
         public async Task<string> RefreshTokenAsync(string refreshToken, HttpResponse response)
         {
             var token = await _refreshTokenRepository.GetValidAsync(refreshToken);
-
-            if (token == null || token.IsRevoked || token.ExpiresAt < DateTime.UtcNow)
+            if (token == null)
                 throw new UnauthorizedAccessException("Invalid refresh token");
 
             await _refreshTokenRepository.RevokeAsync(token);
 
-            var user = await _userRepository.GetByIdAsync(token.UserId);
-            if (user == null)
-                throw new UnauthorizedAccessException("User not found");
-
-            var newRefreshToken = CreateRefreshToken(user);
+            var newRefreshToken = CreateRefreshToken(token.User);
             await _refreshTokenRepository.AddAsync(newRefreshToken);
-
-            var newAccessToken = GenerateJWTToken(user);
 
             SetRefreshTokenCookie(response, newRefreshToken.Token);
 
-            return newAccessToken;
+            return GenerateJWTToken(token.User);
         }
+
+
         public async Task LogoutAsync(string refreshToken, HttpResponse response)
         {
             var token = await _refreshTokenRepository.GetValidAsync(refreshToken);
             if (token != null)
-            {
                 await _refreshTokenRepository.RevokeAsync(token);
-            }
 
-            response.Cookies.Delete("refreshToken", new CookieOptions
-            {
-                HttpOnly = true,
-                Secure = true,
-                SameSite = SameSiteMode.None
-            });
+            response.Cookies.Delete("refreshToken");
         }
+
 
         public async Task<string> GoogleLoginAsync(GoogleLoginRequest request, HttpResponse response)
         {
@@ -253,10 +199,11 @@ namespace StudioStudio_Server.Services
 
             var email = payload.Email;
             var googleId = payload.Subject;
-            var fullName = payload.GivenName + " " + payload.FamilyName;
-            var imgURL = payload.Picture;
+            var fullName = $"{payload.GivenName} {payload.FamilyName}";
+            var avatarUrl = payload.Picture;
 
             var user = await _userRepository.GetByEmailAsync(email);
+
             if (user == null)
             {
                 user = new User
@@ -265,8 +212,10 @@ namespace StudioStudio_Server.Services
                     Email = email,
                     GoogleId = googleId,
                     FullName = fullName,
-                    AvatarUrl = imgURL,
+                    AvatarUrl = avatarUrl,
                     Status = UserStatus.Active,
+                    CreatedAt = DateTime.UtcNow,
+                    UpdatedAt = DateTime.UtcNow
                 };
 
                 await _userRepository.AddAsync(user);
@@ -274,21 +223,25 @@ namespace StudioStudio_Server.Services
             else
             {
                 user.GoogleId ??= googleId;
-                user.FullName ??= fullName;
-                user.AvatarUrl ??= imgURL;
+                user.FullName = fullName;
+                user.AvatarUrl = avatarUrl;
                 user.Status = UserStatus.Active;
+                user.UpdatedAt = DateTime.UtcNow;
 
                 await _userRepository.UpdateAsync(user);
+
+                // REVOKE TẤT CẢ refresh token cũ
+                var activeTokens = await _refreshTokenRepository.GetActiveByUserIdAsync(user.UserId);
+                foreach (var t in activeTokens)
+                {
+                    await _refreshTokenRepository.RevokeAsync(t);
+                }
             }
 
-            if (user.RefreshToken != null)
-            {
-                await _refreshTokenRepository.RevokeAsync(user.RefreshToken);
-            }
-
+            // tạo token mới
             var accessToken = GenerateJWTToken(user);
-            var refreshToken = CreateRefreshToken(user);
 
+            var refreshToken = CreateRefreshToken(user);
             await _refreshTokenRepository.AddAsync(refreshToken);
 
             SetRefreshTokenCookie(response, refreshToken.Token);
@@ -296,39 +249,25 @@ namespace StudioStudio_Server.Services
             return accessToken;
         }
 
+
         public async Task SendResetPasswordLinkAsync(string email)
         {
-            if (!IsValidEmail(email))
-            {
-                throw new Exception("email not in right format");
-            }
-
             var user = await _userRepository.GetByEmailAsync(email);
-            if (user == null)
-            {
-                throw new Exception("this user does not exist in the system");
-            }
+            if (user == null) return; // tránh lộ user tồn tại
 
             var token = new EmailVerificationToken
             {
                 Id = Guid.NewGuid(),
                 UserId = user.UserId,
                 Token = Convert.ToBase64String(RandomNumberGenerator.GetBytes(64)),
-                CreatedAt = DateTime.UtcNow,
-                ExpiresAt = DateTime.UtcNow.AddMinutes(5),
-                IsUsed = false,
+                Type = EmailTokenType.ResetPassword,
+                ExpiresAt = DateTime.UtcNow.AddMinutes(5)
             };
 
             await _emailToken.AddAsync(token);
 
-            string resetURL = $"{_configuration["Frontend:ResetPassURL"]}?token={token.Token}";
-            string html = EmailTemplate.ResetPasswordEmail(resetURL);
-
-            await _emailService.SendLinkAsync(
-                user.Email,
-                "Reset your password",
-                html
-                );
+            var url = $"{_configuration["Frontend:ResetPassURL"]}?token={token.Token}";
+            await _emailService.SendLinkAsync(user.Email, "Reset password", EmailTemplate.ResetPasswordEmail(url));
         }
 
         private bool IsValidEmail(string email)

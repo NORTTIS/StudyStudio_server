@@ -25,65 +25,45 @@ namespace StudioStudio_Server.Controllers
             return Ok();
         }
 
-        [HttpPost("login")]
-        public async Task<IActionResult> Login([FromBody] LoginRequests loginRequest)
+        [HttpGet("verify-email")]
+        public async Task<IActionResult> VerifyEmail(string token)
         {
-            string token = await _authService.LoginAsync(loginRequest, Response);
-            return Ok(new
-            {
-                Token = token
-            });
+            await _authService.VerifyEmailAsync(token);
+            return Ok();
+        }
+
+        [HttpPost("login")]
+        public async Task<IActionResult> Login(LoginRequests request)
+        {
+            var token = await _authService.LoginAsync(request, Response);
+            return Ok(new { accessToken = token });
         }
 
         [HttpPost("refresh")]
         public async Task<IActionResult> Refresh()
         {
-            string? refreshToken = Request.Cookies["refreshToken"];
-
-            if (String.IsNullOrEmpty(refreshToken))
-            {
-                return Unauthorized("Missing refresh token");
-            }
-
-            var newAccessToken = await _authService.RefreshTokenAsync(refreshToken, Response);
-            return Ok(new
-            {
-                AccessToken = newAccessToken,
-            });
+            var refreshToken = Request.Cookies["refreshToken"];
+            var token = await _authService.RefreshTokenAsync(refreshToken!, Response);
+            return Ok(new { accessToken = token });
         }
 
         [HttpPost("logout")]
         public async Task<IActionResult> Logout()
         {
-            string? refreshToken = Request.Cookies["refreshToken"];
-            if (!String.IsNullOrEmpty(refreshToken))
-            {
-                await _authService.LogoutAsync(refreshToken, Response);
-            }
+            var refreshToken = Request.Cookies["refreshToken"];
+            await _authService.LogoutAsync(refreshToken!, Response);
             return Ok();
         }
 
-        [HttpPost("google")]
+        [HttpPost("google-login")]
         public async Task<IActionResult> GoogleLogin([FromBody] GoogleLoginRequest request)
         {
-            var result = await _authService.GoogleLoginAsync(request, Response);
-            return Ok(result);
-        }
+            var accessToken = await _authService.GoogleLoginAsync(request, Response);
 
-        [HttpPost("forgot")]
-        public async Task<IActionResult> ForgotPassword([FromBody] string email)
-        {
-            await _authService.SendResetPasswordLinkAsync(email);
-            return Ok();
-        }
-
-        [Authorize]
-        [HttpPost("reset")]
-        public async Task<IActionResult> ResetPassword()
-        {
-            var email = User.FindFirst(ClaimTypes.Email)?.Value;
-            await _authService.SendResetPasswordLinkAsync(email);
-            return Ok();
+            return Ok(new
+            {
+                accessToken
+            });
         }
     }
 }

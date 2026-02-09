@@ -7,5 +7,6 @@ namespace StudioStudio_Server.Repositories.Interfaces
         Task<RefreshToken?> GetValidAsync(string token);
         Task AddAsync(RefreshToken token);
         Task RevokeAsync(RefreshToken token);
+        Task<List<RefreshToken>> GetActiveByUserIdAsync(Guid userId);
     }
 }

@@ -29,7 +29,7 @@ namespace StudioStudio_Server.Data
         public DbSet<AIRequestLog> AIRequestLogs => Set<AIRequestLog>();
         public DbSet<ActivityLog> ActivityLogs => Set<ActivityLog>();
         public DbSet<Report> Reports => Set<Report>();
-        public DbSet<RefreshToken> RefreshToken => Set<RefreshToken>();
+        public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
         public DbSet<EmailVerificationToken> EmailVerificationTokens => Set<EmailVerificationToken>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -44,29 +44,33 @@ namespace StudioStudio_Server.Data
                 e.HasIndex(x => x.Email).IsUnique();
 
                 e.Property(x => x.Email).IsRequired();
-                e.Property(x => x.PasswordHash).IsRequired();
+                e.Property(x => x.PasswordHash).IsRequired(false);
                 e.Property(x => x.FullName).IsRequired();
-                e.HasOne(u => u.RefreshToken)
-                    .WithOne(r => r.User)
-                    .HasForeignKey<RefreshToken>(r => r.UserId)
-                    .OnDelete(DeleteBehavior.Cascade);
             });
 
-            //Refresh Token
+
+            //Refresh token
             modelBuilder.Entity<RefreshToken>(e =>
             {
                 e.HasKey(x => x.Id);
+
+                e.HasOne(x => x.User)
+                    .WithMany(u => u.RefreshTokens)
+                    .HasForeignKey(x => x.UserId)
+                    .OnDelete(DeleteBehavior.Cascade);
             });
 
-            //Email verify token
+            // EmailVerificationToken
             modelBuilder.Entity<EmailVerificationToken>(e =>
             {
                 e.HasKey(x => x.Id);
-                e.HasOne<User>()
-                    .WithMany()
-                    .HasForeignKey(r => r.UserId)
+
+                e.HasOne(x => x.User)
+                    .WithMany(u => u.EmailVerificationTokens)
+                    .HasForeignKey(x => x.UserId)
                     .OnDelete(DeleteBehavior.Cascade);
             });
+
 
             // STUDIO
             modelBuilder.Entity<Studio>(e =>

@@ -8,18 +8,21 @@ namespace StudioStudio_Server.Repositories
     public class RefreshTokenRepository : IRefreshTokenRepository
     {
         private readonly StudioDbContext _context;
+
         public RefreshTokenRepository(StudioDbContext context)
         {
             _context = context;
         }
+
         public async Task AddAsync(RefreshToken token)
         {
-            _context.RefreshToken.Add(token);
+            _context.RefreshTokens.Add(token);
             await _context.SaveChangesAsync();
         }
+
         public async Task<RefreshToken?> GetValidAsync(string token)
         {
-            return await _context.RefreshToken
+            return await _context.RefreshTokens
                 .Include(x => x.User)
                 .FirstOrDefaultAsync(x =>
                     x.Token == token &&
@@ -27,10 +30,21 @@ namespace StudioStudio_Server.Repositories
                     x.ExpiresAt > DateTime.UtcNow);
         }
 
+        public async Task<List<RefreshToken>> GetActiveByUserIdAsync(Guid userId)
+        {
+            return await _context.RefreshTokens
+                .Where(x => x.UserId == userId &&
+                            !x.IsRevoked &&
+                            x.ExpiresAt > DateTime.UtcNow)
+                .ToListAsync();
+        }
+
         public async Task RevokeAsync(RefreshToken token)
         {
             token.IsRevoked = true;
+            _context.RefreshTokens.Update(token);
             await _context.SaveChangesAsync();
         }
     }
+
 }
