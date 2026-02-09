@@ -107,7 +107,6 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseCors("WebAppPolicy");
-app.UseHttpsRedirection();
 
 app.UseAuthentication();
 app.UseAuthorization();
