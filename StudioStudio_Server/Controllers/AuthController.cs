@@ -1,7 +1,10 @@
-﻿using Microsoft.AspNetCore.Http;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Identity.Data;
 using Microsoft.AspNetCore.Mvc;
 using StudioStudio_Server.Models.DTOs;
 using StudioStudio_Server.Services.Interfaces;
+using System.Security.Claims;
 
 namespace StudioStudio_Server.Controllers
 {
@@ -65,6 +68,22 @@ namespace StudioStudio_Server.Controllers
         {
             var result = await _authService.GoogleLoginAsync(request, Response);
             return Ok(result);
+        }
+
+        [HttpPost("forgot")]
+        public async Task<IActionResult> ForgotPassword([FromBody] string email)
+        {
+            await _authService.SendResetPasswordLinkAsync(email);
+            return Ok();
+        }
+
+        [Authorize]
+        [HttpPost("reset")]
+        public async Task<IActionResult> ResetPassword()
+        {
+            var email = User.FindFirst(ClaimTypes.Email)?.Value;
+            await _authService.SendResetPasswordLinkAsync(email);
+            return Ok();
         }
     }
 }

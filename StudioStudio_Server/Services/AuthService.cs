@@ -21,7 +21,7 @@ namespace StudioStudio_Server.Services
     public class AuthService : IAuthService
     {
         private readonly Regex EmailRegex = new(@"^[^@\s]+@[^@\s]+\.[^@\s]+$", RegexOptions.Compiled);
-        private readonly Regex PasswordRegex = new(@"^(?=.*[A-Z])(?=.*\\d)(?=.*[^A-Za-z\\d]).{8,}$", RegexOptions.Compiled);
+        private readonly Regex PasswordRegex = new(@"""^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,10}$", RegexOptions.Compiled);
 
         private readonly IUserRepository _userRepository;
         private readonly IRefreshTokenRepository _refreshTokenRepository;
@@ -85,6 +85,7 @@ namespace StudioStudio_Server.Services
 
             await _userRepository.AddAsync(registedUser);
 
+            //create eamil token for user to validate
             var emailToken = new EmailVerificationToken
             {
                 Id = Guid.NewGuid(),
@@ -96,13 +97,13 @@ namespace StudioStudio_Server.Services
             await _emailToken.AddAsync(emailToken);
 
             //Fe verify code url
-            string verifyUrl = $"http://3000/verify-email?token={emailToken.Token}";
+            string verifyUrl = $"{_configuration["Frontend:VerfyURL"]}?token={emailToken.Token}";
 
             string html = EmailTemplate.VerifyLinkEmail(verifyUrl);
 
             await _emailService.SendLinkAsync(
                 registedUser.Email,
-                "verify yor account",
+                "verify your account",
                 html
             );
         }
@@ -113,6 +114,10 @@ namespace StudioStudio_Server.Services
             if (verifyToken == null)
             {
                 throw new UnauthorizedAccessException("Invalid token");
+            }
+            if (verifyToken.User.Status == UserStatus.Active)
+            {
+                throw new Exception("Already verified");
             }
             verifyToken.User.Status = UserStatus.Active;
 
@@ -292,6 +297,42 @@ namespace StudioStudio_Server.Services
             SetRefreshTokenCookie(response, refreshToken.Token);
 
             return accessToken;
+        }
+
+        public async Task SendResetPasswordLinkAsync(string email)
+        {
+            if (!IsValidEmail(email))
+            {
+                throw new Exception("email not in right format");
+            }
+
+            var user = await _userRepository.GetByEmailAsync(email);
+            if (user == null)
+            {
+                throw new Exception("this user does not exist in the system");
+            }
+
+            var token = new EmailVerificationToken
+            {
+                Id = Guid.NewGuid(),
+                UserId = user.UserId,
+                Token = Convert.ToBase64String(RandomNumberGenerator.GetBytes(64)),
+                CreatedAt = DateTime.UtcNow,
+                ExpiresAt = DateTime.UtcNow.AddMinutes(5),
+                IsUsed = false,
+            };
+
+            await _emailToken.AddAsync(token);
+
+            string resetURL = $"{_configuration["Frontend:ResetPassURL"]}?token={token.Token}";
+            string html = EmailTemplate.ResetPasswordEmail(resetURL);
+
+            await _emailService.SendLinkAsync(
+                user.Email,
+                "Reset your password",
+                html
+                );
+
         }
 
         private bool IsValidEmail(string email)

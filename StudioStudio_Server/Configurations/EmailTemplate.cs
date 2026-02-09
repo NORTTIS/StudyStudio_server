@@ -1,4 +1,5 @@
-﻿namespace StudioStudio_Server.Configurations
+﻿
+namespace StudioStudio_Server.Configurations
 {
     public static class EmailTemplate
     {
@@ -16,6 +17,26 @@
                     text-decoration:none;
                     border-radius:5px'>
                 Verify Email
+                </a>
+                <p>This link will expire in 5 minutes.</p>
+            </body>
+            </html>";
+        }
+
+        public static string ResetPasswordEmail(string resetURL)
+        {
+            return $@"
+            <html>
+            <body style='font-family:Arial'>
+                <h2>Reset your password</h2>
+                <p>Click the button below to proceed reset your password:</p>
+                <a href='{resetURL}'
+                    style='padding:10px 20px;
+                    background:#4CAF50;
+                    color:white;
+                    text-decoration:none;
+                    border-radius:5px'>
+                Reset password
                 </a>
                 <p>This link will expire in 5 minutes.</p>
             </body>

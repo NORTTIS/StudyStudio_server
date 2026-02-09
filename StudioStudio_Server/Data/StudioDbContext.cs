@@ -50,10 +50,6 @@ namespace StudioStudio_Server.Data
                     .WithOne(r => r.User)
                     .HasForeignKey<RefreshToken>(r => r.UserId)
                     .OnDelete(DeleteBehavior.Cascade);
-                e.HasOne(u => u.EmailVerificationToken)
-                    .WithOne(e => e.User)
-                    .HasForeignKey<EmailVerificationToken>(e => e.UserId)
-                    .OnDelete(DeleteBehavior.Cascade);
             });
 
             //Refresh Token
@@ -66,6 +62,10 @@ namespace StudioStudio_Server.Data
             modelBuilder.Entity<EmailVerificationToken>(e =>
             {
                 e.HasKey(x => x.Id);
+                e.HasOne<User>()
+                    .WithMany()
+                    .HasForeignKey(r => r.UserId)
+                    .OnDelete(DeleteBehavior.Cascade);
             });
 
             // STUDIO
