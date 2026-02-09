@@ -55,8 +55,7 @@ namespace StudioStudio_Server.Controllers
             string? refreshToken = Request.Cookies["refreshToken"];
             if (!String.IsNullOrEmpty(refreshToken))
             {
-                await _authService.LogoutAsync(refreshToken);
-                Response.Cookies.Delete("refreshToken");
+                await _authService.LogoutAsync(refreshToken, Response);
             }
             return Ok();
         }

@@ -136,7 +136,7 @@ namespace StudioStudio_Server.Services
             {
                 HttpOnly = true,
                 Secure = true,
-                SameSite = SameSiteMode.Strict,
+                SameSite = SameSiteMode.None,
                 Expires = DateTime.UtcNow.AddDays(7)
             });
         }
@@ -163,13 +163,20 @@ namespace StudioStudio_Server.Services
 
             return newAccessToken;
         }
-        public async Task LogoutAsync(string refreshToken)
+        public async Task LogoutAsync(string refreshToken, HttpResponse response)
         {
             var token = await _refreshTokenRepository.GetValidAsync(refreshToken);
             if (token != null)
             {
                 await _refreshTokenRepository.RevokeAsync(token);
             }
+
+            response.Cookies.Delete("refreshToken", new CookieOptions
+            {
+                HttpOnly = true,
+                Secure = true,
+                SameSite = SameSiteMode.None
+            });
         }
 
         public async Task<string> GoogleLoginAsync(GoogleLoginRequest request, HttpResponse response)
@@ -187,6 +194,7 @@ namespace StudioStudio_Server.Services
                     UserId = Guid.NewGuid(),
                     Email = email,
                     GoogleId = googleId,
+                    Status = UserStatus.Active,
                 };
 
                 await _userRepository.AddAsync(user);
