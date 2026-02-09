@@ -62,7 +62,8 @@ namespace StudioStudio_Server.Tests.Controllers
                 UserId = Guid.NewGuid(),
                 Email = "test@mail.com",
                 PasswordHash = "hash",
-                FullName = "Test",
+                FirstName = "Test",
+                LastName = "User",
                 Status = UserStatus.Active
             };
 
@@ -98,7 +99,8 @@ namespace StudioStudio_Server.Tests.Controllers
                 UserId = userId,
                 Email = "test@mail.com",
                 PasswordHash = "hash",
-                FullName = "Test",
+                FirstName = "Test",
+                LastName = "User",
                 Status = UserStatus.Active
             });
 
@@ -143,7 +145,8 @@ namespace StudioStudio_Server.Tests.Controllers
                 UserId = userId,
                 Email = "test@mail.com",
                 PasswordHash = "hash",
-                FullName = "Test",
+                FirstName = "Test",
+                LastName = "User",
                 Status = UserStatus.Active
             });
 
