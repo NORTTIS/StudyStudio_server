@@ -8,8 +8,8 @@ namespace StudioStudio_Server.Configurations
             return $@"
             <html>
             <body style='font-family:Arial'>
-                <h2>Verify your account</h2>
-                <p>Click the button below to activate your account:</p>
+                <h2>Xác thực tài khoản của bạn</h2>
+                <p>Nhấn vào link dưới </p>
                 <a href='{verifyUrl}'
                     style='padding:10px 20px;
                     background:#4CAF50;

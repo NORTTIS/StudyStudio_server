@@ -1,0 +1,48 @@
+version: "3.9"
+
+services:
+  api:
+    image: norttis/studiostudio-server:latest
+    container_name: studiostudio_api
+    command: >
+      dotnet ef database update
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: http://+:8080
+
+      # Connection string cho EF Core
+      ConnectionStrings__DefaultConnection: |
+        Host=postgres;
+        Port=5432;
+        Database=study_studio;
+        Username=postgres;
+        Password=12345678
+    depends_on:
+      - postgres
+    networks:
+      - studiostudio_net
+
+  postgres:
+    image: postgres:17
+    container_name: studiostudio_postgres
+    restart: unless-stopped
+    ports:
+      - "5432:5432" # có thể bỏ nếu không cần connect từ ngoài
+    environment:
+      POSTGRES_DB: study_studio
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 12345678
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - studiostudio_net
+
+volumes:
+  postgres_data:
+
+networks:
+  studiostudio_net:
+    driver: bridge

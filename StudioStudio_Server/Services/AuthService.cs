@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Newtonsoft.Json.Linq;
 using StudioStudio_Server.Configurations;
+using StudioStudio_Server.Exceptions;
 using StudioStudio_Server.Models.DTOs;
 using StudioStudio_Server.Models.Entities;
 using StudioStudio_Server.Repositories.Interfaces;
@@ -46,14 +47,9 @@ namespace StudioStudio_Server.Services
         }
         public async Task RegisterAsync(Models.DTOs.RegisterRequest registerRequest)
         {
-            if (!IsValidEmail(registerRequest.Email))
+            if (!IsValidEmail(registerRequest.Email) || !IsValidPass(registerRequest.Password))
             {
-                throw new Exception("This email address does not in right format");
-            }
-
-            if (!IsValidPass(registerRequest.Password))
-            {
-                throw new Exception("Password need to have at least 8 letters, 1 uppercase, 1 special character");
+                throw new AppException(ErrorCodes.AuthInvalidCredential, StatusCodes.Status401Unauthorized);
             }
 
             //check if user email have used or not
@@ -62,12 +58,12 @@ namespace StudioStudio_Server.Services
             //if email used, throw exception
             if (existUser != null)
             {
-                throw new Exception("This email address has already been registered");
+                throw new AppException(ErrorCodes.AuthInvalidCredential, StatusCodes.Status401Unauthorized);
             }
 
             if (registerRequest.Password != registerRequest.ConfirmPassword)
             {
-                throw new Exception("Password and confirmation password do not match");
+                throw new AppException(ErrorCodes.AuthInvalidCredential, StatusCodes.Status401Unauthorized);
             }
 
             //else create new user
@@ -103,7 +99,7 @@ namespace StudioStudio_Server.Services
 
             await _emailService.SendLinkAsync(
                 registedUser.Email,
-                "verify your account",
+                "Xác thực tài khoản của bạn",
                 html
             );
         }
@@ -252,6 +248,7 @@ namespace StudioStudio_Server.Services
             {
                 Audience = new[] { _configuration["Google:ClientId"] }
             };
+
             var payload = await GoogleJsonWebSignature.ValidateAsync(request.IdToken, settings);
 
             var email = payload.Email;
@@ -332,7 +329,6 @@ namespace StudioStudio_Server.Services
                 "Reset your password",
                 html
                 );
-
         }
 
         private bool IsValidEmail(string email)

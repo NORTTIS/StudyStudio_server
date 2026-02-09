@@ -1,0 +1,13 @@
+{
+  "AUTH001": "Invalid email or password",
+  "AUTH002": "Token has expired",
+  "AUTH003": "You do not have permission",
+
+  "USER001": "User not found",
+  "USER002": "User already exist",
+
+  "TASK001": "Task not found",
+  "TASK002": "You are not allowed to access this task",
+
+  "SYS001": "Unexpected system error"
+}

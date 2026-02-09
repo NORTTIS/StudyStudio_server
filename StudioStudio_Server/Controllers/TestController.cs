@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using StudioStudio_Server.Data;
+using StudioStudio_Server.Exceptions;
 using StudioStudio_Server.Models.Entities;
 
 namespace StudioStudio_Server.Controllers
