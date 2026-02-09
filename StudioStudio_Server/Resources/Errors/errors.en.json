@@ -2,12 +2,23 @@
   "AUTH001": "Invalid email or password",
   "AUTH002": "Token has expired",
   "AUTH003": "You do not have permission",
+  "AUTH004": "Password confirmation does not match",
+  "AUTH005": "Account not verified. Please check your email",
 
   "USER001": "User not found",
-  "USER002": "User already exist",
+  "USER002": "User already exists",
+
+  "REPORT001": "Report data is invalid",
+  "REPORT002": "Report email is not configured",
 
   "TASK001": "Task not found",
   "TASK002": "You are not allowed to access this task",
+
+  "SUCCESS001": "Registration successful. Please check your email to verify your account",
+  "SUCCESS002": "Login successful",
+  "SUCCESS003": "Logout successful",
+  "SUCCESS004": "Token refreshed successfully",
+  "SUCCESS005": "Report sent successfully",
 
   "SYS001": "Unexpected system error"
 }

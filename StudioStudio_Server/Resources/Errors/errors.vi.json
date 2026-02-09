@@ -2,11 +2,23 @@
   "AUTH001": "Email hoặc mật khẩu không đúng",
   "AUTH002": "Phiên đăng nhập đã hết hạn",
   "AUTH003": "Bạn không có quyền truy cập",
+  "AUTH004": "Xác nhận mật khẩu không khớp",
+  "AUTH005": "Tài khoản chưa được xác thực. Vui lòng kiểm tra email",
 
   "USER001": "Không tìm thấy người dùng",
+  "USER002": "Email đã được sử dụng",
+
+  "REPORT001": "Dữ liệu báo cáo không hợp lệ",
+  "REPORT002": "Chưa cấu hình email nhận báo cáo",
 
   "TASK001": "Không tìm thấy công việc",
   "TASK002": "Bạn không có quyền truy cập công việc này",
+
+  "SUCCESS001": "Đăng ký thành công. Vui lòng kiểm tra email để xác thực tài khoản",
+  "SUCCESS002": "Đăng nhập thành công",
+  "SUCCESS003": "Đăng xuất thành công",
+  "SUCCESS004": "Làm mới token thành công",
+  "SUCCESS005": "Gửi báo cáo thành công",
 
   "SYS001": "Lỗi hệ thống không xác định"
 }
