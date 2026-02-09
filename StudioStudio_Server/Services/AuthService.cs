@@ -6,7 +6,7 @@ using Microsoft.IdentityModel.Tokens;
 using Newtonsoft.Json.Linq;
 using StudioStudio_Server.Configurations;
 using StudioStudio_Server.Exceptions;
-using StudioStudio_Server.Models.DTOs;
+using StudioStudio_Server.Models.DTOs.Request;
 using StudioStudio_Server.Models.Entities;
 using StudioStudio_Server.Repositories.Interfaces;
 using StudioStudio_Server.Services.Interfaces;
@@ -22,7 +22,7 @@ namespace StudioStudio_Server.Services
     public class AuthService : IAuthService
     {
         private readonly Regex EmailRegex = new(@"^[^@\s]+@[^@\s]+\.[^@\s]+$", RegexOptions.Compiled);
-        private readonly Regex PasswordRegex = new(@"""^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,10}$", RegexOptions.Compiled);
+        private readonly Regex PasswordRegex = new(@"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)[A-Za-z\d@$!%*?&]{8,10}$", RegexOptions.Compiled);
 
         private readonly IUserRepository _userRepository;
         private readonly IRefreshTokenRepository _refreshTokenRepository;
@@ -45,7 +45,7 @@ namespace StudioStudio_Server.Services
             _emailService = emailService;
             _emailToken = emailToken;
         }
-        public async Task RegisterAsync(Models.DTOs.RegisterRequest registerRequest)
+        public async Task RegisterAsync(RegisterRequests registerRequest)
         {
             if (!IsValidEmail(registerRequest.Email) || !IsValidPass(registerRequest.Password))
             {
@@ -120,7 +120,7 @@ namespace StudioStudio_Server.Services
             await _emailToken.MaskAsUsed(verifyToken);
         }
 
-        public async Task<string> LoginAsync(Models.DTOs.LoginRequest loginRequest, HttpResponse response)
+        public async Task<string> LoginAsync(LoginRequests loginRequest, HttpResponse response)
         {
             if (!IsValidEmail(loginRequest.Email))
             {

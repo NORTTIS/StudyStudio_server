@@ -2,7 +2,7 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity.Data;
 using Microsoft.AspNetCore.Mvc;
-using StudioStudio_Server.Models.DTOs;
+using StudioStudio_Server.Models.DTOs.Request;
 using StudioStudio_Server.Services.Interfaces;
 using System.Security.Claims;
 
@@ -19,14 +19,14 @@ namespace StudioStudio_Server.Controllers
         }
 
         [HttpPost("register")]
-        public async Task<IActionResult> Register(RegisterRequest request)
+        public async Task<IActionResult> Register(RegisterRequests request)
         {
             await _authService.RegisterAsync(request);
             return Ok();
         }
 
         [HttpPost("login")]
-        public async Task<IActionResult> Login([FromBody] LoginRequest loginRequest)
+        public async Task<IActionResult> Login([FromBody] LoginRequests loginRequest)
         {
             string token = await _authService.LoginAsync(loginRequest, Response);
             return Ok(new

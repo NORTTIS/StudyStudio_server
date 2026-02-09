@@ -1,4 +1,4 @@
-﻿namespace StudioStudio_Server.Models.DTOs
+﻿namespace StudioStudio_Server.Models.DTOs.Request
 {
     public class GoogleLoginRequest
     {
