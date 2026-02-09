@@ -29,6 +29,8 @@ namespace StudioStudio_Server.Data
         public DbSet<AIRequestLog> AIRequestLogs => Set<AIRequestLog>();
         public DbSet<ActivityLog> ActivityLogs => Set<ActivityLog>();
         public DbSet<Report> Reports => Set<Report>();
+        public DbSet<RefreshToken> RefreshToken => Set<RefreshToken>();
+        public DbSet<EmailVerificationToken> EmailVerificationTokens => Set<EmailVerificationToken>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -44,6 +46,26 @@ namespace StudioStudio_Server.Data
                 e.Property(x => x.Email).IsRequired();
                 e.Property(x => x.PasswordHash).IsRequired();
                 e.Property(x => x.FullName).IsRequired();
+                e.HasOne(u => u.RefreshToken)
+                    .WithOne(r => r.User)
+                    .HasForeignKey<RefreshToken>(r => r.UserId)
+                    .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            //Refresh Token
+            modelBuilder.Entity<RefreshToken>(e =>
+            {
+                e.HasKey(x => x.Id);
+            });
+
+            //Email verify token
+            modelBuilder.Entity<EmailVerificationToken>(e =>
+            {
+                e.HasKey(x => x.Id);
+                e.HasOne<User>()
+                    .WithMany()
+                    .HasForeignKey(r => r.UserId)
+                    .OnDelete(DeleteBehavior.Cascade);
             });
 
             // STUDIO

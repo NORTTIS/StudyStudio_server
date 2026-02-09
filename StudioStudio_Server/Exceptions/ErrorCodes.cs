@@ -9,6 +9,7 @@
 
         // USER
         public const string UserNotFound = "USER001";
+        public const string UserAlreadyExist = "USER002";
 
         // TASK
         public const string TaskNotFound = "TASK001";
