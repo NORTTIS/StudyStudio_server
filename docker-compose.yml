@@ -1,11 +1,9 @@
-version: "3.9"
-
 services:
   api:
     image: norttis/studiostudio-server:latest
     container_name: studiostudio_api
-    command: >
-      dotnet ef database update
+    env_file:
+      - docker.env
     restart: unless-stopped
     ports:
       - "8080:8080"
@@ -30,7 +28,7 @@ services:
     container_name: studiostudio_postgres
     restart: unless-stopped
     ports:
-      - "5432:5432" # có thể bỏ nếu không cần connect từ ngoài
+      - "5432:5432" 
     environment:
       POSTGRES_DB: study_studio
       POSTGRES_USER: postgres
