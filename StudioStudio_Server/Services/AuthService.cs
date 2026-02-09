@@ -7,6 +7,7 @@ using Newtonsoft.Json.Linq;
 using StudioStudio_Server.Configurations;
 using StudioStudio_Server.Exceptions;
 using StudioStudio_Server.Models.DTOs.Request;
+using StudioStudio_Server.Models.DTOs.Response;
 using StudioStudio_Server.Models.Entities;
 using StudioStudio_Server.Repositories.Interfaces;
 using StudioStudio_Server.Services.Interfaces;
@@ -22,6 +23,7 @@ namespace StudioStudio_Server.Services
     public class AuthService : IAuthService
     {
         private readonly Regex EmailRegex = new(@"^[^@\s]+@[^@\s]+\.[^@\s]+$", RegexOptions.Compiled);
+        // Password must be 8-10 characters long, contain at least one uppercase letter, one lowercase letter, and one digit
         private readonly Regex PasswordRegex = new(@"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)[A-Za-z\d@$!%*?&]{8,10}$", RegexOptions.Compiled);
 
         private readonly IUserRepository _userRepository;
@@ -49,7 +51,8 @@ namespace StudioStudio_Server.Services
         {
             if (!IsValidEmail(registerRequest.Email) || !IsValidPass(registerRequest.Password))
             {
-                throw new AppException(ErrorCodes.AuthInvalidCredential, StatusCodes.Status401Unauthorized);
+                Console.WriteLine("Invalid email or password format");
+                throw new AppException(ErrorCodes.AuthInvalidCredential, StatusCodes.Status400BadRequest);
             }
 
             //check if user email have used or not
@@ -58,12 +61,12 @@ namespace StudioStudio_Server.Services
             //if email used, throw exception
             if (existUser != null)
             {
-                throw new AppException(ErrorCodes.AuthInvalidCredential, StatusCodes.Status401Unauthorized);
+                throw new AppException(ErrorCodes.UserAlreadyExist, StatusCodes.Status400BadRequest);
             }
 
             if (registerRequest.Password != registerRequest.ConfirmPassword)
             {
-                throw new AppException(ErrorCodes.AuthInvalidCredential, StatusCodes.Status401Unauthorized);
+                throw new AppException(ErrorCodes.AuthInvalidCredential, StatusCodes.Status400BadRequest);
             }
 
             //else create new user
@@ -71,7 +74,8 @@ namespace StudioStudio_Server.Services
             {
                 UserId = Guid.NewGuid(),
                 Email = registerRequest.Email,
-                FullName = registerRequest.FirstName + " " + registerRequest.LastName,
+                FirstName = registerRequest.FirstName,
+                LastName = registerRequest.LastName,
                 Status = UserStatus.Inactive
             };
 
@@ -93,7 +97,7 @@ namespace StudioStudio_Server.Services
             await _emailToken.AddAsync(emailToken);
 
             //Fe verify code url
-            string verifyUrl = $"{_configuration["Frontend:VerfyURL"]}?token={emailToken.Token}";
+            string verifyUrl = $"{_configuration["Frontend:VerifyURL"]}?token={emailToken.Token}";
 
             string html = EmailTemplate.VerifyLinkEmail(verifyUrl);
 
@@ -120,11 +124,11 @@ namespace StudioStudio_Server.Services
             await _emailToken.MaskAsUsed(verifyToken);
         }
 
-        public async Task<string> LoginAsync(LoginRequests loginRequest, HttpResponse response)
+        public async Task<LoginResponse> LoginAsync(LoginRequests loginRequest, HttpResponse response)
         {
             if (!IsValidEmail(loginRequest.Email))
             {
-                throw new Exception("Invalid email or password");
+                throw new AppException(ErrorCodes.AuthInvalidCredential, StatusCodes.Status401Unauthorized);
             }
 
             //find user and check if user exist or not
@@ -132,7 +136,12 @@ namespace StudioStudio_Server.Services
 
             if (user == null)
             {
-                throw new Exception("Invalid email or password");
+                throw new AppException(ErrorCodes.AuthInvalidCredential, StatusCodes.Status401Unauthorized);
+            }
+
+            if (user.Status == UserStatus.Inactive)
+            {
+                throw new AppException(ErrorCodes.AuthAccountNotVerified, StatusCodes.Status403Forbidden);
             }
 
             //check user password has match
@@ -140,27 +149,42 @@ namespace StudioStudio_Server.Services
 
             if (result != PasswordVerificationResult.Success)
             {
-                throw new Exception("Invalid email or password");
+                throw new AppException(ErrorCodes.AuthInvalidCredential, StatusCodes.Status401Unauthorized);
             }
 
-            //get access token by JWT
-            string accessToken = GenerateJWTToken(user);
+            var accessTokenExpireMs = _configuration.GetValue<long>("JWT:AccessTokenExpireMs", 3600000);
+            var refreshTokenExpireMs = _configuration.GetValue<long>("JWT:RefreshTokenExpireMs", 86400000);
+
+            var accessExpireAt = DateTime.UtcNow.AddMilliseconds(accessTokenExpireMs);
+            var refreshExpireAt = DateTime.UtcNow.AddMilliseconds(refreshTokenExpireMs);
+
+            string accessToken = GenerateJWTToken(user, accessExpireAt);
 
             //create new refresh token each time user login
             if (user.RefreshToken != null)
             {
-                user.RefreshToken.IsRevoked = true;
+                await _refreshTokenRepository.RevokeAsync(user.RefreshToken);
             }
 
-            RefreshToken refreshToken = CreateRefreshToken(user);
+            RefreshToken refreshToken = CreateRefreshToken(user, refreshExpireAt);
             await _refreshTokenRepository.AddAsync(refreshToken);
 
-            SetRefreshTokenCookie(response, refreshToken.Token);
+            SetRefreshTokenCookie(response, refreshToken.Token, refreshExpireAt);
 
-            return accessToken;
+            return new LoginResponse
+            {
+                Id = user.UserId,
+                Email = user.Email,
+                FirstName = user.FirstName,
+                LastName = user.LastName,
+                AccessToken = accessToken,
+                AccessExpireIn = accessTokenExpireMs,
+                RefreshToken = refreshToken.Token,
+                RefreshExpireIn = refreshTokenExpireMs
+            };
         }
 
-        private string GenerateJWTToken(User user)
+        private string GenerateJWTToken(User user, DateTime expireAt)
         {
             var claims = new[]
             {
@@ -176,56 +200,73 @@ namespace StudioStudio_Server.Services
                 issuer: _configuration["JWT:Issuer"],
                 audience: _configuration["JWT:Audience"],
                 claims: claims,
-                expires: DateTime.UtcNow.AddMinutes(30),
+                expires: expireAt,
                 signingCredentials: creds);
 
             return new JwtSecurityTokenHandler().WriteToken(token);
         }
 
-        private RefreshToken CreateRefreshToken(User user)
+        private RefreshToken CreateRefreshToken(User user, DateTime expireAt)
         {
             return new RefreshToken
             {
                 Id = Guid.NewGuid(),
                 Token = Convert.ToBase64String(RandomNumberGenerator.GetBytes(64)),
-                ExpiresAt = DateTime.UtcNow.AddDays(7),
+                ExpiresAt = expireAt,
                 UserId = user.UserId
             };
         }
 
-        private void SetRefreshTokenCookie(HttpResponse response, string token)
+        private void SetRefreshTokenCookie(HttpResponse response, string token, DateTime expireAt)
         {
             response.Cookies.Append("refreshToken", token, new CookieOptions
             {
                 HttpOnly = true,
                 Secure = true,
                 SameSite = SameSiteMode.None,
-                Expires = DateTime.UtcNow.AddDays(7)
+                Expires = expireAt
             });
         }
 
-        public async Task<string> RefreshTokenAsync(string refreshToken, HttpResponse response)
+        public async Task<LoginResponse> RefreshTokenAsync(string refreshToken, HttpResponse response)
         {
             var token = await _refreshTokenRepository.GetValidAsync(refreshToken);
 
             if (token == null || token.IsRevoked || token.ExpiresAt < DateTime.UtcNow)
-                throw new UnauthorizedAccessException("Invalid refresh token");
+                throw new AppException(ErrorCodes.AuthTokenExpired, StatusCodes.Status401Unauthorized);
 
             await _refreshTokenRepository.RevokeAsync(token);
 
             var user = await _userRepository.GetByIdAsync(token.UserId);
             if (user == null)
-                throw new UnauthorizedAccessException("User not found");
+                throw new AppException(ErrorCodes.UserNotFound, StatusCodes.Status404NotFound);
 
-            var newRefreshToken = CreateRefreshToken(user);
+            var accessTokenExpireMs = _configuration.GetValue<long>("JWT:AccessTokenExpireMs", 3600000);
+            var refreshTokenExpireMs = _configuration.GetValue<long>("JWT:RefreshTokenExpireMs", 86400000);
+
+            var accessExpireAt = DateTime.UtcNow.AddMilliseconds(accessTokenExpireMs);
+            var refreshExpireAt = DateTime.UtcNow.AddMilliseconds(refreshTokenExpireMs);
+
+            var newRefreshToken = CreateRefreshToken(user, refreshExpireAt);
             await _refreshTokenRepository.AddAsync(newRefreshToken);
 
-            var newAccessToken = GenerateJWTToken(user);
+            var newAccessToken = GenerateJWTToken(user, accessExpireAt);
 
-            SetRefreshTokenCookie(response, newRefreshToken.Token);
+            SetRefreshTokenCookie(response, newRefreshToken.Token, refreshExpireAt);
 
-            return newAccessToken;
+            return new LoginResponse
+            {
+                Id = user.UserId,
+                Email = user.Email,
+                FirstName = user.FirstName,
+                LastName = user.LastName,
+                AccessToken = newAccessToken,
+                AccessExpireIn = accessTokenExpireMs,
+                RefreshToken = newRefreshToken.Token,
+                RefreshExpireIn = refreshTokenExpireMs
+            };
         }
+
         public async Task LogoutAsync(string refreshToken, HttpResponse response)
         {
             var token = await _refreshTokenRepository.GetValidAsync(refreshToken);
@@ -242,7 +283,7 @@ namespace StudioStudio_Server.Services
             });
         }
 
-        public async Task<string> GoogleLoginAsync(GoogleLoginRequest request, HttpResponse response)
+        public async Task<LoginResponse> GoogleLoginAsync(GoogleLoginRequest request, HttpResponse response)
         {
             var settings = new GoogleJsonWebSignature.ValidationSettings
             {
@@ -253,7 +294,8 @@ namespace StudioStudio_Server.Services
 
             var email = payload.Email;
             var googleId = payload.Subject;
-            var fullName = payload.GivenName + " " + payload.FamilyName;
+            var firstName = payload.GivenName;
+            var lastName = payload.FamilyName;
             var imgURL = payload.Picture;
 
             var user = await _userRepository.GetByEmailAsync(email);
@@ -264,7 +306,8 @@ namespace StudioStudio_Server.Services
                     UserId = Guid.NewGuid(),
                     Email = email,
                     GoogleId = googleId,
-                    FullName = fullName,
+                    FirstName = firstName,
+                    LastName = lastName,
                     AvatarUrl = imgURL,
                     Status = UserStatus.Active,
                 };
@@ -274,7 +317,8 @@ namespace StudioStudio_Server.Services
             else
             {
                 user.GoogleId ??= googleId;
-                user.FullName ??= fullName;
+                user.FirstName ??= firstName;
+                user.LastName ??= lastName;
                 user.AvatarUrl ??= imgURL;
                 user.Status = UserStatus.Active;
 
@@ -286,27 +330,43 @@ namespace StudioStudio_Server.Services
                 await _refreshTokenRepository.RevokeAsync(user.RefreshToken);
             }
 
-            var accessToken = GenerateJWTToken(user);
-            var refreshToken = CreateRefreshToken(user);
+            var accessTokenExpireMs = _configuration.GetValue<long>("JWT:AccessTokenExpireMs", 3600000);
+            var refreshTokenExpireMs = _configuration.GetValue<long>("JWT:RefreshTokenExpireMs", 86400000);
+
+            var accessExpireAt = DateTime.UtcNow.AddMilliseconds(accessTokenExpireMs);
+            var refreshExpireAt = DateTime.UtcNow.AddMilliseconds(refreshTokenExpireMs);
+
+            var accessToken = GenerateJWTToken(user, accessExpireAt);
+            var refreshToken = CreateRefreshToken(user, refreshExpireAt);
 
             await _refreshTokenRepository.AddAsync(refreshToken);
 
-            SetRefreshTokenCookie(response, refreshToken.Token);
+            SetRefreshTokenCookie(response, refreshToken.Token, refreshExpireAt);
 
-            return accessToken;
+            return new LoginResponse
+            {
+                Id = user.UserId,
+                Email = user.Email,
+                FirstName = user.FirstName,
+                LastName = user.LastName,
+                AccessToken = accessToken,
+                AccessExpireIn = accessTokenExpireMs,
+                RefreshToken = refreshToken.Token,
+                RefreshExpireIn = refreshTokenExpireMs
+            };
         }
 
         public async Task SendResetPasswordLinkAsync(string email)
         {
             if (!IsValidEmail(email))
             {
-                throw new Exception("email not in right format");
+                throw new AppException(ErrorCodes.AuthInvalidCredential, StatusCodes.Status400BadRequest);
             }
 
             var user = await _userRepository.GetByEmailAsync(email);
             if (user == null)
             {
-                throw new Exception("this user does not exist in the system");
+                throw new AppException(ErrorCodes.UserNotFound, StatusCodes.Status404NotFound);
             }
 
             var token = new EmailVerificationToken
@@ -328,7 +388,7 @@ namespace StudioStudio_Server.Services
                 user.Email,
                 "Reset your password",
                 html
-                );
+            );
         }
 
         private bool IsValidEmail(string email)

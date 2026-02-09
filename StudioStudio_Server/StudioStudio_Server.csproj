@@ -30,7 +30,6 @@
     <Folder Include="Middlewares\" />
     <Folder Include="Repositories\" />
     <Folder Include="Configurations\" />
-    <Folder Include="Services\Interfaces\" />
   </ItemGroup>
 
   <ItemGroup>
