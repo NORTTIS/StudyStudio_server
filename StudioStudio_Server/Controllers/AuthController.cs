@@ -40,12 +40,19 @@ namespace StudioStudio_Server.Controllers
         }
 
         [HttpPost("refresh")]
-        public async Task<IActionResult> Refresh()
+        public async Task<IActionResult> RefreshToken()
         {
-            var refreshToken = Request.Cookies["refreshToken"];
-            var token = await _authService.RefreshTokenAsync(refreshToken!, Response);
-            return Ok(new { accessToken = token });
+            if (!Request.Cookies.TryGetValue("refreshToken", out var refreshToken)
+                || string.IsNullOrWhiteSpace(refreshToken))
+            {
+                return Unauthorized(new { message = "Refresh token not found" });
+            }
+
+            var accessToken = await _authService.RefreshTokenAsync(refreshToken, Response);
+
+            return Ok(new { accessToken });
         }
+
 
         [HttpPost("logout")]
         public async Task<IActionResult> Logout()
