@@ -10,6 +10,9 @@ using StudioStudio_Server.Repositories.Interfaces;
 using StudioStudio_Server.Services;
 using StudioStudio_Server.Services.Interfaces;
 using System.Text;
+using Microsoft.AspNetCore.Http.Features;
+using Microsoft.AspNetCore.Mvc;
+using StudioStudio_Server.Filters;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -27,7 +30,22 @@ builder.Services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
 builder.Services.AddScoped<IPasswordHasher<User>, PasswordHasher<User>>();
 builder.Services.AddScoped<IEmailVerificationTokenRepository, EmailVerificationTokenRepository>();
 
-builder.Services.AddControllers();
+builder.Services.AddControllers(options =>
+    {
+        options.Filters.Add<ValidationFilter>();
+    })
+    .ConfigureApiBehaviorOptions(options =>
+    {
+        options.SuppressModelStateInvalidFilter = true;
+    });
+
+// Configure file upload
+builder.Services.Configure<FormOptions>(options =>
+{
+    options.ValueLengthLimit = int.MaxValue;
+    options.MultipartBodyLengthLimit = int.MaxValue; // 5GB
+    options.MultipartHeadersLengthLimit = int.MaxValue;
+});
 
 builder.Services.AddDbContext<StudioDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
@@ -92,19 +110,32 @@ builder.Services.AddSwaggerGen(s =>
 });
 var app = builder.Build();
 
-app.UseMiddleware<ExceptionHandlingMiddleware>();
+// Ensure upload directories exist
+var webRoot = app.Environment.WebRootPath ?? Path.Combine(Directory.GetCurrentDirectory(), "wwwroot");
+var uploadsPath = Path.Combine(webRoot, "uploads", "avatars");
+Directory.CreateDirectory(uploadsPath);
+
+// Log the path for debugging
+var logger = app.Services.GetRequiredService<ILogger<Program>>();
+logger.LogInformation($"WebRoot: {webRoot}");
+logger.LogInformation($"Uploads Path: {uploadsPath}");
+logger.LogInformation($"Directory exists: {Directory.Exists(uploadsPath)}");
 
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<StudioDbContext>();
     db.Database.Migrate();
 }
+
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI();
 }
+
+app.UseMiddleware<ExceptionHandlingMiddleware>();
+app.UseStaticFiles();
 
 app.UseCors("WebAppPolicy");
 

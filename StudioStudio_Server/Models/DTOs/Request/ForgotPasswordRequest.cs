@@ -1,15 +1,12 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 using StudioStudio_Server.Exceptions;
 
 namespace StudioStudio_Server.Models.DTOs.Request
 {
-    public class LoginRequests
+    public class ForgotPasswordRequest
     {
         [Required(ErrorMessage = ErrorCodes.ValidationRequiredField)]
         [EmailAddress(ErrorMessage = ErrorCodes.ValidationInvalidEmail)]
         public string Email { get; set; } = string.Empty;
-
-        [Required(ErrorMessage = ErrorCodes.ValidationRequiredField)]
-        public string Password { get; set; } = string.Empty;
     }
 }
