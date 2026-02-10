@@ -27,6 +27,7 @@
         public const string SuccessLogout = "SUCCESS003";
         public const string SuccessRefreshToken = "SUCCESS004";
         public const string SuccessReportSent = "SUCCESS005";
+        public const string SuccessVerifyEmail = "SUCCESS006";
 
         // COMMON
         public const string UnexpectedError = "SYS001";

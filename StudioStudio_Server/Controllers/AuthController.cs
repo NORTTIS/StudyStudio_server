@@ -29,6 +29,19 @@ namespace StudioStudio_Server.Controllers
             return Ok(ApiResponse<object>.Success(message));
         }
 
+        [HttpGet("verify-email")]
+        public async Task<IActionResult> VerifyEmail([FromQuery] string token)
+        {
+            if (string.IsNullOrEmpty(token))
+            {
+                throw new AppException(ErrorCodes.AuthInvalidCredential, StatusCodes.Status400BadRequest);
+            }
+
+            await _authService.VerifyEmailLinkAsync(token);
+            var message = _messageService.GetMessage(ErrorCodes.SuccessVerifyEmail);
+            return Ok(ApiResponse<object>.Success(message));
+        }
+
         [HttpPost("login")]
         public async Task<IActionResult> Login([FromBody] LoginRequests loginRequest)
         {

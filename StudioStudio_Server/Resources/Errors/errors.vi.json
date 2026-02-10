@@ -19,6 +19,7 @@
   "SUCCESS003": "Đăng xuất thành công",
   "SUCCESS004": "Làm mới token thành công",
   "SUCCESS005": "Gửi báo cáo thành công",
+  "SUCCESS006": "Xác thực email thành công",
 
   "SYS001": "Lỗi hệ thống không xác định"
 }

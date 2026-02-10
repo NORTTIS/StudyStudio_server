@@ -19,6 +19,7 @@
   "SUCCESS003": "Logout successful",
   "SUCCESS004": "Token refreshed successfully",
   "SUCCESS005": "Report sent successfully",
+  "SUCCESS006": "Email verified successfully",
 
   "SYS001": "Unexpected system error"
 }
