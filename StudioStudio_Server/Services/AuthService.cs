@@ -85,19 +85,21 @@ namespace StudioStudio_Server.Services
 
             await _userRepository.AddAsync(registedUser);
 
-            //create eamil token for user to validate
+            //create email token for user to validate
             var emailToken = new EmailVerificationToken
             {
                 Id = Guid.NewGuid(),
                 UserId = registedUser.UserId,
                 Token = Convert.ToBase64String(RandomNumberGenerator.GetBytes(64)),
+                CreatedAt = DateTime.UtcNow,
                 ExpiresAt = DateTime.UtcNow.AddMinutes(5),
+                IsUsed = false
             };
 
             await _emailToken.AddAsync(emailToken);
 
-            //Fe verify code url
-            string verifyUrl = $"{_configuration["Frontend:VerifyURL"]}?token={emailToken.Token}";
+            //Fe verify code url - URL encode token to handle special characters
+            string verifyUrl = $"{_configuration["Frontend:VerifyURL"]}?token={Uri.EscapeDataString(emailToken.Token)}";
 
             string html = EmailTemplate.VerifyLinkEmail(verifyUrl);
 
@@ -381,7 +383,7 @@ namespace StudioStudio_Server.Services
 
             await _emailToken.AddAsync(token);
 
-            string resetURL = $"{_configuration["Frontend:ResetPassURL"]}?token={token.Token}";
+            string resetURL = $"{_configuration["Frontend:ResetPassURL"]}?token={Uri.EscapeDataString(token.Token)}";
             string html = EmailTemplate.ResetPasswordEmail(resetURL);
 
             await _emailService.SendLinkAsync(

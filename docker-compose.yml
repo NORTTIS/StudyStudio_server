@@ -3,7 +3,7 @@ services:
     image: norttis/studiostudio-server:latest
     container_name: studiostudio_api
     env_file:
-      - docker.env
+      - .env.docker
     restart: unless-stopped
     ports:
       - "8080:8080"
