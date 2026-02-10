@@ -14,10 +14,6 @@ namespace StudioStudio_Server.Models.DTOs.Request
         public string Password { get; set; } = string.Empty;
 
         [Required(ErrorMessage = ErrorCodes.ValidationRequiredField)]
-        [Compare("Password", ErrorMessage = ErrorCodes.ValidationPasswordMismatch)]
-        public string ConfirmPassword { get; set; } = string.Empty;
-
-        [Required(ErrorMessage = ErrorCodes.ValidationRequiredField)]
         [StringLength(50, MinimumLength = 1, ErrorMessage = ErrorCodes.ValidationRequiredField)]
         public string FirstName { get; set; } = string.Empty;
 

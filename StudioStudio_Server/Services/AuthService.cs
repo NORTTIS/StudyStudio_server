@@ -23,6 +23,7 @@ namespace StudioStudio_Server.Services
     public class AuthService : IAuthService
     {
         private readonly Regex EmailRegex = new(@"^[^@\s]+@[^@\s]+\.[^@\s]+$", RegexOptions.Compiled);
+
         // Password must be 10-20 characters long, contain at least one uppercase letter, one lowercase letter, and one digit
         private readonly Regex PasswordRegex = new(@"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)[A-Za-z\d@$!%*?&]{10,20}$", RegexOptions.Compiled);
 
@@ -66,11 +67,6 @@ namespace StudioStudio_Server.Services
             if (existUser != null)
             {
                 throw new AppException(ErrorCodes.UserAlreadyExist, StatusCodes.Status400BadRequest);
-            }
-
-            if (registerRequest.Password != registerRequest.ConfirmPassword)
-            {
-                throw new AppException(ErrorCodes.ValidationPasswordMismatch, StatusCodes.Status400BadRequest);
             }
 
             //else create new user
@@ -129,7 +125,7 @@ namespace StudioStudio_Server.Services
 
             if (verifyToken.User.Status == UserStatus.Active)
             {
-                throw new AppException(ErrorCodes.ValidationEmailAlreadyVerified, StatusCodes.Status400BadRequest);
+                throw new AppException(ErrorCodes.UserAlreadyExist, StatusCodes.Status400BadRequest);
             }
             verifyToken.User.Status = UserStatus.Active;
 
