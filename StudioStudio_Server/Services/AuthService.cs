@@ -24,7 +24,7 @@ namespace StudioStudio_Server.Services
     {
         private readonly Regex EmailRegex = new(@"^[^@\s]+@[^@\s]+\.[^@\s]+$", RegexOptions.Compiled);
         // Password must be 8-10 characters long, contain at least one uppercase letter, one lowercase letter, and one digit
-        private readonly Regex PasswordRegex = new(@"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)[A-Za-z\d@$!%*?&]{8,10}$", RegexOptions.Compiled);
+        private readonly Regex PasswordRegex = new(@"^(?=.*?[A-Z])(?=.*?[a-z])(?=.*?[0-9])(?=.*?[#?!@$%^&*-]).{10,20}$", RegexOptions.Compiled);
 
         private readonly IUserRepository _userRepository;
         private readonly IRefreshTokenRepository _refreshTokenRepository;
