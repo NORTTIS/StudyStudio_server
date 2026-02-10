@@ -1,26 +1,16 @@
 ﻿namespace StudioStudio_Server.Models.DTOs.Response
 {
-    public class ApiResponse<T>
+    public class ApiResponse
     {
         public string Status { get; set; }
         public string Message { get; set; }
-        public T? Data { get; set; }
+        public object? Data { get; set; }
 
-        public ApiResponse(string status, string message, T? data = default)
+        public ApiResponse(string status, string message, object? data = null)
         {
             Status = status;
             Message = message;
             Data = data;
-        }
-
-        public static ApiResponse<T> Success(string message, T? data = default)
-        {
-            return new ApiResponse<T>("success", message, data);
-        }
-
-        public static ApiResponse<T> Error(string message)
-        {
-            return new ApiResponse<T>("error", message);
         }
     }
 }

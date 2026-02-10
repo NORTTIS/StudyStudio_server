@@ -31,7 +31,6 @@ namespace StudioStudio_Server.Data
         public DbSet<Report> Reports => Set<Report>();
         public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
         public DbSet<EmailVerificationToken> EmailVerificationTokens => Set<EmailVerificationToken>();
-        public DbSet<Announcement> Announcements => Set<Announcement>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -45,13 +44,8 @@ namespace StudioStudio_Server.Data
                 e.HasIndex(x => x.Email).IsUnique();
 
                 e.Property(x => x.Email).IsRequired();
-                e.Property(x => x.PasswordHash).IsRequired();
-                e.Property(x => x.FirstName).IsRequired();
-                e.Property(x => x.LastName).IsRequired();
-                e.HasOne(u => u.RefreshToken)
-                    .WithOne(r => r.User)
-                    .HasForeignKey<RefreshToken>(r => r.UserId)
-                    .OnDelete(DeleteBehavior.Cascade);
+                e.Property(x => x.PasswordHash).IsRequired(false);
+                e.Property(x => x.FullName).IsRequired();
             });
 
 
@@ -70,8 +64,9 @@ namespace StudioStudio_Server.Data
             modelBuilder.Entity<EmailVerificationToken>(e =>
             {
                 e.HasKey(x => x.Id);
+
                 e.HasOne(x => x.User)
-                    .WithMany(u => u.EmailVerificationToken)
+                    .WithMany(u => u.EmailVerificationTokens)
                     .HasForeignKey(x => x.UserId)
                     .OnDelete(DeleteBehavior.Cascade);
             });
@@ -242,11 +237,11 @@ namespace StudioStudio_Server.Data
             {
                 e.HasKey(x => x.SubscriptionId);
 
-                e.HasOne(x => x.User)
+                e.HasOne<User>()
                     .WithMany()
                     .HasForeignKey(x => x.UserId);
 
-                e.HasOne(x => x.Plan)
+                e.HasOne<SubscriptionPlan>()
                     .WithMany()
                     .HasForeignKey(x => x.PlanId);
             });
@@ -273,16 +268,6 @@ namespace StudioStudio_Server.Data
             modelBuilder.Entity<Report>(e =>
             {
                 e.HasKey(x => x.ReportId);
-            });
-
-            // ANNOUNCEMENT
-            modelBuilder.Entity<Announcement>(e =>
-            {
-                e.HasKey(x => x.AnnouncementId);
-                e.Property(x => x.Title).IsRequired();
-                e.Property(x => x.Content).IsRequired();
-                e.HasIndex(x => x.IsActive);
-                e.HasIndex(x => x.PublishedAt);
             });
         }
     }

@@ -3,14 +3,9 @@
     public class User
     {
         public Guid UserId { get; set; }
-
-        public string Email { get; set; } = null!;
-        public string? PasswordHash { get; set; } = null!;
-
-        public string FirstName { get; set; } = null!;
-        public string LastName { get; set; } = null!;
-        public string? PhoneNumber { get; set; }
-        public string? Bio { get; set; }
+        public string Email { get; set; }
+        public string? PasswordHash { get; set; }
+        public string FullName { get; set; }
         public string? AvatarUrl { get; set; }
         public UserStatus Status { get; set; }
         public bool IsAdmin { get; set; }

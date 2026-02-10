@@ -23,15 +23,15 @@ namespace StudioStudio_Server.Repositories
             return await _context.Users
                 .Include(u => u.RefreshTokens)
                 .FirstOrDefaultAsync(u =>
-                    u.Email == email &&
-                    u.Status == UserStatus.Active);
+                    u.Email.Equals(email) &&
+                    u.Status.Equals("Active"));
         }
 
         public async Task<User?> GetByIdAsync(Guid id)
         {
             return await _context.Users
-                .Include(u => u.RefreshToken)
-                .FirstOrDefaultAsync(u => u.UserId == id && u.Status == UserStatus.Active);
+                .Include(u => u.RefreshTokens)
+                .FirstOrDefaultAsync(u => u.UserId == id);
         }
 
         public async Task UpdateAsync(User user)
