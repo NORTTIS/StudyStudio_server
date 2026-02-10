@@ -9,6 +9,7 @@ using StudioStudio_Server.Exceptions;
 using StudioStudio_Server.Models.DTOs.Request;
 using StudioStudio_Server.Models.DTOs.Response;
 using StudioStudio_Server.Models.Entities;
+using StudioStudio_Server.Models.Enums;
 using StudioStudio_Server.Repositories.Interfaces;
 using StudioStudio_Server.Services.Interfaces;
 using System.IdentityModel.Tokens.Jwt;
@@ -47,7 +48,7 @@ namespace StudioStudio_Server.Services
             _emailService = emailService;
             _emailToken = emailToken;
         }
-        public async Task RegisterAsync(RegisterRequests registerRequest)
+        public async Task RegisterAsync(RegisterRequests request)
         {
             if (!IsValidEmail(registerRequest.Email) || !IsValidPass(registerRequest.Password))
             {
@@ -79,17 +80,15 @@ namespace StudioStudio_Server.Services
                 Status = UserStatus.Inactive
             };
 
-            //hashpassword using .net PasswordHasher
-            registedUser.PasswordHash = _passwordHasher.HashPassword(registedUser, registerRequest.Password);
-            registedUser.CreatedAt = DateTime.UtcNow;
+            user.PasswordHash = _passwordHasher.HashPassword(user, request.Password);
 
-            await _userRepository.AddAsync(registedUser);
+            await _userRepository.AddAsync(user);
 
             //create email token for user to validate
             var emailToken = new EmailVerificationToken
             {
                 Id = Guid.NewGuid(),
-                UserId = registedUser.UserId,
+                UserId = user.UserId,
                 Token = Convert.ToBase64String(RandomNumberGenerator.GetBytes(64)),
                 CreatedAt = DateTime.UtcNow,
                 ExpiresAt = DateTime.UtcNow.AddMinutes(5),
@@ -103,27 +102,21 @@ namespace StudioStudio_Server.Services
 
             string html = EmailTemplate.VerifyLinkEmail(verifyUrl);
 
-            await _emailService.SendLinkAsync(
-                registedUser.Email,
-                "Xác thực tài khoản của bạn",
-                html
-            );
+            var url = $"{_configuration["Frontend:VerifyURL"]}?token={token.Token}";
+            await _emailService.SendLinkAsync(user.Email, "Verify account", EmailTemplate.VerifyLinkEmail(url));
         }
 
-        public async Task VerifyEmailLinkAsync(string token)
-        {
-            var verifyToken = await _emailToken.GetValidAsync(token);
-            if (verifyToken == null)
-            {
-                throw new UnauthorizedAccessException("Invalid token");
-            }
-            if (verifyToken.User.Status == UserStatus.Active)
-            {
-                throw new Exception("Already verified");
-            }
-            verifyToken.User.Status = UserStatus.Active;
 
-            await _emailToken.MaskAsUsed(verifyToken);
+        public async Task VerifyEmailAsync(string token)
+        {
+            var verifyToken = await _emailToken.GetValidAsync(token, EmailTokenType.VerifyEmail);
+            if (verifyToken == null)
+                throw new UnauthorizedAccessException("Invalid token");
+
+            verifyToken.User.Status = UserStatus.Active;
+            verifyToken.User.UpdatedAt = DateTime.UtcNow;
+
+            await _emailToken.MarkAsUsedAsync(verifyToken);
         }
 
         public async Task<LoginResponse> LoginAsync(LoginRequests loginRequest, HttpResponse response)
@@ -146,8 +139,9 @@ namespace StudioStudio_Server.Services
                 throw new AppException(ErrorCodes.AuthAccountNotVerified, StatusCodes.Status403Forbidden);
             }
 
-            //check user password has match
-            var result = _passwordHasher.VerifyHashedPassword(user, user.PasswordHash, loginRequest.Password);
+            if (_passwordHasher.VerifyHashedPassword(user, user.PasswordHash!, request.Password)
+                != PasswordVerificationResult.Success)
+                throw new Exception("Invalid credentials");
 
             if (result != PasswordVerificationResult.Success)
             {
@@ -273,16 +267,9 @@ namespace StudioStudio_Server.Services
         {
             var token = await _refreshTokenRepository.GetValidAsync(refreshToken);
             if (token != null)
-            {
                 await _refreshTokenRepository.RevokeAsync(token);
-            }
 
-            response.Cookies.Delete("refreshToken", new CookieOptions
-            {
-                HttpOnly = true,
-                Secure = true,
-                SameSite = SameSiteMode.None
-            });
+            response.Cookies.Delete("refreshToken");
         }
 
         public async Task<LoginResponse> GoogleLoginAsync(GoogleLoginRequest request, HttpResponse response)
@@ -301,6 +288,7 @@ namespace StudioStudio_Server.Services
             var imgURL = payload.Picture;
 
             var user = await _userRepository.GetByEmailAsync(email);
+
             if (user == null)
             {
                 user = new User
@@ -312,6 +300,8 @@ namespace StudioStudio_Server.Services
                     LastName = lastName,
                     AvatarUrl = imgURL,
                     Status = UserStatus.Active,
+                    CreatedAt = DateTime.UtcNow,
+                    UpdatedAt = DateTime.UtcNow
                 };
 
                 await _userRepository.AddAsync(user);
@@ -323,13 +313,16 @@ namespace StudioStudio_Server.Services
                 user.LastName ??= lastName;
                 user.AvatarUrl ??= imgURL;
                 user.Status = UserStatus.Active;
+                user.UpdatedAt = DateTime.UtcNow;
 
                 await _userRepository.UpdateAsync(user);
-            }
 
-            if (user.RefreshToken != null)
-            {
-                await _refreshTokenRepository.RevokeAsync(user.RefreshToken);
+                // REVOKE TẤT CẢ refresh token cũ
+                var activeTokens = await _refreshTokenRepository.GetActiveByUserIdAsync(user.UserId);
+                foreach (var t in activeTokens)
+                {
+                    await _refreshTokenRepository.RevokeAsync(t);
+                }
             }
 
             var accessTokenExpireMs = _configuration.GetValue<long>("JWT:AccessTokenExpireMs", 3600000);
@@ -341,6 +334,7 @@ namespace StudioStudio_Server.Services
             var accessToken = GenerateJWTToken(user, accessExpireAt);
             var refreshToken = CreateRefreshToken(user, refreshExpireAt);
 
+            var refreshToken = CreateRefreshToken(user);
             await _refreshTokenRepository.AddAsync(refreshToken);
 
             SetRefreshTokenCookie(response, refreshToken.Token, refreshExpireAt);
@@ -358,27 +352,65 @@ namespace StudioStudio_Server.Services
             };
         }
 
+
         public async Task SendResetPasswordLinkAsync(string email)
         {
-            if (!IsValidEmail(email))
+            var user = await _userRepository.GetByEmailAsync(email);
+            if (user == null) return;
+
+            var token = new EmailVerificationToken
             {
                 throw new AppException(ErrorCodes.AuthInvalidCredential, StatusCodes.Status400BadRequest);
             }
 
-            var user = await _userRepository.GetByEmailAsync(email);
+            await _emailToken.AddAsync(token);
+
+            var url = $"{_configuration["Frontend:ResetPassURL"]}?token={token.Token}";
+            await _emailService.SendLinkAsync(user.Email, "Reset password", EmailTemplate.ResetPasswordEmail(url));
+        }
+
+        public async Task ResendEmailAsync(ResendEmailRequest request)
+        {
+            if (!IsValidEmail(request.Email))
+                throw new AppException(
+                    ErrorCodes.AuthInvalidCredential,
+                    StatusCodes.Status400BadRequest
+                );
+
+            var user = await _userRepository.GetByEmailAsync(request.Email);
+
+            // chống user enumeration
             if (user == null)
+                return;
+
+            if (request.Purpose == EmailTokenType.VerifyEmail &&
+                user.Status == UserStatus.Active)
             {
                 throw new AppException(ErrorCodes.UserNotFound, StatusCodes.Status404NotFound);
             }
+
+            // rate limit resend (60s)
+            var lastToken = await _emailToken.GetLatestAsync(user.UserId, request.Purpose);
+            if (lastToken != null &&
+                DateTime.UtcNow - lastToken.CreatedAt < TimeSpan.FromSeconds(60))
+            {
+                throw new AppException(
+                    ErrorCodes.TooManyRequests,
+                    StatusCodes.Status429TooManyRequests
+                );
+            }
+
+            await _emailToken.InvalidateAllAsync(user.UserId, request.Purpose);
 
             var token = new EmailVerificationToken
             {
                 Id = Guid.NewGuid(),
                 UserId = user.UserId,
                 Token = Convert.ToBase64String(RandomNumberGenerator.GetBytes(64)),
+                Type = request.Purpose,
                 CreatedAt = DateTime.UtcNow,
-                ExpiresAt = DateTime.UtcNow.AddMinutes(5),
-                IsUsed = false,
+                ExpiresAt = DateTime.UtcNow.AddMinutes(15),
+                IsUsed = false
             };
 
             await _emailToken.AddAsync(token);

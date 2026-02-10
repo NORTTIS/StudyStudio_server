@@ -21,7 +21,7 @@ namespace StudioStudio_Server.Repositories
         public async Task<User?> GetByEmailAsync(string email)
         {
             return await _context.Users
-                .Include(u => u.RefreshToken)
+                .Include(u => u.RefreshTokens)
                 .FirstOrDefaultAsync(u =>
                     u.Email == email &&
                     u.Status == UserStatus.Active);

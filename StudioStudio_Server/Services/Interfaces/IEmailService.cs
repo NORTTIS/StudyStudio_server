@@ -1,4 +1,6 @@
-﻿namespace StudioStudio_Server.Services.Interfaces
+﻿using StudioStudio_Server.Models.DTOs.Request;
+
+namespace StudioStudio_Server.Services.Interfaces
 {
     public interface IEmailService
     {

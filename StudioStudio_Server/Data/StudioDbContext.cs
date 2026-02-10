@@ -29,7 +29,7 @@ namespace StudioStudio_Server.Data
         public DbSet<AIRequestLog> AIRequestLogs => Set<AIRequestLog>();
         public DbSet<ActivityLog> ActivityLogs => Set<ActivityLog>();
         public DbSet<Report> Reports => Set<Report>();
-        public DbSet<RefreshToken> RefreshToken => Set<RefreshToken>();
+        public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
         public DbSet<EmailVerificationToken> EmailVerificationTokens => Set<EmailVerificationToken>();
         public DbSet<Announcement> Announcements => Set<Announcement>();
 
@@ -54,13 +54,19 @@ namespace StudioStudio_Server.Data
                     .OnDelete(DeleteBehavior.Cascade);
             });
 
-            //Refresh Token
+
+            //Refresh token
             modelBuilder.Entity<RefreshToken>(e =>
             {
                 e.HasKey(x => x.Id);
+
+                e.HasOne(x => x.User)
+                    .WithMany(u => u.RefreshTokens)
+                    .HasForeignKey(x => x.UserId)
+                    .OnDelete(DeleteBehavior.Cascade);
             });
 
-            //Email verify token
+            // EmailVerificationToken
             modelBuilder.Entity<EmailVerificationToken>(e =>
             {
                 e.HasKey(x => x.Id);
@@ -69,6 +75,7 @@ namespace StudioStudio_Server.Data
                     .HasForeignKey(x => x.UserId)
                     .OnDelete(DeleteBehavior.Cascade);
             });
+
 
             // STUDIO
             modelBuilder.Entity<Studio>(e =>

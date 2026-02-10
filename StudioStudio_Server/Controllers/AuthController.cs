@@ -42,8 +42,15 @@ namespace StudioStudio_Server.Controllers
             return Ok(ApiResponse<object>.Success(message));
         }
 
+        [HttpGet("verify-email")]
+        public async Task<IActionResult> VerifyEmail(string token)
+        {
+            await _authService.VerifyEmailAsync(token);
+            return Ok();
+        }
+
         [HttpPost("login")]
-        public async Task<IActionResult> Login([FromBody] LoginRequests loginRequest)
+        public async Task<IActionResult> Login(LoginRequests request)
         {
             var loginResponse = await _authService.LoginAsync(loginRequest, Response);
             var message = _messageService.GetMessage(ErrorCodes.SuccessLogin);
@@ -51,7 +58,7 @@ namespace StudioStudio_Server.Controllers
         }
 
         [HttpPost("refresh")]
-        public async Task<IActionResult> Refresh()
+        public async Task<IActionResult> RefreshToken()
         {
             string? refreshToken = Request.Cookies["refreshToken"];
 
@@ -65,6 +72,7 @@ namespace StudioStudio_Server.Controllers
             return Ok(ApiResponse<LoginResponse>.Success(message, refreshResponse));
         }
 
+
         [HttpPost("logout")]
         public async Task<IActionResult> Logout()
         {
@@ -77,7 +85,7 @@ namespace StudioStudio_Server.Controllers
             return Ok(ApiResponse<object>.Success(message));
         }
 
-        [HttpPost("google")]
+        [HttpPost("google-login")]
         public async Task<IActionResult> GoogleLogin([FromBody] GoogleLoginRequest request)
         {
             var loginResponse = await _authService.GoogleLoginAsync(request, Response);
@@ -92,9 +100,8 @@ namespace StudioStudio_Server.Controllers
             return Ok(ApiResponse<object>.Success("Password reset email sent successfully"));
         }
 
-        [Authorize]
-        [HttpPost("reset")]
-        public async Task<IActionResult> ResetPassword()
+        [HttpPost("resend-email")]
+        public async Task<IActionResult> ResendEmail([FromBody] ResendEmailRequest request)
         {
             var email = User.FindFirst(ClaimTypes.Email)?.Value;
             if (string.IsNullOrEmpty(email))
