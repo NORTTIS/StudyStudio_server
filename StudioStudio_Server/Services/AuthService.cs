@@ -64,11 +64,6 @@ namespace StudioStudio_Server.Services
                 throw new AppException(ErrorCodes.UserAlreadyExist, StatusCodes.Status400BadRequest);
             }
 
-            if (registerRequest.Password != registerRequest.ConfirmPassword)
-            {
-                throw new AppException(ErrorCodes.AuthInvalidCredential, StatusCodes.Status400BadRequest);
-            }
-
             //else create new user
             User registedUser = new User
             {
@@ -115,11 +110,11 @@ namespace StudioStudio_Server.Services
             var verifyToken = await _emailToken.GetValidAsync(token);
             if (verifyToken == null)
             {
-                throw new UnauthorizedAccessException("Invalid token");
+                throw new AppException(ErrorCodes.AuthTokenExpired, StatusCodes.Status401Unauthorized);
             }
             if (verifyToken.User.Status == UserStatus.Active)
             {
-                throw new Exception("Already verified");
+                throw new AppException(ErrorCodes.UserAlreadyExist, StatusCodes.Status400BadRequest);
             }
             verifyToken.User.Status = UserStatus.Active;
 
