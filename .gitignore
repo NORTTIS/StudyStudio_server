@@ -49,6 +49,7 @@ secrets.json
 ############################
 appsettings.Development.json
 appsettings.Local.json
+wwwroot/uploads
 
 ############################
 # Environment files
@@ -84,3 +85,4 @@ _ReSharper*/
 ############################
 coverage/
 coverage.*
+/StudioStudio_Server/wwwroot/uploads/avatars

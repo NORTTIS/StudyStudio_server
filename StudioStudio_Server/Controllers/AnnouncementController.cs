@@ -1,9 +1,11 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using StudioStudio_Server.Data;
+using StudioStudio_Server.Exceptions;
 using StudioStudio_Server.Models.DTOs.Response;
 using StudioStudio_Server.Models.Entities;
 using StudioStudio_Server.Models.Enums;
+using StudioStudio_Server.Services.Interfaces;
 
 namespace StudioStudio_Server.Controllers
 {
@@ -12,10 +14,12 @@ namespace StudioStudio_Server.Controllers
     public class AnnouncementController : ControllerBase
     {
         private readonly StudioDbContext _db;
+        private readonly IMessageService _messageService;
 
-        public AnnouncementController(StudioDbContext db)
+        public AnnouncementController(StudioDbContext db, IMessageService messageService)
         {
             _db = db;
+            _messageService = messageService;
         }
 
         [HttpGet]
@@ -81,8 +85,10 @@ namespace StudioStudio_Server.Controllers
                 .OrderByDescending(a => a.PublishedAt)
                 .ToList();
 
+            var message = _messageService.GetMessage(ErrorCodes.SuccessGetData);
             return Ok(ApiResponse<List<AnnouncementResponse>>.Success(
-                "Announcements retrieved successfully",
+                ErrorCodes.SuccessGetData,
+                message,
                 sortedAnnouncements
             ));
         }
@@ -106,11 +112,13 @@ namespace StudioStudio_Server.Controllers
 
             if (announcement == null)
             {
-                return NotFound(ApiResponse<object>.Error("Announcement not found"));
+                throw new AppException(ErrorCodes.AnnouncementNotFound, StatusCodes.Status404NotFound);
             }
 
+            var message = _messageService.GetMessage(ErrorCodes.SuccessGetData);
             return Ok(ApiResponse<AnnouncementResponse>.Success(
-                "Announcement retrieved successfully",
+                ErrorCodes.SuccessGetData,
+                message,
                 announcement
             ));
         }

@@ -4,6 +4,7 @@
   "AUTH003": "Bạn không có quyền truy cập",
   "AUTH004": "Xác nhận mật khẩu không khớp",
   "AUTH005": "Tài khoản chưa được xác thực. Vui lòng kiểm tra email",
+  "AUTH006": "Mật khẩu hiện tại không đúng",
 
   "USER001": "Không tìm thấy người dùng",
   "USER002": "Email đã được sử dụng",
@@ -14,12 +15,29 @@
   "TASK001": "Không tìm thấy công việc",
   "TASK002": "Bạn không có quyền truy cập công việc này",
 
+  "VALIDATION001": "Định dạng email không hợp lệ",
+  "VALIDATION002": "Mật khẩu phải dài từ 10-20 ký tự, chứa ít nhất một chữ hoa, một chữ thường và một chữ số",
+  "VALIDATION003": "Mật khẩu và xác nhận mật khẩu không khớp",
+  "VALIDATION004": "Trường bắt buộc đang thiếu",
+  "VALIDATION005": "Mã xác thực không hợp lệ",
+  "VALIDATION006": "Mã xác thực đã hết hạn",
+  "VALIDATION007": "Email đã được xác thực trước đó",
+  "VALIDATION008": "Kích thước file vượt quá giới hạn tối đa 5MB",
+  "VALIDATION009": "Định dạng file không hợp lệ. Chỉ chấp nhận file ảnh",
+  "VALIDATION010": "Mật khẩu mới không được trùng với mật khẩu hiện tại",
+
+  "ANNOUNCEMENT001": "Không tìm thấy thông báo",
+
   "SUCCESS001": "Đăng ký thành công. Vui lòng kiểm tra email để xác thực tài khoản",
   "SUCCESS002": "Đăng nhập thành công",
   "SUCCESS003": "Đăng xuất thành công",
   "SUCCESS004": "Làm mới token thành công",
   "SUCCESS005": "Gửi báo cáo thành công",
   "SUCCESS006": "Xác thực email thành công",
+  "SUCCESS007": "Đổi mật khẩu thành công",
+  "SUCCESS008": "Cập nhật hồ sơ thành công",
+  "SUCCESS009": "Email đặt lại mật khẩu đã được gửi thành công",
+  "SUCCESS010": "Lấy dữ liệu thành công",
 
   "SYS001": "Lỗi hệ thống không xác định"
 }

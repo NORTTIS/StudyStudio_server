@@ -23,8 +23,9 @@ namespace StudioStudio_Server.Services
     public class AuthService : IAuthService
     {
         private readonly Regex EmailRegex = new(@"^[^@\s]+@[^@\s]+\.[^@\s]+$", RegexOptions.Compiled);
-        // Password must be 8-10 characters long, contain at least one uppercase letter, one lowercase letter, and one digit
-        private readonly Regex PasswordRegex = new(@"^(?=.*?[A-Z])(?=.*?[a-z])(?=.*?[0-9])(?=.*?[#?!@$%^&*-]).{10,20}$", RegexOptions.Compiled);
+
+        // Password must be 10-20 characters long, contain at least one uppercase letter, one lowercase letter, and one digit
+        private readonly Regex PasswordRegex = new(@"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)[A-Za-z\d@$!%*?&]{10,20}$", RegexOptions.Compiled);
 
         private readonly IUserRepository _userRepository;
         private readonly IRefreshTokenRepository _refreshTokenRepository;
@@ -49,10 +50,14 @@ namespace StudioStudio_Server.Services
         }
         public async Task RegisterAsync(RegisterRequests registerRequest)
         {
-            if (!IsValidEmail(registerRequest.Email) || !IsValidPass(registerRequest.Password))
+            if (!IsValidEmail(registerRequest.Email))
             {
-                Console.WriteLine("Invalid email or password format");
-                throw new AppException(ErrorCodes.AuthInvalidCredential, StatusCodes.Status400BadRequest);
+                throw new AppException(ErrorCodes.ValidationInvalidEmail, StatusCodes.Status400BadRequest);
+            }
+
+            if (!IsValidPass(registerRequest.Password))
+            {
+                throw new AppException(ErrorCodes.ValidationInvalidPassword, StatusCodes.Status400BadRequest);
             }
 
             //check if user email have used or not
@@ -66,7 +71,7 @@ namespace StudioStudio_Server.Services
 
             if (registerRequest.Password != registerRequest.ConfirmPassword)
             {
-                throw new AppException(ErrorCodes.AuthInvalidCredential, StatusCodes.Status400BadRequest);
+                throw new AppException(ErrorCodes.ValidationPasswordMismatch, StatusCodes.Status400BadRequest);
             }
 
             //else create new user
@@ -115,11 +120,17 @@ namespace StudioStudio_Server.Services
             var verifyToken = await _emailToken.GetValidAsync(token);
             if (verifyToken == null)
             {
-                throw new UnauthorizedAccessException("Invalid token");
+                throw new AppException(ErrorCodes.ValidationInvalidToken, StatusCodes.Status400BadRequest);
             }
+
+            if (verifyToken.ExpiresAt < DateTime.UtcNow)
+            {
+                throw new AppException(ErrorCodes.ValidationTokenExpired, StatusCodes.Status400BadRequest);
+            }
+
             if (verifyToken.User.Status == UserStatus.Active)
             {
-                throw new Exception("Already verified");
+                throw new AppException(ErrorCodes.ValidationEmailAlreadyVerified, StatusCodes.Status400BadRequest);
             }
             verifyToken.User.Status = UserStatus.Active;
 
@@ -130,7 +141,7 @@ namespace StudioStudio_Server.Services
         {
             if (!IsValidEmail(loginRequest.Email))
             {
-                throw new AppException(ErrorCodes.AuthInvalidCredential, StatusCodes.Status401Unauthorized);
+                throw new AppException(ErrorCodes.ValidationInvalidEmail, StatusCodes.Status400BadRequest);
             }
 
             //find user and check if user exist or not
@@ -362,7 +373,7 @@ namespace StudioStudio_Server.Services
         {
             if (!IsValidEmail(email))
             {
-                throw new AppException(ErrorCodes.AuthInvalidCredential, StatusCodes.Status400BadRequest);
+                throw new AppException(ErrorCodes.ValidationInvalidEmail, StatusCodes.Status400BadRequest);
             }
 
             var user = await _userRepository.GetByEmailAsync(email);
