@@ -7,6 +7,7 @@ using StudioStudio_Server.Models.Entities;
 using StudioStudio_Server.Services.Interfaces;
 using System.Security.Claims;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 
 namespace StudioStudio_Server.Controllers
 {
@@ -18,6 +19,7 @@ namespace StudioStudio_Server.Controllers
         private readonly IEmailService _emailService;
         private readonly IMessageService _messageService;
         private readonly IConfiguration _configuration;
+        private readonly Regex EmailRegex = new(@"^[^@\s]+@[^@\s]+\.[^@\s]+$", RegexOptions.Compiled);
 
         public ReportController(
             StudioDbContext db,
@@ -34,12 +36,9 @@ namespace StudioStudio_Server.Controllers
         [HttpPost]
         public async Task<IActionResult> SendReport([FromBody] ReportRequest request)
         {
-            if (string.IsNullOrWhiteSpace(request.Type) ||
-                string.IsNullOrWhiteSpace(request.Title) ||
-                string.IsNullOrWhiteSpace(request.Content) ||
-                string.IsNullOrWhiteSpace(request.Email))
+            if (!EmailRegex.IsMatch(request.Email))
             {
-                throw new AppException(ErrorCodes.ReportInvalidRequest, StatusCodes.Status400BadRequest);
+                throw new AppException(ErrorCodes.ValidationInvalidEmail, StatusCodes.Status400BadRequest);
             }
 
             var reportToEmail = _configuration["Report:ToEmail"];
@@ -86,7 +85,7 @@ namespace StudioStudio_Server.Controllers
             await _emailService.SendLinkAsync(reportToEmail, subject, body);
 
             var message = _messageService.GetMessage(ErrorCodes.SuccessReportSent);
-            return Ok(ApiResponse<object>.Success(message));
+            return Ok(ApiResponse<object>.Success(ErrorCodes.SuccessReportSent, message));
         }
 
         private Guid GetUserIdOrEmpty()
