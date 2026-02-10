@@ -28,6 +28,13 @@
         public const string SuccessRefreshToken = "SUCCESS004";
         public const string SuccessReportSent = "SUCCESS005";
         public const string SuccessVerifyEmail = "SUCCESS006";
+        public const string SuccessChangePassword = "SUCCESS007";
+        public const string SuccessUpdateProfile = "SUCCESS008";
+        public const string SuccessResetPassword = "SUCCESS009";
+        public const string SuccessGetData = "SUCCESS010";
+
+        // ANNOUNCEMENT
+        public const string AnnouncementNotFound = "ANNOUNCEMENT001";
 
         // COMMON
         public const string UnexpectedError = "SYS001";

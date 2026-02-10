@@ -14,12 +14,18 @@
   "TASK001": "Task not found",
   "TASK002": "You are not allowed to access this task",
 
+  "ANNOUNCEMENT001": "Announcement not found",
+
   "SUCCESS001": "Registration successful. Please check your email to verify your account",
   "SUCCESS002": "Login successful",
   "SUCCESS003": "Logout successful",
   "SUCCESS004": "Token refreshed successfully",
   "SUCCESS005": "Report sent successfully",
   "SUCCESS006": "Email verified successfully",
+  "SUCCESS007": "Password changed successfully",
+  "SUCCESS008": "Profile updated successfully",
+  "SUCCESS009": "Password reset email sent successfully",
+  "SUCCESS010": "Data retrieved successfully",
 
   "SYS001": "Unexpected system error"
 }

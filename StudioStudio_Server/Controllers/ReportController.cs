@@ -86,7 +86,7 @@ namespace StudioStudio_Server.Controllers
             await _emailService.SendLinkAsync(reportToEmail, subject, body);
 
             var message = _messageService.GetMessage(ErrorCodes.SuccessReportSent);
-            return Ok(ApiResponse<object>.Success(message));
+            return Ok(ApiResponse<object>.Success(ErrorCodes.SuccessReportSent, message));
         }
 
         private Guid GetUserIdOrEmpty()

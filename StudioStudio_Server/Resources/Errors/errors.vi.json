@@ -14,12 +14,18 @@
   "TASK001": "Không tìm thấy công việc",
   "TASK002": "Bạn không có quyền truy cập công việc này",
 
+  "ANNOUNCEMENT001": "Không tìm thấy thông báo",
+
   "SUCCESS001": "Đăng ký thành công. Vui lòng kiểm tra email để xác thực tài khoản",
   "SUCCESS002": "Đăng nhập thành công",
   "SUCCESS003": "Đăng xuất thành công",
   "SUCCESS004": "Làm mới token thành công",
   "SUCCESS005": "Gửi báo cáo thành công",
   "SUCCESS006": "Xác thực email thành công",
+  "SUCCESS007": "Đổi mật khẩu thành công",
+  "SUCCESS008": "Cập nhật hồ sơ thành công",
+  "SUCCESS009": "Email đặt lại mật khẩu đã được gửi thành công",
+  "SUCCESS010": "Lấy dữ liệu thành công",
 
   "SYS001": "Lỗi hệ thống không xác định"
 }

@@ -26,7 +26,7 @@ namespace StudioStudio_Server.Controllers
         {
             await _authService.RegisterAsync(request);
             var message = _messageService.GetMessage(ErrorCodes.SuccessRegister);
-            return Ok(ApiResponse<object>.Success(message));
+            return Ok(ApiResponse<object>.Success(ErrorCodes.SuccessRegister, message));
         }
 
         [HttpGet("verify-email")]
@@ -39,7 +39,7 @@ namespace StudioStudio_Server.Controllers
 
             await _authService.VerifyEmailLinkAsync(token);
             var message = _messageService.GetMessage(ErrorCodes.SuccessVerifyEmail);
-            return Ok(ApiResponse<object>.Success(message));
+            return Ok(ApiResponse<object>.Success(ErrorCodes.SuccessVerifyEmail, message));
         }
 
         [HttpPost("login")]
@@ -47,7 +47,7 @@ namespace StudioStudio_Server.Controllers
         {
             var loginResponse = await _authService.LoginAsync(loginRequest, Response);
             var message = _messageService.GetMessage(ErrorCodes.SuccessLogin);
-            return Ok(ApiResponse<LoginResponse>.Success(message, loginResponse));
+            return Ok(ApiResponse<LoginResponse>.Success(ErrorCodes.SuccessLogin, message, loginResponse));
         }
 
         [HttpPost("refresh")]
@@ -62,7 +62,7 @@ namespace StudioStudio_Server.Controllers
 
             var refreshResponse = await _authService.RefreshTokenAsync(refreshToken, Response);
             var message = _messageService.GetMessage(ErrorCodes.SuccessRefreshToken);
-            return Ok(ApiResponse<LoginResponse>.Success(message, refreshResponse));
+            return Ok(ApiResponse<LoginResponse>.Success(ErrorCodes.SuccessRefreshToken, message, refreshResponse));
         }
 
         [HttpPost("logout")]
@@ -74,7 +74,7 @@ namespace StudioStudio_Server.Controllers
                 await _authService.LogoutAsync(refreshToken, Response);
             }
             var message = _messageService.GetMessage(ErrorCodes.SuccessLogout);
-            return Ok(ApiResponse<object>.Success(message));
+            return Ok(ApiResponse<object>.Success(ErrorCodes.SuccessLogout, message));
         }
 
         [HttpPost("google")]
@@ -82,14 +82,15 @@ namespace StudioStudio_Server.Controllers
         {
             var loginResponse = await _authService.GoogleLoginAsync(request, Response);
             var message = _messageService.GetMessage(ErrorCodes.SuccessLogin);
-            return Ok(ApiResponse<LoginResponse>.Success(message, loginResponse));
+            return Ok(ApiResponse<LoginResponse>.Success(ErrorCodes.SuccessLogin, message, loginResponse));
         }
 
         [HttpPost("forgot")]
         public async Task<IActionResult> ForgotPassword([FromBody] string email)
         {
             await _authService.SendResetPasswordLinkAsync(email);
-            return Ok(ApiResponse<object>.Success("Password reset email sent successfully"));
+            var message = _messageService.GetMessage(ErrorCodes.SuccessResetPassword);
+            return Ok(ApiResponse<object>.Success(ErrorCodes.SuccessResetPassword, message));
         }
 
         [Authorize]
@@ -103,7 +104,8 @@ namespace StudioStudio_Server.Controllers
             }
             
             await _authService.SendResetPasswordLinkAsync(email);
-            return Ok(ApiResponse<object>.Success("Password reset email sent successfully"));
+            var message = _messageService.GetMessage(ErrorCodes.SuccessResetPassword);
+            return Ok(ApiResponse<object>.Success(ErrorCodes.SuccessResetPassword, message));
         }
     }
 }
