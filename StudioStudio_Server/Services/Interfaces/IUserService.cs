@@ -11,5 +11,7 @@ namespace StudioStudio_Server.Services.Interfaces
         Task<User?> GetByEmailAsync(string email);
         Task UpdateAsync(User user);
         Task DeleteAsync(Guid userId);
+        Task ChangePasswordAsync(Guid userId, ChangePasswordRequest request);
+        Task UpdateProfileAsync(Guid userId, UpdateUserProfileRequest request);
     }
 }

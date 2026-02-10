@@ -4,6 +4,7 @@
   "AUTH003": "You do not have permission",
   "AUTH004": "Password confirmation does not match",
   "AUTH005": "Account not verified. Please check your email",
+  "AUTH006": "Current password is incorrect",
 
   "USER001": "User not found",
   "USER002": "User already exists",
@@ -14,12 +15,29 @@
   "TASK001": "Task not found",
   "TASK002": "You are not allowed to access this task",
 
+  "VALIDATION001": "Invalid email format",
+  "VALIDATION002": "Password must be 10-20 characters long, contain at least one uppercase letter, one lowercase letter, and one digit",
+  "VALIDATION003": "Password and confirm password do not match",
+  "VALIDATION004": "Required field is missing",
+  "VALIDATION005": "Invalid verification token",
+  "VALIDATION006": "Verification token has expired",
+  "VALIDATION007": "Email has already been verified",
+  "VALIDATION008": "File size exceeds the maximum limit of 5MB",
+  "VALIDATION009": "Invalid file format. Only image files are allowed",
+  "VALIDATION010": "New password cannot be the same as current password",
+
+  "ANNOUNCEMENT001": "Announcement not found",
+
   "SUCCESS001": "Registration successful. Please check your email to verify your account",
   "SUCCESS002": "Login successful",
   "SUCCESS003": "Logout successful",
   "SUCCESS004": "Token refreshed successfully",
   "SUCCESS005": "Report sent successfully",
   "SUCCESS006": "Email verified successfully",
+  "SUCCESS007": "Password changed successfully",
+  "SUCCESS008": "Profile updated successfully",
+  "SUCCESS009": "Password reset email sent successfully",
+  "SUCCESS010": "Data retrieved successfully",
 
   "SYS001": "Unexpected system error"
 }

@@ -2,6 +2,7 @@
 using System.Net;
 using StudioStudio_Server.Exceptions;
 using StudioStudio_Server.Localization;
+using StudioStudio_Server.Models.DTOs.Response;
 
 public class ExceptionHandlingMiddleware
 {
@@ -27,35 +28,46 @@ public class ExceptionHandlingMiddleware
         }
         catch (AppException ex)
         {
-            var culture = GetCulture(context);
-            var localizer = new JsonStringLocalizer(_env, culture);
-
-            context.Response.StatusCode = ex.HttpStatus;
-            context.Response.ContentType = "application/json";
-
-            await context.Response.WriteAsJsonAsync(new
-            {
-                status = "error",
-                code = ex.Code,
-                message = localizer.Get(ex.Code)
-            });
+            await HandleAppException(context, ex);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Unhandled exception");
-
-            var culture = GetCulture(context);
-            var localizer = new JsonStringLocalizer(_env, culture);
-
-            context.Response.StatusCode = (int)HttpStatusCode.InternalServerError;
-
-            await context.Response.WriteAsJsonAsync(new
-            {
-                status = "error",
-                code = ErrorCodes.UnexpectedError,
-                message = localizer.Get(ErrorCodes.UnexpectedError)
-            });
+            await HandleUnexpectedException(context, ex);
         }
+    }
+
+    private async Task HandleAppException(HttpContext context, AppException ex)
+    {
+        var culture = GetCulture(context);
+        var localizer = new JsonStringLocalizer(_env, culture);
+
+        context.Response.StatusCode = ex.HttpStatus;
+        context.Response.ContentType = "application/json";
+
+        var response = ApiResponse<object>.Error(
+            ex.Code,
+            localizer.Get(ex.Code)
+        );
+
+        await context.Response.WriteAsJsonAsync(response);
+    }
+
+    private async Task HandleUnexpectedException(HttpContext context, Exception ex)
+    {
+        _logger.LogError(ex, "Unhandled exception");
+
+        var culture = GetCulture(context);
+        var localizer = new JsonStringLocalizer(_env, culture);
+
+        context.Response.StatusCode = (int)HttpStatusCode.InternalServerError;
+        context.Response.ContentType = "application/json";
+
+        var response = ApiResponse<object>.Error(
+            ErrorCodes.UnexpectedError,
+            localizer.Get(ErrorCodes.UnexpectedError)
+        );
+
+        await context.Response.WriteAsJsonAsync(response);
     }
 
     private static string GetCulture(HttpContext context)
