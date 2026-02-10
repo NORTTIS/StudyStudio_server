@@ -9,13 +9,25 @@ namespace StudioStudio_Server.Services
     public class SMTPEmailService : IEmailService
     {
         private readonly EmailOptions _emailOptions;
+        private readonly ILogger<SMTPEmailService> _logger;
 
-        public SMTPEmailService(IOptions<EmailOptions> emailOptions)
+        public SMTPEmailService(IOptions<EmailOptions> emailOptions, ILogger<SMTPEmailService> logger)
         {
             _emailOptions = emailOptions.Value;
+            _logger = logger;
         }
+        
         public async Task SendLinkAsync(string to, string subject, string body)
         {
+            // Skip sending email if SMTP is not configured
+            if (string.IsNullOrEmpty(_emailOptions.Host) || 
+                string.IsNullOrEmpty(_emailOptions.From))
+            {
+                _logger.LogWarning("Email service is not configured. Skipping email to {To} with subject: {Subject}", to, subject);
+                _logger.LogInformation("Email content (dev only): {Body}", body);
+                return;
+            }
+
             var message = new MailMessage
             {
                 From = new MailAddress(_emailOptions.From),
@@ -35,6 +47,7 @@ namespace StudioStudio_Server.Services
             };
 
             await smtp.SendMailAsync(message);
+            _logger.LogInformation("Email sent successfully to {To}", to);
         }
     }
 }

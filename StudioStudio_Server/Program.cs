@@ -17,8 +17,11 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.Configure<EmailOptions>(
     builder.Configuration.GetSection("Email"));
 
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<IMessageService, MessageService>();
 builder.Services.AddScoped<IEmailService, SMTPEmailService>();
 builder.Services.AddScoped<IUserRepository, UserRepository>();
+builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
 builder.Services.AddScoped<IPasswordHasher<User>, PasswordHasher<User>>();
@@ -50,7 +53,7 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("WebAppPolicy", policy =>
     {
-        policy.WithOrigins("")//FE URL
+        policy.WithOrigins("http://localhost:3000", "http://localhost:3001")//FE URL
         .AllowAnyHeader()
         .AllowAnyMethod()
         .AllowCredentials();
@@ -104,7 +107,6 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseCors("WebAppPolicy");
-app.UseHttpsRedirection();
 
 app.UseAuthentication();
 app.UseAuthorization();
