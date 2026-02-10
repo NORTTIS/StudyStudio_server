@@ -69,11 +69,6 @@ namespace StudioStudio_Server.Services
                 throw new AppException(ErrorCodes.UserAlreadyExist, StatusCodes.Status400BadRequest);
             }
 
-            if (registerRequest.Password != registerRequest.ConfirmPassword)
-            {
-                throw new AppException(ErrorCodes.ValidationPasswordMismatch, StatusCodes.Status400BadRequest);
-            }
-
             //else create new user
             User registedUser = new User
             {
@@ -130,7 +125,7 @@ namespace StudioStudio_Server.Services
 
             if (verifyToken.User.Status == UserStatus.Active)
             {
-                throw new AppException(ErrorCodes.ValidationEmailAlreadyVerified, StatusCodes.Status400BadRequest);
+                throw new AppException(ErrorCodes.UserAlreadyExist, StatusCodes.Status400BadRequest);
             }
             verifyToken.User.Status = UserStatus.Active;
 
