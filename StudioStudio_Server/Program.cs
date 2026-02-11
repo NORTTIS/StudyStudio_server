@@ -71,7 +71,7 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("WebAppPolicy", policy =>
     {
-        policy.WithOrigins("http://localhost:3000", "http://localhost:3001")//FE URL
+        policy.WithOrigins("http://localhost:3000", "https://study-studio-client.vercel.app/")//FE URL
         .AllowAnyHeader()
         .AllowAnyMethod()
         .AllowCredentials();
