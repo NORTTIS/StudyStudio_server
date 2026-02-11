@@ -401,6 +401,53 @@ namespace StudioStudio_Server.Services
             return false;
         }
 
+        public async Task ResendVerifyEmailAsync(ResendVerifyEmailRequest request)
+        {
+            if (!IsValidEmail(request.Email))
+            {
+                throw new AppException(
+                    ErrorCodes.ValidationInvalidEmail,
+                    StatusCodes.Status400BadRequest
+                );
+            }
+
+            var user = await _userRepository.GetByEmailAsync(request.Email);
+
+            if (user == null)
+            {
+                throw new AppException(ErrorCodes.UserNotFound, StatusCodes.Status404NotFound);
+            }
+
+            if (user.Status == UserStatus.Active)
+            {
+                throw new AppException(ErrorCodes.UserAlreadyExist, StatusCodes.Status400BadRequest);
+            }
+
+            await _emailToken.InvalidateTokensAsync(user.UserId);
+
+            var newToken = new EmailVerificationToken
+            {
+                Id = Guid.NewGuid(),
+                UserId = user.UserId,
+                Token = Convert.ToBase64String(RandomNumberGenerator.GetBytes(64)),
+                CreatedAt = DateTime.UtcNow,
+                ExpiresAt = DateTime.UtcNow.AddMinutes(15),
+                IsUsed = false
+            };
+
+            await _emailToken.AddAsync(newToken);
+
+            string verifyUrl =
+                $"{_configuration["Frontend:VerifyURL"]}?token={Uri.EscapeDataString(newToken.Token)}";
+
+            string html = EmailTemplate.VerifyLinkEmail(verifyUrl);
+
+            await _emailService.SendLinkAsync(
+                user.Email,
+                "Xác thực tài khoản của bạn",
+                html
+            );
+        }
         private bool IsValidEmail(string email)
         {
             return EmailRegex.IsMatch(email);
