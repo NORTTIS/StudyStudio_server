@@ -12,6 +12,7 @@ services:
       ASPNETCORE_URLS: http://+:8080
     depends_on:
       - postgres
+      - redis
     networks:
       - studiostudio_net
 
@@ -29,8 +30,18 @@ services:
     networks:
       - studiostudio_net
 
+  redis:
+    image: redis:7
+    container_name: studiostudio_redis
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+    networks:
+      - studiostudio_net
+
 volumes:
   postgres_data:
+  redis_data:
 
 networks:
   studiostudio_net:
