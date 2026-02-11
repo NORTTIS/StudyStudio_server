@@ -86,26 +86,38 @@ namespace StudioStudio_Server.Controllers
         }
 
         [HttpPost("forgot")]
-        public async Task<IActionResult> ForgotPassword([FromBody] string email)
+        public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordRequest request)
         {
-            await _authService.SendResetPasswordLinkAsync(email);
+            await _authService.SendResetPasswordLinkAsync(request.Email);
             var message = _messageService.GetMessage(ErrorCodes.SuccessResetPassword);
             return Ok(ApiResponse<object>.Success(ErrorCodes.SuccessResetPassword, message));
         }
 
         [Authorize]
         [HttpPost("reset")]
-        public async Task<IActionResult> ResetPassword()
+        public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordRequest request)
         {
-            var email = User.FindFirst(ClaimTypes.Email)?.Value;
-            if (string.IsNullOrEmpty(email))
-            {
-                throw new AppException(ErrorCodes.UserNotFound, StatusCodes.Status404NotFound);
-            }
-            
-            await _authService.SendResetPasswordLinkAsync(email);
+            await _authService.ResetPasswordAsync(request.Token, request.NewPassword);
             var message = _messageService.GetMessage(ErrorCodes.SuccessResetPassword);
             return Ok(ApiResponse<object>.Success(ErrorCodes.SuccessResetPassword, message));
+        }
+
+        [HttpGet("verify-reset-token")]
+        public async Task<IActionResult> VerifyResetToken([FromQuery] string token)
+        {
+            if (string.IsNullOrEmpty(token))
+            {
+                throw new AppException(ErrorCodes.ValidationRequiredField, StatusCodes.Status400BadRequest);
+            }
+
+            var isValid = await _authService.VerifyResetTokenAsync(token);
+
+            if (!isValid)
+            {
+                throw new AppException(ErrorCodes.ValidationInvalidToken, StatusCodes.Status400BadRequest);
+            }
+            var message = _messageService.GetMessage(ErrorCodes.SuccessVerifyEmail);
+            return Ok(ApiResponse<object>.Success(ErrorCodes.SuccessVerifyEmail, message));
         }
     }
 }
