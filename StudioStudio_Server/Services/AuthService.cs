@@ -33,13 +33,15 @@ namespace StudioStudio_Server.Services
         private readonly IConfiguration _configuration;
         private readonly IEmailService _emailService;
         private readonly IEmailVerificationTokenRepository _emailToken;
+        private readonly IPasswordResetCacheService _resetCache;
         public AuthService(
             IUserRepository userRepository,
             IPasswordHasher<User> passwordHasher,
             IConfiguration configuration,
             IRefreshTokenRepository refreshTokenRepository,
             IEmailService emailService,
-            IEmailVerificationTokenRepository emailToken)
+            IEmailVerificationTokenRepository emailToken,
+            IPasswordResetCacheService resetCache)
         {
             _userRepository = userRepository;
             _passwordHasher = passwordHasher;
@@ -47,6 +49,7 @@ namespace StudioStudio_Server.Services
             _refreshTokenRepository = refreshTokenRepository;
             _emailService = emailService;
             _emailToken = emailToken;
+            _resetCache = resetCache;
         }
         public async Task RegisterAsync(RegisterRequests registerRequest)
         {
@@ -92,7 +95,7 @@ namespace StudioStudio_Server.Services
                 UserId = registedUser.UserId,
                 Token = Convert.ToBase64String(RandomNumberGenerator.GetBytes(64)),
                 CreatedAt = DateTime.UtcNow,
-                ExpiresAt = DateTime.UtcNow.AddMinutes(5),
+                ExpiresAt = DateTime.UtcNow.AddMinutes(15),
                 IsUsed = false
             };
 
@@ -192,49 +195,6 @@ namespace StudioStudio_Server.Services
             };
         }
 
-        private string GenerateJWTToken(User user, DateTime expireAt)
-        {
-            var claims = new[]
-            {
-                new Claim(JwtRegisteredClaimNames.Sub, user.UserId.ToString()),
-                new Claim(JwtRegisteredClaimNames.Email, user.Email)
-            };
-
-            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_configuration["JWT:Key"]));
-
-            var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
-
-            var token = new JwtSecurityToken(
-                issuer: _configuration["JWT:Issuer"],
-                audience: _configuration["JWT:Audience"],
-                claims: claims,
-                expires: expireAt,
-                signingCredentials: creds);
-
-            return new JwtSecurityTokenHandler().WriteToken(token);
-        }
-
-        private RefreshToken CreateRefreshToken(User user, DateTime expireAt)
-        {
-            return new RefreshToken
-            {
-                Id = Guid.NewGuid(),
-                Token = Convert.ToBase64String(RandomNumberGenerator.GetBytes(64)),
-                ExpiresAt = expireAt,
-                UserId = user.UserId
-            };
-        }
-
-        private void SetRefreshTokenCookie(HttpResponse response, string token, DateTime expireAt)
-        {
-            response.Cookies.Append("refreshToken", token, new CookieOptions
-            {
-                HttpOnly = true,
-                Secure = true,
-                SameSite = SameSiteMode.None,
-                Expires = expireAt
-            });
-        }
 
         public async Task<LoginResponse> RefreshTokenAsync(string refreshToken, HttpResponse response)
         {
@@ -377,19 +337,12 @@ namespace StudioStudio_Server.Services
                 throw new AppException(ErrorCodes.UserNotFound, StatusCodes.Status404NotFound);
             }
 
-            var token = new EmailVerificationToken
-            {
-                Id = Guid.NewGuid(),
-                UserId = user.UserId,
-                Token = Convert.ToBase64String(RandomNumberGenerator.GetBytes(64)),
-                CreatedAt = DateTime.UtcNow,
-                ExpiresAt = DateTime.UtcNow.AddMinutes(5),
-                IsUsed = false,
-            };
+            var token = Convert.ToBase64String(RandomNumberGenerator.GetBytes(64));
+            var expiry = TimeSpan.FromMinutes(15);
 
-            await _emailToken.AddAsync(token);
+            await _resetCache.StoreResetTokenAsync(email, token, user.UserId, expiry);
 
-            string resetURL = $"{_configuration["Frontend:ResetPassURL"]}?token={Uri.EscapeDataString(token.Token)}";
+            string resetURL = $"{_configuration["Frontend:ResetPassURL"]}?token={Uri.EscapeDataString(token)}";
             string html = EmailTemplate.ResetPasswordEmail(resetURL);
 
             await _emailService.SendLinkAsync(
@@ -397,6 +350,55 @@ namespace StudioStudio_Server.Services
                 "Reset your password",
                 html
             );
+        }
+
+        public async Task ResetPasswordAsync(string token, string newPassword)
+        {
+            if (!IsValidPass(newPassword))
+            {
+                throw new AppException(ErrorCodes.ValidationInvalidPassword, StatusCodes.Status400BadRequest);
+            }
+
+            var resetData = await _resetCache.GetResetDataByTokenAsync(token);
+
+            if (resetData == null)
+            {
+                throw new AppException(ErrorCodes.ValidationInvalidToken, StatusCodes.Status400BadRequest);
+            }
+
+            var user = await _userRepository.GetByIdAsync(resetData.UserId);
+            if (user == null)
+            {
+                throw new AppException(ErrorCodes.UserNotFound, StatusCodes.Status404NotFound);
+            }
+
+            user.PasswordHash = _passwordHasher.HashPassword(user, newPassword);
+            user.UpdatedAt = DateTime.UtcNow;
+
+            await _userRepository.UpdateAsync(user);
+            await _resetCache.InvalidateResetTokenAsync(resetData.Email);
+
+            if (user.RefreshToken != null)
+            {
+                await _refreshTokenRepository.RevokeAsync(user.RefreshToken);
+            }
+        }
+        public async Task<bool> VerifyResetTokenAsync(string token)
+        {
+            var resetData = await _resetCache.GetResetDataByTokenAsync(token);
+
+            if (resetData != null)
+            {
+                var user = await _userRepository.GetByIdAsync(resetData.UserId);
+                if (user == null)
+                {
+                    return false;
+                }
+
+                return true;
+            }
+
+            return false;
         }
 
         private bool IsValidEmail(string email)
@@ -407,6 +409,47 @@ namespace StudioStudio_Server.Services
         private bool IsValidPass(string pass)
         {
             return PasswordRegex.IsMatch(pass);
+        }
+        private string GenerateJWTToken(User user, DateTime expireAt)
+        {
+            var claims = new[]
+            {
+                new Claim(JwtRegisteredClaimNames.Sub, user.UserId.ToString()),
+                new Claim(JwtRegisteredClaimNames.Email, user.Email)
+            };
+
+            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_configuration["JWT:Key"]));
+
+            var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+
+            var token = new JwtSecurityToken(
+                issuer: _configuration["JWT:Issuer"],
+                audience: _configuration["JWT:Audience"],
+                claims: claims,
+                expires: expireAt,
+                signingCredentials: creds);
+
+            return new JwtSecurityTokenHandler().WriteToken(token);
+        }
+        private RefreshToken CreateRefreshToken(User user, DateTime expireAt)
+        {
+            return new RefreshToken
+            {
+                Id = Guid.NewGuid(),
+                Token = Convert.ToBase64String(RandomNumberGenerator.GetBytes(64)),
+                ExpiresAt = expireAt,
+                UserId = user.UserId
+            };
+        }
+        private void SetRefreshTokenCookie(HttpResponse response, string token, DateTime expireAt)
+        {
+            response.Cookies.Append("refreshToken", token, new CookieOptions
+            {
+                HttpOnly = true,
+                Secure = true,
+                SameSite = SameSiteMode.None,
+                Expires = expireAt
+            });
         }
     }
 }
