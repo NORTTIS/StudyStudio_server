@@ -13,12 +13,20 @@ using System.Text;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Mvc;
 using StudioStudio_Server.Filters;
+using StackExchange.Redis;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.Configure<EmailOptions>(
     builder.Configuration.GetSection("Email"));
+
+//redis connection
+builder.Services.AddSingleton<IConnectionMultiplexer>(r =>
+{
+    var configuration = ConfigurationOptions.Parse(builder.Configuration.GetConnectionString("Redis") ?? "localhost:6379");
+    return ConnectionMultiplexer.Connect(configuration);
+});
 
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<IMessageService, MessageService>();
@@ -29,6 +37,8 @@ builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
 builder.Services.AddScoped<IPasswordHasher<User>, PasswordHasher<User>>();
 builder.Services.AddScoped<IEmailVerificationTokenRepository, EmailVerificationTokenRepository>();
+builder.Services.AddScoped<IPasswordResetCacheService, PasswordResetCacheService>();
+
 
 builder.Services.AddControllers(options =>
     {
