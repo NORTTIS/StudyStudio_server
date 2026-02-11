@@ -34,5 +34,18 @@ namespace StudioStudio_Server.Repositories
             await _context.SaveChangesAsync();
         }
 
+        public async Task InvalidateTokensAsync(Guid userId)
+        {
+            var tokens = await _context.EmailVerificationTokens
+                .Where(x => x.UserId == userId && !x.IsUsed)
+                .ToListAsync();
+
+            foreach (var token in tokens)
+            {
+                token.IsUsed = true;
+            }
+
+            await _context.SaveChangesAsync();
+        }
     }
 }
