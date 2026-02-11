@@ -89,12 +89,11 @@ namespace StudioStudio_Server.Controllers
         public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordRequest request)
         {
             await _authService.SendResetPasswordLinkAsync(request.Email);
-            var message = _messageService.GetMessage(ErrorCodes.SuccessResetPassword);
-            return Ok(ApiResponse<object>.Success(ErrorCodes.SuccessResetPassword, message));
+            var message = _messageService.GetMessage(ErrorCodes.SuccessSendForgotLink);
+            return Ok(ApiResponse<object>.Success(ErrorCodes.SuccessSendForgotLink, message));
         }
 
-        [Authorize]
-        [HttpPost("reset")]
+        [HttpPost("reset-password")]
         public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordRequest request)
         {
             await _authService.ResetPasswordAsync(request.Token, request.NewPassword);
