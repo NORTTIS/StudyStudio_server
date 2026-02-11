@@ -4,20 +4,12 @@ services:
     container_name: studiostudio_api
     env_file:
       - .env.docker
-    restart: unless-stopped
+    restart: always
     ports:
       - "8080:8080"
     environment:
       ASPNETCORE_ENVIRONMENT: Development
       ASPNETCORE_URLS: http://+:8080
-
-      # Connection string cho EF Core
-      ConnectionStrings__DefaultConnection: |
-        Host=postgres;
-        Port=5432;
-        Database=study_studio;
-        Username=postgres;
-        Password=12345678
     depends_on:
       - postgres
     networks:
@@ -26,13 +18,11 @@ services:
   postgres:
     image: postgres:17
     container_name: studiostudio_postgres
-    restart: unless-stopped
-    ports:
-      - "5432:5432" 
+    restart: always
     environment:
       POSTGRES_DB: study_studio
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: 12345678
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
