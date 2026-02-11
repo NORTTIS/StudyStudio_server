@@ -7,5 +7,6 @@ namespace StudioStudio_Server.Repositories.Interfaces
         Task AddAsync(EmailVerificationToken token);
         Task<EmailVerificationToken?> GetValidAsync(string token);
         Task MaskAsUsed(EmailVerificationToken token);
+        Task InvalidateTokensAsync(Guid userId);
     }
 }
