@@ -38,6 +38,7 @@
   "SUCCESS008": "Profile updated successfully",
   "SUCCESS009": "Password reset email sent successfully",
   "SUCCESS010": "Data retrieved successfully",
+  "SUCCESS011": "Password reset successfully",
 
   "SYS001": "Unexpected system error"
 }
