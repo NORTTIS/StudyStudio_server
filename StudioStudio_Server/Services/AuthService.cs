@@ -253,75 +253,86 @@ namespace StudioStudio_Server.Services
 
         public async Task<LoginResponse> GoogleLoginAsync(GoogleLoginRequest request, HttpResponse response)
         {
-            var settings = new GoogleJsonWebSignature.ValidationSettings
+            try
             {
-                Audience = new[] { _configuration["Google:ClientId"] }
-            };
-
-            var payload = await GoogleJsonWebSignature.ValidateAsync(request.IdToken, settings);
-
-            var email = payload.Email;
-            var googleId = payload.Subject;
-            var firstName = payload.GivenName;
-            var lastName = payload.FamilyName;
-            var imgURL = payload.Picture;
-
-            var user = await _userRepository.GetByEmailAsync(email);
-            if (user == null)
-            {
-                user = new User
+                var settings = new GoogleJsonWebSignature.ValidationSettings
                 {
-                    UserId = Guid.NewGuid(),
-                    Email = email,
-                    GoogleId = googleId,
-                    FirstName = firstName,
-                    LastName = lastName,
-                    AvatarUrl = imgURL,
-                    Status = UserStatus.Active,
+                    Audience = new[] { _configuration["Google:ClientId"] }
                 };
 
-                await _userRepository.AddAsync(user);
+                var payload = await GoogleJsonWebSignature.ValidateAsync(request.IdToken, settings);
+
+                var email = payload.Email;
+                var googleId = payload.Subject;
+                var firstName = payload.GivenName;
+                var lastName = payload.FamilyName;
+                var imgURL = payload.Picture;
+
+                var user = await _userRepository.GetByEmailAsync(email);
+                var passwordHash = _passwordHasher.HashPassword(user, Guid.NewGuid().ToString());
+
+                if (user == null)
+                {
+                    user = new User
+                    {
+                        UserId = Guid.NewGuid(),
+                        Email = email,
+                        PasswordHash = passwordHash,
+                        GoogleId = googleId,
+                        FirstName = firstName,
+                        LastName = lastName,
+                        AvatarUrl = imgURL,
+                        Status = UserStatus.Active,
+                    };
+
+                    await _userRepository.AddAsync(user);
+                }
+                else
+                {
+                    user.GoogleId ??= googleId;
+                    user.FirstName ??= firstName;
+                    user.LastName ??= lastName;
+                    user.AvatarUrl ??= imgURL;
+                    user.Status = UserStatus.Active;
+
+                    await _userRepository.UpdateAsync(user);
+                }
+
+                if (user.RefreshToken != null)
+                {
+                    await _refreshTokenRepository.RevokeAsync(user.RefreshToken);
+                }
+
+                var accessTokenExpireMs = _configuration.GetValue<long>("JWT:AccessTokenExpireMs", 3600000);
+                var refreshTokenExpireMs = _configuration.GetValue<long>("JWT:RefreshTokenExpireMs", 86400000);
+
+                var accessExpireAt = DateTime.UtcNow.AddMilliseconds(accessTokenExpireMs);
+                var refreshExpireAt = DateTime.UtcNow.AddMilliseconds(refreshTokenExpireMs);
+
+                var accessToken = GenerateJWTToken(user, accessExpireAt);
+                var refreshToken = CreateRefreshToken(user, refreshExpireAt);
+
+                await _refreshTokenRepository.AddAsync(refreshToken);
+
+                SetRefreshTokenCookie(response, refreshToken.Token, refreshExpireAt);
+
+                return new LoginResponse
+                {
+                    Id = user.UserId,
+                    Email = user.Email,
+                    FirstName = user.FirstName,
+                    LastName = user.LastName,
+                    AccessToken = accessToken,
+                    AccessExpireIn = accessTokenExpireMs,
+                    RefreshToken = refreshToken.Token,
+                    RefreshExpireIn = refreshTokenExpireMs
+                };
             }
-            else
+            catch (Exception ex)
             {
-                user.GoogleId ??= googleId;
-                user.FirstName ??= firstName;
-                user.LastName ??= lastName;
-                user.AvatarUrl ??= imgURL;
-                user.Status = UserStatus.Active;
 
-                await _userRepository.UpdateAsync(user);
+                throw new AppException(ErrorCodes.AuthInvalidCredential, StatusCodes.Status401Unauthorized);
             }
-
-            if (user.RefreshToken != null)
-            {
-                await _refreshTokenRepository.RevokeAsync(user.RefreshToken);
-            }
-
-            var accessTokenExpireMs = _configuration.GetValue<long>("JWT:AccessTokenExpireMs", 3600000);
-            var refreshTokenExpireMs = _configuration.GetValue<long>("JWT:RefreshTokenExpireMs", 86400000);
-
-            var accessExpireAt = DateTime.UtcNow.AddMilliseconds(accessTokenExpireMs);
-            var refreshExpireAt = DateTime.UtcNow.AddMilliseconds(refreshTokenExpireMs);
-
-            var accessToken = GenerateJWTToken(user, accessExpireAt);
-            var refreshToken = CreateRefreshToken(user, refreshExpireAt);
-
-            await _refreshTokenRepository.AddAsync(refreshToken);
-
-            SetRefreshTokenCookie(response, refreshToken.Token, refreshExpireAt);
-
-            return new LoginResponse
-            {
-                Id = user.UserId,
-                Email = user.Email,
-                FirstName = user.FirstName,
-                LastName = user.LastName,
-                AccessToken = accessToken,
-                AccessExpireIn = accessTokenExpireMs,
-                RefreshToken = refreshToken.Token,
-                RefreshExpireIn = refreshTokenExpireMs
-            };
         }
 
         public async Task SendResetPasswordLinkAsync(string email)

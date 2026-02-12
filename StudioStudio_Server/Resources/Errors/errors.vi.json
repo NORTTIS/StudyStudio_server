@@ -39,6 +39,7 @@
   "SUCCESS009": "Email đặt lại mật khẩu đã được gửi thành công",
   "SUCCESS010": "Lấy dữ liệu thành công",
   "SUCCESS011": "Đặt lại mật khẩu thành công",
+  "SUCCESS012": "Gửi lại email xác thực thành công",
 
   "SYS001": "Lỗi hệ thống không xác định"
 }

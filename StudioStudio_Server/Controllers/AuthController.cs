@@ -50,6 +50,14 @@ namespace StudioStudio_Server.Controllers
             return Ok(ApiResponse<LoginResponse>.Success(ErrorCodes.SuccessLogin, message, loginResponse));
         }
 
+        [HttpPost("resend-email-verify")]
+        public async Task<IActionResult> ResendEmailVerify([FromBody] ResendVerifyEmailRequest request)
+        {
+            await _authService.ResendVerifyEmailAsync(request);
+            var message = _messageService.GetMessage(ErrorCodes.SuccessResendEmailVerify);
+            return Ok(ApiResponse<object>.Success(ErrorCodes.SuccessResendEmailVerify, message));
+        }
+
         [HttpPost("refresh")]
         public async Task<IActionResult> Refresh()
         {

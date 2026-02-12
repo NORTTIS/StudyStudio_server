@@ -15,5 +15,7 @@ namespace StudioStudio_Server.Services.Interfaces
         Task SendResetPasswordLinkAsync(string email);
         Task ResetPasswordAsync(string token, string newPassword);
         Task<bool> VerifyResetTokenAsync(string token);
+
+        Task ResendVerifyEmailAsync(ResendVerifyEmailRequest resendVerifyEmailRequest);
     }
 }

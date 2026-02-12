@@ -3,7 +3,7 @@
   "AUTH002": "Token has expired",
   "AUTH003": "You do not have permission",
   "AUTH004": "Password confirmation does not match",
-  "AUTH005": "Account not verified. Please check your email",
+  "AUTH005": "Account not verified.",
   "AUTH006": "Current password is incorrect",
 
   "USER001": "User not found",
@@ -39,6 +39,7 @@
   "SUCCESS009": "Password reset email sent successfully",
   "SUCCESS010": "Data retrieved successfully",
   "SUCCESS011": "Password reset successfully",
+  "SUCCESS012": "Verification email resent successfully",
 
   "SYS001": "Unexpected system error"
 }
