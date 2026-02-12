@@ -46,6 +46,7 @@
         public const string SuccessSendForgotLink = "SUCCESS009";
         public const string SuccessGetData = "SUCCESS010";
         public const string SuccessResetPassword = "SUCCESS011";
+        public const string SuccessResendEmailVerify = "SUCCESS012";
 
         // ANNOUNCEMENT
         public const string AnnouncementNotFound = "ANNOUNCEMENT001";

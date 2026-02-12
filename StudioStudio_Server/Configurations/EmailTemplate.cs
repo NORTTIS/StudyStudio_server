@@ -18,7 +18,7 @@ namespace StudioStudio_Server.Configurations
                     border-radius:5px'>
                 Verify Email
                 </a>
-                <p>This link will expire in 5 minutes.</p>
+                <p>Liên kết này sẽ hết hạn sau 15 phút.</p>
             </body>
             </html>";
         }
@@ -38,7 +38,7 @@ namespace StudioStudio_Server.Configurations
                     border-radius:5px'>
                 Reset password
                 </a>
-                <p>This link will expire in 5 minutes.</p>
+                <p>This link will expire in 15 minutes.</p>
             </body>
             </html>";
         }
