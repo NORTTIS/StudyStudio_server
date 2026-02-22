@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using StudioStudio_Server.Data;
@@ -11,9 +12,11 @@ using StudioStudio_Server.Data;
 namespace StudioStudio_Server.Migrations
 {
     [DbContext(typeof(StudioDbContext))]
-    partial class StudioDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260221134946_updateGroupField")]
+    partial class updateGroupField
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -205,10 +208,6 @@ namespace StudioStudio_Server.Migrations
 
                     b.HasKey("FavouriteId");
 
-                    b.HasIndex("GroupId");
-
-                    b.HasIndex("UserId");
-
                     b.ToTable("Favourites");
                 });
 
@@ -239,6 +238,9 @@ namespace StudioStudio_Server.Migrations
 
                     b.Property<Guid?>("StudioId")
                         .HasColumnType("uuid");
+
+                    b.Property<string>("Subject")
+                        .HasColumnType("text");
 
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -499,12 +501,6 @@ namespace StudioStudio_Server.Migrations
                     b.Property<int>("MaxAiRequestsPerDay")
                         .HasColumnType("integer");
 
-                    b.Property<int>("MaxGroups")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("MaxMembersPerGroup")
-                        .HasColumnType("integer");
-
                     b.Property<int>("MaxStorageMb")
                         .HasColumnType("integer");
 
@@ -744,21 +740,6 @@ namespace StudioStudio_Server.Migrations
                     b.Navigation("User");
                 });
 
-            modelBuilder.Entity("StudioStudio_Server.Models.Entities.Favourite", b =>
-                {
-                    b.HasOne("StudioStudio_Server.Models.Entities.Group", null)
-                        .WithMany("Favourites")
-                        .HasForeignKey("GroupId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("StudioStudio_Server.Models.Entities.User", null)
-                        .WithMany("Favourites")
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-                });
-
             modelBuilder.Entity("StudioStudio_Server.Models.Entities.Group", b =>
                 {
                     b.HasOne("StudioStudio_Server.Models.Entities.Studio", null)
@@ -853,8 +834,6 @@ namespace StudioStudio_Server.Migrations
 
             modelBuilder.Entity("StudioStudio_Server.Models.Entities.Group", b =>
                 {
-                    b.Navigation("Favourites");
-
                     b.Navigation("Participants");
                 });
 
@@ -866,8 +845,6 @@ namespace StudioStudio_Server.Migrations
             modelBuilder.Entity("StudioStudio_Server.Models.Entities.User", b =>
                 {
                     b.Navigation("EmailVerificationToken");
-
-                    b.Navigation("Favourites");
 
                     b.Navigation("GroupParticipants");
 

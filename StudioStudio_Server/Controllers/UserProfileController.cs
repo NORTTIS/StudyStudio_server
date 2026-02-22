@@ -23,17 +23,17 @@ namespace StudioStudio_Server.Controllers
         }
 
         [HttpGet("user-profile")]
-        public async Task<IActionResult> GetUserProfile()
+        public async Task<ActionResult<ApiResponse<UserProfileResponse>>> GetUserProfile()
         {
             var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            
+
             if (string.IsNullOrEmpty(userIdClaim) || !Guid.TryParse(userIdClaim, out Guid userId))
             {
                 throw new AppException(ErrorCodes.AuthInvalidCredential, StatusCodes.Status401Unauthorized);
             }
 
             var user = await _userService.GetByIdAsync(userId);
-            
+
             if (user == null)
             {
                 throw new AppException(ErrorCodes.UserNotFound, StatusCodes.Status404NotFound);
@@ -73,7 +73,7 @@ namespace StudioStudio_Server.Controllers
         public async Task<IActionResult> UpdateUserProfile([FromForm] UpdateUserProfileRequest request)
         {
             var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            
+
             if (string.IsNullOrEmpty(userIdClaim) || !Guid.TryParse(userIdClaim, out Guid userId))
             {
                 throw new AppException(ErrorCodes.AuthInvalidCredential, StatusCodes.Status401Unauthorized);
@@ -88,7 +88,7 @@ namespace StudioStudio_Server.Controllers
         public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordRequest request)
         {
             var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            
+
             if (string.IsNullOrEmpty(userIdClaim) || !Guid.TryParse(userIdClaim, out Guid userId))
             {
                 throw new AppException(ErrorCodes.AuthInvalidCredential, StatusCodes.Status401Unauthorized);

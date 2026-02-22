@@ -40,6 +40,7 @@
   "SUCCESS010": "Data retrieved successfully",
   "SUCCESS011": "Password reset successfully",
   "SUCCESS012": "Verification email resent successfully",
+  "SUCCESS013": "Groups retrieved successfully",
 
   "SYS001": "Unexpected system error"
 }

@@ -47,6 +47,7 @@
         public const string SuccessGetData = "SUCCESS010";
         public const string SuccessResetPassword = "SUCCESS011";
         public const string SuccessResendEmailVerify = "SUCCESS012";
+        public const string SuccessGetGroup = "SUCCESS013";
 
         // ANNOUNCEMENT
         public const string AnnouncementNotFound = "ANNOUNCEMENT001";
