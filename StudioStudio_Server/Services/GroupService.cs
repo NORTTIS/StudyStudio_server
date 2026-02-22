@@ -1,5 +1,7 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using StudioStudio_Server.Data;
+using StudioStudio_Server.Exceptions;
+using StudioStudio_Server.Models.DTOs.Request;
 using StudioStudio_Server.Models.DTOs.Response;
 using StudioStudio_Server.Models.Entities;
 using StudioStudio_Server.Repositories.Interfaces;
@@ -157,6 +159,113 @@ namespace StudioStudio_Server.Services
             };
 
             return response;
+        }
+
+        public async Task<CreateGroupResponse> CreateGroupAsync(Guid userId, CreateGroupRequest request)
+        {
+            // Check subscription limit
+            var subscriptionPlan = await _userSubscriptionRepository.GetSubscriptionPlanByUserIdAsync(userId);
+            var groupLimit = subscriptionPlan?.MaxGroups ?? 5;
+
+            var currentGroupCount = await _groupRepository.CountGroupsCreatedByUserAsync(userId);
+            if (currentGroupCount >= groupLimit)
+            {
+                throw new AppException(ErrorCodes.GroupLimitReached, StatusCodes.Status403Forbidden);
+            }
+
+            // Check if creating in studio
+            if (request.StudioId.HasValue)
+            {
+                // Verify studio exists
+                var studio = await _studioRepository.GetByIdAsync(request.StudioId.Value);
+                if (studio == null)
+                {
+                    throw new AppException(ErrorCodes.StudioNotFound, StatusCodes.Status404NotFound);
+                }
+
+                // Verify user is studio owner
+                var isOwner = await _studioRepository.IsUserStudioOwnerAsync(request.StudioId.Value, userId);
+                if (!isOwner)
+                {
+                    throw new AppException(ErrorCodes.StudioPermissionDenied, StatusCodes.Status403Forbidden);
+                }
+
+                // Check if group name already exists in this studio
+                var nameExists = await _groupRepository.GroupNameExistsInStudioAsync(request.StudioId, request.GroupName);
+                if (nameExists)
+                {
+                    throw new AppException(ErrorCodes.GroupNameAlreadyExists, StatusCodes.Status400BadRequest);
+                }
+            }
+            else
+            {
+                // For independent groups, check if name exists (studioId = null)
+                var nameExists = await _groupRepository.GroupNameExistsInStudioAsync(null, request.GroupName);
+                if (nameExists)
+                {
+                    throw new AppException(ErrorCodes.GroupNameAlreadyExists, StatusCodes.Status400BadRequest);
+                }
+            }
+
+            // Create new group
+            var now = DateTime.UtcNow;
+            var newGroup = new Group
+            {
+                GroupId = Guid.NewGuid(),
+                GroupName = request.GroupName,
+                Description = request.Description,
+                StudioId = request.StudioId,
+                CreatedBy = userId,
+                IsTemplate = false,
+                IsActive = true,
+                CreatedAt = now,
+                UpdatedAt = now
+            };
+
+            await _groupRepository.AddAsync(newGroup);
+
+            // Add creator as Owner participant
+            var ownerParticipant = new GroupParticipant
+            {
+                ParticipantId = Guid.NewGuid(),
+                GroupId = newGroup.GroupId,
+                UserId = userId,
+                Role = GroupRole.Owner,
+                CreatedAt = now
+            };
+
+            await _groupParticipantRepository.AddAsync(ownerParticipant);
+
+            return new CreateGroupResponse
+            {
+                GroupId = newGroup.GroupId,
+                GroupName = newGroup.GroupName,
+                Description = newGroup.Description,
+                StudioId = newGroup.StudioId,
+                GroupType = newGroup.StudioId.HasValue ? "Studio" : "Independent",
+                CreatedBy = userId,
+                CreatedAt = newGroup.CreatedAt
+            };
+        }
+
+        public async Task DeleteGroupAsync(Guid userId, Guid groupId)
+        {
+            // Check if group exists
+            var group = await _groupRepository.GetByIdAsync(groupId);
+            if (group == null)
+            {
+                throw new AppException(ErrorCodes.GroupNotFound, StatusCodes.Status404NotFound);
+            }
+
+            // Check if user is the owner of the group
+            var isOwner = await _groupRepository.IsUserGroupOwnerAsync(groupId, userId);
+            if (!isOwner)
+            {
+                throw new AppException(ErrorCodes.GroupPermissionDenied, StatusCodes.Status403Forbidden);
+            }
+
+            // Soft delete the group
+            await _groupRepository.DeleteAsync(group);
         }
     }
 }

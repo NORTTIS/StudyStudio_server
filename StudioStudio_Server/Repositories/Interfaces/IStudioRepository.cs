@@ -5,5 +5,7 @@ namespace StudioStudio_Server.Repositories.Interfaces
     public interface IStudioRepository
     {
         Task<List<Studio>> GetByIdsAsync(List<Guid> studioIds);
+        Task<Studio?> GetByIdAsync(Guid studioId);
+        Task<bool> IsUserStudioOwnerAsync(Guid studioId, Guid userId);
     }
 }

@@ -22,5 +22,48 @@ namespace StudioStudio_Server.Repositories
                 .AsNoTracking()
                 .ToListAsync();
         }
+
+        public async Task<Group?> GetByIdAsync(Guid groupId)
+        {
+            return await _db.Groups
+                .Include(g => g.Participants)
+                .FirstOrDefaultAsync(g => g.GroupId == groupId && g.IsActive);
+        }
+
+        public async Task<bool> GroupNameExistsInStudioAsync(Guid? studioId, string groupName)
+        {
+            return await _db.Groups
+                .AnyAsync(g => g.StudioId == studioId && 
+                              g.GroupName == groupName && 
+                              g.IsActive);
+        }
+
+        public async Task<int> CountGroupsCreatedByUserAsync(Guid userId)
+        {
+            return await _db.Groups
+                .Where(g => g.Participants.Any(p => p.UserId == userId && p.Role == GroupRole.Owner) && g.IsActive)
+                .CountAsync();
+        }
+
+        public async Task AddAsync(Group group)
+        {
+            _db.Groups.Add(group);
+            await _db.SaveChangesAsync();
+        }
+
+        public async Task<bool> IsUserGroupOwnerAsync(Guid groupId, Guid userId)
+        {
+            return await _db.Groups
+                .Where(g => g.GroupId == groupId && g.IsActive)
+                .AnyAsync(g => g.Participants.Any(p => p.UserId == userId && p.Role == GroupRole.Owner));
+        }
+
+        public async Task DeleteAsync(Group group)
+        {
+            group.IsActive = false;
+            group.UpdatedAt = DateTime.UtcNow;
+            _db.Groups.Update(group);
+            await _db.SaveChangesAsync();
+        }
     }
 }

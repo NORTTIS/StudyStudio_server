@@ -21,5 +21,11 @@ namespace StudioStudio_Server.Repositories
                 .AsNoTracking()
                 .ToListAsync();
         }
+
+        public async Task AddAsync(GroupParticipant participant)
+        {
+            _context.GroupParticipants.Add(participant);
+            await _context.SaveChangesAsync();
+        }
     }
 }
