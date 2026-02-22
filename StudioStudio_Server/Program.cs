@@ -38,6 +38,13 @@ builder.Services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
 builder.Services.AddScoped<IPasswordHasher<User>, PasswordHasher<User>>();
 builder.Services.AddScoped<IEmailVerificationTokenRepository, EmailVerificationTokenRepository>();
 builder.Services.AddScoped<IPasswordResetCacheService, PasswordResetCacheService>();
+builder.Services.AddScoped<IGroupRepository, GroupRepository>();
+builder.Services.AddScoped<IGroupService, GroupService>();
+builder.Services.AddScoped<IUserSubscriptionRepository, UserSubscriptionRepository>();
+builder.Services.AddScoped<IFavouriteRepository, FavouriteRepository>();
+builder.Services.AddScoped<IStudioRepository, StudioRepository>();
+builder.Services.AddScoped<IGroupParticipantRepository, GroupParticipantRepository>();
+builder.Services.AddScoped<ITaskRepository, TaskRepository>();
 
 
 builder.Services.AddControllers(options =>
