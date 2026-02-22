@@ -24,5 +24,17 @@ namespace StudioStudio_Server.Repositories
                 .AsNoTracking()
                 .ToListAsync();
         }
+
+        public async Task<Studio?> GetByIdAsync(Guid studioId)
+        {
+            return await _context.Studios
+                .FirstOrDefaultAsync(s => s.StudioId == studioId);
+        }
+
+        public async Task<bool> IsUserStudioOwnerAsync(Guid studioId, Guid userId)
+        {
+            return await _context.Studios
+                .AnyAsync(s => s.StudioId == studioId && s.OwnerId == userId);
+        }
     }
 }
