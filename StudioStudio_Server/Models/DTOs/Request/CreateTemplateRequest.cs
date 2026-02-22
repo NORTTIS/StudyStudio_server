@@ -3,10 +3,8 @@ using StudioStudio_Server.Exceptions;
 
 namespace StudioStudio_Server.Models.DTOs.Request
 {
-    public class CreateGroupRequest
+    public class CreateTemplateRequest
     {
-        public Guid? StudioId { get; set; } = null;
-
         [Required(ErrorMessage = ErrorCodes.ValidationRequiredField)]
         [StringLength(100, MinimumLength = 1, ErrorMessage = ErrorCodes.ValidationRequiredField)]
         public string GroupName { get; set; } = string.Empty;
@@ -14,6 +12,8 @@ namespace StudioStudio_Server.Models.DTOs.Request
         [StringLength(500, ErrorMessage = ErrorCodes.ValidationRequiredField)]
         public string? Description { get; set; }
 
-        public Guid? TemplateId { get; set; } = null;
+        [Required(ErrorMessage = ErrorCodes.ValidationRequiredField)]
+        [MinLength(1, ErrorMessage = ErrorCodes.ValidationRequiredField)]
+        public List<GroupTaskStatusRequest> GroupTaskStatuses { get; set; } = new List<GroupTaskStatusRequest>();
     }
 }

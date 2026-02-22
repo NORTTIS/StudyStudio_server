@@ -45,6 +45,10 @@ builder.Services.AddScoped<IFavouriteRepository, FavouriteRepository>();
 builder.Services.AddScoped<IStudioRepository, StudioRepository>();
 builder.Services.AddScoped<IGroupParticipantRepository, GroupParticipantRepository>();
 builder.Services.AddScoped<ITaskRepository, TaskRepository>();
+builder.Services.AddScoped<ITemplateRepository, TemplateRepository>();
+builder.Services.AddScoped<ITemplateService, TemplateService>();
+builder.Services.AddScoped<IGroupTaskStatusRepository, GroupTaskStatusRepository>();
+builder.Services.AddScoped<ISeederService, SeederService>();
 
 
 builder.Services.AddControllers(options =>
@@ -142,6 +146,9 @@ using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<StudioDbContext>();
     db.Database.Migrate();
+    
+    var seeder = scope.ServiceProvider.GetRequiredService<ISeederService>();
+    await seeder.SeedInitialDataAsync();
 }
 
 // Configure the HTTP request pipeline.

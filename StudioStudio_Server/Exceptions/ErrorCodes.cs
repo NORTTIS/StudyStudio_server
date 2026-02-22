@@ -30,6 +30,11 @@
         public const string StudioPermissionDenied = "GROUP005";
         public const string GroupPermissionDenied = "GROUP006";
 
+        // TEMPLATE
+        public const string TemplateNotFound = "TEMPLATE001";
+        public const string TemplatePermissionDenied = "TEMPLATE002";
+        public const string TemplateGroupNotFound = "TEMPLATE003";
+
         // VALIDATION
         public const string ValidationInvalidEmail = "VALIDATION001";
         public const string ValidationInvalidPassword = "VALIDATION002";
@@ -58,6 +63,9 @@
         public const string SuccessGetGroup = "SUCCESS013";
         public const string SuccessCreateGroup = "SUCCESS014";
         public const string SuccessDeleteGroup = "SUCCESS015";
+        public const string SuccessCreateTemplate = "SUCCESS016";
+        public const string SuccessUpdateTemplate = "SUCCESS017";
+        public const string SuccessDeleteTemplate = "SUCCESS018";
 
         // ANNOUNCEMENT
         public const string AnnouncementNotFound = "ANNOUNCEMENT001";
