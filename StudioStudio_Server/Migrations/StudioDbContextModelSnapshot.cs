@@ -94,6 +94,47 @@ namespace StudioStudio_Server.Migrations
                     b.ToTable("ActivityLogs");
                 });
 
+            modelBuilder.Entity("StudioStudio_Server.Models.Entities.Announcement", b =>
+                {
+                    b.Property<Guid>("AnnouncementId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Content")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("CreatedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime?>("PublishedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<int>("Type")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("AnnouncementId");
+
+                    b.HasIndex("IsActive");
+
+                    b.HasIndex("PublishedAt");
+
+                    b.ToTable("Announcements");
+                });
+
             modelBuilder.Entity("StudioStudio_Server.Models.Entities.Comment", b =>
                 {
                     b.Property<Guid>("CommentId")
@@ -164,6 +205,10 @@ namespace StudioStudio_Server.Migrations
 
                     b.HasKey("FavouriteId");
 
+                    b.HasIndex("GroupId");
+
+                    b.HasIndex("UserId");
+
                     b.ToTable("Favourites");
                 });
 
@@ -178,6 +223,9 @@ namespace StudioStudio_Server.Migrations
 
                     b.Property<Guid>("CreatedBy")
                         .HasColumnType("uuid");
+
+                    b.Property<string>("Description")
+                        .HasColumnType("text");
 
                     b.Property<string>("GroupName")
                         .IsRequired()
@@ -451,6 +499,12 @@ namespace StudioStudio_Server.Migrations
                     b.Property<int>("MaxAiRequestsPerDay")
                         .HasColumnType("integer");
 
+                    b.Property<int>("MaxGroups")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("MaxMembersPerGroup")
+                        .HasColumnType("integer");
+
                     b.Property<int>("MaxStorageMb")
                         .HasColumnType("integer");
 
@@ -522,6 +576,42 @@ namespace StudioStudio_Server.Migrations
                     b.HasKey("HistoryId");
 
                     b.ToTable("TaskHistories");
+                });
+
+            modelBuilder.Entity("StudioStudio_Server.Models.Entities.Template", b =>
+                {
+                    b.Property<Guid>("TemplateId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("GroupId")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsSystemTemplate")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("TemplateId");
+
+                    b.HasIndex("GroupId")
+                        .IsUnique();
+
+                    b.HasIndex("IsActive");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("Templates");
                 });
 
             modelBuilder.Entity("StudioStudio_Server.Models.Entities.User", b =>
@@ -690,6 +780,21 @@ namespace StudioStudio_Server.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("StudioStudio_Server.Models.Entities.Favourite", b =>
+                {
+                    b.HasOne("StudioStudio_Server.Models.Entities.Group", null)
+                        .WithMany("Favourites")
+                        .HasForeignKey("GroupId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("StudioStudio_Server.Models.Entities.User", null)
+                        .WithMany("Favourites")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("StudioStudio_Server.Models.Entities.Group", b =>
                 {
                     b.HasOne("StudioStudio_Server.Models.Entities.Studio", null)
@@ -731,6 +836,25 @@ namespace StudioStudio_Server.Migrations
                         .HasForeignKey("OwnerId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("StudioStudio_Server.Models.Entities.Template", b =>
+                {
+                    b.HasOne("StudioStudio_Server.Models.Entities.Group", "Group")
+                        .WithMany()
+                        .HasForeignKey("GroupId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("StudioStudio_Server.Models.Entities.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Group");
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("StudioStudio_Server.Models.Entities.UserSubscription", b =>
@@ -784,6 +908,8 @@ namespace StudioStudio_Server.Migrations
 
             modelBuilder.Entity("StudioStudio_Server.Models.Entities.Group", b =>
                 {
+                    b.Navigation("Favourites");
+
                     b.Navigation("Participants");
                 });
 
@@ -795,6 +921,8 @@ namespace StudioStudio_Server.Migrations
             modelBuilder.Entity("StudioStudio_Server.Models.Entities.User", b =>
                 {
                     b.Navigation("EmailVerificationToken");
+
+                    b.Navigation("Favourites");
 
                     b.Navigation("GroupParticipants");
 

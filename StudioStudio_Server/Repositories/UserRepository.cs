@@ -38,5 +38,13 @@ namespace StudioStudio_Server.Repositories
             _context.Users.Update(user);
             await _context.SaveChangesAsync();
         }
+
+        public async Task<List<User>> GetByIdsAsync(List<Guid> userIds)
+        {
+            return await _context.Users
+                .Where(u => userIds.Contains(u.UserId))
+                .AsNoTracking()
+                .ToListAsync();
+        }
     }
 }

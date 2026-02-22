@@ -24,5 +24,6 @@
         public ICollection<EmailVerificationToken> EmailVerificationToken { get; set; } = new List<EmailVerificationToken>();
         public string? GoogleId { get; set; } = null;
         public ICollection<GroupParticipant> GroupParticipants { get; set; } = new List<GroupParticipant>();
+        public ICollection<Favourite> Favourites { get; set; } = new List<Favourite>();
     }
 }

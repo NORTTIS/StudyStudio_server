@@ -23,7 +23,7 @@ namespace StudioStudio_Server.Controllers
         }
 
         [HttpGet]
-        public async Task<IActionResult> GetAnnouncements()
+        public async Task<ActionResult<ApiResponse<List<AnnouncementResponse>>>> GetAnnouncements()
         {
             // Mock data - later can be replaced with real database query
             var mockAnnouncements = new List<AnnouncementResponse>

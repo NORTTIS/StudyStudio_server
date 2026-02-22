@@ -8,5 +8,6 @@ namespace StudioStudio_Server.Repositories.Interfaces
         Task<User?> GetByEmailAsync(string email);
         Task AddAsync(User user);
         Task UpdateAsync(User user);
+        Task<List<User>> GetByIdsAsync(List<Guid> userIds);
     }
 }
