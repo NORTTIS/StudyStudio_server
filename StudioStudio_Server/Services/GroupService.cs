@@ -20,6 +20,8 @@ namespace StudioStudio_Server.Services
         private readonly IStudioRepository _studioRepository;
         private readonly IGroupParticipantRepository _groupParticipantRepository;
         private readonly ITaskRepository _taskRepository;
+        private readonly ITemplateRepository _templateRepository;
+        private readonly IGroupTaskStatusRepository _groupTaskStatusRepository;
 
         public GroupService(
             ILogger<GroupService> logger,
@@ -30,7 +32,9 @@ namespace StudioStudio_Server.Services
             IUserRepository userRepository,
             IStudioRepository studioRepository,
             IGroupParticipantRepository groupParticipantRepository,
-            ITaskRepository taskRepository)
+            ITaskRepository taskRepository,
+            ITemplateRepository templateRepository,
+            IGroupTaskStatusRepository groupTaskStatusRepository)
         {
             _logger = logger;
             _messageService = messageService;
@@ -41,6 +45,8 @@ namespace StudioStudio_Server.Services
             _studioRepository = studioRepository;
             _groupParticipantRepository = groupParticipantRepository;
             _taskRepository = taskRepository;
+            _templateRepository = templateRepository;
+            _groupTaskStatusRepository = groupTaskStatusRepository;
         }
 
         public async Task<GroupListResponse> GetGroupsAsync(Guid userId)
@@ -207,6 +213,26 @@ namespace StudioStudio_Server.Services
                 }
             }
 
+            // Validate template if provided
+            List<GroupTaskStatus>? templateTaskStatuses = null;
+            if (request.TemplateId.HasValue)
+            {
+                var template = await _templateRepository.GetByIdAsync(request.TemplateId.Value);
+                if (template == null)
+                {
+                    throw new AppException(ErrorCodes.TemplateNotFound, StatusCodes.Status404NotFound);
+                }
+
+                // Check if user has access to this template
+                if (!template.IsSystemTemplate && template.UserId != userId)
+                {
+                    throw new AppException(ErrorCodes.TemplatePermissionDenied, StatusCodes.Status403Forbidden);
+                }
+
+                // Get template's task statuses
+                templateTaskStatuses = await _groupTaskStatusRepository.GetByGroupIdAsync(template.GroupId);
+            }
+
             // Create new group
             var now = DateTime.UtcNow;
             var newGroup = new Group
@@ -235,6 +261,20 @@ namespace StudioStudio_Server.Services
             };
 
             await _groupParticipantRepository.AddAsync(ownerParticipant);
+
+            // Copy task statuses from template if provided
+            if (templateTaskStatuses != null && templateTaskStatuses.Any())
+            {
+                var newTaskStatuses = templateTaskStatuses.Select(ts => new GroupTaskStatus
+                {
+                    StatusId = Guid.NewGuid(),
+                    GroupId = newGroup.GroupId,
+                    StatusName = ts.StatusName,
+                    Position = ts.Position
+                }).ToList();
+
+                await _groupTaskStatusRepository.AddRangeAsync(newTaskStatuses);
+            }
 
             return new CreateGroupResponse
             {
