@@ -1,0 +1,15 @@
+﻿using StudioStudio_Server.Models.Entities;
+
+namespace StudioStudio_Server.Repositories.Interfaces
+{
+    public interface IGroupRepository
+    {
+        Task<List<Group>> GetUserGroupsAsync(Guid userId);
+        Task<Group?> GetByIdAsync(Guid groupId);
+        Task<bool> GroupNameExistsInStudioAsync(Guid? studioId, string groupName);
+        Task<int> CountGroupsCreatedByUserAsync(Guid userId);
+        Task AddAsync(Group group);
+        Task<bool> IsUserGroupOwnerAsync(Guid groupId, Guid userId);
+        Task DeleteAsync(Group group);
+    }
+}

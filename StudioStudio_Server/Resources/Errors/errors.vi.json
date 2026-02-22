@@ -15,6 +15,17 @@
   "TASK001": "Không tìm thấy công việc",
   "TASK002": "Bạn không có quyền truy cập công việc này",
 
+  "GROUP001": "Không tìm thấy nhóm",
+  "GROUP002": "Tên nhóm đã tồn tại trong studio này",
+  "GROUP003": "Bạn đã đạt giới hạn số lượng nhóm có thể tạo",
+  "GROUP004": "Không tìm thấy studio",
+  "GROUP005": "Bạn không có quyền tạo nhóm trong studio này",
+  "GROUP006": "Bạn không có quyền xóa nhóm này. Chỉ chủ nhóm mới có thể xóa",
+
+  "TEMPLATE001": "Không tìm thấy mẫu",
+  "TEMPLATE002": "Bạn không có quyền truy cập mẫu này",
+  "TEMPLATE003": "Không tìm thấy nhóm mẫu",
+
   "VALIDATION001": "Định dạng email không hợp lệ",
   "VALIDATION002": "Mật khẩu phải dài từ 10-20 ký tự, chứa ít nhất một chữ hoa, một chữ thường và một chữ số",
   "VALIDATION003": "Mật khẩu và xác nhận mật khẩu không khớp",
@@ -40,6 +51,12 @@
   "SUCCESS010": "Lấy dữ liệu thành công",
   "SUCCESS011": "Đặt lại mật khẩu thành công",
   "SUCCESS012": "Gửi lại email xác thực thành công",
+  "SUCCESS013": "Lấy danh sách nhóm thành công",
+  "SUCCESS014": "Tạo nhóm thành công",
+  "SUCCESS015": "Xóa nhóm thành công",
+  "SUCCESS016": "Tạo mẫu thành công",
+  "SUCCESS017": "Cập nhật mẫu thành công",
+  "SUCCESS018": "Xóa mẫu thành công",
 
   "SYS001": "Lỗi hệ thống không xác định"
 }

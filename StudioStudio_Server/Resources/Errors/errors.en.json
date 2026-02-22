@@ -15,6 +15,17 @@
   "TASK001": "Task not found",
   "TASK002": "You are not allowed to access this task",
 
+  "GROUP001": "Group not found",
+  "GROUP002": "Group name already exists in this studio",
+  "GROUP003": "You have reached the limit of groups you can create",
+  "GROUP004": "Studio not found",
+  "GROUP005": "You do not have permission to create a group in this studio",
+  "GROUP006": "You do not have permission to delete this group. Only the group owner can delete it",
+
+  "TEMPLATE001": "Template not found",
+  "TEMPLATE002": "You do not have permission to access this template",
+  "TEMPLATE003": "Template group not found",
+
   "VALIDATION001": "Invalid email format",
   "VALIDATION002": "Password must be 10-20 characters long, contain at least one uppercase letter, one lowercase letter, and one digit",
   "VALIDATION003": "Password and confirm password do not match",
@@ -40,6 +51,12 @@
   "SUCCESS010": "Data retrieved successfully",
   "SUCCESS011": "Password reset successfully",
   "SUCCESS012": "Verification email resent successfully",
+  "SUCCESS013": "Groups retrieved successfully",
+  "SUCCESS014": "Group created successfully",
+  "SUCCESS015": "Group deleted successfully",
+  "SUCCESS016": "Template created successfully",
+  "SUCCESS017": "Template updated successfully",
+  "SUCCESS018": "Template deleted successfully",
 
   "SYS001": "Unexpected system error"
 }

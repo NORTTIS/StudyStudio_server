@@ -43,7 +43,7 @@ namespace StudioStudio_Server.Controllers
         }
 
         [HttpPost("login")]
-        public async Task<IActionResult> Login([FromBody] LoginRequests loginRequest)
+        public async Task<ActionResult<ApiResponse<LoginResponse>>> Login([FromBody] LoginRequests loginRequest)
         {
             var loginResponse = await _authService.LoginAsync(loginRequest, Response);
             var message = _messageService.GetMessage(ErrorCodes.SuccessLogin);
@@ -59,7 +59,7 @@ namespace StudioStudio_Server.Controllers
         }
 
         [HttpPost("refresh")]
-        public async Task<IActionResult> Refresh()
+        public async Task<ActionResult<ApiResponse<LoginResponse>>> Refresh()
         {
             string? refreshToken = Request.Cookies["refreshToken"];
 

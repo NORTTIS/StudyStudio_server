@@ -14,6 +14,8 @@
         public int MaxStorageMb { get; set; }
 
         public int MaxAiRequestsPerDay { get; set; }
+        public int MaxGroups { get; set; }
+        public int MaxMembersPerGroup { get; set; }
 
         public bool IsActive { get; set; }
     }

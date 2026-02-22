@@ -32,6 +32,7 @@ namespace StudioStudio_Server.Data
         public DbSet<RefreshToken> RefreshToken => Set<RefreshToken>();
         public DbSet<EmailVerificationToken> EmailVerificationTokens => Set<EmailVerificationToken>();
         public DbSet<Announcement> Announcements => Set<Announcement>();
+        public DbSet<Template> Templates => Set<Template>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -276,6 +277,25 @@ namespace StudioStudio_Server.Data
                 e.Property(x => x.Content).IsRequired();
                 e.HasIndex(x => x.IsActive);
                 e.HasIndex(x => x.PublishedAt);
+            });
+
+            // TEMPLATE
+            modelBuilder.Entity<Template>(e =>
+            {
+                e.HasKey(x => x.TemplateId);
+
+                e.HasOne(x => x.User)
+                    .WithMany()
+                    .HasForeignKey(x => x.UserId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+                e.HasOne(x => x.Group)
+                    .WithMany()
+                    .HasForeignKey(x => x.GroupId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                e.HasIndex(x => x.GroupId).IsUnique();
+                e.HasIndex(x => x.IsActive);
             });
         }
     }
