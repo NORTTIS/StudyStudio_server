@@ -72,5 +72,21 @@ namespace StudioStudio_Server.Repositories
                 .Where(g => g.StudioId == studioId && g.IsActive)
                 .CountAsync();
         }
+
+        public async Task UpdateAsync(Group group)
+        {
+            group.UpdatedAt = DateTime.UtcNow;
+            _db.Groups.Update(group);
+            await _db.SaveChangesAsync();
+        }
+
+        public async Task<bool> GroupNameExistsInStudioExcludingGroupAsync(Guid? studioId, string groupName, Guid excludeGroupId)
+        {
+            return await _db.Groups
+                .AnyAsync(g => g.StudioId == studioId && 
+                              g.GroupName == groupName && 
+                              g.GroupId != excludeGroupId &&
+                              g.IsActive);
+        }
     }
 }

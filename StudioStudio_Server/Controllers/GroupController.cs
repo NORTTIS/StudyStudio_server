@@ -101,5 +101,29 @@ namespace StudioStudio_Server.Controllers
             var message = _messageService.GetMessage(ErrorCodes.SuccessDeleteGroup);
             return Ok(ApiResponse<object>.Success(ErrorCodes.SuccessDeleteGroup, message, null));
         }
+
+        [HttpPut]
+        [Authorize]
+        public async Task<ActionResult<ApiResponse<UpdateGroupResponse>>> UpdateGroup([FromBody] UpdateGroupRequest request)
+        {
+            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+            if (string.IsNullOrEmpty(userIdClaim) || !Guid.TryParse(userIdClaim, out Guid userId))
+            {
+                throw new AppException(ErrorCodes.AuthInvalidCredential, StatusCodes.Status401Unauthorized);
+            }
+
+            var isAdminClaim = User.FindFirst("IsAdmin")?.Value;
+            var isAdmin = isAdminClaim != null && bool.TryParse(isAdminClaim, out var adminResult) && adminResult;
+
+            if (isAdmin)
+            {
+                throw new AppException(ErrorCodes.AuthForbidden, StatusCodes.Status403Forbidden);
+            }
+
+            var result = await _groupService.UpdateGroupAsync(userId, request);
+            var message = _messageService.GetMessage(ErrorCodes.SuccessUpdateGroup);
+            return Ok(ApiResponse<UpdateGroupResponse>.Success(ErrorCodes.SuccessUpdateGroup, message, result));
+        }
     }
 }

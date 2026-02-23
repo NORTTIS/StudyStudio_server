@@ -173,6 +173,7 @@ namespace StudioStudio_Server.Services
             return allTemplates.Select(t => new TemplateResponse
             {
                 TemplateId = t.TemplateId,
+                UserId = t.UserId,
                 GroupId = t.GroupId,
                 GroupName = t.Group.GroupName,
                 GroupDescription = t.Group.Description,

@@ -21,6 +21,20 @@
   "GROUP004": "Không tìm thấy studio",
   "GROUP005": "Bạn không có quyền tạo nhóm trong studio này",
   "GROUP006": "Bạn không có quyền xóa nhóm này. Chỉ chủ nhóm mới có thể xóa",
+  "GROUP007": "Bạn đã là thành viên của nhóm này",
+  "GROUP008": "Nhóm đã đạt giới hạn số lượng thành viên tối đa",
+  "GROUP009": "Không tìm thấy thành viên trong nhóm này",
+  "GROUP010": "Không thể xóa chủ nhóm",
+  "GROUP011": "Bạn không thể tự xóa mình khỏi nhóm",
+  "GROUP012": "Chỉ có thể có một chủ nhóm",
+  "GROUP013": "Chỉ có thể có một người điều hành",
+  "GROUP014": "Bạn không thể thay đổi vai trò của chính mình",
+  "GROUP015": "Bạn không có quyền cập nhật nhóm này. Chỉ chủ nhóm và người điều hành mới có thể cập nhật",
+
+  "INVITE001": "Liên kết mời không hợp lệ hoặc đã hết hạn",
+  "INVITE002": "Liên kết mời đã hết hạn",
+  "INVITE003": "Vai trò mời không hợp lệ",
+  "INVITE004": "Bạn đã vượt quá giới hạn tạo liên kết mời. Vui lòng thử lại sau 15 phút",
 
   "STUDIO001": "Bạn đã đạt giới hạn số lượng studio có thể tạo",
 
@@ -59,9 +73,15 @@
   "SUCCESS016": "Tạo mẫu thành công",
   "SUCCESS017": "Cập nhật mẫu thành công",
   "SUCCESS018": "Xóa mẫu thành công",
-  "SUCCESS019": "Tạo studio thành công",
-  "SUCCESS020": "Xóa studio thành công",
-  "SUCCESS021": "Cập nhật studio thành công",
+  "SUCCESS019": "Tạo liên kết mời thành công",
+  "SUCCESS020": "Tham gia nhóm thành công",
+  "SUCCESS021": "Gửi email mời thành công",
+  "SUCCESS022": "Xóa thành viên thành công",
+  "SUCCESS023": "Phân quyền thành công",
+  "SUCCESS024": "Cập nhật nhóm thành công",
+  "SUCCESS025": "Tạo studio thành công",
+  "SUCCESS026": "Xóa studio thành công",
+  "SUCCESS02": "Cập nhật studio thành công",
 
   "SYS001": "Lỗi hệ thống không xác định"
 }
