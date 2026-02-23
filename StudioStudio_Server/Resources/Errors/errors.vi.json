@@ -8,6 +8,7 @@
 
   "USER001": "Không tìm thấy người dùng",
   "USER002": "Email đã được sử dụng",
+  "USER003": "Tài khoản đã bị xóa",
 
   "REPORT001": "Dữ liệu báo cáo không hợp lệ",
   "REPORT002": "Chưa cấu hình email nhận báo cáo",
@@ -31,12 +32,16 @@
   "GROUP014": "Bạn không thể thay đổi vai trò của chính mình",
   "GROUP015": "Bạn không có quyền cập nhật nhóm này. Chỉ chủ nhóm và người điều hành mới có thể cập nhật",
 
+  "STUDIO001": "Bạn đã đạt giới hạn số lượng studio có thể tạo",
+
+  "FAVOURITE001": "Nhóm đã có trong danh sách yêu thích của bạn",
+  "FAVOURITE002": "Không tìm thấy yêu thích",
+  "FAVOURITE003": "Bạn phải là thành viên của nhóm để thêm vào yêu thích",
+
   "INVITE001": "Liên kết mời không hợp lệ hoặc đã hết hạn",
   "INVITE002": "Liên kết mời đã hết hạn",
   "INVITE003": "Vai trò mời không hợp lệ",
   "INVITE004": "Bạn đã vượt quá giới hạn tạo liên kết mời. Vui lòng thử lại sau 15 phút",
-
-  "STUDIO001": "Bạn đã đạt giới hạn số lượng studio có thể tạo",
 
   "TEMPLATE001": "Không tìm thấy mẫu",
   "TEMPLATE002": "Bạn không có quyền truy cập mẫu này",
@@ -79,9 +84,10 @@
   "SUCCESS022": "Xóa thành viên thành công",
   "SUCCESS023": "Phân quyền thành công",
   "SUCCESS024": "Cập nhật nhóm thành công",
-  "SUCCESS025": "Tạo studio thành công",
-  "SUCCESS026": "Xóa studio thành công",
-  "SUCCESS027": "Cập nhật studio thành công",
+  "SUCCESS025": "Đã thêm nhóm vào yêu thích",
+  "SUCCESS026": "Đã xóa nhóm khỏi yêu thích",
+  "SUCCESS027": "Tạo studio thành công",
+  "SUCCESS028": "Xóa tài khoản thành công",
 
   "SYS001": "Lỗi hệ thống không xác định"
 }

@@ -13,6 +13,7 @@
         // USER
         public const string UserNotFound = "USER001";
         public const string UserAlreadyExist = "USER002";
+        public const string UserAccountAlreadyDeleted = "USER003";
 
         // REPORT
         public const string ReportInvalidRequest = "REPORT001";
@@ -39,14 +40,19 @@
         public const string GroupCannotChangeOwnRole = "GROUP014";
         public const string GroupUpdatePermissionDenied = "GROUP015";
 
+        // STUDIO
+        public const string StudioLimitReached = "STUDIO001";
+
+        // FAVOURITE
+        public const string FavouriteAlreadyExists = "FAVOURITE001";
+        public const string FavouriteNotFound = "FAVOURITE002";
+        public const string FavouriteNotMember = "FAVOURITE003";
+
         // INVITE
         public const string InviteTokenInvalid = "INVITE001";
         public const string InviteTokenExpired = "INVITE002";
         public const string InviteInvalidRole = "INVITE003";
         public const string InviteRateLimitExceeded = "INVITE004";
-
-        // STUDIO
-        public const string StudioLimitReached = "STUDIO001";
 
         // TEMPLATE
         public const string TemplateNotFound = "TEMPLATE001";
@@ -90,9 +96,11 @@
         public const string SuccessRemoveMember = "SUCCESS022";
         public const string SuccessAssignRole = "SUCCESS023";
         public const string SuccessUpdateGroup = "SUCCESS024";
-        public const string SuccessCreateStudio = "SUCCESS025";
-        public const string SuccessDeleteStudio = "SUCCESS026";
-        public const string SuccessUpdateStudio = "SUCCESS027";
+        public const string SuccessAddFavourite = "SUCCESS025";
+        public const string SuccessRemoveFavourite = "SUCCESS026";
+        public const string SuccessCreateStudio = "SUCCESS027";
+        public const string SuccessDeleteAccount = "SUCCESS028";
+
         // ANNOUNCEMENT
         public const string AnnouncementNotFound = "ANNOUNCEMENT001";
 
