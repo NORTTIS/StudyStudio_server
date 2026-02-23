@@ -36,6 +36,8 @@
   "INVITE003": "Invalid role for invite link",
   "INVITE004": "You have exceeded the rate limit for creating invite links. Please try again in 15 minutes",
 
+  "STUDIO001": "You have reached the limit of studios you can create",
+
   "TEMPLATE001": "Template not found",
   "TEMPLATE002": "You do not have permission to access this template",
   "TEMPLATE003": "Template group not found",
@@ -77,6 +79,9 @@
   "SUCCESS022": "Member removed successfully",
   "SUCCESS023": "Role assigned successfully",
   "SUCCESS024": "Group updated successfully",
+  "SUCCESS025": "Studio created successfully",
+  "SUCCESS026": "Studio deleted successfully",
+  "SUCCESS02": "Studio updated successfully",
 
   "SYS001": "Unexpected system error"
 }
