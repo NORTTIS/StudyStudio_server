@@ -45,5 +45,17 @@ namespace StudioStudio_Server.Repositories
                 .AsNoTracking()
                 .ToListAsync();
         }
+        public async Task CreateStudioAsync(Studio studio)
+        {
+            _context.Studios.Add(studio);
+            await _context.SaveChangesAsync();
+        }
+
+        public async Task<int> CountStudioCreatedByUserAsync(Guid userId)
+        {
+            return await _context.Studios
+                .Where(s => s.OwnerId == userId)
+                .CountAsync();
+        }
     }
 }

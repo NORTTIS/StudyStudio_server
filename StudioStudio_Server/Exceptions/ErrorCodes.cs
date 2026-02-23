@@ -30,6 +30,9 @@
         public const string StudioPermissionDenied = "GROUP005";
         public const string GroupPermissionDenied = "GROUP006";
 
+        // STUDIO
+        public const string StudioLimitReached = "STUDIO001";
+
         // TEMPLATE
         public const string TemplateNotFound = "TEMPLATE001";
         public const string TemplatePermissionDenied = "TEMPLATE002";
@@ -66,6 +69,9 @@
         public const string SuccessCreateTemplate = "SUCCESS016";
         public const string SuccessUpdateTemplate = "SUCCESS017";
         public const string SuccessDeleteTemplate = "SUCCESS018";
+        public const string SuccessCreateStudio = "SUCCESS019";
+        public const string SuccessDeleteStudio = "SUCCESS020";
+        public const string SuccessUpdateStudio = "SUCCESS021";
 
         // ANNOUNCEMENT
         public const string AnnouncementNotFound = "ANNOUNCEMENT001";
