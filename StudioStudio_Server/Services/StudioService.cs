@@ -88,5 +88,74 @@ namespace StudioStudio_Server.Services
                 GroupCount = 0
             };
         }
+
+        public async Task<StudioResponse> GetStudioDetailAsync(Guid userId, Guid studioId)
+        {
+            var studio = await _studioRepository.GetByIdAsync(studioId);
+            if (studio == null)
+            {
+                throw new AppException(ErrorCodes.StudioNotFound, StatusCodes.Status404NotFound);
+            }
+
+            if (studio.OwnerId != userId)
+            {
+                throw new AppException(ErrorCodes.AuthForbidden, StatusCodes.Status403Forbidden);
+            }
+
+            var groupCount = await _groupRepository.GetGroupCountByStudioIdAsync(studioId);
+
+            return new StudioResponse
+            {
+                StudioId = studio.StudioId,
+                StudioName = studio.StudioName,
+                Description = studio.Description,
+                OwnerId = studio.OwnerId,
+                CreatedAt = studio.CreatedAt,
+                UpdatedAt = studio.UpdatedAt,
+                GroupCount = groupCount
+            };
+        }
+
+        public async Task DeleteStudioAsync(Guid userId, Guid studioId)
+        {
+            var deleteStudio = await _studioRepository.GetByIdAsync(studioId);
+            if (deleteStudio == null)
+            {
+                throw new AppException(ErrorCodes.StudioNotFound, StatusCodes.Status404NotFound);
+            }
+
+            if (deleteStudio.OwnerId != userId)
+            {
+                throw new AppException(ErrorCodes.AuthForbidden, StatusCodes.Status403Forbidden);
+            }
+            await _studioRepository.DeleteStudioAsync(deleteStudio);
+        }
+
+        public async Task<UpdateStudioResponse> UpdateStudioAsync(Guid userId, UpdateStudioRequest studio)
+        {
+            var updateStudio = await _studioRepository.GetByIdAsync(studio.Id);
+            if (updateStudio == null)
+            {
+                throw new AppException(ErrorCodes.StudioNotFound, StatusCodes.Status404NotFound);
+            }
+
+            if (updateStudio.OwnerId != userId)
+            {
+                throw new AppException(ErrorCodes.AuthForbidden, StatusCodes.Status403Forbidden);
+            }
+
+            updateStudio.StudioName = studio.StudioName;
+            updateStudio.Description = studio.Description;
+            updateStudio.UpdatedAt = DateTime.UtcNow;
+
+            await _studioRepository.UpdateStudioAsync(updateStudio);
+
+            return new UpdateStudioResponse
+            {
+                StudioName = updateStudio.StudioName,
+                Description = updateStudio.Description,
+                UpdatedAt = updateStudio.UpdatedAt
+            };
+        }
     }
 }
