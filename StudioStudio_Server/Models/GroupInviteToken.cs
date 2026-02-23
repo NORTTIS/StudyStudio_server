@@ -1,0 +1,10 @@
+namespace StudioStudio_Server.Models
+{
+    public class GroupInviteToken
+    {
+        public Guid GroupId { get; set; }
+        public string Role { get; set; } = string.Empty;
+        public Guid CreatedBy { get; set; }
+        public DateTime CreatedAt { get; set; }
+    }
+}
