@@ -65,5 +65,12 @@ namespace StudioStudio_Server.Repositories
             _db.Groups.Update(group);
             await _db.SaveChangesAsync();
         }
+
+        public async Task<int> GetGroupCountByStudioIdAsync(Guid studioId)
+        {
+            return await _db.Groups
+                .Where(g => g.StudioId == studioId && g.IsActive)
+                .CountAsync();
+        }
     }
 }
