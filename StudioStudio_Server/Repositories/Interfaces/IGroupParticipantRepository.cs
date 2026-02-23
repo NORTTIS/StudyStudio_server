@@ -6,5 +6,12 @@ namespace StudioStudio_Server.Repositories.Interfaces
     {
         Task<List<GroupParticipant>> GetByGroupIdsAsync(List<Guid> groupIds);
         Task AddAsync(GroupParticipant participant);
+        Task<int> GetParticipantCountByGroupIdAsync(Guid groupId);
+        Task<bool> IsUserInGroupAsync(Guid groupId, Guid userId);
+        Task<GroupParticipant?> GetByGroupAndUserAsync(Guid groupId, Guid userId);
+        Task RemoveAsync(GroupParticipant participant);
+        Task UpdateAsync(GroupParticipant participant);
+        Task<int> GetRoleCountByGroupIdAsync(Guid groupId, GroupRole role);
+        Task<List<GroupParticipant>> GetAllByGroupIdAsync(Guid groupId);
     }
 }
