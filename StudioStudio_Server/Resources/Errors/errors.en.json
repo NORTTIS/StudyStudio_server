@@ -8,6 +8,7 @@
 
   "USER001": "User not found",
   "USER002": "User already exists",
+  "USER003": "Account has already been deleted",
 
   "REPORT001": "Report data is invalid",
   "REPORT002": "Report email is not configured",
@@ -31,12 +32,16 @@
   "GROUP014": "You cannot change your own role",
   "GROUP015": "You do not have permission to update this group. Only owner and moderator can update it",
 
+  "STUDIO001": "You have reached the limit of studios you can create",
+
+  "FAVOURITE001": "Group is already in your favourites",
+  "FAVOURITE002": "Favourite not found",
+  "FAVOURITE003": "You must be a member of the group to add it to favourites",
+
   "INVITE001": "Invalid or expired invite link",
   "INVITE002": "Invite link has expired",
   "INVITE003": "Invalid role for invite link",
   "INVITE004": "You have exceeded the rate limit for creating invite links. Please try again in 15 minutes",
-
-  "STUDIO001": "You have reached the limit of studios you can create",
 
   "TEMPLATE001": "Template not found",
   "TEMPLATE002": "You do not have permission to access this template",
@@ -79,9 +84,10 @@
   "SUCCESS022": "Member removed successfully",
   "SUCCESS023": "Role assigned successfully",
   "SUCCESS024": "Group updated successfully",
-  "SUCCESS025": "Studio created successfully",
-  "SUCCESS026": "Studio deleted successfully",
-  "SUCCESS027": "Studio updated successfully",
+  "SUCCESS025": "Group added to favourites successfully",
+  "SUCCESS026": "Group removed from favourites successfully",
+  "SUCCESS027": "Studio created successfully",
+  "SUCCESS028": "Account deleted successfully",
 
   "SYS001": "Unexpected system error"
 }

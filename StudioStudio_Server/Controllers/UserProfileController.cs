@@ -98,5 +98,20 @@ namespace StudioStudio_Server.Controllers
             var message = _messageService.GetMessage(ErrorCodes.SuccessChangePassword);
             return Ok(ApiResponse<object>.Success(ErrorCodes.SuccessChangePassword, message));
         }
+
+        [HttpDelete("user-profile")]
+        public async Task<IActionResult> DeleteAccount()
+        {
+            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+            if (string.IsNullOrEmpty(userIdClaim) || !Guid.TryParse(userIdClaim, out Guid userId))
+            {
+                throw new AppException(ErrorCodes.AuthInvalidCredential, StatusCodes.Status401Unauthorized);
+            }
+
+            await _userService.DeleteAsync(userId);
+            var message = _messageService.GetMessage(ErrorCodes.SuccessDeleteAccount);
+            return Ok(ApiResponse<object>.Success(ErrorCodes.SuccessDeleteAccount, message));
+        }
     }
 }
