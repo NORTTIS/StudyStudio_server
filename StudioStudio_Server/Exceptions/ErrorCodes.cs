@@ -45,6 +45,9 @@
         public const string InviteInvalidRole = "INVITE003";
         public const string InviteRateLimitExceeded = "INVITE004";
 
+        // STUDIO
+        public const string StudioLimitReached = "STUDIO001";
+
         // TEMPLATE
         public const string TemplateNotFound = "TEMPLATE001";
         public const string TemplatePermissionDenied = "TEMPLATE002";
@@ -87,7 +90,9 @@
         public const string SuccessRemoveMember = "SUCCESS022";
         public const string SuccessAssignRole = "SUCCESS023";
         public const string SuccessUpdateGroup = "SUCCESS024";
-
+        public const string SuccessCreateStudio = "SUCCESS025";
+        public const string SuccessDeleteStudio = "SUCCESS026";
+        public const string SuccessUpdateStudio = "SUCCESS02";
         // ANNOUNCEMENT
         public const string AnnouncementNotFound = "ANNOUNCEMENT001";
 

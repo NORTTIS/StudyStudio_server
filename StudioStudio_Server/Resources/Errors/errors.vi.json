@@ -36,6 +36,8 @@
   "INVITE003": "Vai trò mời không hợp lệ",
   "INVITE004": "Bạn đã vượt quá giới hạn tạo liên kết mời. Vui lòng thử lại sau 15 phút",
 
+  "STUDIO001": "Bạn đã đạt giới hạn số lượng studio có thể tạo",
+
   "TEMPLATE001": "Không tìm thấy mẫu",
   "TEMPLATE002": "Bạn không có quyền truy cập mẫu này",
   "TEMPLATE003": "Không tìm thấy nhóm mẫu",
@@ -77,6 +79,9 @@
   "SUCCESS022": "Xóa thành viên thành công",
   "SUCCESS023": "Phân quyền thành công",
   "SUCCESS024": "Cập nhật nhóm thành công",
+  "SUCCESS025": "Tạo studio thành công",
+  "SUCCESS026": "Xóa studio thành công",
+  "SUCCESS02": "Cập nhật studio thành công",
 
   "SYS001": "Lỗi hệ thống không xác định"
 }

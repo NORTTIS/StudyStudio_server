@@ -1,6 +1,11 @@
+using StudioStudio_Server.Exceptions;
+using StudioStudio_Server.Models.DTOs.Request;
 using StudioStudio_Server.Models.DTOs.Response;
+using StudioStudio_Server.Models.Entities;
+using StudioStudio_Server.Repositories;
 using StudioStudio_Server.Repositories.Interfaces;
 using StudioStudio_Server.Services.Interfaces;
+using System.Security.Claims;
 
 namespace StudioStudio_Server.Services
 {
@@ -8,13 +13,16 @@ namespace StudioStudio_Server.Services
     {
         private readonly IStudioRepository _studioRepository;
         private readonly IGroupRepository _groupRepository;
+        private readonly IUserSubscriptionRepository _userSubscriptionRepository;
 
         public StudioService(
             IStudioRepository studioRepository,
-            IGroupRepository groupRepository)
+            IGroupRepository groupRepository,
+            IUserSubscriptionRepository userSubscriptionRepository)
         {
             _studioRepository = studioRepository;
             _groupRepository = groupRepository;
+            _userSubscriptionRepository = userSubscriptionRepository;
         }
 
         public async Task<List<StudioResponse>> GetUserStudiosAsync(Guid userId)
@@ -43,6 +51,42 @@ namespace StudioStudio_Server.Services
             }
 
             return studioResponses;
+        }
+
+        public async Task<StudioResponse> CreateStudioAsync(Guid ownerId, CreateStudioRequest studio)
+        {
+            var subscriptionPlan = await _userSubscriptionRepository.GetSubscriptionPlanByUserIdAsync(ownerId);
+            var studioLimit = subscriptionPlan?.MaxStudios ?? 3;
+
+            var currentStudioCount = await _studioRepository.CountStudioCreatedByUserAsync(ownerId);
+            if (currentStudioCount >= studioLimit)
+            {
+                throw new AppException(ErrorCodes.StudioLimitReached, StatusCodes.Status403Forbidden);
+            }
+
+            var now = DateTime.UtcNow;
+            var createStudio = new Studio
+            {
+                StudioId = Guid.NewGuid(),
+                OwnerId = ownerId,
+                StudioName = studio.StudioName,
+                Description = studio.Description,
+                CreatedAt = now,
+                UpdatedAt = now
+            };
+
+            await _studioRepository.CreateStudioAsync(createStudio);
+
+            return new StudioResponse
+            {
+                StudioId = createStudio.StudioId,
+                StudioName = createStudio.StudioName,
+                OwnerId = createStudio.OwnerId,
+                Description = createStudio.Description,
+                CreatedAt = now,
+                UpdatedAt = now,
+                GroupCount = 0
+            };
         }
     }
 }
