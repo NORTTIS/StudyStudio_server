@@ -50,6 +50,7 @@ builder.Services.AddScoped<ITemplateRepository, TemplateRepository>();
 builder.Services.AddScoped<ITemplateService, TemplateService>();
 builder.Services.AddScoped<IGroupTaskStatusRepository, GroupTaskStatusRepository>();
 builder.Services.AddScoped<ISeederService, SeederService>();
+builder.Services.AddScoped<IGroupInviteService, GroupInviteService>();
 
 
 builder.Services.AddControllers(options =>
