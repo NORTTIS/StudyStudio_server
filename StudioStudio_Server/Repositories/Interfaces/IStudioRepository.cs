@@ -10,5 +10,7 @@ namespace StudioStudio_Server.Repositories.Interfaces
         Task<List<Studio>> GetByOwnerIdAsync(Guid ownerId);
         Task CreateStudioAsync(Studio newStudio);
         Task<int> CountStudioCreatedByUserAsync(Guid ownerId);
+        Task DeleteStudioAsync(Studio studio);
+        Task UpdateStudioAsync(Studio studio);
     }
 }

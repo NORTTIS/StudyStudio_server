@@ -57,5 +57,17 @@ namespace StudioStudio_Server.Repositories
                 .Where(s => s.OwnerId == userId)
                 .CountAsync();
         }
+
+        public async Task DeleteStudioAsync(Studio studio)
+        {
+            _context.Studios.Remove(studio);
+            await _context.SaveChangesAsync();
+        }
+
+        public async Task UpdateStudioAsync(Studio studio)
+        {
+            _context.Studios.Update(studio);
+            await _context.SaveChangesAsync();
+        }
     }
 }
