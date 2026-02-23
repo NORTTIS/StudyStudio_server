@@ -37,6 +37,7 @@
         public const string GroupOnlyOneOwner = "GROUP012";
         public const string GroupOnlyOneModerator = "GROUP013";
         public const string GroupCannotChangeOwnRole = "GROUP014";
+        public const string GroupUpdatePermissionDenied = "GROUP015";
 
         // INVITE
         public const string InviteTokenInvalid = "INVITE001";
@@ -85,6 +86,7 @@
         public const string SuccessSendInviteEmail = "SUCCESS021";
         public const string SuccessRemoveMember = "SUCCESS022";
         public const string SuccessAssignRole = "SUCCESS023";
+        public const string SuccessUpdateGroup = "SUCCESS024";
 
         // ANNOUNCEMENT
         public const string AnnouncementNotFound = "ANNOUNCEMENT001";
