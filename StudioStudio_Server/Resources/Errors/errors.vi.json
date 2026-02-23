@@ -22,6 +22,8 @@
   "GROUP005": "Bạn không có quyền tạo nhóm trong studio này",
   "GROUP006": "Bạn không có quyền xóa nhóm này. Chỉ chủ nhóm mới có thể xóa",
 
+  "STUDIO001": "Bạn đã đạt giới hạn số lượng studio có thể tạo",
+
   "TEMPLATE001": "Không tìm thấy mẫu",
   "TEMPLATE002": "Bạn không có quyền truy cập mẫu này",
   "TEMPLATE003": "Không tìm thấy nhóm mẫu",
@@ -57,6 +59,9 @@
   "SUCCESS016": "Tạo mẫu thành công",
   "SUCCESS017": "Cập nhật mẫu thành công",
   "SUCCESS018": "Xóa mẫu thành công",
+  "SUCCESS019": "Tạo studio thành công",
+  "SUCCESS020": "Xóa studio thành công",
+  "SUCCESS021": "Cập nhật studio thành công",
 
   "SYS001": "Lỗi hệ thống không xác định"
 }

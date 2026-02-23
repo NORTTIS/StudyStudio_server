@@ -8,5 +8,7 @@ namespace StudioStudio_Server.Repositories.Interfaces
         Task<Studio?> GetByIdAsync(Guid studioId);
         Task<bool> IsUserStudioOwnerAsync(Guid studioId, Guid userId);
         Task<List<Studio>> GetByOwnerIdAsync(Guid ownerId);
+        Task CreateStudioAsync(Studio newStudio);
+        Task<int> CountStudioCreatedByUserAsync(Guid ownerId);
     }
 }
