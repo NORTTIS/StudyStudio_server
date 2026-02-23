@@ -12,5 +12,7 @@ namespace StudioStudio_Server.Repositories.Interfaces
         Task<bool> IsUserGroupOwnerAsync(Guid groupId, Guid userId);
         Task DeleteAsync(Group group);
         Task<int> GetGroupCountByStudioIdAsync(Guid studioId);
+        Task UpdateAsync(Group group);
+        Task<bool> GroupNameExistsInStudioExcludingGroupAsync(Guid? studioId, string groupName, Guid excludeGroupId);
     }
 }

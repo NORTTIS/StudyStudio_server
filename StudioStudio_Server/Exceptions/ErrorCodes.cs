@@ -29,6 +29,21 @@
         public const string StudioNotFound = "GROUP004";
         public const string StudioPermissionDenied = "GROUP005";
         public const string GroupPermissionDenied = "GROUP006";
+        public const string GroupAlreadyMember = "GROUP007";
+        public const string GroupMemberLimitReached = "GROUP008";
+        public const string GroupMemberNotFound = "GROUP009";
+        public const string GroupCannotRemoveOwner = "GROUP010";
+        public const string GroupCannotRemoveSelf = "GROUP011";
+        public const string GroupOnlyOneOwner = "GROUP012";
+        public const string GroupOnlyOneModerator = "GROUP013";
+        public const string GroupCannotChangeOwnRole = "GROUP014";
+        public const string GroupUpdatePermissionDenied = "GROUP015";
+
+        // INVITE
+        public const string InviteTokenInvalid = "INVITE001";
+        public const string InviteTokenExpired = "INVITE002";
+        public const string InviteInvalidRole = "INVITE003";
+        public const string InviteRateLimitExceeded = "INVITE004";
 
         // TEMPLATE
         public const string TemplateNotFound = "TEMPLATE001";
@@ -66,6 +81,12 @@
         public const string SuccessCreateTemplate = "SUCCESS016";
         public const string SuccessUpdateTemplate = "SUCCESS017";
         public const string SuccessDeleteTemplate = "SUCCESS018";
+        public const string SuccessCreateInvite = "SUCCESS019";
+        public const string SuccessAcceptInvite = "SUCCESS020";
+        public const string SuccessSendInviteEmail = "SUCCESS021";
+        public const string SuccessRemoveMember = "SUCCESS022";
+        public const string SuccessAssignRole = "SUCCESS023";
+        public const string SuccessUpdateGroup = "SUCCESS024";
 
         // ANNOUNCEMENT
         public const string AnnouncementNotFound = "ANNOUNCEMENT001";

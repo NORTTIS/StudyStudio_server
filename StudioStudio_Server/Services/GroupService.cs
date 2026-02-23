@@ -307,5 +307,108 @@ namespace StudioStudio_Server.Services
             // Soft delete the group
             await _groupRepository.DeleteAsync(group);
         }
+
+        public async Task<UpdateGroupResponse> UpdateGroupAsync(Guid userId, UpdateGroupRequest request)
+        {
+            // Check if group exists
+            var group = await _groupRepository.GetByIdAsync(request.GroupId);
+            if (group == null)
+            {
+                throw new AppException(ErrorCodes.GroupNotFound, StatusCodes.Status404NotFound);
+            }
+
+            // Check if user is Owner or Moderator
+            var userParticipant = await _groupParticipantRepository.GetByGroupAndUserAsync(request.GroupId, userId);
+            if (userParticipant == null ||
+                (userParticipant.Role != GroupRole.Owner && userParticipant.Role != GroupRole.Moderator))
+            {
+                throw new AppException(ErrorCodes.GroupUpdatePermissionDenied, StatusCodes.Status403Forbidden);
+            }
+
+            // Check if name is being changed
+            if (group.GroupName != request.GroupName)
+            {
+                // Check if new name already exists in the same studio (excluding current group)
+                var nameExists = await _groupRepository.GroupNameExistsInStudioExcludingGroupAsync(
+                    group.StudioId, request.GroupName, request.GroupId);
+                
+                if (nameExists)
+                {
+                    throw new AppException(ErrorCodes.GroupNameAlreadyExists, StatusCodes.Status400BadRequest);
+                }
+
+                group.GroupName = request.GroupName;
+            }
+
+            // Update description
+            group.Description = request.Description;
+
+            // Handle template creation/deactivation
+            var existingTemplate = await _templateRepository.GetByGroupIdAsync(request.GroupId);
+            Template? activeTemplate = null;
+
+            if (request.IsTemplate && existingTemplate == null)
+            {
+                // Create new template
+                var newTemplate = new Template
+                {
+                    TemplateId = Guid.NewGuid(),
+                    UserId = userId,
+                    GroupId = group.GroupId,
+                    IsSystemTemplate = false, // User templates are not system templates
+                    CreatedAt = DateTime.UtcNow,
+                    UpdatedAt = DateTime.UtcNow,
+                    IsActive = true
+                };
+
+                await _templateRepository.AddAsync(newTemplate);
+                activeTemplate = newTemplate;
+
+                _logger.LogInformation(
+                    "Template created for group {GroupId} by user {UserId}. TemplateId: {TemplateId}",
+                    group.GroupId, userId, newTemplate.TemplateId);
+            }
+            else if (!request.IsTemplate && existingTemplate != null && existingTemplate.IsActive)
+            {
+                // Deactivate existing template
+                await _templateRepository.DeleteAsync(existingTemplate);
+
+                _logger.LogInformation(
+                    "Template deactivated for group {GroupId} by user {UserId}. TemplateId: {TemplateId}",
+                    group.GroupId, userId, existingTemplate.TemplateId);
+            }
+            else if (request.IsTemplate && existingTemplate != null && !existingTemplate.IsActive)
+            {
+                // Reactivate existing template
+                existingTemplate.IsActive = true;
+                existingTemplate.UpdatedAt = DateTime.UtcNow;
+                await _templateRepository.UpdateAsync(existingTemplate);
+                activeTemplate = existingTemplate;
+
+                _logger.LogInformation(
+                    "Template reactivated for group {GroupId} by user {UserId}. TemplateId: {TemplateId}",
+                    group.GroupId, userId, existingTemplate.TemplateId);
+            }
+            else if (request.IsTemplate && existingTemplate != null && existingTemplate.IsActive)
+            {
+                // Template already exists and is active
+                activeTemplate = existingTemplate;
+            }
+
+            // Save changes
+            await _groupRepository.UpdateAsync(group);
+
+            return new UpdateGroupResponse
+            {
+                GroupId = group.GroupId,
+                GroupName = group.GroupName,
+                Description = group.Description,
+                StudioId = group.StudioId,
+                GroupType = group.StudioId.HasValue ? "Studio" : "Independent",
+                IsTemplate = activeTemplate != null,
+                TemplateId = activeTemplate?.TemplateId,
+                UpdatedAt = group.UpdatedAt
+            };
+        }
     }
 }
