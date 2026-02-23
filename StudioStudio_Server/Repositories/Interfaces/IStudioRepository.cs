@@ -7,5 +7,6 @@ namespace StudioStudio_Server.Repositories.Interfaces
         Task<List<Studio>> GetByIdsAsync(List<Guid> studioIds);
         Task<Studio?> GetByIdAsync(Guid studioId);
         Task<bool> IsUserStudioOwnerAsync(Guid studioId, Guid userId);
+        Task<List<Studio>> GetByOwnerIdAsync(Guid ownerId);
     }
 }

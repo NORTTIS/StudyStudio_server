@@ -36,5 +36,14 @@ namespace StudioStudio_Server.Repositories
             return await _context.Studios
                 .AnyAsync(s => s.StudioId == studioId && s.OwnerId == userId);
         }
+
+        public async Task<List<Studio>> GetByOwnerIdAsync(Guid ownerId)
+        {
+            return await _context.Studios
+                .Where(s => s.OwnerId == ownerId)
+                .OrderByDescending(s => s.CreatedAt)
+                .AsNoTracking()
+                .ToListAsync();
+        }
     }
 }
