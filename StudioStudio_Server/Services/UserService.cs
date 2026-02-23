@@ -15,8 +15,8 @@ namespace StudioStudio_Server.Services
         private readonly IConfiguration _configuration;
         private readonly IHttpContextAccessor _httpContextAccessor;
         private readonly IWebHostEnvironment _environment;
-        // Password must be 10-20 characters long, contain at least one uppercase letter, one digit, and one special character
-        private readonly Regex PasswordRegex = new(@"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{10,20}$", RegexOptions.Compiled);
+        // Password must be 10-20 characters long, contain at least one uppercase letter, one lowercase letter, and one digit
+        private readonly Regex PasswordRegex = new(@"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)[A-Za-z\d@$!%*?&]{10,20}$", RegexOptions.Compiled);
 
         public UserService(
             IUserRepository userRepository,
@@ -51,12 +51,19 @@ namespace StudioStudio_Server.Services
         public async Task DeleteAsync(Guid userId)
         {
             var user = await _userRepository.GetByIdAsync(userId);
-            if (user != null)
+            if (user == null)
             {
-                user.Status = UserStatus.Deleted;
-                user.UpdatedAt = DateTime.UtcNow;
-                await _userRepository.UpdateAsync(user);
+                throw new AppException(ErrorCodes.UserNotFound, StatusCodes.Status404NotFound);
             }
+
+            if (user.Status == UserStatus.Deleted)
+            {
+                throw new AppException(ErrorCodes.UserAccountAlreadyDeleted, StatusCodes.Status400BadRequest);
+            }
+
+            user.Status = UserStatus.Deleted;
+            user.UpdatedAt = DateTime.UtcNow;
+            await _userRepository.UpdateAsync(user);
         }
 
         public async Task ChangePasswordAsync(Guid userId, ChangePasswordRequest request)

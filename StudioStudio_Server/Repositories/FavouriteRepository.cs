@@ -21,5 +21,29 @@ namespace StudioStudio_Server.Repositories
                 .AsNoTracking()
                 .ToListAsync();
         }
+
+        public async Task<Favourite?> GetByUserAndGroupIdAsync(Guid userId, Guid groupId)
+        {
+            return await _context.Favourites
+                .FirstOrDefaultAsync(f => f.UserId == userId && f.GroupId == groupId);
+        }
+
+        public async Task AddAsync(Favourite favourite)
+        {
+            _context.Favourites.Add(favourite);
+            await _context.SaveChangesAsync();
+        }
+
+        public async Task RemoveAsync(Favourite favourite)
+        {
+            _context.Favourites.Remove(favourite);
+            await _context.SaveChangesAsync();
+        }
+
+        public async Task<bool> ExistsAsync(Guid userId, Guid groupId)
+        {
+            return await _context.Favourites
+                .AnyAsync(f => f.UserId == userId && f.GroupId == groupId);
+        }
     }
 }
