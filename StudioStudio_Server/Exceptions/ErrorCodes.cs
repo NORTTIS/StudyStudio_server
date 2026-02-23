@@ -92,7 +92,7 @@
         public const string SuccessUpdateGroup = "SUCCESS024";
         public const string SuccessCreateStudio = "SUCCESS025";
         public const string SuccessDeleteStudio = "SUCCESS026";
-        public const string SuccessUpdateStudio = "SUCCESS02";
+        public const string SuccessUpdateStudio = "SUCCESS027";
         // ANNOUNCEMENT
         public const string AnnouncementNotFound = "ANNOUNCEMENT001";
 
