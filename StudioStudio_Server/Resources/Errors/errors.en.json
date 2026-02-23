@@ -21,6 +21,19 @@
   "GROUP004": "Studio not found",
   "GROUP005": "You do not have permission to create a group in this studio",
   "GROUP006": "You do not have permission to delete this group. Only the group owner can delete it",
+  "GROUP007": "You are already a member of this group",
+  "GROUP008": "Group has reached the maximum member limit",
+  "GROUP009": "Member not found in this group",
+  "GROUP010": "Cannot remove the group owner",
+  "GROUP011": "You cannot remove yourself from the group",
+  "GROUP012": "There can only be one owner in the group",
+  "GROUP013": "There can only be one moderator in the group",
+  "GROUP014": "You cannot change your own role",
+
+  "INVITE001": "Invalid or expired invite link",
+  "INVITE002": "Invite link has expired",
+  "INVITE003": "Invalid role for invite link",
+  "INVITE004": "You have exceeded the rate limit for creating invite links. Please try again in 15 minutes",
 
   "TEMPLATE001": "Template not found",
   "TEMPLATE002": "You do not have permission to access this template",
@@ -57,6 +70,11 @@
   "SUCCESS016": "Template created successfully",
   "SUCCESS017": "Template updated successfully",
   "SUCCESS018": "Template deleted successfully",
+  "SUCCESS019": "Invite link created successfully",
+  "SUCCESS020": "Successfully joined the group",
+  "SUCCESS021": "Invite email sent successfully",
+  "SUCCESS022": "Member removed successfully",
+  "SUCCESS023": "Role assigned successfully",
 
   "SYS001": "Unexpected system error"
 }
