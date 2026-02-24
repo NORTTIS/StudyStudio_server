@@ -18,6 +18,7 @@ namespace StudioStudio_Server.Repositories
         {
             return await _context.GroupParticipants
                 .Where(gp => groupIds.Contains(gp.GroupId))
+                .OrderBy(gp => gp.CreatedAt)
                 .AsNoTracking()
                 .ToListAsync();
         }
@@ -70,6 +71,7 @@ namespace StudioStudio_Server.Repositories
         {
             return await _context.GroupParticipants
                 .Where(gp => gp.GroupId == groupId)
+                .OrderBy(gp => gp.CreatedAt)
                 .AsNoTracking()
                 .ToListAsync();
         }
