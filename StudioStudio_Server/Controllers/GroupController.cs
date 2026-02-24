@@ -125,5 +125,53 @@ namespace StudioStudio_Server.Controllers
             var message = _messageService.GetMessage(ErrorCodes.SuccessUpdateGroup);
             return Ok(ApiResponse<UpdateGroupResponse>.Success(ErrorCodes.SuccessUpdateGroup, message, result));
         }
+
+        [HttpGet("{groupId}/detail")]
+        [Authorize]
+        public async Task<ActionResult<ApiResponse<GroupDetailResponse>>> GetGroupDetail(Guid groupId)
+        {
+            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+            if (string.IsNullOrEmpty(userIdClaim) || !Guid.TryParse(userIdClaim, out Guid userId))
+            {
+                throw new AppException(ErrorCodes.AuthInvalidCredential, StatusCodes.Status401Unauthorized);
+            }
+
+            var isAdminClaim = User.FindFirst("IsAdmin")?.Value;
+            var isAdmin = isAdminClaim != null && bool.TryParse(isAdminClaim, out var adminResult) && adminResult;
+
+            if (isAdmin)
+            {
+                throw new AppException(ErrorCodes.AuthForbidden, StatusCodes.Status403Forbidden);
+            }
+
+            var result = await _groupService.GetGroupDetailAsync(userId, groupId);
+            var message = _messageService.GetMessage(ErrorCodes.SuccessGetData);
+            return Ok(ApiResponse<GroupDetailResponse>.Success(ErrorCodes.SuccessGetData, message, result));
+        }
+
+        [HttpGet("{groupId}/members")]
+        [Authorize]
+        public async Task<ActionResult<ApiResponse<GroupMemberListResponse>>> GetGroupMembers(Guid groupId)
+        {
+            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+            if (string.IsNullOrEmpty(userIdClaim) || !Guid.TryParse(userIdClaim, out Guid userId))
+            {
+                throw new AppException(ErrorCodes.AuthInvalidCredential, StatusCodes.Status401Unauthorized);
+            }
+
+            var isAdminClaim = User.FindFirst("IsAdmin")?.Value;
+            var isAdmin = isAdminClaim != null && bool.TryParse(isAdminClaim, out var adminResult) && adminResult;
+
+            if (isAdmin)
+            {
+                throw new AppException(ErrorCodes.AuthForbidden, StatusCodes.Status403Forbidden);
+            }
+
+            var result = await _groupService.GetGroupMembersAsync(userId, groupId);
+            var message = _messageService.GetMessage(ErrorCodes.SuccessGetData);
+            return Ok(ApiResponse<GroupMemberListResponse>.Success(ErrorCodes.SuccessGetData, message, result));
+        }
     }
 }

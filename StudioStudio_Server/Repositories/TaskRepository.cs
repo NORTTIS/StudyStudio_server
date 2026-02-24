@@ -24,5 +24,12 @@ namespace StudioStudio_Server.Repositories
 
             return taskCounts.ToDictionary(tc => tc.GroupId, tc => tc.Count);
         }
+
+        public async Task<int> GetTaskCountByGroupIdAsync(Guid groupId)
+        {
+            return await _context.Tasks
+                .Where(t => t.GroupId == groupId && !t.IsPendingDeleted)
+                .CountAsync();
+        }
     }
 }

@@ -18,6 +18,7 @@ namespace StudioStudio_Server.Repositories
         {
             return await _context.Favourites
                 .Where(f => f.UserId == userId && groupIds.Contains(f.GroupId))
+                .OrderByDescending(f => f.CreatedAt)
                 .AsNoTracking()
                 .ToListAsync();
         }
@@ -41,6 +42,12 @@ namespace StudioStudio_Server.Repositories
         }
 
         public async Task<bool> ExistsAsync(Guid userId, Guid groupId)
+        {
+            return await _context.Favourites
+                .AnyAsync(f => f.UserId == userId && f.GroupId == groupId);
+        }
+
+        public async Task<bool> IsFavouriteAsync(Guid userId, Guid groupId)
         {
             return await _context.Favourites
                 .AnyAsync(f => f.UserId == userId && f.GroupId == groupId);
