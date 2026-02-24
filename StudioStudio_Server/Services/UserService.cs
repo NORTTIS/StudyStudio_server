@@ -56,12 +56,12 @@ namespace StudioStudio_Server.Services
                 throw new AppException(ErrorCodes.UserNotFound, StatusCodes.Status404NotFound);
             }
 
-            if (user.Status == UserStatus.Deleted)
+            if (user.DeletedFlag)
             {
                 throw new AppException(ErrorCodes.UserAccountAlreadyDeleted, StatusCodes.Status400BadRequest);
             }
 
-            user.Status = UserStatus.Deleted;
+            user.DeletedFlag = true;
             user.UpdatedAt = DateTime.UtcNow;
             await _userRepository.UpdateAsync(user);
         }
