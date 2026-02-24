@@ -79,7 +79,8 @@ namespace StudioStudio_Server.Services
                 Email = registerRequest.Email,
                 FirstName = registerRequest.FirstName,
                 LastName = registerRequest.LastName,
-                Status = UserStatus.Inactive
+                Status = UserStatus.Inactive,
+                DeletedFlag = false
             };
 
             //hashpassword using .net PasswordHasher
@@ -126,6 +127,11 @@ namespace StudioStudio_Server.Services
                 throw new AppException(ErrorCodes.ValidationTokenExpired, StatusCodes.Status400BadRequest);
             }
 
+            if (verifyToken.User.DeletedFlag)
+            {
+                throw new AppException(ErrorCodes.UserAccountAlreadyDeleted, StatusCodes.Status400BadRequest);
+            }
+
             if (verifyToken.User.Status == UserStatus.Active)
             {
                 throw new AppException(ErrorCodes.UserAlreadyExist, StatusCodes.Status400BadRequest);
@@ -148,6 +154,11 @@ namespace StudioStudio_Server.Services
             if (user == null)
             {
                 throw new AppException(ErrorCodes.AuthInvalidCredential, StatusCodes.Status401Unauthorized);
+            }
+
+            if (user.DeletedFlag)
+            {
+                throw new AppException(ErrorCodes.UserAccountAlreadyDeleted, StatusCodes.Status400BadRequest);
             }
 
             if (user.Status == UserStatus.Inactive)
@@ -208,6 +219,9 @@ namespace StudioStudio_Server.Services
             var user = await _userRepository.GetByIdAsync(token.UserId);
             if (user == null)
                 throw new AppException(ErrorCodes.UserNotFound, StatusCodes.Status404NotFound);
+
+            if (user.DeletedFlag)
+                throw new AppException(ErrorCodes.UserAccountAlreadyDeleted, StatusCodes.Status400BadRequest);
 
             var accessTokenExpireMs = _configuration.GetValue<long>("JWT:AccessTokenExpireMs", 3600000);
             var refreshTokenExpireMs = _configuration.GetValue<long>("JWT:RefreshTokenExpireMs", 86400000);
@@ -283,12 +297,18 @@ namespace StudioStudio_Server.Services
                         LastName = lastName,
                         AvatarUrl = imgURL,
                         Status = UserStatus.Active,
+                        DeletedFlag = false
                     };
 
                     await _userRepository.AddAsync(user);
                 }
                 else
                 {
+                    if (user.DeletedFlag)
+                    {
+                        throw new AppException(ErrorCodes.UserAccountAlreadyDeleted, StatusCodes.Status400BadRequest);
+                    }
+
                     user.GoogleId ??= googleId;
                     user.FirstName ??= firstName;
                     user.LastName ??= lastName;
@@ -348,6 +368,11 @@ namespace StudioStudio_Server.Services
                 throw new AppException(ErrorCodes.UserNotFound, StatusCodes.Status404NotFound);
             }
 
+            if (user.DeletedFlag)
+            {
+                throw new AppException(ErrorCodes.UserAccountAlreadyDeleted, StatusCodes.Status400BadRequest);
+            }
+
             var token = Convert.ToBase64String(RandomNumberGenerator.GetBytes(64));
             var expiry = TimeSpan.FromMinutes(15);
 
@@ -383,6 +408,11 @@ namespace StudioStudio_Server.Services
                 throw new AppException(ErrorCodes.UserNotFound, StatusCodes.Status404NotFound);
             }
 
+            if (user.DeletedFlag)
+            {
+                throw new AppException(ErrorCodes.UserAccountAlreadyDeleted, StatusCodes.Status400BadRequest);
+            }
+
             user.PasswordHash = _passwordHasher.HashPassword(user, newPassword);
             user.UpdatedAt = DateTime.UtcNow;
 
@@ -401,7 +431,7 @@ namespace StudioStudio_Server.Services
             if (resetData != null)
             {
                 var user = await _userRepository.GetByIdAsync(resetData.UserId);
-                if (user == null)
+                if (user == null || user.DeletedFlag)
                 {
                     return false;
                 }
@@ -427,6 +457,11 @@ namespace StudioStudio_Server.Services
             if (user == null)
             {
                 throw new AppException(ErrorCodes.UserNotFound, StatusCodes.Status404NotFound);
+            }
+
+            if (user.DeletedFlag)
+            {
+                throw new AppException(ErrorCodes.UserAccountAlreadyDeleted, StatusCodes.Status400BadRequest);
             }
 
             if (user.Status == UserStatus.Active)

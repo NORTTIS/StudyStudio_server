@@ -24,7 +24,7 @@ namespace StudioStudio_Server.Repositories
                 .Include(x => x.User)
                 .FirstOrDefaultAsync(x =>
                     x.Token == token && !x.IsUsed &&
-                    x.ExpiresAt > DateTime.UtcNow);
+                    x.ExpiresAt > DateTime.UtcNow && !x.User.DeletedFlag);
         }
 
         public async Task MaskAsUsed(EmailVerificationToken token)

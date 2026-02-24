@@ -14,6 +14,7 @@
         public string? AvatarUrl { get; set; }
         public UserStatus Status { get; set; }
         public bool IsAdmin { get; set; }
+        public bool DeletedFlag { get; set; } = false;
 
         public DateTime CreatedAt { get; set; }
         public DateTime UpdatedAt { get; set; }

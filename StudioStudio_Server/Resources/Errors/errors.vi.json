@@ -88,6 +88,8 @@
   "SUCCESS026": "Đã xóa nhóm khỏi yêu thích",
   "SUCCESS027": "Tạo studio thành công",
   "SUCCESS028": "Xóa tài khoản thành công",
+  "SUCCESS029": "Cập nhật studio thành công",
+  "SUCCESS030": "Xóa studio thành công",
 
   "SYS001": "Lỗi hệ thống không xác định"
 }

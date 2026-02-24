@@ -23,14 +23,14 @@ namespace StudioStudio_Server.Repositories
             return await _context.Users
                 .Include(u => u.RefreshToken)
                 .FirstOrDefaultAsync(u =>
-                    u.Email == email);
+                    u.Email == email && !u.DeletedFlag);
         }
 
         public async Task<User?> GetByIdAsync(Guid id)
         {
             return await _context.Users
                 .Include(u => u.RefreshToken)
-                .FirstOrDefaultAsync(u => u.UserId == id && u.Status == UserStatus.Active);
+                .FirstOrDefaultAsync(u => u.UserId == id && !u.DeletedFlag);
         }
 
         public async Task UpdateAsync(User user)
@@ -42,7 +42,7 @@ namespace StudioStudio_Server.Repositories
         public async Task<List<User>> GetByIdsAsync(List<Guid> userIds)
         {
             return await _context.Users
-                .Where(u => userIds.Contains(u.UserId))
+                .Where(u => userIds.Contains(u.UserId) && !u.DeletedFlag)
                 .AsNoTracking()
                 .ToListAsync();
         }
