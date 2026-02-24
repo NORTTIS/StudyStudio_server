@@ -100,6 +100,8 @@
         public const string SuccessRemoveFavourite = "SUCCESS026";
         public const string SuccessCreateStudio = "SUCCESS027";
         public const string SuccessDeleteAccount = "SUCCESS028";
+        public const string SuccessUpdateStudio = "SUCCESS029";
+        public const string SuccessDeleteStudio = "SUCCESS030";
 
         // ANNOUNCEMENT
         public const string AnnouncementNotFound = "ANNOUNCEMENT001";

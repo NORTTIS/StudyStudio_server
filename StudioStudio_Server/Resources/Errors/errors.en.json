@@ -88,6 +88,8 @@
   "SUCCESS026": "Group removed from favourites successfully",
   "SUCCESS027": "Studio created successfully",
   "SUCCESS028": "Account deleted successfully",
+  "SUCCESS029": "Studio updated successfully",
+  "SUCCESS030": "Studio deleted successfully",
 
   "SYS001": "Unexpected system error"
 }
