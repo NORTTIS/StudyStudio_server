@@ -167,6 +167,130 @@ namespace StudioStudio_Server.Services
             return response;
         }
 
+        public async Task<GroupDetailResponse> GetGroupDetailAsync(Guid userId, Guid groupId)
+        {
+            // Get group with participants
+            var group = await _groupRepository.GetGroupWithDetailsAsync(groupId);
+            if (group == null)
+            {
+                throw new AppException(ErrorCodes.GroupNotFound, StatusCodes.Status404NotFound);
+            }
+
+            // Check if user is a member
+            var userParticipant = group.Participants.FirstOrDefault(p => p.UserId == userId);
+            if (userParticipant == null)
+            {
+                throw new AppException(ErrorCodes.GroupPermissionDenied, StatusCodes.Status403Forbidden);
+            }
+
+            // Get studio info if group belongs to a studio
+            Studio? studio = null;
+            if (group.StudioId.HasValue)
+            {
+                studio = await _studioRepository.GetByIdAsync(group.StudioId.Value);
+            }
+
+            // Get creator info
+            var creator = await _userRepository.GetByIdAsync(group.CreatedBy);
+
+            // Check if favorite
+            var isFavorite = await _favouriteRepository.IsFavouriteAsync(userId, groupId);
+
+            // Get task count
+            var taskCount = await _taskRepository.GetTaskCountByGroupIdAsync(groupId);
+
+            // Get member count
+            var memberCount = await _groupParticipantRepository.GetParticipantCountByGroupIdAsync(groupId);
+
+            // Get task statuses
+            var taskStatuses = await _groupTaskStatusRepository.GetByGroupIdAsync(groupId);
+
+            // Check if group is a template
+            var template = await _templateRepository.GetByGroupIdAsync(groupId);
+
+            return new GroupDetailResponse
+            {
+                GroupId = group.GroupId,
+                GroupName = group.GroupName,
+                Description = group.Description,
+                StudioId = group.StudioId,
+                StudioName = studio?.StudioName,
+                GroupType = group.StudioId.HasValue ? "Studio" : "Independent",
+                IsFavorite = isFavorite,
+                IsTemplate = template != null && template.IsActive,
+                TemplateId = template?.TemplateId,
+                CreatedBy = creator != null ? new UserDto
+                {
+                    Id = creator.UserId,
+                    FirstName = creator.FirstName,
+                    LastName = creator.LastName,
+                    AvatarUrl = creator.AvatarUrl
+                } : new UserDto(),
+                CreatedAt = group.CreatedAt,
+                UpdatedAt = group.UpdatedAt,
+                MemberCount = memberCount,
+                TaskCount = taskCount,
+                UserRole = userParticipant.Role.ToString(),
+                TaskStatuses = taskStatuses.Select(ts => new TaskStatusDto
+                {
+                    StatusId = ts.StatusId,
+                    StatusName = ts.StatusName,
+                    Position = ts.Position
+                }).ToList()
+            };
+        }
+
+        public async Task<GroupMemberListResponse> GetGroupMembersAsync(Guid userId, Guid groupId)
+        {
+            // Get group
+            var group = await _groupRepository.GetByIdAsync(groupId);
+            if (group == null)
+            {
+                throw new AppException(ErrorCodes.GroupNotFound, StatusCodes.Status404NotFound);
+            }
+
+            // Check if user is a member
+            var isUserInGroup = await _groupParticipantRepository.IsUserInGroupAsync(groupId, userId);
+            if (!isUserInGroup)
+            {
+                throw new AppException(ErrorCodes.GroupPermissionDenied, StatusCodes.Status403Forbidden);
+            }
+
+            // Get all participants
+            var participants = await _groupParticipantRepository.GetAllByGroupIdAsync(groupId);
+
+            // Get user info for all participants
+            var userIds = participants.Select(p => p.UserId).ToList();
+            var users = await _userRepository.GetByIdsAsync(userIds);
+
+            // Build member list
+            var members = participants.Select(p =>
+            {
+                var user = users.FirstOrDefault(u => u.UserId == p.UserId);
+                return new GroupMemberDto
+                {
+                    UserId = p.UserId,
+                    FirstName = user?.FirstName ?? "",
+                    LastName = user?.LastName ?? "",
+                    Email = user?.Email ?? "",
+                    AvatarUrl = user?.AvatarUrl,
+                    Role = p.Role.ToString(),
+                    JoinedAt = p.CreatedAt
+                };
+            })
+            .OrderBy(m => m.Role == "Owner" ? 0 : m.Role == "Moderator" ? 1 : 2)
+            .ThenBy(m => m.JoinedAt)
+            .ToList();
+
+            return new GroupMemberListResponse
+            {
+                GroupId = group.GroupId,
+                GroupName = group.GroupName,
+                TotalMembers = members.Count,
+                Members = members
+            };
+        }
+
         public async Task<CreateGroupResponse> CreateGroupAsync(Guid userId, CreateGroupRequest request)
         {
             // Check subscription limit

@@ -19,6 +19,7 @@ namespace StudioStudio_Server.Repositories
             return await _db.Groups
                 .Where(g => g.Participants.Any(p => p.UserId == userId) && g.IsActive)
                 .Include(g => g.Participants)
+                .OrderByDescending(g => g.CreatedAt)
                 .AsNoTracking()
                 .ToListAsync();
         }
@@ -27,6 +28,14 @@ namespace StudioStudio_Server.Repositories
         {
             return await _db.Groups
                 .Include(g => g.Participants)
+                .FirstOrDefaultAsync(g => g.GroupId == groupId && g.IsActive);
+        }
+
+        public async Task<Group?> GetGroupWithDetailsAsync(Guid groupId)
+        {
+            return await _db.Groups
+                .Include(g => g.Participants)
+                .AsNoTracking()
                 .FirstOrDefaultAsync(g => g.GroupId == groupId && g.IsActive);
         }
 
