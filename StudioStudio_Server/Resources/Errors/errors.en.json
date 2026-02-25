@@ -47,6 +47,14 @@
   "TEMPLATE002": "You do not have permission to access this template",
   "TEMPLATE003": "Template group not found",
 
+  "MESSAGE001": "Message not found",
+  "MESSAGE002": "You do not have permission to delete this message",
+  "MESSAGE003": "Parent message not found or has been deleted",
+
+  "COMMENT001": "Comment not found",
+  "COMMENT002": "You do not have permission to delete this comment",
+  "COMMENT003": "Parent comment not found or has been deleted",
+
   "VALIDATION001": "Invalid email format",
   "VALIDATION002": "Password must be 10-20 characters long, contain at least one uppercase letter, one lowercase letter, and one digit",
   "VALIDATION003": "Password and confirm password do not match",
@@ -91,6 +99,9 @@
   "SUCCESS028": "Account deleted successfully",
   "SUCCESS029": "Studio updated successfully",
   "SUCCESS030": "Studio deleted successfully",
+  "SUCCESS031": "Message and all replies deleted successfully",
+  "SUCCESS032": "Reply sent successfully",
+  "SUCCESS033": "Comment and all replies deleted successfully",
 
   "SYS001": "Unexpected system error"
 }
