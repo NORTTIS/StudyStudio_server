@@ -31,5 +31,11 @@ namespace StudioStudio_Server.Repositories
                 .Where(t => t.GroupId == groupId && !t.IsPendingDeleted)
                 .CountAsync();
         }
+
+        public async Task<TaskItem?> GetByIdAsync(Guid taskId)
+        {
+            return await _context.Tasks
+                .FirstOrDefaultAsync(t => t.TaskId == taskId && !t.IsPendingDeleted);
+        }
     }
 }

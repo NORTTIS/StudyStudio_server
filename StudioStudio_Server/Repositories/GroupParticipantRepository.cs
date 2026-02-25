@@ -48,6 +48,12 @@ namespace StudioStudio_Server.Repositories
                 .FirstOrDefaultAsync(gp => gp.GroupId == groupId && gp.UserId == userId);
         }
 
+        public async Task<GroupParticipant?> GetByUserAndGroupAsync(Guid userId, Guid groupId)
+        {
+            return await _context.GroupParticipants
+                .FirstOrDefaultAsync(gp => gp.GroupId == groupId && gp.UserId == userId);
+        }
+
         public async Task RemoveAsync(GroupParticipant participant)
         {
             _context.GroupParticipants.Remove(participant);
