@@ -173,5 +173,29 @@ namespace StudioStudio_Server.Controllers
             var message = _messageService.GetMessage(ErrorCodes.SuccessGetData);
             return Ok(ApiResponse<GroupMemberListResponse>.Success(ErrorCodes.SuccessGetData, message, result));
         }
+
+        [HttpPost]
+        [Authorize]
+        public async Task<ActionResult<ApiResponse<CreateStudioGroupsResponse>>> CreateStudioGroups([FromBody] CreateStudioGroupsRequest request)
+        {
+            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+            if (string.IsNullOrEmpty(userIdClaim) || !Guid.TryParse(userIdClaim, out Guid userId))
+            {
+                throw new AppException(ErrorCodes.AuthInvalidCredential, StatusCodes.Status401Unauthorized);
+            }
+
+            var isAdminClaim = User.FindFirst("IsAdmin")?.Value;
+            var isAdmin = isAdminClaim != null && bool.TryParse(isAdminClaim, out var adminResult) && adminResult;
+
+            if (isAdmin)
+            {
+                throw new AppException(ErrorCodes.AuthForbidden, StatusCodes.Status403Forbidden);
+            }
+
+            var result = await _groupService.CreateStudioGroupAsync(userId, request);
+            var message = _messageService.GetMessage(ErrorCodes.SuccessCreateGroup);
+            return Ok(ApiResponse<CreateStudioGroupsResponse>.Success(ErrorCodes.SuccessCreateGroup, message, result));
+        }
     }
 }
