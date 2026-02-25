@@ -14,6 +14,7 @@ using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Mvc;
 using StudioStudio_Server.Filters;
 using StackExchange.Redis;
+using StudioStudio_Server.Hubs;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -51,6 +52,8 @@ builder.Services.AddScoped<ITemplateService, TemplateService>();
 builder.Services.AddScoped<IGroupTaskStatusRepository, GroupTaskStatusRepository>();
 builder.Services.AddScoped<ISeederService, SeederService>();
 builder.Services.AddScoped<IGroupInviteService, GroupInviteService>();
+builder.Services.AddScoped<IGroupMessageRepository, GroupMessageRepository>();
+builder.Services.AddScoped<ITaskCommentRepository, TaskCommentRepository>();
 
 
 builder.Services.AddControllers(options =>
@@ -73,6 +76,9 @@ builder.Services.Configure<FormOptions>(options =>
 builder.Services.AddDbContext<StudioDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
+// Add SignalR
+builder.Services.AddSignalR();
+
 //JWT config
 builder.Services.AddAuthentication("Bearer").AddJwtBearer("Bearer", options =>
 {
@@ -88,13 +94,36 @@ builder.Services.AddAuthentication("Bearer").AddJwtBearer("Bearer", options =>
         IssuerSigningKey = new SymmetricSecurityKey(
             Encoding.UTF8.GetBytes(builder.Configuration["JWT:Key"]))
     };
+
+    // SignalR authentication configuration
+    options.Events = new Microsoft.AspNetCore.Authentication.JwtBearer.JwtBearerEvents
+    {
+        OnMessageReceived = context =>
+        {
+            var accessToken = context.Request.Query["access_token"];
+
+            var path = context.HttpContext.Request.Path;
+            if (!string.IsNullOrEmpty(accessToken) &&
+                (path.StartsWithSegments("/hubs/group-discuss") || 
+                 path.StartsWithSegments("/hubs/task-comment")))
+            {
+                context.Token = accessToken;
+            }
+            return Task.CompletedTask;
+        }
+    };
 });
 
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("WebAppPolicy", policy =>
     {
-        policy.WithOrigins("http://localhost:3000", "https://study-studio-client.vercel.app")
+        policy.WithOrigins(
+            "http://localhost:3000", 
+            "https://study-studio-client.vercel.app",
+            "http://localhost:5006",
+            "https://localhost:7070"
+        )
         .AllowAnyHeader()
         .AllowAnyMethod()
         .AllowCredentials();
@@ -169,5 +198,9 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
+
+// Map SignalR Hubs
+app.MapHub<GroupDiscussHub>("/hubs/group-discuss");
+app.MapHub<TaskCommentHub>("/hubs/task-comment");
 
 app.Run();

@@ -174,7 +174,7 @@ namespace StudioStudio_Server.Controllers
             return Ok(ApiResponse<GroupMemberListResponse>.Success(ErrorCodes.SuccessGetData, message, result));
         }
 
-        [HttpPost]
+        [HttpPost("studio-groups")]
         [Authorize]
         public async Task<ActionResult<ApiResponse<CreateStudioGroupsResponse>>> CreateStudioGroups([FromBody] CreateStudioGroupsRequest request)
         {

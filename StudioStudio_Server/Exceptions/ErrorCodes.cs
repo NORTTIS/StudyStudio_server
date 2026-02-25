@@ -59,6 +59,16 @@
         public const string TemplatePermissionDenied = "TEMPLATE002";
         public const string TemplateGroupNotFound = "TEMPLATE003";
 
+        // MESSAGE
+        public const string MessageNotFound = "MESSAGE001";
+        public const string MessagePermissionDenied = "MESSAGE002";
+        public const string MessageParentNotFound = "MESSAGE003";
+
+        // COMMENT
+        public const string CommentNotFound = "COMMENT001";
+        public const string CommentPermissionDenied = "COMMENT002";
+        public const string CommentParentNotFound = "COMMENT003";
+
         // VALIDATION
         public const string ValidationInvalidEmail = "VALIDATION001";
         public const string ValidationInvalidPassword = "VALIDATION002";
@@ -103,6 +113,9 @@
         public const string SuccessDeleteAccount = "SUCCESS028";
         public const string SuccessUpdateStudio = "SUCCESS029";
         public const string SuccessDeleteStudio = "SUCCESS030";
+        public const string SuccessDeleteMessage = "SUCCESS031";
+        public const string SuccessSendReply = "SUCCESS032";
+        public const string SuccessDeleteComment = "SUCCESS033";
 
         // ANNOUNCEMENT
         public const string AnnouncementNotFound = "ANNOUNCEMENT001";
