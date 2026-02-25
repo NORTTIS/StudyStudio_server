@@ -57,6 +57,7 @@
   "VALIDATION008": "File size exceeds the maximum limit of 5MB",
   "VALIDATION009": "Invalid file format. Only image files are allowed",
   "VALIDATION010": "New password cannot be the same as current password",
+  "VALIDATION011": "Required at least one group.",
 
   "ANNOUNCEMENT001": "Announcement not found",
 

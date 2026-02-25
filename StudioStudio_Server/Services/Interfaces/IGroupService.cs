@@ -11,5 +11,7 @@ namespace StudioStudio_Server.Services.Interfaces
         Task<CreateGroupResponse> CreateGroupAsync(Guid userId, CreateGroupRequest request);
         Task DeleteGroupAsync(Guid userId, Guid groupId);
         Task<UpdateGroupResponse> UpdateGroupAsync(Guid userId, UpdateGroupRequest request);
+        Task<CreateStudioGroupsResponse> CreateStudioGroupAsync(Guid userId, CreateStudioGroupsRequest request);
+        Task<StudioGroupListResponse> GetStudioGroupsAsync(Guid userId, Guid studioId);
     }
 }

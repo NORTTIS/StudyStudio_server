@@ -1,4 +1,5 @@
-﻿using StudioStudio_Server.Models.Entities;
+﻿using Microsoft.AspNetCore.SignalR;
+using StudioStudio_Server.Models.Entities;
 
 namespace StudioStudio_Server.Repositories.Interfaces
 {
@@ -15,5 +16,6 @@ namespace StudioStudio_Server.Repositories.Interfaces
         Task<int> GetGroupCountByStudioIdAsync(Guid studioId);
         Task UpdateAsync(Group group);
         Task<bool> GroupNameExistsInStudioExcludingGroupAsync(Guid? studioId, string groupName, Guid excludeGroupId);
+        Task<List<Group>> GetStudioGroupsAsync(Guid studioId);
     }
 }

@@ -70,6 +70,7 @@
         public const string ValidationFileSizeExceeded = "VALIDATION008";
         public const string ValidationInvalidFileFormat = "VALIDATION009";
         public const string ValidationNewPasswordSameAsCurrent = "VALIDATION010";
+        public const string ValidationGroupCreationNumber = "VALIDATION011";
 
         // SUCCESS
         public const string SuccessRegister = "SUCCESS001";

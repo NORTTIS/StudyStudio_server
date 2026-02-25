@@ -42,8 +42,8 @@ namespace StudioStudio_Server.Repositories
         public async Task<bool> GroupNameExistsInStudioAsync(Guid? studioId, string groupName)
         {
             return await _db.Groups
-                .AnyAsync(g => g.StudioId == studioId && 
-                              g.GroupName == groupName && 
+                .AnyAsync(g => g.StudioId == studioId &&
+                              g.GroupName == groupName &&
                               g.IsActive);
         }
 
@@ -92,10 +92,19 @@ namespace StudioStudio_Server.Repositories
         public async Task<bool> GroupNameExistsInStudioExcludingGroupAsync(Guid? studioId, string groupName, Guid excludeGroupId)
         {
             return await _db.Groups
-                .AnyAsync(g => g.StudioId == studioId && 
-                              g.GroupName == groupName && 
+                .AnyAsync(g => g.StudioId == studioId &&
+                              g.GroupName == groupName &&
                               g.GroupId != excludeGroupId &&
                               g.IsActive);
+        }
+
+        public async Task<List<Group>> GetStudioGroupsAsync(Guid studioId)
+        {
+            return await _db.Groups
+                .Where(g => g.StudioId == studioId && g.IsActive)
+                .OrderByDescending(g => g.GroupName)
+                .ThenByDescending(g => g.CreatedAt)
+                .ToListAsync();
         }
     }
 }

@@ -17,15 +17,18 @@ namespace StudioStudio_Server.Controllers
         private readonly ILogger<StudioController> _logger;
         private readonly IMessageService _messageService;
         private readonly IStudioService _studioService;
+        private readonly IGroupService _groupService;
 
         public StudioController(
             ILogger<StudioController> logger,
             IMessageService messageService,
-            IStudioService studioService)
+            IStudioService studioService,
+            IGroupService groupService)
         {
             _logger = logger;
             _messageService = messageService;
             _studioService = studioService;
+            _groupService = groupService;
         }
 
         [HttpGet]
@@ -125,7 +128,7 @@ namespace StudioStudio_Server.Controllers
 
         [HttpDelete("{studioId}")]
         [Authorize]
-        public async Task<ActionResult<ApiResponse<object>>> DeleteGroup(Guid studioId)
+        public async Task<ActionResult<ApiResponse<object>>> DeleteStudio(Guid studioId)
         {
             var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
 
@@ -145,6 +148,37 @@ namespace StudioStudio_Server.Controllers
             await _studioService.DeleteStudioAsync(userId, studioId);
             var message = _messageService.GetMessage(ErrorCodes.SuccessDeleteStudio);
             return Ok(ApiResponse<object>.Success(ErrorCodes.SuccessDeleteStudio, message, null));
+        }
+
+        [HttpGet("studioId")]
+        [Authorize]
+        public async Task<ActionResult<ApiResponse<StudioGroupListResponse>>> ViewStudioGroupList(Guid studioId)
+        {
+            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+            if (string.IsNullOrEmpty(userIdClaim) || !Guid.TryParse(userIdClaim, out Guid userId))
+            {
+                throw new AppException(ErrorCodes.AuthInvalidCredential, StatusCodes.Status401Unauthorized);
+            }
+
+            var isAdminClaim = User.FindFirst("IsAdmin")?.Value;
+            var isAdmin = isAdminClaim != null && bool.TryParse(isAdminClaim, out var adminResult) && adminResult;
+
+            if (isAdmin)
+            {
+                throw new AppException(ErrorCodes.AuthForbidden, StatusCodes.Status403Forbidden);
+            }
+            var result = new StudioGroupListResponse();
+            try
+            {
+                result = await _groupService.GetStudioGroupsAsync(userId, studioId);
+            }
+            catch (Exception e)
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError, ApiResponse<StudioGroupListResponse>.Error(ErrorCodes.UnexpectedError, e.Message));
+            }
+            var message = _messageService.GetMessage(ErrorCodes.SuccessGetGroup);
+            return Ok(ApiResponse<StudioGroupListResponse>.Success(ErrorCodes.SuccessGetGroup, message, result));
         }
     }
 }
