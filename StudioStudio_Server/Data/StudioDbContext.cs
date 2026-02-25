@@ -20,7 +20,6 @@ namespace StudioStudio_Server.Data
         public DbSet<PersonalTaskStatus> PersonalTaskStatuses => Set<PersonalTaskStatus>();
         public DbSet<TaskAssignment> TaskAssignments => Set<TaskAssignment>();
         public DbSet<TaskHistory> TaskHistories => Set<TaskHistory>();
-        public DbSet<Comment> Comments => Set<Comment>();
         public DbSet<GroupAttachment> GroupAttachments => Set<GroupAttachment>();
         public DbSet<PersonalAttachment> PersonalAttachments => Set<PersonalAttachment>();
         public DbSet<SubscriptionPlan> SubscriptionPlans => Set<SubscriptionPlan>();
@@ -33,6 +32,8 @@ namespace StudioStudio_Server.Data
         public DbSet<EmailVerificationToken> EmailVerificationTokens => Set<EmailVerificationToken>();
         public DbSet<Announcement> Announcements => Set<Announcement>();
         public DbSet<Template> Templates => Set<Template>();
+        public DbSet<GroupMessage> GroupMessages => Set<GroupMessage>();
+        public DbSet<TaskComment> TaskComments => Set<TaskComment>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -196,14 +197,6 @@ namespace StudioStudio_Server.Data
                 e.HasKey(x => x.HistoryId);
             });
 
-            // COMMENT
-            modelBuilder.Entity<Comment>(e =>
-            {
-                e.HasKey(x => x.CommentId);
-
-                e.Property(x => x.Content).IsRequired();
-            });
-
             // GROUP ATTACHMENT
             modelBuilder.Entity<GroupAttachment>(e =>
             {
@@ -296,6 +289,64 @@ namespace StudioStudio_Server.Data
 
                 e.HasIndex(x => x.GroupId).IsUnique();
                 e.HasIndex(x => x.IsActive);
+            });
+
+            // GROUP MESSAGE
+            modelBuilder.Entity<GroupMessage>(e =>
+            {
+                e.HasKey(x => x.MessageId);
+
+                e.Property(x => x.Content).IsRequired();
+
+                e.HasOne(x => x.Group)
+                    .WithMany()
+                    .HasForeignKey(x => x.GroupId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                e.HasOne(x => x.User)
+                    .WithMany()
+                    .HasForeignKey(x => x.UserId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+                // ⚠️ FIX: Changed from Cascade to Restrict to avoid multiple cascade paths
+                e.HasOne(x => x.ParentMessage)
+                    .WithMany(x => x.Replies)
+                    .HasForeignKey(x => x.ParentMessageId)
+                    .OnDelete(DeleteBehavior.Restrict)
+                    .IsRequired(false);
+
+                e.HasIndex(x => x.GroupId);
+                e.HasIndex(x => x.CreatedAt);
+                e.HasIndex(x => x.ParentMessageId);
+            });
+
+            // TASK COMMENT
+            modelBuilder.Entity<TaskComment>(e =>
+            {
+                e.HasKey(x => x.CommentId);
+
+                e.Property(x => x.Content).IsRequired();
+
+                e.HasOne(x => x.Task)
+                    .WithMany()
+                    .HasForeignKey(x => x.TaskId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                e.HasOne(x => x.User)
+                    .WithMany()
+                    .HasForeignKey(x => x.UserId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+                // ⚠️ FIX: Changed from Cascade to Restrict to avoid multiple cascade paths
+                e.HasOne(x => x.ParentComment)
+                    .WithMany(x => x.Replies)
+                    .HasForeignKey(x => x.ParentCommentId)
+                    .OnDelete(DeleteBehavior.Restrict)
+                    .IsRequired(false);
+
+                e.HasIndex(x => x.TaskId);
+                e.HasIndex(x => x.CreatedAt);
+                e.HasIndex(x => x.ParentCommentId);
             });
         }
     }

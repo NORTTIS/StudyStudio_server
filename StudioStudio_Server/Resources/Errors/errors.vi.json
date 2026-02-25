@@ -47,6 +47,14 @@
   "TEMPLATE002": "Bạn không có quyền truy cập mẫu này",
   "TEMPLATE003": "Không tìm thấy nhóm mẫu",
 
+  "MESSAGE001": "Không tìm thấy tin nhắn",
+  "MESSAGE002": "Bạn không có quyền xóa tin nhắn này",
+  "MESSAGE003": "Tin nhắn gốc không tồn tại hoặc đã bị xóa",
+
+  "COMMENT001": "Không tìm thấy bình luận",
+  "COMMENT002": "Bạn không có quyền xóa bình luận này",
+  "COMMENT003": "Bình luận gốc không tồn tại hoặc đã bị xóa",
+
   "VALIDATION001": "Định dạng email không hợp lệ",
   "VALIDATION002": "Mật khẩu phải dài từ 10-20 ký tự, chứa ít nhất một chữ hoa, một chữ thường và một chữ số",
   "VALIDATION003": "Mật khẩu và xác nhận mật khẩu không khớp",
@@ -91,6 +99,9 @@
   "SUCCESS028": "Xóa tài khoản thành công",
   "SUCCESS029": "Cập nhật studio thành công",
   "SUCCESS030": "Xóa studio thành công",
+  "SUCCESS031": "Đã xóa tin nhắn và tất cả phản hồi thành công",
+  "SUCCESS032": "Gửi phản hồi thành công",
+  "SUCCESS033": "Đã xóa bình luận và tất cả phản hồi thành công",
 
   "SYS001": "Lỗi hệ thống không xác định"
 }

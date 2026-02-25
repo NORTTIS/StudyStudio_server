@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using StudioStudio_Server.Data;
@@ -11,9 +12,11 @@ using StudioStudio_Server.Data;
 namespace StudioStudio_Server.Migrations
 {
     [DbContext(typeof(StudioDbContext))]
-    partial class StudioDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260225080907_AddGroupMessagesAndTaskComments")]
+    partial class AddGroupMessagesAndTaskComments
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -133,6 +136,30 @@ namespace StudioStudio_Server.Migrations
                     b.HasIndex("PublishedAt");
 
                     b.ToTable("Announcements");
+                });
+
+            modelBuilder.Entity("StudioStudio_Server.Models.Entities.Comment", b =>
+                {
+                    b.Property<Guid>("CommentId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Content")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("TaskId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("CommentId");
+
+                    b.ToTable("Comments");
                 });
 
             modelBuilder.Entity("StudioStudio_Server.Models.Entities.EmailVerificationToken", b =>
@@ -280,9 +307,6 @@ namespace StudioStudio_Server.Migrations
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<Guid?>("ParentMessageId")
-                        .HasColumnType("uuid");
-
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -294,8 +318,6 @@ namespace StudioStudio_Server.Migrations
                     b.HasIndex("CreatedAt");
 
                     b.HasIndex("GroupId");
-
-                    b.HasIndex("ParentMessageId");
 
                     b.HasIndex("UserId");
 
@@ -585,9 +607,6 @@ namespace StudioStudio_Server.Migrations
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<Guid?>("ParentCommentId")
-                        .HasColumnType("uuid");
-
                     b.Property<Guid>("TaskId")
                         .HasColumnType("uuid");
 
@@ -600,8 +619,6 @@ namespace StudioStudio_Server.Migrations
                     b.HasKey("CommentId");
 
                     b.HasIndex("CreatedAt");
-
-                    b.HasIndex("ParentCommentId");
 
                     b.HasIndex("TaskId");
 
@@ -872,11 +889,6 @@ namespace StudioStudio_Server.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("StudioStudio_Server.Models.Entities.GroupMessage", "ParentMessage")
-                        .WithMany("Replies")
-                        .HasForeignKey("ParentMessageId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
                     b.HasOne("StudioStudio_Server.Models.Entities.User", "User")
                         .WithMany()
                         .HasForeignKey("UserId")
@@ -884,8 +896,6 @@ namespace StudioStudio_Server.Migrations
                         .IsRequired();
 
                     b.Navigation("Group");
-
-                    b.Navigation("ParentMessage");
 
                     b.Navigation("User");
                 });
@@ -927,11 +937,6 @@ namespace StudioStudio_Server.Migrations
 
             modelBuilder.Entity("StudioStudio_Server.Models.Entities.TaskComment", b =>
                 {
-                    b.HasOne("StudioStudio_Server.Models.Entities.TaskComment", "ParentComment")
-                        .WithMany("Replies")
-                        .HasForeignKey("ParentCommentId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
                     b.HasOne("TaskItem", "Task")
                         .WithMany()
                         .HasForeignKey("TaskId")
@@ -943,8 +948,6 @@ namespace StudioStudio_Server.Migrations
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
-
-                    b.Navigation("ParentComment");
 
                     b.Navigation("Task");
 
@@ -1026,19 +1029,9 @@ namespace StudioStudio_Server.Migrations
                     b.Navigation("Participants");
                 });
 
-            modelBuilder.Entity("StudioStudio_Server.Models.Entities.GroupMessage", b =>
-                {
-                    b.Navigation("Replies");
-                });
-
             modelBuilder.Entity("StudioStudio_Server.Models.Entities.Studio", b =>
                 {
                     b.Navigation("Groups");
-                });
-
-            modelBuilder.Entity("StudioStudio_Server.Models.Entities.TaskComment", b =>
-                {
-                    b.Navigation("Replies");
                 });
 
             modelBuilder.Entity("StudioStudio_Server.Models.Entities.User", b =>
