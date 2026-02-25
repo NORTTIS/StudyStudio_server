@@ -41,7 +41,8 @@ namespace StudioStudio_Server.Repositories
         {
             return await _context.Studios
                 .Where(s => s.OwnerId == ownerId)
-                .OrderByDescending(s => s.CreatedAt)
+                .OrderByDescending(s => s.StudioName)
+                .ThenByDescending(s => s.CreatedAt)
                 .AsNoTracking()
                 .ToListAsync();
         }
