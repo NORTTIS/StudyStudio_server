@@ -662,5 +662,88 @@ namespace StudioStudio_Server.Services
                 }).ToList()
             };
         }
+
+        public async Task<StudioGroupListResponse> GetStudioGroupsAsync(Guid userId, Guid studioId)
+        {
+            // Get all groups belong to studio
+            var groups = await _groupRepository.GetStudioGroupsAsync(studioId);
+
+            // Get all group IDs
+            var groupIds = groups.Select(g => g.GroupId).ToList();
+
+            // Get all participants for member previews
+            var allParticipants = await _groupParticipantRepository.GetByGroupIdsAsync(groupIds);
+
+            var participantUserIds = allParticipants.Select(gp => gp.UserId).Distinct().ToList();
+            var users = await _userRepository.GetByIdsAsync(participantUserIds);
+
+            // Get task counts
+            var taskCounts = await _taskRepository.GetTaskCountByGroupIdsAsync(groupIds);
+
+            // Fix for the CS1061 error: Ensure that the `groupCards` list is awaited properly since it contains tasks.
+            // Modify the code to await the tasks and then access the `Studio` property.
+
+            var groupCards = await Task.WhenAll(groups.Select(async g =>
+            {
+                var userRole = GroupRole.Owner;
+                var createdByUser = await _userRepository.GetByIdAsync(userId);
+                var studio = await _studioRepository.GetByIdAsync(studioId);
+
+                var groupParticipants = allParticipants.Where(gp => gp.GroupId == g.GroupId).ToList();
+
+                var membersPreview = groupParticipants
+                    .Take(5)
+                    .Select(gp =>
+                    {
+                        var user = users.FirstOrDefault(u => u.UserId == gp.UserId);
+                        return new MemberPreviewDto
+                        {
+                            Id = gp.UserId,
+                            FirstName = user?.FirstName ?? "",
+                            LastName = user?.LastName ?? "",
+                            AvatarUrl = user?.AvatarUrl
+                        };
+                    })
+                    .ToList();
+
+                return new GroupCardDto
+                {
+                    Id = g.GroupId,
+                    Name = g.GroupName,
+                    Description = g.Description ?? "",
+                    IsFavorite = false,
+                    Role = userRole.ToString(),
+                    Studio = studio != null ? new StudioDto
+                    {
+                        Id = studioId,
+                        Name = studio.StudioName
+                    } : null,
+                    CreatedBy = createdByUser != null ? new UserDto
+                    {
+                        Id = createdByUser.UserId,
+                        FirstName = createdByUser.FirstName,
+                        LastName = createdByUser.LastName,
+                        AvatarUrl = createdByUser.AvatarUrl
+                    } : new UserDto(),
+                    MemberCount = groupParticipants.Count,
+                    TaskCount = taskCounts.TryGetValue(g.GroupId, out var count) ? count : 0,
+                    LastActivityAt = g.UpdatedAt,
+                    MembersPreview = membersPreview
+                };
+            }));
+
+            var studioGroups = groupCards.Where(g => g.Studio != null).ToList();
+
+
+            var totalGroup = await _groupRepository.GetGroupCountByStudioIdAsync(studioId);
+
+            var response = new StudioGroupListResponse
+            {
+                TotalGroup = totalGroup,
+                StudioGroups = studioGroups,
+            };
+
+            return response;
+        }
     }
 }
