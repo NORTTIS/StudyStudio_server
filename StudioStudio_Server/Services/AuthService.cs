@@ -161,17 +161,16 @@ namespace StudioStudio_Server.Services
                 throw new AppException(ErrorCodes.UserAccountAlreadyDeleted, StatusCodes.Status400BadRequest);
             }
 
-            if (user.Status == UserStatus.Inactive)
-            {
-                throw new AppException(ErrorCodes.AuthAccountNotVerified, StatusCodes.Status403Forbidden);
-            }
-
             //check user password has match
             var result = _passwordHasher.VerifyHashedPassword(user, user.PasswordHash, loginRequest.Password);
-
             if (result != PasswordVerificationResult.Success)
             {
                 throw new AppException(ErrorCodes.AuthInvalidCredential, StatusCodes.Status401Unauthorized);
+            }
+
+            if (user.Status == UserStatus.Inactive)
+            {
+                throw new AppException(ErrorCodes.AuthAccountNotVerified, StatusCodes.Status403Forbidden);
             }
 
             var accessTokenExpireMs = _configuration.GetValue<long>("JWT:AccessTokenExpireMs", 3600000);
