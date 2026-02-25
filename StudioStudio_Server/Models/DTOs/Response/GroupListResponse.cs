@@ -7,6 +7,12 @@
         public GroupSections Sections { get; set; } = null!;
     }
 
+    public class StudioGroupListResponse
+    {
+        public int TotalGroup { get; set; }
+        public List<GroupCardDto> StudioGroups { get; set; } = new();
+    }
+
     public class SubscriptionInfo
     {
         public int GroupLimit { get; set; }
