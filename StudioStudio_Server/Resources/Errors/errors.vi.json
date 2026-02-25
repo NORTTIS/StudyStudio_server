@@ -57,6 +57,7 @@
   "VALIDATION008": "Kích thước file vượt quá giới hạn tối đa 5MB",
   "VALIDATION009": "Định dạng file không hợp lệ. Chỉ chấp nhận file ảnh",
   "VALIDATION010": "Mật khẩu mới không được trùng với mật khẩu hiện tại",
+  "VALIDATION011": "Cần ít nhất một nhóm.",
 
   "ANNOUNCEMENT001": "Không tìm thấy thông báo",
 
