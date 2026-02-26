@@ -682,14 +682,14 @@ namespace StudioStudio_Server.Services
 
             // Fix for the CS1061 error: Ensure that the `groupCards` list is awaited properly since it contains tasks.
             // Modify the code to await the tasks and then access the `Studio` property.
+            var createdByUser = await _userRepository.GetByIdAsync(userId);
+            var studio = await _studioRepository.GetByIdAsync(studioId);
 
-            var groupCards = await Task.WhenAll(groups.Select(async g =>
+            var groupCards = groups.Select(g =>
             {
-                var userRole = GroupRole.Owner;
-                var createdByUser = await _userRepository.GetByIdAsync(userId);
-                var studio = await _studioRepository.GetByIdAsync(studioId);
-
-                var groupParticipants = allParticipants.Where(gp => gp.GroupId == g.GroupId).ToList();
+                var groupParticipants = allParticipants
+                    .Where(gp => gp.GroupId == g.GroupId)
+                    .ToList();
 
                 var membersPreview = groupParticipants
                     .Take(5)
@@ -712,7 +712,7 @@ namespace StudioStudio_Server.Services
                     Name = g.GroupName,
                     Description = g.Description ?? "",
                     IsFavorite = false,
-                    Role = userRole.ToString(),
+                    Role = GroupRole.Owner.ToString(),
                     Studio = studio != null ? new StudioDto
                     {
                         Id = studioId,
@@ -730,7 +730,7 @@ namespace StudioStudio_Server.Services
                     LastActivityAt = g.UpdatedAt,
                     MembersPreview = membersPreview
                 };
-            }));
+            }).ToList();
 
             var studioGroups = groupCards.Where(g => g.Studio != null).ToList();
 

@@ -1,4 +1,4 @@
-using StudioStudio_Server.Models;
+using StudioStudio_Server.Models.Caches;
 
 namespace StudioStudio_Server.Services.Interfaces
 {

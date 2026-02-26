@@ -3,7 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using StudioStudio_Server.Configurations;
 using StudioStudio_Server.Exceptions;
-using StudioStudio_Server.Models;
+using StudioStudio_Server.Models.Caches;
 using StudioStudio_Server.Models.DTOs.Request;
 using StudioStudio_Server.Models.DTOs.Response;
 using StudioStudio_Server.Models.Entities;
