@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using StudioStudio_Server.Configurations;
 using StudioStudio_Server.Exceptions;
 using StudioStudio_Server.Models;
 using StudioStudio_Server.Models.DTOs.Request;
@@ -248,40 +249,16 @@ namespace StudioStudio_Server.Controllers
             string frontendUrl = _configuration["Frontend:BaseUrl"] ?? "http://localhost:3000";
             string inviteUrl = $"{frontendUrl}/invite/{token}";
 
-            // Prepare email
+            // Prepare email using template
             string inviterName = $"{inviter.FirstName} {inviter.LastName}";
             string subject = $"Invitation to join {group.GroupName} on Study Studio";
-            string body = $@"
-                <div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;'>
-                    <h2>You've been invited to join a group!</h2>
-                    <p><strong>{inviterName}</strong> has invited you to join <strong>{group.GroupName}</strong> as a <strong>{role}</strong>.</p>
-                    
-                    {(!string.IsNullOrEmpty(group.Description) ? $"<p><em>{group.Description}</em></p>" : "")}
-                    
-                    <p>Click the button below to accept the invitation:</p>
-                    
-                    <div style='text-align: center; margin: 30px 0;'>
-                        <a href='{inviteUrl}' style='background-color: #4CAF50; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block;'>
-                            Accept Invitation
-                        </a>
-                    </div>
-                    
-                    <p style='color: #666; font-size: 12px;'>
-                        Or copy and paste this link into your browser:<br/>
-                        <a href='{inviteUrl}'>{inviteUrl}</a>
-                    </p>
-                    
-                    <p style='color: #666; font-size: 12px;'>
-                        This invitation will expire in 15 minutes.
-                    </p>
-                    
-                    <hr style='border: none; border-top: 1px solid #eee; margin: 30px 0;'/>
-                    
-                    <p style='color: #999; font-size: 11px;'>
-                        If you didn't expect this invitation, you can safely ignore this email.
-                    </p>
-                </div>
-            ";
+            string body = EmailTemplate.GroupInviteEmail(
+                inviteUrl,
+                inviterName,
+                group.GroupName,
+                role.ToString(),
+                group.Description
+            );
 
             // Send email
             await _emailService.SendLinkAsync(request.Email, subject, body);
