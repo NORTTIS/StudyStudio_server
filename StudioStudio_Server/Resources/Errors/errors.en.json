@@ -31,6 +31,7 @@
   "GROUP013": "There can only be one moderator in the group",
   "GROUP014": "You cannot change your own role",
   "GROUP015": "You do not have permission to update this group. Only owner and moderator can update it",
+  "GROUP016": "You do not have permission to access this group",
 
   "STUDIO001": "You have reached the limit of studios you can create",
 
