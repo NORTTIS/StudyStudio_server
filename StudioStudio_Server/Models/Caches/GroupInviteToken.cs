@@ -1,4 +1,4 @@
-namespace StudioStudio_Server.Models
+namespace StudioStudio_Server.Models.Caches
 {
     public class GroupInviteToken
     {
