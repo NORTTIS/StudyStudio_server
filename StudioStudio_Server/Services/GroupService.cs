@@ -181,7 +181,7 @@ namespace StudioStudio_Server.Services
             var userParticipant = group.Participants.FirstOrDefault(p => p.UserId == userId);
             if (userParticipant == null)
             {
-                throw new AppException(ErrorCodes.GroupPermissionDenied, StatusCodes.Status403Forbidden);
+                throw new AppException(ErrorCodes.GroupAccessDenied, StatusCodes.Status403Forbidden);
             }
 
             // Get studio info if group belongs to a studio
