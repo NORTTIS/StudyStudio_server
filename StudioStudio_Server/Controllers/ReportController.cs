@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using StudioStudio_Server.Configurations;
 using StudioStudio_Server.Data;
 using StudioStudio_Server.Exceptions;
 using StudioStudio_Server.Models.DTOs.Request;
@@ -69,18 +70,13 @@ namespace StudioStudio_Server.Controllers
             await _db.SaveChangesAsync();
 
             var subject = $"[Report] {request.Type} - {request.Title}";
-            var body = $@"
-                <h3>Report Type</h3>
-                <p>{request.Type}</p>
-                <h3>Title</h3>
-                <p>{request.Title}</p>
-                <h3>Email</h3>
-                <p>{request.Email}</p>
-                <h3>Content</h3>
-                <p>{request.Content}</p>
-                <h3>UserId</h3>
-                <p>{userId}</p>
-            ";
+            var body = EmailTemplate.ReportEmail(
+                request.Type,
+                request.Title,
+                request.Email,
+                request.Content,
+                userId.ToString()
+            );
 
             await _emailService.SendLinkAsync(reportToEmail, subject, body);
 
