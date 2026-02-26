@@ -32,15 +32,16 @@ namespace StudioStudio_Server.Services
         private readonly IPasswordHasher<User> _passwordHasher;
         private readonly IConfiguration _configuration;
         private readonly IEmailService _emailService;
-        private readonly IEmailVerificationTokenRepository _emailToken;
+        private readonly IEmailVerificationCacheService _emailVerificationCache;
         private readonly IPasswordResetCacheService _resetCache;
+
         public AuthService(
             IUserRepository userRepository,
             IPasswordHasher<User> passwordHasher,
             IConfiguration configuration,
             IRefreshTokenRepository refreshTokenRepository,
             IEmailService emailService,
-            IEmailVerificationTokenRepository emailToken,
+            IEmailVerificationCacheService emailVerificationCache,
             IPasswordResetCacheService resetCache)
         {
             _userRepository = userRepository;
@@ -48,7 +49,7 @@ namespace StudioStudio_Server.Services
             _configuration = configuration;
             _refreshTokenRepository = refreshTokenRepository;
             _emailService = emailService;
-            _emailToken = emailToken;
+            _emailVerificationCache = emailVerificationCache;
             _resetCache = resetCache;
         }
         public async Task RegisterAsync(RegisterRequests registerRequest)
@@ -61,6 +62,12 @@ namespace StudioStudio_Server.Services
             if (!IsValidPass(registerRequest.Password))
             {
                 throw new AppException(ErrorCodes.ValidationInvalidPassword, StatusCodes.Status400BadRequest);
+            }
+
+            // Check rate limit
+            if (!await _emailVerificationCache.CanSendVerificationEmailAsync(registerRequest.Email))
+            {
+                throw new AppException(ErrorCodes.ValidationRateLimitExceeded, StatusCodes.Status429TooManyRequests);
             }
 
             //check if user email have used or not
@@ -89,21 +96,22 @@ namespace StudioStudio_Server.Services
 
             await _userRepository.AddAsync(registedUser);
 
-            //create email token for user to validate
-            var emailToken = new EmailVerificationToken
-            {
-                Id = Guid.NewGuid(),
-                UserId = registedUser.UserId,
-                Token = Convert.ToBase64String(RandomNumberGenerator.GetBytes(64)),
-                CreatedAt = DateTime.UtcNow,
-                ExpiresAt = DateTime.UtcNow.AddMinutes(15),
-                IsUsed = false
-            };
+            // Generate verification token and store in Redis
+            var token = Convert.ToBase64String(RandomNumberGenerator.GetBytes(64));
+            var expiry = TimeSpan.FromMinutes(15);
 
-            await _emailToken.AddAsync(emailToken);
+            await _emailVerificationCache.StoreVerificationTokenAsync(
+                registerRequest.Email,
+                token,
+                registedUser.UserId,
+                expiry
+            );
+
+            // Increment rate limit counter
+            await _emailVerificationCache.IncrementSendCountAsync(registerRequest.Email);
 
             //Fe verify code url - URL encode token to handle special characters
-            string verifyUrl = $"{_configuration["Frontend:VerifyURL"]}?token={Uri.EscapeDataString(emailToken.Token)}";
+            string verifyUrl = $"{_configuration["Frontend:VerifyURL"]}?token={Uri.EscapeDataString(token)}";
 
             string html = EmailTemplate.VerifyLinkEmail(verifyUrl);
 
@@ -116,29 +124,37 @@ namespace StudioStudio_Server.Services
 
         public async Task VerifyEmailLinkAsync(string token)
         {
-            var verifyToken = await _emailToken.GetValidAsync(token);
-            if (verifyToken == null)
+            var verifyData = await _emailVerificationCache.GetVerificationDataByTokenAsync(token);
+
+            if (verifyData == null)
             {
                 throw new AppException(ErrorCodes.ValidationInvalidToken, StatusCodes.Status400BadRequest);
             }
 
-            if (verifyToken.ExpiresAt < DateTime.UtcNow)
+            var user = await _userRepository.GetByIdAsync(verifyData.UserId);
+
+            if (user == null)
             {
-                throw new AppException(ErrorCodes.ValidationTokenExpired, StatusCodes.Status400BadRequest);
+                throw new AppException(ErrorCodes.UserNotFound, StatusCodes.Status404NotFound);
             }
 
-            if (verifyToken.User.DeletedFlag)
+            if (user.DeletedFlag)
             {
                 throw new AppException(ErrorCodes.UserAccountAlreadyDeleted, StatusCodes.Status400BadRequest);
             }
 
-            if (verifyToken.User.Status == UserStatus.Active)
+            if (user.Status == UserStatus.Active)
             {
-                throw new AppException(ErrorCodes.UserAlreadyExist, StatusCodes.Status400BadRequest);
+                throw new AppException(ErrorCodes.ValidationEmailAlreadyVerified, StatusCodes.Status400BadRequest);
             }
-            verifyToken.User.Status = UserStatus.Active;
 
-            await _emailToken.MaskAsUsed(verifyToken);
+            user.Status = UserStatus.Active;
+            user.UpdatedAt = DateTime.UtcNow;
+
+            await _userRepository.UpdateAsync(user);
+
+            // Invalidate token after successful verification
+            await _emailVerificationCache.InvalidateVerificationTokenAsync(verifyData.Email);
         }
 
         public async Task<LoginResponse> LoginAsync(LoginRequests loginRequest, HttpResponse response)
@@ -161,11 +177,6 @@ namespace StudioStudio_Server.Services
                 throw new AppException(ErrorCodes.UserAccountAlreadyDeleted, StatusCodes.Status400BadRequest);
             }
 
-            if (user.Status == UserStatus.Inactive)
-            {
-                throw new AppException(ErrorCodes.AuthAccountNotVerified, StatusCodes.Status403Forbidden);
-            }
-
             //check user password has match
             var result = _passwordHasher.VerifyHashedPassword(user, user.PasswordHash, loginRequest.Password);
 
@@ -173,6 +184,12 @@ namespace StudioStudio_Server.Services
             {
                 throw new AppException(ErrorCodes.AuthInvalidCredential, StatusCodes.Status401Unauthorized);
             }
+
+            if (user.Status == UserStatus.Inactive)
+            {
+                throw new AppException(ErrorCodes.AuthAccountNotVerified, StatusCodes.Status403Forbidden);
+            }
+
 
             var accessTokenExpireMs = _configuration.GetValue<long>("JWT:AccessTokenExpireMs", 3600000);
             var refreshTokenExpireMs = _configuration.GetValue<long>("JWT:RefreshTokenExpireMs", 86400000);
@@ -362,6 +379,12 @@ namespace StudioStudio_Server.Services
                 throw new AppException(ErrorCodes.ValidationInvalidEmail, StatusCodes.Status400BadRequest);
             }
 
+            // Check rate limit
+            if (!await _resetCache.CanSendResetEmailAsync(email))
+            {
+                throw new AppException(ErrorCodes.ValidationRateLimitExceeded, StatusCodes.Status429TooManyRequests);
+            }
+
             var user = await _userRepository.GetByEmailAsync(email);
             if (user == null)
             {
@@ -377,6 +400,9 @@ namespace StudioStudio_Server.Services
             var expiry = TimeSpan.FromMinutes(15);
 
             await _resetCache.StoreResetTokenAsync(email, token, user.UserId, expiry);
+
+            // Increment rate limit counter
+            await _resetCache.IncrementSendCountAsync(email);
 
             string resetURL = $"{_configuration["Frontend:ResetPassURL"]}?token={Uri.EscapeDataString(token)}";
             string html = EmailTemplate.ResetPasswordEmail(resetURL);
@@ -452,6 +478,12 @@ namespace StudioStudio_Server.Services
                 );
             }
 
+            // Check rate limit
+            if (!await _emailVerificationCache.CanSendVerificationEmailAsync(request.Email))
+            {
+                throw new AppException(ErrorCodes.ValidationRateLimitExceeded, StatusCodes.Status429TooManyRequests);
+            }
+
             var user = await _userRepository.GetByEmailAsync(request.Email);
 
             if (user == null)
@@ -466,25 +498,25 @@ namespace StudioStudio_Server.Services
 
             if (user.Status == UserStatus.Active)
             {
-                throw new AppException(ErrorCodes.UserAlreadyExist, StatusCodes.Status400BadRequest);
+                throw new AppException(ErrorCodes.ValidationEmailAlreadyVerified, StatusCodes.Status400BadRequest);
             }
 
-            await _emailToken.InvalidateTokensAsync(user.UserId);
+            // Generate new token and store in Redis
+            var token = Convert.ToBase64String(RandomNumberGenerator.GetBytes(64));
+            var expiry = TimeSpan.FromMinutes(15);
 
-            var newToken = new EmailVerificationToken
-            {
-                Id = Guid.NewGuid(),
-                UserId = user.UserId,
-                Token = Convert.ToBase64String(RandomNumberGenerator.GetBytes(64)),
-                CreatedAt = DateTime.UtcNow,
-                ExpiresAt = DateTime.UtcNow.AddMinutes(15),
-                IsUsed = false
-            };
+            await _emailVerificationCache.StoreVerificationTokenAsync(
+                request.Email,
+                token,
+                user.UserId,
+                expiry
+            );
 
-            await _emailToken.AddAsync(newToken);
+            // Increment rate limit counter
+            await _emailVerificationCache.IncrementSendCountAsync(request.Email);
 
             string verifyUrl =
-                $"{_configuration["Frontend:VerifyURL"]}?token={Uri.EscapeDataString(newToken.Token)}";
+                $"{_configuration["Frontend:VerifyURL"]}?token={Uri.EscapeDataString(token)}";
 
             string html = EmailTemplate.VerifyLinkEmail(verifyUrl);
 

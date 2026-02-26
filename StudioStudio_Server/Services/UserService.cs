@@ -79,7 +79,7 @@ namespace StudioStudio_Server.Services
             var verifyResult = _passwordHasher.VerifyHashedPassword(user, user.PasswordHash, request.CurrentPassword);
             if (verifyResult != PasswordVerificationResult.Success)
             {
-                throw new AppException(ErrorCodes.AuthIncorrectCurrentPassword, StatusCodes.Status401Unauthorized);
+                throw new AppException(ErrorCodes.AuthIncorrectCurrentPassword, StatusCodes.Status400BadRequest);
             }
 
             // Validate new password format

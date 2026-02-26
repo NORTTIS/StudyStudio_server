@@ -81,6 +81,7 @@
         public const string ValidationInvalidFileFormat = "VALIDATION009";
         public const string ValidationNewPasswordSameAsCurrent = "VALIDATION010";
         public const string ValidationGroupCreationNumber = "VALIDATION011";
+        public const string ValidationRateLimitExceeded = "VALIDATION012";
 
         // SUCCESS
         public const string SuccessRegister = "SUCCESS001";
