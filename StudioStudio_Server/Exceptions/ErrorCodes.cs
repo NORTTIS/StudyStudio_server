@@ -39,6 +39,7 @@
         public const string GroupOnlyOneModerator = "GROUP013";
         public const string GroupCannotChangeOwnRole = "GROUP014";
         public const string GroupUpdatePermissionDenied = "GROUP015";
+        public const string GroupAccessDenied = "GROUP016";
 
         // STUDIO
         public const string StudioLimitReached = "STUDIO001";
