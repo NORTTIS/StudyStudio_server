@@ -93,6 +93,19 @@ namespace StudioStudio_Server.Controllers
                 throw new AppException(ErrorCodes.GroupPermissionDenied, StatusCodes.Status403Forbidden);
             }
 
+            // ? Check if trying to create Moderator invite when Moderator already exists
+            if (role == GroupRole.Moderator)
+            {
+                int moderatorCount = await _groupParticipantRepository.GetRoleCountByGroupIdAsync(request.GroupId, GroupRole.Moderator);
+                if (moderatorCount > 0)
+                {
+                    _logger.LogWarning(
+                        "Attempt to create Moderator invite for group {GroupId} that already has a Moderator. Request by user {UserId}",
+                        request.GroupId, userId);
+                    throw new AppException(ErrorCodes.GroupOnlyOneModerator, StatusCodes.Status400BadRequest);
+                }
+            }
+
             // Check rate limit
             bool canCreate = await _groupInviteService.CheckInviteCreationRateLimitAsync(request.GroupId, userId);
             if (!canCreate)
@@ -131,6 +144,10 @@ namespace StudioStudio_Server.Controllers
                 ExpiresAt = DateTime.UtcNow.AddMinutes(15),
                 CreatedAt = inviteData.CreatedAt
             };
+
+            _logger.LogInformation(
+                "Invite link created for group {GroupId} with role {Role} by user {UserId}. Token expires at {ExpiresAt}",
+                request.GroupId, role, userId, response.ExpiresAt);
 
             var message = _messageService.GetMessage(ErrorCodes.SuccessCreateInvite);
             return Ok(ApiResponse<CreateInviteLinkResponse>.Success(ErrorCodes.SuccessCreateInvite, message, response));
@@ -179,6 +196,19 @@ namespace StudioStudio_Server.Controllers
                 (userParticipant.Role != GroupRole.Owner && userParticipant.Role != GroupRole.Moderator))
             {
                 throw new AppException(ErrorCodes.GroupPermissionDenied, StatusCodes.Status403Forbidden);
+            }
+
+            // ? Check if trying to invite Moderator when Moderator already exists
+            if (role == GroupRole.Moderator)
+            {
+                int moderatorCount = await _groupParticipantRepository.GetRoleCountByGroupIdAsync(request.GroupId, GroupRole.Moderator);
+                if (moderatorCount > 0)
+                {
+                    _logger.LogWarning(
+                        "Attempt to send Moderator invite for group {GroupId} that already has a Moderator. Request by user {UserId}",
+                        request.GroupId, userId);
+                    throw new AppException(ErrorCodes.GroupOnlyOneModerator, StatusCodes.Status400BadRequest);
+                }
             }
 
             // Check rate limit
@@ -309,6 +339,29 @@ namespace StudioStudio_Server.Controllers
                 throw new AppException(ErrorCodes.GroupAlreadyMember, StatusCodes.Status400BadRequest);
             }
 
+            // Parse role
+            if (!Enum.TryParse<GroupRole>(inviteData.Role, true, out GroupRole role))
+            {
+                throw new AppException(ErrorCodes.InviteInvalidRole, StatusCodes.Status400BadRequest);
+            }
+
+            // Only 1 Owner and 1 Moderator allowed per group
+            if (role == GroupRole.Owner)
+            {
+                throw new AppException(ErrorCodes.GroupOnlyOneOwner, StatusCodes.Status400BadRequest);
+            }
+            else if (role == GroupRole.Moderator)
+            {
+                int moderatorCount = await _groupParticipantRepository.GetRoleCountByGroupIdAsync(inviteData.GroupId, GroupRole.Moderator);
+                if (moderatorCount > 0)
+                {
+                    _logger.LogWarning(
+                        "Attempt to add second Moderator to group {GroupId}. Invite rejected for user {UserId}",
+                        inviteData.GroupId, userId);
+                    throw new AppException(ErrorCodes.GroupOnlyOneModerator, StatusCodes.Status400BadRequest);
+                }
+            }
+
             // Get group owner's subscription plan
             var ownerParticipant = group.Participants.FirstOrDefault(p => p.Role == GroupRole.Owner);
             if (ownerParticipant == null)
@@ -326,12 +379,6 @@ namespace StudioStudio_Server.Controllers
                 throw new AppException(ErrorCodes.GroupMemberLimitReached, StatusCodes.Status403Forbidden);
             }
 
-            // Parse role
-            if (!Enum.TryParse<GroupRole>(inviteData.Role, true, out GroupRole role))
-            {
-                throw new AppException(ErrorCodes.InviteInvalidRole, StatusCodes.Status400BadRequest);
-            }
-
             // Add user as participant
             var participant = new GroupParticipant
             {
@@ -345,6 +392,10 @@ namespace StudioStudio_Server.Controllers
             try
             {
                 await _groupParticipantRepository.AddAsync(participant);
+
+                _logger.LogInformation(
+                    "User {UserId} accepted invite and joined group {GroupId} with role {Role}",
+                    userId, inviteData.GroupId, role);
             }
             catch (DbUpdateException ex) when (ex.InnerException?.Message.Contains("IX_GroupParticipants_GroupId_UserId") == true)
             {
