@@ -66,6 +66,7 @@
   "VALIDATION009": "Invalid file format. Only image files are allowed",
   "VALIDATION010": "New password cannot be the same as current password",
   "VALIDATION011": "Required at least one group.",
+  "VALIDATION012": "You have exceeded the rate limit (5 times/15 minutes). Please try again later",
 
   "ANNOUNCEMENT001": "Announcement not found",
 
