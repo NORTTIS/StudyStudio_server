@@ -1,38 +1,35 @@
-﻿using Microsoft.OpenApi.Validations;
 using StackExchange.Redis;
-using StudioStudio_Server.Exceptions;
 using StudioStudio_Server.Models.Entities;
 using StudioStudio_Server.Services.Interfaces;
 using System.Text.Json;
-using System.Text.Json.Serialization;
 
 namespace StudioStudio_Server.Services
 {
-    public class PasswordResetCacheService : IPasswordResetCacheService
+    public class EmailVerificationCacheService : IEmailVerificationCacheService
     {
         private readonly IConnectionMultiplexer _redis;
         private readonly IDatabase _database;
-        private readonly ILogger<PasswordResetCacheService> _logger;
+        private readonly ILogger<EmailVerificationCacheService> _logger;
 
         // Redis key prefixes
-        private const string TOKEN_BY_EMAIL_PREFIX = "reset_password:token_by_email:";
-        private const string TOKEN_DATA_PREFIX = "reset_password:token_data:";
-        private const string RATE_LIMIT_PREFIX = "reset_password:rate_limit:";
+        private const string TOKEN_BY_EMAIL_PREFIX = "email_verification:token_by_email:";
+        private const string TOKEN_DATA_PREFIX = "email_verification:token_data:";
+        private const string RATE_LIMIT_PREFIX = "email_verification:rate_limit:";
 
         // Rate limit settings
         private const int MAX_REQUESTS_PER_WINDOW = 5;
         private static readonly TimeSpan RATE_LIMIT_WINDOW = TimeSpan.FromMinutes(15);
 
-        public PasswordResetCacheService(
+        public EmailVerificationCacheService(
             IConnectionMultiplexer redis,
-            ILogger<PasswordResetCacheService> logger)
+            ILogger<EmailVerificationCacheService> logger)
         {
             _redis = redis;
             _database = redis.GetDatabase();
             _logger = logger;
         }
 
-        public async Task<PasswordResetDataRedis?> GetResetDataByTokenAsync(string token)
+        public async Task<EmailVerificationDataRedis?> GetVerificationDataByTokenAsync(string token)
         {
             try
             {
@@ -41,21 +38,21 @@ namespace StudioStudio_Server.Services
 
                 if (!json.HasValue)
                 {
-                    _logger.LogWarning("Reset token not found: {Token}", token);
+                    _logger.LogWarning("Verification token not found: {Token}", token);
                     return null;
                 }
 
-                var resetData = JsonSerializer.Deserialize<PasswordResetDataRedis>(json!);
-                return resetData;
+                var verificationData = JsonSerializer.Deserialize<EmailVerificationDataRedis>(json!);
+                return verificationData;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error getting reset data for token: {Token}", token);
+                _logger.LogError(ex, "Error getting verification data for token: {Token}", token);
                 throw;
             }
         }
 
-        public async Task<bool> CanSendResetEmailAsync(string email)
+        public async Task<bool> CanSendVerificationEmailAsync(string email)
         {
             try
             {
@@ -85,7 +82,45 @@ namespace StudioStudio_Server.Services
             }
         }
 
-        public async Task InvalidateResetTokenAsync(string email)
+        public async Task StoreVerificationTokenAsync(string email, string token, Guid userId, TimeSpan expiry)
+        {
+            try
+            {
+                // Invalidate old token first
+                await InvalidateVerificationTokenAsync(email);
+
+                var verificationData = new EmailVerificationDataRedis
+                {
+                    Email = email,
+                    UserId = userId,
+                    Token = token,
+                    CreatedAt = DateTime.UtcNow
+                };
+
+                var json = JsonSerializer.Serialize(verificationData);
+                var emailKey = TOKEN_BY_EMAIL_PREFIX + email.ToLowerInvariant();
+                var tokenKey = TOKEN_DATA_PREFIX + token;
+
+                // Use batch for atomic operations
+                var batch = _database.CreateBatch();
+                var emailTask = batch.StringSetAsync(emailKey, token, expiry);
+                var tokenTask = batch.StringSetAsync(tokenKey, json, expiry);
+                batch.Execute();
+
+                await Task.WhenAll(emailTask, tokenTask);
+
+                _logger.LogInformation(
+                    "Stored verification token for email: {Email}, UserId: {UserId}, Expires in: {Expiry}",
+                    email, userId, expiry);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error storing verification token for email: {Email}", email);
+                throw;
+            }
+        }
+
+        public async Task InvalidateVerificationTokenAsync(string email)
         {
             try
             {
@@ -103,48 +138,12 @@ namespace StudioStudio_Server.Services
 
                     await Task.WhenAll(deleteEmailTask, deleteTokenTask);
 
-                    _logger.LogInformation("Invalidated reset token for email: {Email}", email);
+                    _logger.LogInformation("Invalidated verification token for email: {Email}", email);
                 }
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error invalidating reset token for email: {Email}", email);
-                throw;
-            }
-        }
-
-        public async Task StoreResetTokenAsync(string email, string token, Guid userId, TimeSpan expiry)
-        {
-            try
-            {
-                await InvalidateResetTokenAsync(email);
-
-                var resetData = new PasswordResetDataRedis
-                {
-                    Email = email,
-                    UserId = userId,
-                    Token = token,
-                    CreatedAt = DateTime.UtcNow
-                };
-
-                var json = JsonSerializer.Serialize(resetData);
-                var emailKey = TOKEN_BY_EMAIL_PREFIX + email.ToLowerInvariant();
-                var tokenKey = TOKEN_DATA_PREFIX + token;
-
-                var batch = _database.CreateBatch();
-                var emailTask = batch.StringSetAsync(emailKey, token, expiry);
-                var tokenTask = batch.StringSetAsync(tokenKey, json, expiry);
-                batch.Execute();
-
-                await Task.WhenAll(emailTask, tokenTask);
-
-                _logger.LogInformation(
-                    "Stored reset token for email: {Email}, UserId: {UserId}, Expires in: {Expiry}",
-                    email, userId, expiry);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error storing reset token for email: {Email}", email);
+                _logger.LogError(ex, "Error invalidating verification token for email: {Email}", email);
                 throw;
             }
         }
