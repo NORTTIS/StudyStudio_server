@@ -1,5 +1,5 @@
 using StackExchange.Redis;
-using StudioStudio_Server.Models;
+using StudioStudio_Server.Models.Caches;
 using StudioStudio_Server.Services.Interfaces;
 using System.Security.Cryptography;
 using System.Text;
