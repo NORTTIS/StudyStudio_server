@@ -150,7 +150,7 @@ namespace StudioStudio_Server.Controllers
             return Ok(ApiResponse<object>.Success(ErrorCodes.SuccessDeleteStudio, message, null));
         }
 
-        [HttpGet("studioId")]
+        [HttpGet("{studioId}/groups")]
         [Authorize]
         public async Task<ActionResult<ApiResponse<StudioGroupListResponse>>> ViewStudioGroupList(Guid studioId)
         {
