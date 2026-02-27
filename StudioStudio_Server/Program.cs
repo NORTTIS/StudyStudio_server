@@ -54,6 +54,9 @@ builder.Services.AddScoped<ISeederService, SeederService>();
 builder.Services.AddScoped<IGroupInviteService, GroupInviteService>();
 builder.Services.AddScoped<IGroupMessageRepository, GroupMessageRepository>();
 builder.Services.AddScoped<ITaskCommentRepository, TaskCommentRepository>();
+builder.Services.AddScoped<IAnnouncementRepository, AnnouncementRepository>();
+builder.Services.AddScoped<IUserAnnouccementRepository, UserAnnouncementRepository>();
+builder.Services.AddScoped<IUserAnnouncementService, UserAnnouncementService>();
 
 
 builder.Services.AddControllers(options =>
@@ -104,7 +107,7 @@ builder.Services.AddAuthentication("Bearer").AddJwtBearer("Bearer", options =>
 
             var path = context.HttpContext.Request.Path;
             if (!string.IsNullOrEmpty(accessToken) &&
-                (path.StartsWithSegments("/hubs/group-discuss") || 
+                (path.StartsWithSegments("/hubs/group-discuss") ||
                  path.StartsWithSegments("/hubs/task-comment")))
             {
                 context.Token = accessToken;
@@ -119,7 +122,7 @@ builder.Services.AddCors(options =>
     options.AddPolicy("WebAppPolicy", policy =>
     {
         policy.WithOrigins(
-            "http://localhost:3000", 
+            "http://localhost:3000",
             "https://study-studio-client.vercel.app",
             "http://localhost:5006",
             "https://localhost:7070"
@@ -177,7 +180,7 @@ using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<StudioDbContext>();
     db.Database.Migrate();
-    
+
     var seeder = scope.ServiceProvider.GetRequiredService<ISeederService>();
     await seeder.SeedInitialDataAsync();
 }
