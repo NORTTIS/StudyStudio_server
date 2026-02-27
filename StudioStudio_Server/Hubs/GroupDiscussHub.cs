@@ -1,12 +1,15 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
+using Microsoft.IdentityModel.Tokens;
 using StudioStudio_Server.Exceptions;
 using StudioStudio_Server.Models.DTOs.Request;
 using StudioStudio_Server.Models.DTOs.Response;
 using StudioStudio_Server.Models.Entities;
+using StudioStudio_Server.Models.Enums;
 using StudioStudio_Server.Repositories.Interfaces;
 using StudioStudio_Server.Services.Interfaces;
 using System.Security.Claims;
+using System.Text.RegularExpressions;
 
 namespace StudioStudio_Server.Hubs
 {
@@ -17,6 +20,9 @@ namespace StudioStudio_Server.Hubs
         private readonly IGroupParticipantRepository _groupParticipantRepository;
         private readonly IUserRepository _userRepository;
         private readonly IMessageService _messageService;
+        private readonly IAnnouncementRepository _announcementRepository;
+        private readonly IUserAnnouncementService _userAnnouncementService;
+        private readonly IGroupRepository _groupRepository;
         private readonly ILogger<GroupDiscussHub> _logger;
 
         public GroupDiscussHub(
@@ -24,12 +30,18 @@ namespace StudioStudio_Server.Hubs
             IGroupParticipantRepository groupParticipantRepository,
             IUserRepository userRepository,
             IMessageService messageService,
+            IAnnouncementRepository announcementRepository,
+            IUserAnnouncementService userAnnouncementService,
+            IGroupRepository groupRepository,
             ILogger<GroupDiscussHub> logger)
         {
             _messageRepository = messageRepository;
             _groupParticipantRepository = groupParticipantRepository;
             _userRepository = userRepository;
             _messageService = messageService;
+            _announcementRepository = announcementRepository;
+            _userAnnouncementService = userAnnouncementService;
+            _groupRepository = groupRepository;
             _logger = logger;
         }
 
@@ -49,7 +61,7 @@ namespace StudioStudio_Server.Hubs
             {
                 var userId = GetUserId();
                 var user = await _userRepository.GetByIdAsync(userId);
-                
+
                 // If user has language preference, use it
                 if (user != null && !string.IsNullOrEmpty(user.Language))
                 {
@@ -59,7 +71,7 @@ namespace StudioStudio_Server.Hubs
                         Context.GetHttpContext().Request.Headers["Accept-Language"] = user.Language;
                     }
                 }
-                
+
                 return _messageService.GetMessage(errorCode);
             }
             catch
@@ -67,6 +79,12 @@ namespace StudioStudio_Server.Hubs
                 // Fallback to default message service behavior
                 return _messageService.GetMessage(errorCode);
             }
+        }
+
+        private List<Guid> ExtractTaggedUserIds(string content)
+        {
+            var matches = Regex.Matches(content, @"@([a-fA-F0-9\-]{36})");
+            return matches.Select(m => Guid.Parse(m.Groups[1].Value)).ToList();
         }
 
         public async Task JoinGroup(Guid groupId)
@@ -174,6 +192,40 @@ namespace StudioStudio_Server.Hubs
 
                 await Clients.Group(request.GroupId.ToString()).SendAsync("ReceiveMessage", messageDto);
                 _logger.LogInformation("Message sent to group {GroupId} by user {UserId}", request.GroupId, userId);
+
+                var taggedUserIds = ExtractTaggedUserIds(request.Content);
+                if (!taggedUserIds.IsNullOrEmpty())
+                {
+                    var userName = user.FirstName + " " + user.LastName;
+                    var group = await _groupRepository.GetByIdAsync(request.GroupId);
+                    var annouce = new Announcement
+                    {
+                        AnnouncementId = Guid.NewGuid(),
+                        Title = await GetLocalizedMessageAsync(ErrorCodes.AnnouncementTagTitle),
+                        Content = userName + " " + await GetLocalizedMessageAsync(ErrorCodes.AnnouncementTagContent) + " " + group.GroupName,
+                        Type = AnnouncementType.Info,
+                        IsActive = true,
+                        CreatedBy = userId,
+                        CreatedAt = DateTime.Now,
+                        UpdatedAt = DateTime.Now,
+                        PublishedAt = DateTime.Now,
+                    };
+                    await _announcementRepository.AddAsync(annouce);
+
+                    foreach (var tagId in taggedUserIds)
+                    {
+                        var userAnnounce = new UserAnnouncementRequest
+                        {
+                            AnnouncementId = annouce.AnnouncementId,
+                            MentionedId = tagId,
+                            IsRead = false,
+                            CreatedAt = DateTime.Now
+                        };
+
+                        await _userAnnouncementService.AddAnnouncementAsync(userAnnounce);
+                        await Clients.User(tagId.ToString()).SendAsync("ReceiveAnnouncement", annouce);
+                    }
+                }
             }
             catch (Exception ex)
             {
@@ -190,7 +242,7 @@ namespace StudioStudio_Server.Hubs
                 var userId = GetUserId();
 
                 // ? LOG: Request data
-                _logger.LogInformation("ReplyToMessage - Request: GroupId={GroupId}, ParentMessageId={ParentId}, UserId={UserId}, Content length={Length}", 
+                _logger.LogInformation("ReplyToMessage - Request: GroupId={GroupId}, ParentMessageId={ParentId}, UserId={UserId}, Content length={Length}",
                     request.GroupId, request.ParentMessageId, userId, request.Content?.Length ?? 0);
 
                 var isUserInGroup = await _groupParticipantRepository.IsUserInGroupAsync(request.GroupId, userId);
@@ -203,11 +255,11 @@ namespace StudioStudio_Server.Hubs
                 }
 
                 var parentMessage = await _messageRepository.GetByIdAsync(request.ParentMessageId);
-                
+
                 // ? LOG: Parent message status
-                _logger.LogInformation("Parent message check: Found={Found}, IsDeleted={IsDeleted}, GroupId={GroupId}", 
+                _logger.LogInformation("Parent message check: Found={Found}, IsDeleted={IsDeleted}, GroupId={GroupId}",
                     parentMessage != null, parentMessage?.IsDeleted, parentMessage?.GroupId);
-                
+
                 if (parentMessage == null || parentMessage.IsDeleted)
                 {
                     _logger.LogError("Parent message not found or deleted: ParentMessageId={ParentMessageId}", request.ParentMessageId);
@@ -219,7 +271,7 @@ namespace StudioStudio_Server.Hubs
                 // ? VALIDATION: Verify parent belongs to same group
                 if (parentMessage.GroupId != request.GroupId)
                 {
-                    _logger.LogError("Parent message GroupId mismatch: ParentGroupId={ParentGroupId}, RequestGroupId={RequestGroupId}", 
+                    _logger.LogError("Parent message GroupId mismatch: ParentGroupId={ParentGroupId}, RequestGroupId={RequestGroupId}",
                         parentMessage.GroupId, request.GroupId);
                     var errorMsg = await GetLocalizedMessageAsync(ErrorCodes.MessageParentNotFound);
                     await Clients.Caller.SendAsync("Error", errorMsg);
@@ -238,7 +290,7 @@ namespace StudioStudio_Server.Hubs
                 };
 
                 // ? LOG: Before save
-                _logger.LogInformation("Attempting to save reply: ReplyId={ReplyId}, ParentId={ParentId}, GroupId={GroupId}", 
+                _logger.LogInformation("Attempting to save reply: ReplyId={ReplyId}, ParentId={ParentId}, GroupId={GroupId}",
                     reply.MessageId, reply.ParentMessageId, reply.GroupId);
 
                 await _messageRepository.AddAsync(reply);
@@ -273,7 +325,7 @@ namespace StudioStudio_Server.Hubs
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error replying to message - GroupId={GroupId}, ParentMessageId={ParentMessageId}, Error={Error}", 
+                _logger.LogError(ex, "Error replying to message - GroupId={GroupId}, ParentMessageId={ParentMessageId}, Error={Error}",
                     request.GroupId, request.ParentMessageId, ex.Message);
                 var errorMsg = await GetLocalizedMessageAsync(ErrorCodes.UnexpectedError);
                 await Clients.Caller.SendAsync("Error", errorMsg);

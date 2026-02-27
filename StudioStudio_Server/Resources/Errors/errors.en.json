@@ -69,6 +69,8 @@
   "VALIDATION011": "Required at least one group.",
   "VALIDATION012": "You have exceeded the rate limit (5 times/15 minutes). Please try again later",
 
+  "ANNOUNCEMENTTAGTITLE": "You have been mentioned",
+  "ANNOUNCEMENTTAGCONTENT": "have mentioned you at group",
   "ANNOUNCEMENT001": "Announcement not found",
 
   "SUCCESS001": "Registration successful. Please check your email to verify your account",
