@@ -1,96 +1,65 @@
 using Microsoft.AspNetCore.Mvc;
-using StudioStudio_Server.Configurations;
-using StudioStudio_Server.Data;
 using StudioStudio_Server.Exceptions;
 using StudioStudio_Server.Models.DTOs.Request;
 using StudioStudio_Server.Models.DTOs.Response;
-using StudioStudio_Server.Models.Entities;
 using StudioStudio_Server.Services.Interfaces;
 using System.Security.Claims;
-using System.Text.Json;
-using System.Text.RegularExpressions;
 
 namespace StudioStudio_Server.Controllers
 {
+    /// <summary>
+    /// Controller qu?n l? Reports (báo cáo/feedback)
+    /// Route: /api/reports
+    /// Note: Public API - không c?n authentication
+    /// </summary>
     [Route("api/reports")]
     [ApiController]
     public class ReportController : ControllerBase
     {
-        private readonly StudioDbContext _db;
-        private readonly IEmailService _emailService;
+        private readonly IReportService _reportService;
         private readonly IMessageService _messageService;
-        private readonly IConfiguration _configuration;
-        private readonly Regex EmailRegex = new(@"^[^@\s]+@[^@\s]+\.[^@\s]+$", RegexOptions.Compiled);
 
         public ReportController(
-            StudioDbContext db,
-            IEmailService emailService,
-            IMessageService messageService,
-            IConfiguration configuration)
+            IReportService reportService,
+            IMessageService messageService)
         {
-            _db = db;
-            _emailService = emailService;
+            _reportService = reportService;
             _messageService = messageService;
-            _configuration = configuration;
         }
 
+        /// <summary>
+        /// L?y userId t? claims (nullable - public API)
+        /// Return: userId n?u user ð? ðãng nh?p, null n?u anonymous
+        /// </summary>
+        private Guid? GetUserIdOrNull()
+        {
+            var userIdValue = User.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                              ?? User.FindFirst(ClaimTypes.Name)?.Value
+                              ?? User.FindFirst(ClaimTypes.Email)?.Value;
+
+            return Guid.TryParse(userIdValue, out var userId) ? userId : null;
+        }
+
+        /// <summary>
+        /// [PUBLIC] POST /api/reports
+        /// G?i báo cáo/feedback (bug report, feature request, etc.)
+        /// Validate: Email format
+        /// Action:
+        /// 1. Lýu report vào database (Status = Pending)
+        /// 2. G?i email notification t?i admin
+        /// Note: Không c?n authentication - anonymous users có th? g?i
+        /// </summary>
         [HttpPost]
         public async Task<IActionResult> SendReport([FromBody] ReportRequest request)
         {
-            if (!EmailRegex.IsMatch(request.Email))
-            {
-                throw new AppException(ErrorCodes.ValidationInvalidEmail, StatusCodes.Status400BadRequest);
-            }
-
-            var reportToEmail = _configuration["Report:ToEmail"];
-            if (string.IsNullOrWhiteSpace(reportToEmail))
-            {
-                throw new AppException(ErrorCodes.ReportEmailNotConfigured, StatusCodes.Status500InternalServerError);
-            }
-
-            var userId = GetUserIdOrEmpty();
-            var reportContent = JsonSerializer.Serialize(new
-            {
-                request.Type,
-                request.Email,
-                request.Title,
-                request.Content
-            });
-
-            var report = new Report
-            {
-                ReportId = Guid.NewGuid(),
-                UserId = userId,
-                Content = reportContent,
-                Status = ReportStatus.Pending,
-                CreatedAt = DateTime.UtcNow
-            };
-
-            _db.Reports.Add(report);
-            await _db.SaveChangesAsync();
-
-            var subject = $"[Report] {request.Type} - {request.Title}";
-            var body = EmailTemplate.ReportEmail(
-                request.Type,
-                request.Title,
-                request.Email,
-                request.Content,
-                userId.ToString()
-            );
-
-            await _emailService.SendLinkAsync(reportToEmail, subject, body);
-
+            var userId = GetUserIdOrNull();
+            await _reportService.SendReportAsync(userId, request);
             var message = _messageService.GetMessage(ErrorCodes.SuccessReportSent);
-            return Ok(ApiResponse<object>.Success(ErrorCodes.SuccessReportSent, message));
-        }
 
-        private Guid GetUserIdOrEmpty()
-        {
-            var userIdValue = User.FindFirst(ClaimTypes.NameIdentifier)?.Value
-                ?? User.FindFirst(ClaimTypes.Name)?.Value
-                ?? User.FindFirst(ClaimTypes.Email)?.Value;
-
-            return Guid.TryParse(userIdValue, out var userId) ? userId : Guid.Empty;
+            return Ok(ApiResponse<object>.Success(
+                ErrorCodes.SuccessReportSent,
+                message,
+                null));
         }
     }
 }

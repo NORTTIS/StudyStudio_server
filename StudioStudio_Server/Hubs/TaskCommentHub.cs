@@ -10,6 +10,11 @@ using System.Security.Claims;
 
 namespace StudioStudio_Server.Hubs
 {
+    /// <summary>
+    /// SignalR Hub x? l? realtime Task Comments
+    /// Route: /hubs/task-comment
+    /// Features: Join/Leave task room, Send comment, Reply to comment, Delete comment
+    /// </summary>
     [Authorize]
     public class TaskCommentHub : Hub
     {
@@ -36,23 +41,33 @@ namespace StudioStudio_Server.Hubs
             _logger = logger;
         }
 
+        /// <summary>
+        /// L?y userId t? SignalR Context
+        /// </summary>
         private Guid GetUserId()
         {
             var userIdClaim = Context.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
             if (string.IsNullOrEmpty(userIdClaim) || !Guid.TryParse(userIdClaim, out Guid userId))
             {
-                throw new AppException(ErrorCodes.AuthInvalidCredential, StatusCodes.Status401Unauthorized);
+                throw new AppException(
+                    ErrorCodes.AuthInvalidCredential,
+                    StatusCodes.Status401Unauthorized);
             }
+
             return userId;
         }
 
+        /// <summary>
+        /// L?y localized error message theo ngôn ng? c?a user
+        /// </summary>
         private async Task<string> GetLocalizedMessageAsync(string errorCode)
         {
             try
             {
                 var userId = GetUserId();
                 var user = await _userRepository.GetByIdAsync(userId);
-                
+
                 if (user != null && !string.IsNullOrEmpty(user.Language))
                 {
                     if (Context.GetHttpContext() != null)
@@ -60,7 +75,7 @@ namespace StudioStudio_Server.Hubs
                         Context.GetHttpContext().Request.Headers["Accept-Language"] = user.Language;
                     }
                 }
-                
+
                 return _messageService.GetMessage(errorCode);
             }
             catch
@@ -69,13 +84,63 @@ namespace StudioStudio_Server.Hubs
             }
         }
 
+        /// <summary>
+        /// Validate user có quy?n access task không
+        /// GroupTask: User ph?i là member c?a group
+        /// PersonalTask: User ph?i là owner
+        /// </summary>
+        private async Task<bool> ValidateTaskAccessAsync(TaskItem task, Guid userId)
+        {
+            if (task.GroupId.HasValue)
+            {
+                return await _groupParticipantRepository.IsUserInGroupAsync(task.GroupId.Value, userId);
+            }
+            else
+            {
+                return task.OwnerId == userId;
+            }
+        }
+
+        /// <summary>
+        /// Validate user có quy?n delete comment không
+        /// Owner c?a comment: Luôn có quy?n
+        /// Group Owner/Moderator: Có quy?n delete b?t k? comment nào
+        /// Personal task owner: Có quy?n delete b?t k? comment nào
+        /// </summary>
+        private async Task<bool> ValidateDeletePermissionAsync(TaskComment comment, TaskItem task, Guid userId)
+        {
+            if (comment.UserId == userId)
+            {
+                return true;
+            }
+
+            if (task.GroupId.HasValue)
+            {
+                var participant = await _groupParticipantRepository
+                    .GetByUserAndGroupAsync(userId, task.GroupId.Value);
+
+                return participant != null &&
+                       (participant.Role == GroupRole.Owner ||
+                        participant.Role == GroupRole.Moderator);
+            }
+            else
+            {
+                return task.OwnerId == userId;
+            }
+        }
+
+        /// <summary>
+        /// Join task room ð? nh?n realtime comments
+        /// Validate: User ph?i có quy?n access task
+        /// SignalR Group Name: "task_{taskId}"
+        /// </summary>
         public async Task JoinTask(Guid taskId)
         {
             try
             {
                 var userId = GetUserId();
-
                 var task = await _taskRepository.GetByIdAsync(taskId);
+
                 if (task == null)
                 {
                     var errorMsg = await GetLocalizedMessageAsync(ErrorCodes.TaskNotFound);
@@ -83,24 +148,15 @@ namespace StudioStudio_Server.Hubs
                     return;
                 }
 
-                if (task.GroupId.HasValue)
+                var hasAccess = await ValidateTaskAccessAsync(task, userId);
+                if (!hasAccess)
                 {
-                    var isUserInGroup = await _groupParticipantRepository.IsUserInGroupAsync(task.GroupId.Value, userId);
-                    if (!isUserInGroup)
-                    {
-                        var errorMsg = await GetLocalizedMessageAsync(ErrorCodes.GroupPermissionDenied);
-                        await Clients.Caller.SendAsync("Error", errorMsg);
-                        return;
-                    }
-                }
-                else
-                {
-                    if (task.OwnerId != userId)
-                    {
-                        var errorMsg = await GetLocalizedMessageAsync(ErrorCodes.TaskPermissionDenied);
-                        await Clients.Caller.SendAsync("Error", errorMsg);
-                        return;
-                    }
+                    var errorMsg = await GetLocalizedMessageAsync(
+                        task.GroupId.HasValue
+                            ? ErrorCodes.GroupPermissionDenied
+                            : ErrorCodes.TaskPermissionDenied);
+                    await Clients.Caller.SendAsync("Error", errorMsg);
+                    return;
                 }
 
                 await Groups.AddToGroupAsync(Context.ConnectionId, $"task_{taskId}");
@@ -121,6 +177,9 @@ namespace StudioStudio_Server.Hubs
             }
         }
 
+        /// <summary>
+        /// Leave task room
+        /// </summary>
         public async Task LeaveTask(Guid taskId)
         {
             try
@@ -145,13 +204,18 @@ namespace StudioStudio_Server.Hubs
             }
         }
 
+        /// <summary>
+        /// G?i comment m?i vào task (realtime)
+        /// Validate: User ph?i có quy?n access task
+        /// Broadcast: "ReceiveComment" event t?i t?t c? members trong task room
+        /// </summary>
         public async Task SendComment(SendTaskCommentRequest request)
         {
             try
             {
                 var userId = GetUserId();
-
                 var task = await _taskRepository.GetByIdAsync(request.TaskId);
+
                 if (task == null)
                 {
                     var errorMsg = await GetLocalizedMessageAsync(ErrorCodes.TaskNotFound);
@@ -159,24 +223,15 @@ namespace StudioStudio_Server.Hubs
                     return;
                 }
 
-                if (task.GroupId.HasValue)
+                var hasAccess = await ValidateTaskAccessAsync(task, userId);
+                if (!hasAccess)
                 {
-                    var isUserInGroup = await _groupParticipantRepository.IsUserInGroupAsync(task.GroupId.Value, userId);
-                    if (!isUserInGroup)
-                    {
-                        var errorMsg = await GetLocalizedMessageAsync(ErrorCodes.GroupPermissionDenied);
-                        await Clients.Caller.SendAsync("Error", errorMsg);
-                        return;
-                    }
-                }
-                else
-                {
-                    if (task.OwnerId != userId)
-                    {
-                        var errorMsg = await GetLocalizedMessageAsync(ErrorCodes.TaskPermissionDenied);
-                        await Clients.Caller.SendAsync("Error", errorMsg);
-                        return;
-                    }
+                    var errorMsg = await GetLocalizedMessageAsync(
+                        task.GroupId.HasValue
+                            ? ErrorCodes.GroupPermissionDenied
+                            : ErrorCodes.TaskPermissionDenied);
+                    await Clients.Caller.SendAsync("Error", errorMsg);
+                    return;
                 }
 
                 var comment = new TaskComment
@@ -215,7 +270,10 @@ namespace StudioStudio_Server.Hubs
                 };
 
                 await Clients.Group($"task_{request.TaskId}").SendAsync("ReceiveComment", commentDto);
-                _logger.LogInformation("Comment sent to task {TaskId} by user {UserId}", request.TaskId, userId);
+
+                _logger.LogInformation(
+                    "Comment sent to task {TaskId} by user {UserId}",
+                    request.TaskId, userId);
             }
             catch (Exception ex)
             {
@@ -225,13 +283,20 @@ namespace StudioStudio_Server.Hubs
             }
         }
 
+        /// <summary>
+        /// Reply t?i comment (threaded conversation)
+        /// Validate:
+        /// - User ph?i có quy?n access task
+        /// - Parent comment ph?i t?n t?i và chýa b? xóa
+        /// Broadcast: "CommentReplied" event t?i task room
+        /// </summary>
         public async Task ReplyToComment(ReplyToTaskCommentRequest request)
         {
             try
             {
                 var userId = GetUserId();
-
                 var task = await _taskRepository.GetByIdAsync(request.TaskId);
+
                 if (task == null)
                 {
                     var errorMsg = await GetLocalizedMessageAsync(ErrorCodes.TaskNotFound);
@@ -239,24 +304,15 @@ namespace StudioStudio_Server.Hubs
                     return;
                 }
 
-                if (task.GroupId.HasValue)
+                var hasAccess = await ValidateTaskAccessAsync(task, userId);
+                if (!hasAccess)
                 {
-                    var isUserInGroup = await _groupParticipantRepository.IsUserInGroupAsync(task.GroupId.Value, userId);
-                    if (!isUserInGroup)
-                    {
-                        var errorMsg = await GetLocalizedMessageAsync(ErrorCodes.GroupPermissionDenied);
-                        await Clients.Caller.SendAsync("Error", errorMsg);
-                        return;
-                    }
-                }
-                else
-                {
-                    if (task.OwnerId != userId)
-                    {
-                        var errorMsg = await GetLocalizedMessageAsync(ErrorCodes.TaskPermissionDenied);
-                        await Clients.Caller.SendAsync("Error", errorMsg);
-                        return;
-                    }
+                    var errorMsg = await GetLocalizedMessageAsync(
+                        task.GroupId.HasValue
+                            ? ErrorCodes.GroupPermissionDenied
+                            : ErrorCodes.TaskPermissionDenied);
+                    await Clients.Caller.SendAsync("Error", errorMsg);
+                    return;
                 }
 
                 var parentComment = await _commentRepository.GetByIdAsync(request.ParentCommentId);
@@ -303,7 +359,10 @@ namespace StudioStudio_Server.Hubs
                 };
 
                 await Clients.Group($"task_{request.TaskId}").SendAsync("CommentReplied", replyDto);
-                _logger.LogInformation("Reply sent to comment {ParentCommentId} by user {UserId}", request.ParentCommentId, userId);
+
+                _logger.LogInformation(
+                    "Reply sent to comment {ParentCommentId} by user {UserId}",
+                    request.ParentCommentId, userId);
             }
             catch (Exception ex)
             {
@@ -313,6 +372,14 @@ namespace StudioStudio_Server.Hubs
             }
         }
 
+        /// <summary>
+        /// Xóa comment (soft delete) và t?t c? replies
+        /// Validate:
+        /// - Comment owner: Có quy?n delete
+        /// - Group Owner/Moderator: Có quy?n delete b?t k? comment nào
+        /// - Personal task owner: Có quy?n delete b?t k? comment nào
+        /// Broadcast: "CommentDeleted" event t?i task room
+        /// </summary>
         public async Task DeleteComment(DeleteTaskCommentRequest request)
         {
             try
@@ -335,27 +402,12 @@ namespace StudioStudio_Server.Hubs
                     return;
                 }
 
-                if (comment.UserId != userId)
+                var hasPermission = await ValidateDeletePermissionAsync(comment, task, userId);
+                if (!hasPermission)
                 {
-                    if (task.GroupId.HasValue)
-                    {
-                        var participant = await _groupParticipantRepository.GetByUserAndGroupAsync(userId, task.GroupId.Value);
-                        if (participant == null || (participant.Role != GroupRole.Owner && participant.Role != GroupRole.Moderator))
-                        {
-                            var errorMsg = await GetLocalizedMessageAsync(ErrorCodes.CommentPermissionDenied);
-                            await Clients.Caller.SendAsync("Error", errorMsg);
-                            return;
-                        }
-                    }
-                    else
-                    {
-                        if (task.OwnerId != userId)
-                        {
-                            var errorMsg = await GetLocalizedMessageAsync(ErrorCodes.CommentPermissionDenied);
-                            await Clients.Caller.SendAsync("Error", errorMsg);
-                            return;
-                        }
-                    }
+                    var errorMsg = await GetLocalizedMessageAsync(ErrorCodes.CommentPermissionDenied);
+                    await Clients.Caller.SendAsync("Error", errorMsg);
+                    return;
                 }
 
                 var replyCount = await _commentRepository.GetReplyCountAsync(request.CommentId);
@@ -371,7 +423,9 @@ namespace StudioStudio_Server.Hubs
                     Timestamp = DateTime.UtcNow
                 });
 
-                _logger.LogInformation("Comment {CommentId} and {ReplyCount} replies deleted by user {UserId}", request.CommentId, replyCount, userId);
+                _logger.LogInformation(
+                    "Comment {CommentId} and {ReplyCount} replies deleted by user {UserId}",
+                    request.CommentId, replyCount, userId);
             }
             catch (Exception ex)
             {
@@ -381,6 +435,10 @@ namespace StudioStudio_Server.Hubs
             }
         }
 
+        /// <summary>
+        /// Handle client disconnect
+        /// Auto-cleanup: SignalR t? ð?ng remove kh?i groups
+        /// </summary>
         public override async Task OnDisconnectedAsync(Exception? exception)
         {
             _logger.LogInformation("Client disconnected: {ConnectionId}", Context.ConnectionId);

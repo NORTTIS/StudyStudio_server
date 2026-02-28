@@ -57,6 +57,14 @@ builder.Services.AddScoped<ITaskCommentRepository, TaskCommentRepository>();
 builder.Services.AddScoped<IAnnouncementRepository, AnnouncementRepository>();
 builder.Services.AddScoped<IUserAnnouccementRepository, UserAnnouncementRepository>();
 builder.Services.AddScoped<IUserAnnouncementService, UserAnnouncementService>();
+builder.Services.AddScoped<IAnnouncementService, AnnouncementService>();
+builder.Services.AddScoped<IAdminAnnouncementService, AdminAnnouncementService>();
+builder.Services.AddScoped<IGroupMemberService, GroupMemberService>();
+builder.Services.AddScoped<IFavouriteService, FavouriteService>();
+builder.Services.AddScoped<IGroupMessageService, GroupMessageService>();
+builder.Services.AddScoped<ITaskCommentService, TaskCommentService>();
+builder.Services.AddScoped<IReportRepository, ReportRepository>();
+builder.Services.AddScoped<IReportService, ReportService>();
 
 
 builder.Services.AddControllers(options =>
