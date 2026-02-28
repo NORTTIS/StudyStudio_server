@@ -119,10 +119,11 @@ builder.Services.AddCors(options =>
     options.AddPolicy("WebAppPolicy", policy =>
     {
         policy.WithOrigins(
-            "http://localhost:3000", 
-            "https://study-studio-client.vercel.app",
+            "http://localhost:3000",
             "http://localhost:5006",
-            "https://localhost:7070"
+            "https://localhost:7070",
+            "https://studystudio.asia",
+            "https://www.studystudio.asia"
         )
         .AllowAnyHeader()
         .AllowAnyMethod()
