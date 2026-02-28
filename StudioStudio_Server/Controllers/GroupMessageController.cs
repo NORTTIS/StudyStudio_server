@@ -2,105 +2,74 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using StudioStudio_Server.Exceptions;
 using StudioStudio_Server.Models.DTOs.Response;
-using StudioStudio_Server.Repositories.Interfaces;
+using StudioStudio_Server.Services.Interfaces;
 using System.Security.Claims;
 
 namespace StudioStudio_Server.Controllers
 {
+    /// <summary>
+    /// Controller qu?n l? Group Messages (l?ch s? tin nh?n)
+    /// Route: /api/group-messages
+    /// Note: Realtime messaging ðý?c handle b?i GroupDiscussHub (SignalR)
+    /// </summary>
     [Route("api/group-messages")]
     [ApiController]
     [Authorize]
     public class GroupMessageController : ControllerBase
     {
-        private readonly IGroupMessageRepository _messageRepository;
-        private readonly IGroupParticipantRepository _groupParticipantRepository;
-        private readonly ILogger<GroupMessageController> _logger;
+        private readonly IGroupMessageService _groupMessageService;
+        private readonly IMessageService _messageService;
 
         public GroupMessageController(
-            IGroupMessageRepository messageRepository,
-            IGroupParticipantRepository groupParticipantRepository,
-            ILogger<GroupMessageController> logger)
+            IGroupMessageService groupMessageService,
+            IMessageService messageService)
         {
-            _messageRepository = messageRepository;
-            _groupParticipantRepository = groupParticipantRepository;
-            _logger = logger;
+            _groupMessageService = groupMessageService;
+            _messageService = messageService;
         }
 
+        /// <summary>
+        /// Xác th?c và l?y userId t? JWT token
+        /// </summary>
+        private Guid ValidateAndGetUserId()
+        {
+            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+            if (string.IsNullOrEmpty(userIdClaim) || !Guid.TryParse(userIdClaim, out Guid userId))
+            {
+                throw new AppException(
+                    ErrorCodes.AuthInvalidCredential,
+                    StatusCodes.Status401Unauthorized);
+            }
+
+            return userId;
+        }
+
+        /// <summary>
+        /// [AUTHORIZED] GET /api/group-messages/{groupId}?limit=100&offset=0
+        /// L?y l?ch s? tin nh?n trong group (pagination)
+        /// Validate: User ph?i là member c?a group
+        /// Query:
+        /// - Ch? l?y parent messages (ParentMessageId = null)
+        /// - Include: User info, Replies (1 level only)
+        /// - S?p x?p: CreatedAt DESC
+        /// - Pagination: offset + limit
+        /// Return: Danh sách messages + total count
+        /// </summary>
         [HttpGet("{groupId}")]
         public async Task<ActionResult<ApiResponse<GroupMessageListResponse>>> GetGroupMessages(
             Guid groupId,
             [FromQuery] int limit = 100,
             [FromQuery] int offset = 0)
         {
-            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (string.IsNullOrEmpty(userIdClaim) || !Guid.TryParse(userIdClaim, out Guid userId))
-            {
-                throw new AppException(ErrorCodes.AuthInvalidCredential, StatusCodes.Status401Unauthorized);
-            }
-
-            var isUserInGroup = await _groupParticipantRepository.IsUserInGroupAsync(groupId, userId);
-            if (!isUserInGroup)
-            {
-                throw new AppException(ErrorCodes.GroupPermissionDenied, StatusCodes.Status403Forbidden);
-            }
-
-            var messages = await _messageRepository.GetByGroupIdAsync(groupId, limit, offset);
-            var totalCount = await _messageRepository.GetCountByGroupIdAsync(groupId);
-
-            var messageDtos = messages.Select(m => new GroupMessageDto
-            {
-                MessageId = m.MessageId,
-                GroupId = m.GroupId,
-                UserId = m.UserId,
-                Content = m.Content,
-                ParentMessageId = m.ParentMessageId,
-                CreatedAt = m.CreatedAt,
-                UpdatedAt = m.UpdatedAt,
-                IsDeleted = m.IsDeleted,
-                User = new UserDto
-                {
-                    Id = m.User.UserId,
-                    FirstName = m.User.FirstName,
-                    LastName = m.User.LastName,
-                    AvatarUrl = m.User.AvatarUrl
-                },
-                ReplyCount = m.Replies?.Count(r => !r.IsDeleted) ?? 0,
-                Replies = m.Replies?
-                    .Where(r => !r.IsDeleted)
-                    .Select(r => new GroupMessageDto
-                    {
-                        MessageId = r.MessageId,
-                        GroupId = r.GroupId,
-                        UserId = r.UserId,
-                        Content = r.Content,
-                        ParentMessageId = r.ParentMessageId,
-                        CreatedAt = r.CreatedAt,
-                        UpdatedAt = r.UpdatedAt,
-                        IsDeleted = r.IsDeleted,
-                        User = new UserDto
-                        {
-                            Id = r.User.UserId,
-                            FirstName = r.User.FirstName,
-                            LastName = r.User.LastName,
-                            AvatarUrl = r.User.AvatarUrl
-                        },
-                        ReplyCount = 0,
-                        Replies = null
-                    })
-                    .ToList()
-            }).ToList();
-
-            var response = new GroupMessageListResponse
-            {
-                GroupId = groupId,
-                TotalMessages = totalCount,
-                Messages = messageDtos
-            };
+            var userId = ValidateAndGetUserId();
+            var result = await _groupMessageService.GetGroupMessagesAsync(userId, groupId, limit, offset);
+            var message = _messageService.GetMessage(ErrorCodes.SuccessGetData);
 
             return Ok(ApiResponse<GroupMessageListResponse>.Success(
                 ErrorCodes.SuccessGetData,
-                "Messages retrieved successfully",
-                response));
+                message,
+                result));
         }
     }
 }

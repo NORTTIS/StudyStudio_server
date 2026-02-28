@@ -2,99 +2,77 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using StudioStudio_Server.Exceptions;
 using StudioStudio_Server.Models.DTOs.Response;
-using StudioStudio_Server.Repositories.Interfaces;
+using StudioStudio_Server.Services.Interfaces;
 using System.Security.Claims;
 
 namespace StudioStudio_Server.Controllers
 {
+    /// <summary>
+    /// Controller qu?n l? Task Comments (l?ch s? comments)
+    /// Route: /api/task-comments
+    /// Note: Realtime commenting ðý?c handle b?i TaskCommentHub (SignalR)
+    /// </summary>
     [Route("api/task-comments")]
     [ApiController]
     [Authorize]
     public class TaskCommentController : ControllerBase
     {
-        private readonly ITaskCommentRepository _commentRepository;
-        private readonly ITaskRepository _taskRepository;
-        private readonly IGroupParticipantRepository _groupParticipantRepository;
-        private readonly ILogger<TaskCommentController> _logger;
+        private readonly ITaskCommentService _taskCommentService;
+        private readonly IMessageService _messageService;
 
         public TaskCommentController(
-            ITaskCommentRepository commentRepository,
-            ITaskRepository taskRepository,
-            IGroupParticipantRepository groupParticipantRepository,
-            ILogger<TaskCommentController> logger)
+            ITaskCommentService taskCommentService,
+            IMessageService messageService)
         {
-            _commentRepository = commentRepository;
-            _taskRepository = taskRepository;
-            _groupParticipantRepository = groupParticipantRepository;
-            _logger = logger;
+            _taskCommentService = taskCommentService;
+            _messageService = messageService;
         }
 
+        /// <summary>
+        /// Xác th?c và l?y userId t? JWT token
+        /// </summary>
+        private Guid ValidateAndGetUserId()
+        {
+            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+            if (string.IsNullOrEmpty(userIdClaim) || !Guid.TryParse(userIdClaim, out Guid userId))
+            {
+                throw new AppException(
+                    ErrorCodes.AuthInvalidCredential,
+                    StatusCodes.Status401Unauthorized);
+            }
+
+            return userId;
+        }
+
+        /// <summary>
+        /// [AUTHORIZED] GET /api/task-comments/{taskId}?limit=100&offset=0
+        /// L?y l?ch s? comments c?a task (pagination)
+        /// Validate:
+        /// - Task ph?i t?n t?i
+        /// - GroupTask: User ph?i là member c?a group
+        /// - PersonalTask: User ph?i là owner
+        /// Query:
+        /// - Ch? l?y parent comments (ParentCommentId = null)
+        /// - Include: User info, Replies (1 level only)
+        /// - S?p x?p: CreatedAt DESC
+        /// - Pagination: offset + limit
+        /// Return: Danh sách comments + total count
+        /// </summary>
         [HttpGet("{taskId}")]
         public async Task<ActionResult<ApiResponse<TaskCommentListResponse>>> GetTaskComments(
             Guid taskId,
             [FromQuery] int limit = 100,
             [FromQuery] int offset = 0)
         {
-            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (string.IsNullOrEmpty(userIdClaim) || !Guid.TryParse(userIdClaim, out Guid userId))
-            {
-                throw new AppException(ErrorCodes.AuthInvalidCredential, StatusCodes.Status401Unauthorized);
-            }
-
-            var task = await _taskRepository.GetByIdAsync(taskId);
-            if (task == null)
-            {
-                throw new AppException(ErrorCodes.TaskNotFound, StatusCodes.Status404NotFound);
-            }
-
-            if (task.GroupId.HasValue)
-            {
-                var isUserInGroup = await _groupParticipantRepository.IsUserInGroupAsync(task.GroupId.Value, userId);
-                if (!isUserInGroup)
-                {
-                    throw new AppException(ErrorCodes.GroupPermissionDenied, StatusCodes.Status403Forbidden);
-                }
-            }
-            else
-            {
-                if (task.OwnerId != userId)
-                {
-                    throw new AppException(ErrorCodes.TaskPermissionDenied, StatusCodes.Status403Forbidden);
-                }
-            }
-
-            var comments = await _commentRepository.GetByTaskIdAsync(taskId, limit, offset);
-            var totalCount = await _commentRepository.GetCountByTaskIdAsync(taskId);
-
-            var commentDtos = comments.Select(c => new TaskCommentDto
-            {
-                CommentId = c.CommentId,
-                TaskId = c.TaskId,
-                UserId = c.UserId,
-                Content = c.Content,
-                CreatedAt = c.CreatedAt,
-                UpdatedAt = c.UpdatedAt,
-                IsDeleted = c.IsDeleted,
-                User = new UserDto
-                {
-                    Id = c.User.UserId,
-                    FirstName = c.User.FirstName,
-                    LastName = c.User.LastName,
-                    AvatarUrl = c.User.AvatarUrl
-                }
-            }).ToList();
-
-            var response = new TaskCommentListResponse
-            {
-                TaskId = taskId,
-                TotalComments = totalCount,
-                Comments = commentDtos
-            };
+            var userId = ValidateAndGetUserId();
+            var result = await _taskCommentService.GetTaskCommentsAsync(userId, taskId, limit, offset);
+            var message = _messageService.GetMessage(ErrorCodes.SuccessGetData);
 
             return Ok(ApiResponse<TaskCommentListResponse>.Success(
                 ErrorCodes.SuccessGetData,
-                "Comments retrieved successfully",
-                response));
+                message,
+                result));
         }
     }
 }

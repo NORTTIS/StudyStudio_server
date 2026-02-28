@@ -120,6 +120,8 @@
         public const string SuccessDeleteComment = "SUCCESS033";
 
         // ANNOUNCEMENT
+        public const string AnnouncementTagTitle = "ANNOUNCEMENTTAGTITLE";
+        public const string AnnouncementTagContent = "ANNOUNCEMENTTAGCONTENT";
         public const string AnnouncementNotFound = "ANNOUNCEMENT001";
 
         // COMMON
