@@ -54,6 +54,17 @@ builder.Services.AddScoped<ISeederService, SeederService>();
 builder.Services.AddScoped<IGroupInviteService, GroupInviteService>();
 builder.Services.AddScoped<IGroupMessageRepository, GroupMessageRepository>();
 builder.Services.AddScoped<ITaskCommentRepository, TaskCommentRepository>();
+builder.Services.AddScoped<IAnnouncementRepository, AnnouncementRepository>();
+builder.Services.AddScoped<IUserAnnouccementRepository, UserAnnouncementRepository>();
+builder.Services.AddScoped<IUserAnnouncementService, UserAnnouncementService>();
+builder.Services.AddScoped<IAnnouncementService, AnnouncementService>();
+builder.Services.AddScoped<IAdminAnnouncementService, AdminAnnouncementService>();
+builder.Services.AddScoped<IGroupMemberService, GroupMemberService>();
+builder.Services.AddScoped<IFavouriteService, FavouriteService>();
+builder.Services.AddScoped<IGroupMessageService, GroupMessageService>();
+builder.Services.AddScoped<ITaskCommentService, TaskCommentService>();
+builder.Services.AddScoped<IReportRepository, ReportRepository>();
+builder.Services.AddScoped<IReportService, ReportService>();
 
 
 builder.Services.AddControllers(options =>
@@ -104,7 +115,7 @@ builder.Services.AddAuthentication("Bearer").AddJwtBearer("Bearer", options =>
 
             var path = context.HttpContext.Request.Path;
             if (!string.IsNullOrEmpty(accessToken) &&
-                (path.StartsWithSegments("/hubs/group-discuss") || 
+                (path.StartsWithSegments("/hubs/group-discuss") ||
                  path.StartsWithSegments("/hubs/task-comment")))
             {
                 context.Token = accessToken;
@@ -178,7 +189,7 @@ using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<StudioDbContext>();
     db.Database.Migrate();
-    
+
     var seeder = scope.ServiceProvider.GetRequiredService<ISeederService>();
     await seeder.SeedInitialDataAsync();
 }

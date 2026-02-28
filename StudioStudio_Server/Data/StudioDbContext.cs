@@ -34,6 +34,7 @@ namespace StudioStudio_Server.Data
         public DbSet<Template> Templates => Set<Template>();
         public DbSet<GroupMessage> GroupMessages => Set<GroupMessage>();
         public DbSet<TaskComment> TaskComments => Set<TaskComment>();
+        public DbSet<UserAnnouncement> UserAnnouncements => Set<UserAnnouncement>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -347,6 +348,25 @@ namespace StudioStudio_Server.Data
                 e.HasIndex(x => x.TaskId);
                 e.HasIndex(x => x.CreatedAt);
                 e.HasIndex(x => x.ParentCommentId);
+            });
+
+            // USER ANNOUNCEMENT
+            modelBuilder.Entity<UserAnnouncement>(e =>
+            {
+                e.HasKey(x => x.UserAnnouncementId);
+
+                e.HasOne<Announcement>()
+                    .WithMany()
+                    .HasForeignKey(x => x.AnnouncementId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                e.HasOne<User>()
+                    .WithMany()
+                    .HasForeignKey(x => x.MetionedId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                e.Property(x => x.IsRead).IsRequired();
+                e.Property(x => x.CreatedAt).IsRequired();
             });
         }
     }

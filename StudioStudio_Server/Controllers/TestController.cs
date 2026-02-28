@@ -1,35 +1,54 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using StudioStudio_Server.Data;
-using StudioStudio_Server.Exceptions;
 using StudioStudio_Server.Models.Entities;
 
 namespace StudioStudio_Server.Controllers
 {
+    /// <summary>
+    /// Controller cho testing và development
+    /// Route: /api/test
+    /// WARNING: Chỉ dùng cho môi trường Development
+    /// TODO: Disable trong Production hoặc add authentication
+    /// </summary>
     [ApiController]
     [Route("api/test")]
     public class TestController : ControllerBase
     {
         private readonly StudioDbContext _db;
+        private readonly ILogger<TestController> _logger;
 
-        public TestController(StudioDbContext db)
+        public TestController(StudioDbContext db, ILogger<TestController> logger)
         {
             _db = db;
+            _logger = logger;
         }
 
-        // 1. Test DB connection
+        /// <summary>
+        /// [TEST] GET /api/test/ping
+        /// Test database connection
+        /// Return: Connection status + current UTC time
+        /// </summary>
         [HttpGet("ping")]
         public async Task<IActionResult> Ping()
         {
             var canConnect = await _db.Database.CanConnectAsync();
+
+            _logger.LogInformation("Database connection test: {Status}", canConnect);
+
             return Ok(new
             {
                 databaseConnected = canConnect,
-                time = DateTime.UtcNow
+                time = DateTime.UtcNow,
+                environment = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT")
             });
         }
 
-        // 2. Create test user
+        /// <summary>
+        /// [TEST] POST /api/test/user
+        /// Tạo test user
+        /// Auto-generate: Email, UserId
+        /// </summary>
         [HttpPost("user")]
         public async Task<IActionResult> CreateUser()
         {
@@ -42,6 +61,8 @@ namespace StudioStudio_Server.Controllers
                 LastName = "User",
                 Status = UserStatus.Active,
                 IsAdmin = false,
+                Language = "vi",
+                EmailNotificationEnabled = true,
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow
             };
@@ -49,10 +70,15 @@ namespace StudioStudio_Server.Controllers
             _db.Users.Add(user);
             await _db.SaveChangesAsync();
 
+            _logger.LogInformation("Test user created: {UserId}, {Email}", user.UserId, user.Email);
+
             return Ok(user);
         }
 
-        // 3. Create personal task status
+        /// <summary>
+        /// [TEST] POST /api/test/personal-status/{userId}
+        /// Tạo personal task status cho user
+        /// </summary>
         [HttpPost("personal-status/{userId}")]
         public async Task<IActionResult> CreatePersonalStatus(Guid userId)
         {
@@ -68,14 +94,19 @@ namespace StudioStudio_Server.Controllers
             _db.PersonalTaskStatuses.Add(status);
             await _db.SaveChangesAsync();
 
+            _logger.LogInformation(
+                "Personal status created: StatusId={StatusId}, UserId={UserId}",
+                status.StatusId, userId);
+
             return Ok(status);
         }
 
-        // 4. Create personal task
+        /// <summary>
+        /// [TEST] POST /api/test/personal-task/{userId}/{statusId}
+        /// Tạo personal task cho user
+        /// </summary>
         [HttpPost("personal-task/{userId}/{statusId}")]
-        public async Task<IActionResult> CreatePersonalTask(
-            Guid userId,
-            Guid statusId)
+        public async Task<IActionResult> CreatePersonalTask(Guid userId, Guid statusId)
         {
             var task = new TaskItem
             {
@@ -94,10 +125,20 @@ namespace StudioStudio_Server.Controllers
             _db.Tasks.Add(task);
             await _db.SaveChangesAsync();
 
+            _logger.LogInformation(
+                "Personal task created: TaskId={TaskId}, UserId={UserId}",
+                task.TaskId, userId);
+
             return Ok(task);
         }
 
-        // 5. View all personal tasks of user
+        /// <summary>
+        /// [TEST] GET /api/test/personal-task/{userId}
+        /// Lấy tất cả personal tasks của user
+        /// Điều kiện: OwnerId = {userId} AND GroupId = null
+        /// Sắp xếp: PersonalStatus.Position ASC
+        /// Include: PersonalStatus
+        /// </summary>
         [HttpGet("personal-task/{userId}")]
         public async Task<IActionResult> GetPersonalTasks(Guid userId)
         {
@@ -105,7 +146,12 @@ namespace StudioStudio_Server.Controllers
                 .Include(t => t.PersonalStatus)
                 .Where(t => t.OwnerId == userId && t.GroupId == null)
                 .OrderBy(t => t.PersonalStatus!.Position)
+                .AsNoTracking()
                 .ToListAsync();
+
+            _logger.LogInformation(
+                "Retrieved {Count} personal tasks for user {UserId}",
+                tasks.Count, userId);
 
             return Ok(tasks);
         }

@@ -69,6 +69,8 @@
   "VALIDATION011": "Cần ít nhất một nhóm.",
   "VALIDATION012": "Bạn đã vượt quá giới hạn gửi email (5 lần/15 phút). Vui lòng thử lại sau",
 
+  "ANNOUNCEMENTTAGTITLE": "Bạn đã được nhắc đến",
+  "ANNOUNCEMENTTAGCONTENT": "đã nhắc đến bạn từ nhóm",
   "ANNOUNCEMENT001": "Không tìm thấy thông báo",
 
   "SUCCESS001": "Đăng ký thành công. Vui lòng kiểm tra email để xác thực tài khoản",

@@ -736,6 +736,39 @@ namespace StudioStudio_Server.Migrations
                     b.ToTable("Users");
                 });
 
+            modelBuilder.Entity("StudioStudio_Server.Models.Entities.UserAnnouncement", b =>
+                {
+                    b.Property<Guid>("UserAnnouncementId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("AnnouncementId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsDelete")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsRead")
+                        .HasColumnType("boolean");
+
+                    b.Property<Guid>("MetionedId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("UserAnnouncementId");
+
+                    b.HasIndex("AnnouncementId");
+
+                    b.HasIndex("MetionedId");
+
+                    b.ToTable("UserAnnouncements");
+                });
+
             modelBuilder.Entity("StudioStudio_Server.Models.Entities.UserSubscription", b =>
                 {
                     b.Property<Guid>("SubscriptionId")
@@ -968,6 +1001,21 @@ namespace StudioStudio_Server.Migrations
                     b.Navigation("Group");
 
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("StudioStudio_Server.Models.Entities.UserAnnouncement", b =>
+                {
+                    b.HasOne("StudioStudio_Server.Models.Entities.Announcement", null)
+                        .WithMany()
+                        .HasForeignKey("AnnouncementId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("StudioStudio_Server.Models.Entities.User", null)
+                        .WithMany()
+                        .HasForeignKey("MetionedId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("StudioStudio_Server.Models.Entities.UserSubscription", b =>
