@@ -5,6 +5,9 @@ using StudioStudio_Server.Repositories.Interfaces;
 
 namespace StudioStudio_Server.Repositories
 {
+    /// <summary>
+    /// Repository x? l? các thao tác CRUD v?i Studio entity
+    /// </summary>
     public class StudioRepository : IStudioRepository
     {
         private readonly StudioDbContext _context;
@@ -14,10 +17,28 @@ namespace StudioStudio_Server.Repositories
             _context = context;
         }
 
+        /// <summary>
+        /// L?y studio theo ID
+        /// Ði?u ki?n: StudioId = {studioId}
+        /// </summary>
+        public async Task<Studio?> GetByIdAsync(Guid studioId)
+        {
+            return await _context.Studios
+                .AsNoTracking()
+                .FirstOrDefaultAsync(s => s.StudioId == studioId);
+        }
+
+        /// <summary>
+        /// L?y nhi?u studios theo danh sách IDs
+        /// Ði?u ki?n: StudioId IN {studioIds}
+        /// Return: Empty list n?u studioIds r?ng
+        /// </summary>
         public async Task<List<Studio>> GetByIdsAsync(List<Guid> studioIds)
         {
             if (studioIds.Count == 0)
+            {
                 return new List<Studio>();
+            }
 
             return await _context.Studios
                 .Where(s => studioIds.Contains(s.StudioId))
@@ -25,18 +46,11 @@ namespace StudioStudio_Server.Repositories
                 .ToListAsync();
         }
 
-        public async Task<Studio?> GetByIdAsync(Guid studioId)
-        {
-            return await _context.Studios
-                .FirstOrDefaultAsync(s => s.StudioId == studioId);
-        }
-
-        public async Task<bool> IsUserStudioOwnerAsync(Guid studioId, Guid userId)
-        {
-            return await _context.Studios
-                .AnyAsync(s => s.StudioId == studioId && s.OwnerId == userId);
-        }
-
+        /// <summary>
+        /// L?y danh sách studios c?a user
+        /// Ði?u ki?n: OwnerId = {ownerId}
+        /// S?p x?p: StudioName DESC, CreatedAt DESC
+        /// </summary>
         public async Task<List<Studio>> GetByOwnerIdAsync(Guid ownerId)
         {
             return await _context.Studios
@@ -46,12 +60,12 @@ namespace StudioStudio_Server.Repositories
                 .AsNoTracking()
                 .ToListAsync();
         }
-        public async Task CreateStudioAsync(Studio studio)
-        {
-            _context.Studios.Add(studio);
-            await _context.SaveChangesAsync();
-        }
 
+        /// <summary>
+        /// Ð?m s? studios do user t?o
+        /// Ði?u ki?n: OwnerId = {userId}
+        /// Use case: Check gi?i h?n s? studios có th? t?o
+        /// </summary>
         public async Task<int> CountStudioCreatedByUserAsync(Guid userId)
         {
             return await _context.Studios
@@ -59,15 +73,41 @@ namespace StudioStudio_Server.Repositories
                 .CountAsync();
         }
 
-        public async Task DeleteStudioAsync(Studio studio)
+        /// <summary>
+        /// Ki?m tra user có ph?i owner c?a studio không
+        /// Ði?u ki?n: StudioId = {studioId} AND OwnerId = {userId}
+        /// </summary>
+        public async Task<bool> IsUserStudioOwnerAsync(Guid studioId, Guid userId)
         {
-            _context.Studios.Remove(studio);
+            return await _context.Studios
+                .AnyAsync(s => s.StudioId == studioId && s.OwnerId == userId);
+        }
+
+        /// <summary>
+        /// Thêm studio m?i vào database
+        /// </summary>
+        public async Task CreateStudioAsync(Studio studio)
+        {
+            _context.Studios.Add(studio);
             await _context.SaveChangesAsync();
         }
 
+        /// <summary>
+        /// Update studio information
+        /// </summary>
         public async Task UpdateStudioAsync(Studio studio)
         {
             _context.Studios.Update(studio);
+            await _context.SaveChangesAsync();
+        }
+
+        /// <summary>
+        /// Hard delete studio
+        /// Note: Cascade delete s? xóa t?t c? groups thu?c studio
+        /// </summary>
+        public async Task DeleteStudioAsync(Studio studio)
+        {
+            _context.Studios.Remove(studio);
             await _context.SaveChangesAsync();
         }
     }

@@ -1,4 +1,6 @@
 ﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using StudioStudio_Server.Controllers;
 using StudioStudio_Server.Models.Entities;
 using StudioStudio_Server.Tests.Helpers;
@@ -8,6 +10,13 @@ namespace StudioStudio_Server.Tests.Controllers
 {
     public class TestControllerTests
     {
+        private readonly ILogger<TestController> _logger;
+
+        public TestControllerTests()
+        {
+            _logger = NullLogger<TestController>.Instance;
+        }
+
         // ============================
         // 1. Ping DB
         // ============================
@@ -16,7 +25,7 @@ namespace StudioStudio_Server.Tests.Controllers
         {
             // Arrange
             var db = DbContextFactory.Create(nameof(Ping_ShouldReturnDatabaseConnectedTrue));
-            var controller = new TestController(db);
+            var controller = new TestController(db, _logger);
 
             // Act
             var result = await controller.Ping();
@@ -34,7 +43,7 @@ namespace StudioStudio_Server.Tests.Controllers
         {
             // Arrange
             var db = DbContextFactory.Create(nameof(CreateUser_ShouldCreateUserInMemory));
-            var controller = new TestController(db);
+            var controller = new TestController(db, _logger);
 
             // Act
             var result = await controller.CreateUser();
@@ -55,7 +64,7 @@ namespace StudioStudio_Server.Tests.Controllers
         {
             // Arrange
             var db = DbContextFactory.Create(nameof(CreatePersonalStatus_ShouldAttachToUser));
-            var controller = new TestController(db);
+            var controller = new TestController(db, _logger);
 
             var user = new User
             {
@@ -64,7 +73,11 @@ namespace StudioStudio_Server.Tests.Controllers
                 PasswordHash = "hash",
                 FirstName = "Test",
                 LastName = "User",
-                Status = UserStatus.Active
+                Status = UserStatus.Active,
+                Language = "vi",
+                EmailNotificationEnabled = true,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
             };
 
             db.Users.Add(user);
@@ -89,7 +102,7 @@ namespace StudioStudio_Server.Tests.Controllers
         {
             // Arrange
             var db = DbContextFactory.Create(nameof(CreatePersonalTask_ShouldHaveNullGroupId));
-            var controller = new TestController(db);
+            var controller = new TestController(db, _logger);
 
             var userId = Guid.NewGuid();
             var statusId = Guid.NewGuid();
@@ -101,7 +114,11 @@ namespace StudioStudio_Server.Tests.Controllers
                 PasswordHash = "hash",
                 FirstName = "Test",
                 LastName = "User",
-                Status = UserStatus.Active
+                Status = UserStatus.Active,
+                Language = "vi",
+                EmailNotificationEnabled = true,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
             });
 
             db.PersonalTaskStatuses.Add(new PersonalTaskStatus
@@ -135,7 +152,7 @@ namespace StudioStudio_Server.Tests.Controllers
         {
             // Arrange
             var db = DbContextFactory.Create(nameof(GetPersonalTasks_ShouldReturnOnlyPersonalTasks));
-            var controller = new TestController(db);
+            var controller = new TestController(db, _logger);
 
             var userId = Guid.NewGuid();
             var statusId = Guid.NewGuid();
@@ -147,7 +164,11 @@ namespace StudioStudio_Server.Tests.Controllers
                 PasswordHash = "hash",
                 FirstName = "Test",
                 LastName = "User",
-                Status = UserStatus.Active
+                Status = UserStatus.Active,
+                Language = "vi",
+                EmailNotificationEnabled = true,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
             });
 
             db.PersonalTaskStatuses.Add(new PersonalTaskStatus
@@ -167,7 +188,8 @@ namespace StudioStudio_Server.Tests.Controllers
                 PersonalStatusId = statusId,
                 Title = "Personal Task",
                 CreatedAt = DateTime.UtcNow,
-                UpdatedAt = DateTime.UtcNow
+                UpdatedAt = DateTime.UtcNow,
+                IsPendingDeleted = false
             });
 
             await db.SaveChangesAsync();

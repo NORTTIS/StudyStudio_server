@@ -3,227 +3,156 @@ using Microsoft.AspNetCore.Mvc;
 using StudioStudio_Server.Exceptions;
 using StudioStudio_Server.Models.DTOs.Request;
 using StudioStudio_Server.Models.DTOs.Response;
-using StudioStudio_Server.Models.Entities;
-using StudioStudio_Server.Repositories.Interfaces;
 using StudioStudio_Server.Services.Interfaces;
 using System.Security.Claims;
 
-namespace StudioStudio_Server.Controllers.Admin
+namespace StudioStudio_Server.Controllers
 {
+    /// <summary>
+    /// Controller qu?n l? announcements cho Admin
+    /// Route: /api/admin/announcements
+    /// </summary>
     [Route("api/admin/announcements")]
     [ApiController]
     [Authorize]
     public class AdminAnnouncementController : ControllerBase
     {
-        private readonly IAnnouncementRepository _announcementRepository;
+        private readonly IAdminAnnouncementService _adminAnnouncementService;
         private readonly IMessageService _messageService;
-        private readonly ILogger<AdminAnnouncementController> _logger;
 
         public AdminAnnouncementController(
-            IAnnouncementRepository announcementRepository,
-            IMessageService messageService,
-            ILogger<AdminAnnouncementController> logger)
+            IAdminAnnouncementService adminAnnouncementService,
+            IMessageService messageService)
         {
-            _announcementRepository = announcementRepository;
+            _adminAnnouncementService = adminAnnouncementService;
             _messageService = messageService;
-            _logger = logger;
         }
 
+        /// <summary>
+        /// Xác th?c user là admin và l?y userId
+        /// Validate: User ph?i có IsAdmin = true
+        /// </summary>
         private Guid ValidateAdminUser()
         {
             var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
             if (string.IsNullOrEmpty(userIdClaim) || !Guid.TryParse(userIdClaim, out Guid userId))
             {
-                throw new AppException(ErrorCodes.AuthInvalidCredential, StatusCodes.Status401Unauthorized);
+                throw new AppException(
+                    ErrorCodes.AuthInvalidCredential, 
+                    StatusCodes.Status401Unauthorized);
             }
 
             var isAdminClaim = User.FindFirst("IsAdmin")?.Value;
-            var isAdmin = isAdminClaim != null && bool.TryParse(isAdminClaim, out var adminResult) && adminResult;
+            var isAdmin = isAdminClaim != null && 
+                          bool.TryParse(isAdminClaim, out var adminResult) && 
+                          adminResult;
 
             if (!isAdmin)
             {
-                throw new AppException(ErrorCodes.AuthForbidden, StatusCodes.Status403Forbidden);
+                throw new AppException(
+                    ErrorCodes.AuthForbidden, 
+                    StatusCodes.Status403Forbidden);
             }
 
             return userId;
         }
 
+        /// <summary>
+        /// [ADMIN] GET /api/admin/announcements
+        /// L?y t?t c? announcements (bao g?m inactive)
+        /// S?p x?p: CreatedAt DESC
+        /// </summary>
         [HttpGet]
         public async Task<ActionResult<ApiResponse<List<AnnouncementResponse>>>> GetAllAnnouncements()
         {
             ValidateAdminUser();
 
-            var announcements = await _announcementRepository.GetAllAsync();
-
-            var response = announcements.Select(a => new AnnouncementResponse
-            {
-                AnnouncementId = a.AnnouncementId,
-                Title = a.Title,
-                Content = a.Content,
-                Type = a.Type.ToString(),
-                IsActive = a.IsActive,
-                CreatedAt = a.CreatedAt,
-                PublishedAt = a.PublishedAt
-            }).ToList();
-
+            var response = await _adminAnnouncementService.GetAllAnnouncementsAsync();
             var message = _messageService.GetMessage(ErrorCodes.SuccessGetData);
+
             return Ok(ApiResponse<List<AnnouncementResponse>>.Success(
                 ErrorCodes.SuccessGetData,
                 message,
-                response
-            ));
+                response));
         }
 
+        /// <summary>
+        /// [ADMIN] GET /api/admin/announcements/{id}
+        /// L?y chi ti?t m?t announcement
+        /// Validate: Announcement ph?i t?n t?i
+        /// </summary>
         [HttpGet("{id}")]
         public async Task<ActionResult<ApiResponse<AnnouncementResponse>>> GetAnnouncementById(Guid id)
         {
             ValidateAdminUser();
 
-            var announcement = await _announcementRepository.GetByIdAsync(id);
-            if (announcement == null)
-            {
-                throw new AppException(ErrorCodes.AnnouncementNotFound, StatusCodes.Status404NotFound);
-            }
-
-            var response = new AnnouncementResponse
-            {
-                AnnouncementId = announcement.AnnouncementId,
-                Title = announcement.Title,
-                Content = announcement.Content,
-                Type = announcement.Type.ToString(),
-                IsActive = announcement.IsActive,
-                CreatedAt = announcement.CreatedAt,
-                PublishedAt = announcement.PublishedAt
-            };
-
+            var response = await _adminAnnouncementService.GetAnnouncementByIdAsync(id);
             var message = _messageService.GetMessage(ErrorCodes.SuccessGetData);
+
             return Ok(ApiResponse<AnnouncementResponse>.Success(
                 ErrorCodes.SuccessGetData,
                 message,
-                response
-            ));
+                response));
         }
 
+        /// <summary>
+        /// [ADMIN] POST /api/admin/announcements
+        /// T?o m?i announcement
+        /// Auto-set: PublishedAt n?u IsActive = true
+        /// </summary>
         [HttpPost]
         public async Task<ActionResult<ApiResponse<AnnouncementResponse>>> CreateAnnouncement(
             [FromBody] CreateAnnouncementRequest request)
         {
             var userId = ValidateAdminUser();
 
-            var now = DateTime.UtcNow;
-            var announcement = new Announcement
-            {
-                AnnouncementId = Guid.NewGuid(),
-                Title = request.Title,
-                Content = request.Content,
-                Type = request.Type,
-                IsActive = request.IsActive,
-                CreatedBy = userId,
-                CreatedAt = now,
-                UpdatedAt = now,
-                PublishedAt = request.PublishedAt ?? (request.IsActive ? now : null)
-            };
-
-            await _announcementRepository.AddAsync(announcement);
-
-            _logger.LogInformation(
-                "Announcement created by admin {UserId}. AnnouncementId: {AnnouncementId}",
-                userId, announcement.AnnouncementId);
-
-            var response = new AnnouncementResponse
-            {
-                AnnouncementId = announcement.AnnouncementId,
-                Title = announcement.Title,
-                Content = announcement.Content,
-                Type = announcement.Type.ToString(),
-                IsActive = announcement.IsActive,
-                CreatedAt = announcement.CreatedAt,
-                PublishedAt = announcement.PublishedAt
-            };
-
+            var response = await _adminAnnouncementService.CreateAnnouncementAsync(userId, request);
             var message = _messageService.GetMessage(ErrorCodes.SuccessGetData);
+
             return Ok(ApiResponse<AnnouncementResponse>.Success(
                 ErrorCodes.SuccessGetData,
                 message,
-                response
-            ));
+                response));
         }
 
+        /// <summary>
+        /// [ADMIN] PUT /api/admin/announcements
+        /// C?p nh?t announcement
+        /// Validate: Announcement ph?i t?n t?i
+        /// </summary>
         [HttpPut]
         public async Task<ActionResult<ApiResponse<AnnouncementResponse>>> UpdateAnnouncement(
             [FromBody] UpdateAnnouncementRequest request)
         {
             var userId = ValidateAdminUser();
 
-            var announcement = await _announcementRepository.GetByIdAsync(request.AnnouncementId);
-            if (announcement == null)
-            {
-                throw new AppException(ErrorCodes.AnnouncementNotFound, StatusCodes.Status404NotFound);
-            }
-
-            announcement.Title = request.Title;
-            announcement.Content = request.Content;
-            announcement.Type = request.Type;
-            announcement.IsActive = request.IsActive;
-            announcement.UpdatedAt = DateTime.UtcNow;
-
-            if (request.PublishedAt.HasValue)
-            {
-                announcement.PublishedAt = request.PublishedAt;
-            }
-            else if (request.IsActive && !announcement.PublishedAt.HasValue)
-            {
-                announcement.PublishedAt = DateTime.UtcNow;
-            }
-
-            await _announcementRepository.UpdateAsync(announcement);
-
-            _logger.LogInformation(
-                "Announcement {AnnouncementId} updated by admin {UserId}",
-                announcement.AnnouncementId, userId);
-
-            var response = new AnnouncementResponse
-            {
-                AnnouncementId = announcement.AnnouncementId,
-                Title = announcement.Title,
-                Content = announcement.Content,
-                Type = announcement.Type.ToString(),
-                IsActive = announcement.IsActive,
-                CreatedAt = announcement.CreatedAt,
-                PublishedAt = announcement.PublishedAt
-            };
-
+            var response = await _adminAnnouncementService.UpdateAnnouncementAsync(userId, request);
             var message = _messageService.GetMessage(ErrorCodes.SuccessGetData);
+
             return Ok(ApiResponse<AnnouncementResponse>.Success(
                 ErrorCodes.SuccessGetData,
                 message,
-                response
-            ));
+                response));
         }
 
+        /// <summary>
+        /// [ADMIN] DELETE /api/admin/announcements/{id}
+        /// Xóa announcement
+        /// Validate: Announcement ph?i t?n t?i
+        /// </summary>
         [HttpDelete("{id}")]
         public async Task<ActionResult<ApiResponse<object>>> DeleteAnnouncement(Guid id)
         {
             var userId = ValidateAdminUser();
 
-            var announcement = await _announcementRepository.GetByIdAsync(id);
-            if (announcement == null)
-            {
-                throw new AppException(ErrorCodes.AnnouncementNotFound, StatusCodes.Status404NotFound);
-            }
-
-            await _announcementRepository.DeleteAsync(announcement);
-
-            _logger.LogInformation(
-                "Announcement {AnnouncementId} deleted by admin {UserId}",
-                id, userId);
-
+            await _adminAnnouncementService.DeleteAnnouncementAsync(userId, id);
             var message = _messageService.GetMessage(ErrorCodes.SuccessGetData);
+
             return Ok(ApiResponse<object>.Success(
                 ErrorCodes.SuccessGetData,
                 message,
-                null
-            ));
+                null));
         }
     }
 }

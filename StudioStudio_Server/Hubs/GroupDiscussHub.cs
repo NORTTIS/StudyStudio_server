@@ -13,6 +13,11 @@ using System.Text.RegularExpressions;
 
 namespace StudioStudio_Server.Hubs
 {
+    /// <summary>
+    /// SignalR Hub x? l? realtime Group Discussions (Messages)
+    /// Route: /hubs/group-discuss
+    /// Features: Join/Leave group, Send message, Reply to message, Delete message, @mentions
+    /// </summary>
     [Authorize]
     public class GroupDiscussHub : Hub
     {
@@ -45,16 +50,26 @@ namespace StudioStudio_Server.Hubs
             _logger = logger;
         }
 
+        /// <summary>
+        /// L?y userId t? SignalR Context
+        /// </summary>
         private Guid GetUserId()
         {
             var userIdClaim = Context.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
             if (string.IsNullOrEmpty(userIdClaim) || !Guid.TryParse(userIdClaim, out Guid userId))
             {
-                throw new AppException(ErrorCodes.AuthInvalidCredential, StatusCodes.Status401Unauthorized);
+                throw new AppException(
+                    ErrorCodes.AuthInvalidCredential,
+                    StatusCodes.Status401Unauthorized);
             }
+
             return userId;
         }
 
+        /// <summary>
+        /// L?y localized error message theo ngôn ng? c?a user
+        /// </summary>
         private async Task<string> GetLocalizedMessageAsync(string errorCode)
         {
             try
@@ -62,10 +77,8 @@ namespace StudioStudio_Server.Hubs
                 var userId = GetUserId();
                 var user = await _userRepository.GetByIdAsync(userId);
 
-                // If user has language preference, use it
                 if (user != null && !string.IsNullOrEmpty(user.Language))
                 {
-                    // Temporarily set language in HTTP context if available
                     if (Context.GetHttpContext() != null)
                     {
                         Context.GetHttpContext().Request.Headers["Accept-Language"] = user.Language;
@@ -76,17 +89,101 @@ namespace StudioStudio_Server.Hubs
             }
             catch
             {
-                // Fallback to default message service behavior
                 return _messageService.GetMessage(errorCode);
             }
         }
 
+        /// <summary>
+        /// Extract user IDs t? @mentions trong message content
+        /// Pattern: @{userId} (UUID format)
+        /// Example: "Hello @550e8400-e29b-41d4-a716-446655440000"
+        /// </summary>
         private List<Guid> ExtractTaggedUserIds(string content)
         {
             var matches = Regex.Matches(content, @"@([a-fA-F0-9\-]{36})");
             return matches.Select(m => Guid.Parse(m.Groups[1].Value)).ToList();
         }
 
+        /// <summary>
+        /// Validate user có quy?n delete message không
+        /// Message owner: Luôn có quy?n
+        /// Group Owner/Moderator: Có quy?n delete b?t k? message nào
+        /// </summary>
+        private async Task<bool> ValidateDeletePermissionAsync(GroupMessage message, Guid userId)
+        {
+            if (message.UserId == userId)
+            {
+                return true;
+            }
+
+            var participant = await _groupParticipantRepository
+                .GetByUserAndGroupAsync(userId, message.GroupId);
+
+            return participant != null &&
+                   (participant.Role == GroupRole.Owner ||
+                    participant.Role == GroupRole.Moderator);
+        }
+
+        /// <summary>
+        /// G?i notification cho users ðý?c @mention
+        /// T?o announcement và g?i qua SignalR
+        /// </summary>
+        private async Task HandleMentionNotificationsAsync(
+            Guid groupId,
+            Guid senderId,
+            string content)
+        {
+            var taggedUserIds = ExtractTaggedUserIds(content);
+
+            if (taggedUserIds.IsNullOrEmpty())
+            {
+                return;
+            }
+
+            var now = DateTime.UtcNow;
+            var sender = await _userRepository.GetByIdAsync(senderId);
+            var group = await _groupRepository.GetByIdAsync(groupId);
+            var senderName = $"{sender.FirstName} {sender.LastName}";
+
+            var announcement = new Announcement
+            {
+                AnnouncementId = Guid.NewGuid(),
+                Title = await GetLocalizedMessageAsync(ErrorCodes.AnnouncementTagTitle),
+                Content = $"{senderName} {await GetLocalizedMessageAsync(ErrorCodes.AnnouncementTagContent)} {group.GroupName}",
+                Type = AnnouncementType.Info,
+                IsActive = true,
+                CreatedBy = senderId,
+                CreatedAt = now,
+                UpdatedAt = now,
+                PublishedAt = now
+            };
+
+            await _announcementRepository.AddAsync(announcement);
+
+            foreach (var taggedUserId in taggedUserIds)
+            {
+                var userAnnouncement = new UserAnnouncementRequest
+                {
+                    AnnouncementId = announcement.AnnouncementId,
+                    MentionedId = taggedUserId,
+                    IsRead = false,
+                    CreatedAt = now
+                };
+
+                await _userAnnouncementService.AddAnnouncementAsync(userAnnouncement);
+                await Clients.User(taggedUserId.ToString()).SendAsync("ReceiveAnnouncement", announcement);
+            }
+
+            _logger.LogInformation(
+                "Mention notifications sent to {Count} users in group {GroupId}",
+                taggedUserIds.Count, groupId);
+        }
+
+        /// <summary>
+        /// Join group room ð? nh?n realtime messages
+        /// Validate: User ph?i là member c?a group
+        /// SignalR Group Name: {groupId}
+        /// </summary>
         public async Task JoinGroup(Guid groupId)
         {
             try
@@ -118,6 +215,9 @@ namespace StudioStudio_Server.Hubs
             }
         }
 
+        /// <summary>
+        /// Leave group room
+        /// </summary>
         public async Task LeaveGroup(Guid groupId)
         {
             try
@@ -141,6 +241,12 @@ namespace StudioStudio_Server.Hubs
             }
         }
 
+        /// <summary>
+        /// G?i message m?i vào group (realtime)
+        /// Validate: User ph?i là member c?a group
+        /// Features: @mentions notification
+        /// Broadcast: "ReceiveMessage" event t?i t?t c? members trong group
+        /// </summary>
         public async Task SendMessage(SendGroupMessageRequest request)
         {
             try
@@ -191,42 +297,12 @@ namespace StudioStudio_Server.Hubs
                 };
 
                 await Clients.Group(request.GroupId.ToString()).SendAsync("ReceiveMessage", messageDto);
-                _logger.LogInformation("Message sent to group {GroupId} by user {UserId}", request.GroupId, userId);
 
-                var taggedUserIds = ExtractTaggedUserIds(request.Content);
-                if (!taggedUserIds.IsNullOrEmpty())
-                {
-                    var now = DateTime.UtcNow;
-                    var userName = user.FirstName + " " + user.LastName;
-                    var group = await _groupRepository.GetByIdAsync(request.GroupId);
-                    var annouce = new Announcement
-                    {
-                        AnnouncementId = Guid.NewGuid(),
-                        Title = await GetLocalizedMessageAsync(ErrorCodes.AnnouncementTagTitle),
-                        Content = userName + " " + await GetLocalizedMessageAsync(ErrorCodes.AnnouncementTagContent) + " " + group.GroupName,
-                        Type = AnnouncementType.Info,
-                        IsActive = true,
-                        CreatedBy = userId,
-                        CreatedAt = now,
-                        UpdatedAt = now,
-                        PublishedAt = now,
-                    };
-                    await _announcementRepository.AddAsync(annouce);
+                _logger.LogInformation(
+                    "Message sent to group {GroupId} by user {UserId}",
+                    request.GroupId, userId);
 
-                    foreach (var tagId in taggedUserIds)
-                    {
-                        var userAnnounce = new UserAnnouncementRequest
-                        {
-                            AnnouncementId = annouce.AnnouncementId,
-                            MentionedId = tagId,
-                            IsRead = false,
-                            CreatedAt = now
-                        };
-
-                        await _userAnnouncementService.AddAnnouncementAsync(userAnnounce);
-                        await Clients.User(tagId.ToString()).SendAsync("ReceiveAnnouncement", annouce);
-                    }
-                }
+                await HandleMentionNotificationsAsync(request.GroupId, userId, request.Content);
             }
             catch (Exception ex)
             {
@@ -236,14 +312,21 @@ namespace StudioStudio_Server.Hubs
             }
         }
 
+        /// <summary>
+        /// Reply t?i message (threaded conversation)
+        /// Validate:
+        /// - User ph?i là member c?a group
+        /// - Parent message ph?i t?n t?i, chýa b? xóa, và thu?c cùng group
+        /// Broadcast: "MessageReplied" event t?i group
+        /// </summary>
         public async Task ReplyToMessage(ReplyToGroupMessageRequest request)
         {
             try
             {
                 var userId = GetUserId();
 
-                // ? LOG: Request data
-                _logger.LogInformation("ReplyToMessage - Request: GroupId={GroupId}, ParentMessageId={ParentId}, UserId={UserId}, Content length={Length}",
+                _logger.LogInformation(
+                    "ReplyToMessage - Request: GroupId={GroupId}, ParentMessageId={ParentId}, UserId={UserId}, Content length={Length}",
                     request.GroupId, request.ParentMessageId, userId, request.Content?.Length ?? 0);
 
                 var isUserInGroup = await _groupParticipantRepository.IsUserInGroupAsync(request.GroupId, userId);
@@ -257,22 +340,24 @@ namespace StudioStudio_Server.Hubs
 
                 var parentMessage = await _messageRepository.GetByIdAsync(request.ParentMessageId);
 
-                // ? LOG: Parent message status
-                _logger.LogInformation("Parent message check: Found={Found}, IsDeleted={IsDeleted}, GroupId={GroupId}",
+                _logger.LogInformation(
+                    "Parent message check: Found={Found}, IsDeleted={IsDeleted}, GroupId={GroupId}",
                     parentMessage != null, parentMessage?.IsDeleted, parentMessage?.GroupId);
 
                 if (parentMessage == null || parentMessage.IsDeleted)
                 {
-                    _logger.LogError("Parent message not found or deleted: ParentMessageId={ParentMessageId}", request.ParentMessageId);
+                    _logger.LogError(
+                        "Parent message not found or deleted: ParentMessageId={ParentMessageId}",
+                        request.ParentMessageId);
                     var errorMsg = await GetLocalizedMessageAsync(ErrorCodes.MessageParentNotFound);
                     await Clients.Caller.SendAsync("Error", errorMsg);
                     return;
                 }
 
-                // ? VALIDATION: Verify parent belongs to same group
                 if (parentMessage.GroupId != request.GroupId)
                 {
-                    _logger.LogError("Parent message GroupId mismatch: ParentGroupId={ParentGroupId}, RequestGroupId={RequestGroupId}",
+                    _logger.LogError(
+                        "Parent message GroupId mismatch: ParentGroupId={ParentGroupId}, RequestGroupId={RequestGroupId}",
                         parentMessage.GroupId, request.GroupId);
                     var errorMsg = await GetLocalizedMessageAsync(ErrorCodes.MessageParentNotFound);
                     await Clients.Caller.SendAsync("Error", errorMsg);
@@ -290,13 +375,12 @@ namespace StudioStudio_Server.Hubs
                     IsDeleted = false
                 };
 
-                // ? LOG: Before save
-                _logger.LogInformation("Attempting to save reply: ReplyId={ReplyId}, ParentId={ParentId}, GroupId={GroupId}",
+                _logger.LogInformation(
+                    "Attempting to save reply: ReplyId={ReplyId}, ParentId={ParentId}, GroupId={GroupId}",
                     reply.MessageId, reply.ParentMessageId, reply.GroupId);
 
                 await _messageRepository.AddAsync(reply);
 
-                // ? LOG: After save
                 _logger.LogInformation("Reply saved successfully: ReplyId={ReplyId}", reply.MessageId);
 
                 var user = await _userRepository.GetByIdAsync(userId);
@@ -322,17 +406,29 @@ namespace StudioStudio_Server.Hubs
                 };
 
                 await Clients.Group(request.GroupId.ToString()).SendAsync("MessageReplied", replyDto);
-                _logger.LogInformation("Reply broadcasted to group {GroupId} for message {ParentMessageId}", request.GroupId, request.ParentMessageId);
+
+                _logger.LogInformation(
+                    "Reply broadcasted to group {GroupId} for message {ParentMessageId}",
+                    request.GroupId, request.ParentMessageId);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error replying to message - GroupId={GroupId}, ParentMessageId={ParentMessageId}, Error={Error}",
-                    request.GroupId, request.ParentMessageId, ex.Message);
+                _logger.LogError(ex,
+                    "Error replying to message - GroupId={GroupId}, ParentMessageId={ParentMessageId}",
+                    request.GroupId, request.ParentMessageId);
                 var errorMsg = await GetLocalizedMessageAsync(ErrorCodes.UnexpectedError);
                 await Clients.Caller.SendAsync("Error", errorMsg);
             }
         }
 
+        /// <summary>
+        /// Xóa message (soft delete) và t?t c? replies
+        /// Validate:
+        /// - User ph?i là member c?a group
+        /// - Message owner: Có quy?n delete
+        /// - Group Owner/Moderator: Có quy?n delete b?t k? message nào
+        /// Broadcast: "MessageDeleted" event t?i group
+        /// </summary>
         public async Task DeleteMessage(DeleteGroupMessageRequest request)
         {
             try
@@ -355,15 +451,12 @@ namespace StudioStudio_Server.Hubs
                     return;
                 }
 
-                if (message.UserId != userId)
+                var hasPermission = await ValidateDeletePermissionAsync(message, userId);
+                if (!hasPermission)
                 {
-                    var participant = await _groupParticipantRepository.GetByUserAndGroupAsync(userId, message.GroupId);
-                    if (participant == null || (participant.Role != GroupRole.Owner && participant.Role != GroupRole.Moderator))
-                    {
-                        var errorMsg = await GetLocalizedMessageAsync(ErrorCodes.MessagePermissionDenied);
-                        await Clients.Caller.SendAsync("Error", errorMsg);
-                        return;
-                    }
+                    var errorMsg = await GetLocalizedMessageAsync(ErrorCodes.MessagePermissionDenied);
+                    await Clients.Caller.SendAsync("Error", errorMsg);
+                    return;
                 }
 
                 var replyCount = await _messageRepository.GetReplyCountAsync(request.MessageId);
@@ -379,7 +472,9 @@ namespace StudioStudio_Server.Hubs
                     Timestamp = DateTime.UtcNow
                 });
 
-                _logger.LogInformation("Message {MessageId} and {ReplyCount} replies deleted by user {UserId}", request.MessageId, replyCount, userId);
+                _logger.LogInformation(
+                    "Message {MessageId} and {ReplyCount} replies deleted by user {UserId}",
+                    request.MessageId, replyCount, userId);
             }
             catch (Exception ex)
             {
@@ -389,6 +484,10 @@ namespace StudioStudio_Server.Hubs
             }
         }
 
+        /// <summary>
+        /// Handle client disconnect
+        /// Auto-cleanup: SignalR t? ð?ng remove kh?i groups
+        /// </summary>
         public override async Task OnDisconnectedAsync(Exception? exception)
         {
             _logger.LogInformation("Client disconnected: {ConnectionId}", Context.ConnectionId);
