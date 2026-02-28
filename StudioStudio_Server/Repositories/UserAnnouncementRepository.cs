@@ -26,7 +26,30 @@ namespace StudioStudio_Server.Repositories
             if (annouce == null) return;
 
             annouce.IsDelete = true;
-            annouce.UpdatedAt = DateTime.Now;
+            var now = DateTime.UtcNow;
+            annouce.UpdatedAt = now;
+            await _context.SaveChangesAsync();
+        }
+
+        public async Task<List<UserAnnouncement>> GetByUserIdAsync(Guid userId)
+        {
+            return await _context.UserAnnouncements
+                .Where(ua => ua.MetionedId == userId && !ua.IsDelete)
+                .OrderByDescending(ua => ua.CreatedAt)
+                .AsNoTracking()
+                .ToListAsync();
+        }
+
+        public async Task<UserAnnouncement?> GetByIdAsync(Guid userAnnouncementId)
+        {
+            return await _context.UserAnnouncements
+                .FirstOrDefaultAsync(ua => ua.UserAnnouncementId == userAnnouncementId && !ua.IsDelete);
+        }
+
+        public async Task UpdateAsync(UserAnnouncement userAnnouncement)
+        {
+            userAnnouncement.UpdatedAt = DateTime.UtcNow;
+            _context.UserAnnouncements.Update(userAnnouncement);
             await _context.SaveChangesAsync();
         }
     }

@@ -6,5 +6,8 @@ namespace StudioStudio_Server.Repositories.Interfaces
     {
         Task AddAsync(UserAnnouncement userAnnouncement);
         Task DeleteAsync(Guid userAnnouncementId);
+        Task<List<UserAnnouncement>> GetByUserIdAsync(Guid userId);
+        Task<UserAnnouncement?> GetByIdAsync(Guid userAnnouncementId);
+        Task UpdateAsync(UserAnnouncement userAnnouncement);
     }
 }

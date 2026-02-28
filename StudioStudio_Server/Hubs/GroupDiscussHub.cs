@@ -196,6 +196,7 @@ namespace StudioStudio_Server.Hubs
                 var taggedUserIds = ExtractTaggedUserIds(request.Content);
                 if (!taggedUserIds.IsNullOrEmpty())
                 {
+                    var now = DateTime.UtcNow;
                     var userName = user.FirstName + " " + user.LastName;
                     var group = await _groupRepository.GetByIdAsync(request.GroupId);
                     var annouce = new Announcement
@@ -206,9 +207,9 @@ namespace StudioStudio_Server.Hubs
                         Type = AnnouncementType.Info,
                         IsActive = true,
                         CreatedBy = userId,
-                        CreatedAt = DateTime.Now,
-                        UpdatedAt = DateTime.Now,
-                        PublishedAt = DateTime.Now,
+                        CreatedAt = now,
+                        UpdatedAt = now,
+                        PublishedAt = now,
                     };
                     await _announcementRepository.AddAsync(annouce);
 
@@ -219,7 +220,7 @@ namespace StudioStudio_Server.Hubs
                             AnnouncementId = annouce.AnnouncementId,
                             MentionedId = tagId,
                             IsRead = false,
-                            CreatedAt = DateTime.Now
+                            CreatedAt = now
                         };
 
                         await _userAnnouncementService.AddAnnouncementAsync(userAnnounce);
