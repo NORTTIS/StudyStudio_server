@@ -1,11 +1,14 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using StudioStudio_Server.Data;
 using StudioStudio_Server.Exceptions;
 using StudioStudio_Server.Models.DTOs.Response;
 using StudioStudio_Server.Models.Entities;
 using StudioStudio_Server.Models.Enums;
+using StudioStudio_Server.Repositories.Interfaces;
 using StudioStudio_Server.Services.Interfaces;
+using System.Security.Claims;
 
 namespace StudioStudio_Server.Controllers
 {
@@ -13,113 +16,202 @@ namespace StudioStudio_Server.Controllers
     [ApiController]
     public class AnnouncementController : ControllerBase
     {
-        private readonly StudioDbContext _db;
+        private readonly IAnnouncementRepository _announcementRepository;
+        private readonly IUserAnnouccementRepository _userAnnouncementRepository;
         private readonly IMessageService _messageService;
 
-        public AnnouncementController(StudioDbContext db, IMessageService messageService)
+        public AnnouncementController(
+            IAnnouncementRepository announcementRepository,
+            IUserAnnouccementRepository userAnnouncementRepository,
+            IMessageService messageService)
         {
-            _db = db;
+            _announcementRepository = announcementRepository;
+            _userAnnouncementRepository = userAnnouncementRepository;
             _messageService = messageService;
         }
 
         [HttpGet]
         public async Task<ActionResult<ApiResponse<List<AnnouncementResponse>>>> GetAnnouncements()
         {
-            // Mock data - later can be replaced with real database query
-            var mockAnnouncements = new List<AnnouncementResponse>
-            {
-                new AnnouncementResponse
-                {
-                    AnnouncementId = Guid.NewGuid(),
-                    Title = "Chào mừng đến với Study Studio!",
-                    Content = "Study Studio giúp bạn quản lý công việc và học tập hiệu quả hơn. Hãy khám phá các tính năng mới!",
-                    Type = AnnouncementType.Info.ToString(),
-                    IsActive = true,
-                    CreatedAt = DateTime.UtcNow.AddDays(-7),
-                    PublishedAt = DateTime.UtcNow.AddDays(-7)
-                },
-                new AnnouncementResponse
-                {
-                    AnnouncementId = Guid.NewGuid(),
-                    Title = "Bảo trì hệ thống",
-                    Content = "Hệ thống sẽ bảo trì vào 2h sáng ngày mai. Thời gian dự kiến: 1 giờ.",
-                    Type = AnnouncementType.Maintenance.ToString(),
-                    IsActive = true,
-                    CreatedAt = DateTime.UtcNow.AddDays(-2),
-                    PublishedAt = DateTime.UtcNow.AddDays(-2)
-                },
-                new AnnouncementResponse
-                {
-                    AnnouncementId = Guid.NewGuid(),
-                    Title = "Tính năng mới: Tích hợp AI",
-                    Content = "Chúng tôi đã thêm tính năng AI để gợi ý công việc và lên lịch thông minh.",
-                    Type = AnnouncementType.Info.ToString(),
-                    IsActive = true,
-                    CreatedAt = DateTime.UtcNow.AddDays(-1),
-                    PublishedAt = DateTime.UtcNow.AddDays(-1)
-                },
-                new AnnouncementResponse
-                {
-                    AnnouncementId = Guid.NewGuid(),
-                    Title = "Lưu ý bảo mật",
-                    Content = "Vui lòng không chia sẻ mật khẩu của bạn với bất kỳ ai. Thường xuyên thay đổi mật khẩu để đảm bảo an toàn.",
-                    Type = AnnouncementType.Warning.ToString(),
-                    IsActive = true,
-                    CreatedAt = DateTime.UtcNow.AddHours(-12),
-                    PublishedAt = DateTime.UtcNow.AddHours(-12)
-                },
-                new AnnouncementResponse
-                {
-                    AnnouncementId = Guid.NewGuid(),
-                    Title = "Giới thiệu chương trình khuyến mãi",
-                    Content = "Đăng ký gói Premium ngay hôm nay để nhận ưu đãi 50% trong tháng đầu tiên!",
-                    Type = AnnouncementType.Info.ToString(),
-                    IsActive = true,
-                    CreatedAt = DateTime.UtcNow.AddHours(-6),
-                    PublishedAt = DateTime.UtcNow.AddHours(-6)
-                }
-            };
+            var announcements = await _announcementRepository.GetAllActiveAsync();
 
-            // Sort by published date descending
-            var sortedAnnouncements = mockAnnouncements
-                .OrderByDescending(a => a.PublishedAt)
-                .ToList();
+            var response = announcements.Select(a => new AnnouncementResponse
+            {
+                AnnouncementId = a.AnnouncementId,
+                Title = a.Title,
+                Content = a.Content,
+                Type = a.Type.ToString(),
+                IsActive = a.IsActive,
+                CreatedAt = a.CreatedAt,
+                PublishedAt = a.PublishedAt
+            }).ToList();
 
             var message = _messageService.GetMessage(ErrorCodes.SuccessGetData);
             return Ok(ApiResponse<List<AnnouncementResponse>>.Success(
                 ErrorCodes.SuccessGetData,
                 message,
-                sortedAnnouncements
+                response
             ));
         }
 
         [HttpGet("{id}")]
-        public async Task<IActionResult> GetAnnouncementById(Guid id)
+        public async Task<ActionResult<ApiResponse<AnnouncementResponse>>> GetAnnouncementById(Guid id)
         {
-            var announcement = await _db.Announcements
-                .Where(a => a.AnnouncementId == id && a.IsActive)
-                .Select(a => new AnnouncementResponse
-                {
-                    AnnouncementId = a.AnnouncementId,
-                    Title = a.Title,
-                    Content = a.Content,
-                    Type = a.Type.ToString(),
-                    IsActive = a.IsActive,
-                    CreatedAt = a.CreatedAt,
-                    PublishedAt = a.PublishedAt
-                })
-                .FirstOrDefaultAsync();
+            var announcement = await _announcementRepository.GetByIdAsync(id);
 
-            if (announcement == null)
+            if (announcement == null || !announcement.IsActive)
             {
                 throw new AppException(ErrorCodes.AnnouncementNotFound, StatusCodes.Status404NotFound);
             }
+
+            var response = new AnnouncementResponse
+            {
+                AnnouncementId = announcement.AnnouncementId,
+                Title = announcement.Title,
+                Content = announcement.Content,
+                Type = announcement.Type.ToString(),
+                IsActive = announcement.IsActive,
+                CreatedAt = announcement.CreatedAt,
+                PublishedAt = announcement.PublishedAt
+            };
 
             var message = _messageService.GetMessage(ErrorCodes.SuccessGetData);
             return Ok(ApiResponse<AnnouncementResponse>.Success(
                 ErrorCodes.SuccessGetData,
                 message,
-                announcement
+                response
+            ));
+        }
+
+        [HttpGet("user")]
+        [Authorize]
+        public async Task<ActionResult<ApiResponse<List<UserAnnouncementResponse>>>> GetUserAnnouncements()
+        {
+            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(userIdClaim) || !Guid.TryParse(userIdClaim, out Guid userId))
+            {
+                throw new AppException(ErrorCodes.AuthInvalidCredential, StatusCodes.Status401Unauthorized);
+            }
+
+            var isAdminClaim = User.FindFirst("IsAdmin")?.Value;
+            var isAdmin = isAdminClaim != null && bool.TryParse(isAdminClaim, out var adminResult) && adminResult;
+            if (isAdmin)
+            {
+                throw new AppException(ErrorCodes.AuthForbidden, StatusCodes.Status403Forbidden);
+            }
+
+            var userAnnouncements = await _userAnnouncementRepository.GetByUserIdAsync(userId);
+
+            var announcementIds = userAnnouncements.Select(ua => ua.AnnouncementId).ToList();
+            var announcements = new List<Announcement>();
+            
+            foreach (var announcementId in announcementIds)
+            {
+                var announcement = await _announcementRepository.GetByIdAsync(announcementId);
+                if (announcement != null)
+                {
+                    announcements.Add(announcement);
+                }
+            }
+
+            var response = userAnnouncements.Select(ua =>
+            {
+                var announcement = announcements.FirstOrDefault(a => a.AnnouncementId == ua.AnnouncementId);
+                return new UserAnnouncementResponse
+                {
+                    UserAnnouncementId = ua.UserAnnouncementId,
+                    AnnouncementId = ua.AnnouncementId,
+                    Title = announcement?.Title ?? "",
+                    Content = announcement?.Content ?? "",
+                    Type = announcement?.Type.ToString() ?? "",
+                    IsRead = ua.IsRead,
+                    CreatedAt = ua.CreatedAt,
+                    PublishedAt = announcement?.PublishedAt
+                };
+            }).ToList();
+
+            var message = _messageService.GetMessage(ErrorCodes.SuccessGetData);
+            return Ok(ApiResponse<List<UserAnnouncementResponse>>.Success(
+                ErrorCodes.SuccessGetData,
+                message,
+                response
+            ));
+        }
+
+        [HttpPut("user/{userAnnouncementId}/read")]
+        [Authorize]
+        public async Task<ActionResult<ApiResponse<object>>> MarkAnnouncementAsRead(Guid userAnnouncementId)
+        {
+            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(userIdClaim) || !Guid.TryParse(userIdClaim, out Guid userId))
+            {
+                throw new AppException(ErrorCodes.AuthInvalidCredential, StatusCodes.Status401Unauthorized);
+            }
+
+            var isAdminClaim = User.FindFirst("IsAdmin")?.Value;
+            var isAdmin = isAdminClaim != null && bool.TryParse(isAdminClaim, out var adminResult) && adminResult;
+            if (isAdmin)
+            {
+                throw new AppException(ErrorCodes.AuthForbidden, StatusCodes.Status403Forbidden);
+            }
+
+            var userAnnouncement = await _userAnnouncementRepository.GetByIdAsync(userAnnouncementId);
+            if (userAnnouncement == null)
+            {
+                throw new AppException(ErrorCodes.AnnouncementNotFound, StatusCodes.Status404NotFound);
+            }
+
+            if (userAnnouncement.MetionedId != userId)
+            {
+                throw new AppException(ErrorCodes.AuthForbidden, StatusCodes.Status403Forbidden);
+            }
+
+            userAnnouncement.IsRead = true;
+            await _userAnnouncementRepository.UpdateAsync(userAnnouncement);
+
+            var message = _messageService.GetMessage(ErrorCodes.SuccessGetData);
+            return Ok(ApiResponse<object>.Success(
+                ErrorCodes.SuccessGetData,
+                message,
+                null
+            ));
+        }
+
+        [HttpDelete("user/{userAnnouncementId}")]
+        [Authorize]
+        public async Task<ActionResult<ApiResponse<object>>> DeleteUserAnnouncement(Guid userAnnouncementId)
+        {
+            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(userIdClaim) || !Guid.TryParse(userIdClaim, out Guid userId))
+            {
+                throw new AppException(ErrorCodes.AuthInvalidCredential, StatusCodes.Status401Unauthorized);
+            }
+
+            var isAdminClaim = User.FindFirst("IsAdmin")?.Value;
+            var isAdmin = isAdminClaim != null && bool.TryParse(isAdminClaim, out var adminResult) && adminResult;
+            if (isAdmin)
+            {
+                throw new AppException(ErrorCodes.AuthForbidden, StatusCodes.Status403Forbidden);
+            }
+
+            var userAnnouncement = await _userAnnouncementRepository.GetByIdAsync(userAnnouncementId);
+            if (userAnnouncement == null)
+            {
+                throw new AppException(ErrorCodes.AnnouncementNotFound, StatusCodes.Status404NotFound);
+            }
+
+            if (userAnnouncement.MetionedId != userId)
+            {
+                throw new AppException(ErrorCodes.AuthForbidden, StatusCodes.Status403Forbidden);
+            }
+
+            await _userAnnouncementRepository.DeleteAsync(userAnnouncementId);
+
+            var message = _messageService.GetMessage(ErrorCodes.SuccessGetData);
+            return Ok(ApiResponse<object>.Success(
+                ErrorCodes.SuccessGetData,
+                message,
+                null
             ));
         }
     }
