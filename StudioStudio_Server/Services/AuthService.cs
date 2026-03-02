@@ -199,12 +199,6 @@ namespace StudioStudio_Server.Services
 
             string accessToken = GenerateJWTToken(user, accessExpireAt);
 
-            //create new refresh token each time user login
-            if (user.RefreshToken != null)
-            {
-                await _refreshTokenRepository.RevokeAsync(user.RefreshToken);
-            }
-
             RefreshToken refreshToken = CreateRefreshToken(user, refreshExpireAt);
             await _refreshTokenRepository.AddAsync(refreshToken);
 
@@ -335,11 +329,6 @@ namespace StudioStudio_Server.Services
                     await _userRepository.UpdateAsync(user);
                 }
 
-                if (user.RefreshToken != null)
-                {
-                    await _refreshTokenRepository.RevokeAsync(user.RefreshToken);
-                }
-
                 var accessTokenExpireMs = _configuration.GetValue<long>("JWT:AccessTokenExpireMs", 3600000);
                 var refreshTokenExpireMs = _configuration.GetValue<long>("JWT:RefreshTokenExpireMs", 86400000);
 
@@ -445,9 +434,12 @@ namespace StudioStudio_Server.Services
             await _userRepository.UpdateAsync(user);
             await _resetCache.InvalidateResetTokenAsync(resetData.Email);
 
-            if (user.RefreshToken != null)
+            if (user.RefreshTokens != null && user.RefreshTokens.Any())
             {
-                await _refreshTokenRepository.RevokeAsync(user.RefreshToken);
+                foreach (var refreshToken in user.RefreshTokens.Where(t => !t.IsRevoked))
+                {
+                    await _refreshTokenRepository.RevokeAsync(refreshToken);
+                }
             }
         }
         public async Task<bool> VerifyResetTokenAsync(string token)

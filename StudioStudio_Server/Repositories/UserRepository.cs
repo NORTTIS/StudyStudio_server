@@ -34,7 +34,7 @@ namespace StudioStudio_Server.Repositories
         public async Task<User?> GetByEmailAsync(string email)
         {
             return await _context.Users
-                .Include(u => u.RefreshToken)
+                .Include(u => u.RefreshTokens)
                 .AsNoTracking()
                 .FirstOrDefaultAsync(u => u.Email == email && !u.DeletedFlag);
         }
@@ -47,7 +47,7 @@ namespace StudioStudio_Server.Repositories
         public async Task<User?> GetByIdAsync(Guid id)
         {
             return await _context.Users
-                .Include(u => u.RefreshToken)
+                .Include(u => u.RefreshTokens)
                 .AsNoTracking()
                 .FirstOrDefaultAsync(u => u.UserId == id && !u.DeletedFlag);
         }
