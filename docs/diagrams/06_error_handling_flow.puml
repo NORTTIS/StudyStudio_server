@@ -1,0 +1,126 @@
+@startuml Error Handling Flow
+!theme plain
+skinparam backgroundColor #FEFEFE
+
+title Error Handling & Status Tracking
+
+actor User as U
+participant "Frontend" as FE
+participant "DocumentController" as DC
+participant "DocumentService" as DS
+participant "BackgroundJob" as BG
+database "PostgreSQL" as PG
+
+== Success Path ==
+
+U -> FE: Upload document
+FE -> DC: POST /api/documents/request-upload
+DC -> DS: RequestUploadAsync()
+DS -> PG: INSERT status = Uploading
+DC <-- DS: uploadUrl
+FE <-- DC: 200 OK
+
+FE -> FE: Upload to B2 directly
+
+FE -> DC: POST /api/documents/{id}/complete
+DC -> DS: CompleteUploadAsync()
+DS -> PG: UPDATE status = Processing
+DS -> BG: Start background job
+DC <-- DS: ?
+FE <-- DC: 200 OK
+
+BG -> BG: Process document
+BG -> PG: UPDATE status = Completed
+BG -> BG: ?
+
+== Polling Status ==
+
+loop Every 2-3 seconds
+    FE -> DC: GET /api/documents/{id}/status
+    DC -> DS: GetDocumentStatusAsync()
+    DS -> PG: SELECT FROM GroupAttachments
+    DC <-- DS: DocumentStatusResponse
+    FE <-- DC: {status, progress, chunkCount}
+    
+    alt Status = Completed
+        FE -> FE: Stop polling\nShow success
+    else Status = Processing
+        FE -> FE: Continue polling
+    else Status = Failed
+        FE -> FE: Stop polling\nShow error
+    end
+end
+
+== Error Scenarios ==
+
+group Validation Errors (Immediate)
+    U -> FE: Upload invalid file
+    FE -> DC: POST /api/documents/request-upload
+    DC -> DS: RequestUploadAsync()
+    
+    alt File extension không h?p l?
+        DS -> DC: throw ValidationInvalidFileFormat
+        DC -> FE: 400 Bad Request
+        FE -> U: Show error: "File type not supported"
+    else File size > 10MB
+        DS -> DC: throw ValidationFileSizeExceeded
+        DC -> FE: 400 Bad Request
+        FE -> U: Show error: "File too large"
+    else User không ph?i member
+        DS -> DC: throw GroupPermissionDenied
+        DC -> FE: 403 Forbidden
+        FE -> U: Show error: "No permission"
+    end
+end
+
+group Upload Errors
+    U -> FE: Complete upload
+    FE -> DC: POST /api/documents/{id}/complete
+    DC -> DS: CompleteUploadAsync()
+    
+    alt File không t?n t?i trên B2
+        DS -> DC: throw BadRequest
+        DC -> FE: 400 Bad Request
+        FE -> U: Show error: "Upload failed"
+    end
+end
+
+group Processing Errors (Background)
+    BG -> BG: ProcessDocumentAsync()
+    
+    alt Cannot download file
+        BG -> PG: UPDATE status = Failed\nerrorMessage = "Download failed"
+        note right: Status tracking continues
+    else Text extraction failed
+        BG -> PG: UPDATE status = Failed\nerrorMessage = "Extraction failed"
+    else Embedding generation failed
+        BG -> PG: UPDATE status = Failed\nerrorMessage = "Embedding failed"
+    else Qdrant upsert failed
+        BG -> PG: UPDATE status = Failed\nerrorMessage = "Vector storage failed"
+    end
+    
+    FE -> DC: GET /api/documents/{id}/status
+    DC -> FE: {status: "Failed", errorMessage}
+    FE -> U: Show error message
+end
+
+group AI Q&A Errors
+    U -> FE: Ask question
+    FE -> DC: POST /api/ai/ask
+    
+    alt User không ph?i member
+        DC -> FE: 403 Forbidden
+        FE -> U: "No permission"
+    else Gemini API failed
+        DC -> FE: 500 Internal Error
+        FE -> U: "Embedding service unavailable"
+    else Qdrant search failed
+        DC -> FE: 200 OK (degraded)\n{answer: based on tasks only}
+        FE -> U: Show answer without document context
+    else Groq LLM timeout
+        DC -> FE: 500 Internal Error
+        FE -> U: "AI service temporarily unavailable"
+    end
+end
+
+@enduml

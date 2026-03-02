@@ -1,0 +1,171 @@
+@startuml AI Q&A with Hybrid RAG
+!theme plain
+skinparam backgroundColor #FEFEFE
+skinparam sequenceMessageAlign center
+skinparam responseMessageBelowArrow true
+
+title AI Question & Answer Flow\n(Hybrid RAG: Documents + Task Statistics)
+
+actor User as U
+participant "AIController" as AC
+participant "AIService" as AS
+participant "GroupParticipantRepo" as GPR
+participant "EmbeddingService\n(Gemini)" as ES
+participant "VectorDBService\n(Qdrant)" as QD
+participant "TaskRepository" as TR
+participant "LLMService\n(Groq)" as LLM
+database "PostgreSQL" as PG
+
+== Step 1: User Ask Question ==
+
+U -> AC: POST /api/ai/ask\n{groupId, question}
+activate AC
+
+AC -> AC: ValidateAndGetUserId()\nExtract userId from JWT
+
+AC -> AS: AskQuestionAsync(userId, request)
+activate AS
+
+AS -> AS: Start Stopwatch\nTrack processing time
+
+== Step 2: Validate Permissions ==
+
+AS -> GPR: IsUserInGroupAsync(groupId, userId)
+activate GPR
+GPR -> PG: SELECT FROM GroupParticipants\nWHERE groupId AND userId
+GPR <-- PG: true/false
+AS <-- GPR: isMember
+deactivate GPR
+
+alt User không ph?i member
+    AS -> AC: throw GroupPermissionDenied
+    AC -> U: 403 Forbidden
+end
+
+== Step 3: Generate Query Embedding ==
+
+AS -> ES: GenerateEmbeddingAsync(question)
+activate ES
+
+ES -> ES: POST https://generativelanguage.googleapis.com\n/v1beta/models/text-embedding-004:embedContent\n{\n  "content": {"parts": [{"text": question}]},\n  "taskType": "RETRIEVAL_QUERY"\n}
+
+note right of ES
+**Gemini Embedding API**
+Model: text-embedding-004
+Output: 768 dimensions
+Task: RETRIEVAL_QUERY
+end note
+
+ES -> ES: Parse JSON response\nExtract embedding vector
+
+AS <-- ES: float[768] queryEmbedding
+deactivate ES
+
+== Step 4: Search Qdrant (Document Context) ==
+
+AS -> QD: SearchVectorsAsync(queryEmbedding, topK=3, groupId)
+activate QD
+
+QD -> QD: POST /collections/studystudio_documents/points/search\n{\n  "vector": [float array],\n  "limit": 3,\n  "filter": {\n    "must": [{"key": "groupId", "match": {"value": groupId}}]\n  },\n  "with_payload": true\n}
+
+note right of QD
+**Vector Search**
+Algorithm: Cosine similarity
+Filter: ONLY documents in groupId
+Return: Top 3 most relevant chunks
+end note
+
+QD -> QD: Search similar vectors\nCosine similarity
+
+AS <-- QD: List<SearchResult>\n[{id, score, payload}, ...]
+deactivate QD
+
+== Step 5: Query Task Statistics ==
+
+AS -> TR: GetGroupTaskStatisticsAsync(groupId)
+activate TR
+
+TR -> PG: SELECT FROM Tasks\nWHERE groupId AND !IsPendingDeleted
+TR <-- PG: List<TaskItem>
+
+TR -> TR: Calculate statistics:\n- Total tasks\n- Completed tasks (status contains "done")\n- Overdue tasks (dueDate < now)\n- Completion percentage\n- Nearest deadline\n- Risk flags
+
+note right of TR
+**Task Statistics**
+- Count totals
+- Filter by status
+- Check deadlines
+- Generate warnings
+end note
+
+AS <-- TR: TaskSummaryResponse\n{totalTasks, completed, overdue, ...}
+deactivate TR
+
+== Step 6: Build Context ==
+
+AS -> AS: BuildContext(searchResults, taskSummary)
+
+note right of AS
+**Context Format:**
+
+=== TÀI LI?U LIÊN QUAN ===
+
+[Tài li?u 1] document.pdf
+Ð? liên quan: 0.85
+<chunk content>
+
+[Tài li?u 2] notes.txt
+Ð? liên quan: 0.78
+<chunk content>
+
+=== TH?NG KÊ CÔNG VI?C ===
+T?ng s? tasks: 15
+Ð? hoàn thành: 8/15 (53%)
+Tasks quá h?n: 2
+Deadline g?n nh?t: 15/03/2024
+
+C?nh báo:
+- ?? Có 2 task(s) quá h?n
+end note
+
+== Step 7: Call LLM (Groq) ==
+
+AS -> LLM: GenerateAnswerAsync(systemPrompt, question, context)
+activate LLM
+
+LLM -> LLM: Build messages:\n[\n  {role: "system", content: SYSTEM_PROMPT},\n  {role: "user", content: question + context}\n]
+
+LLM -> LLM: POST https://api.groq.com/openai/v1/chat/completions\n{\n  "model": "llama-3.3-70b-versatile",\n  "messages": messages,\n  "temperature": 0.7,\n  "max_tokens": 2000\n}
+
+note right of LLM
+**Groq LLM Parameters**
+Model: llama-3.3-70b-versatile
+Temperature: 0.7 (balanced)
+Max Tokens: 2000
+System Prompt: AI assistant rules
+end note
+
+LLM -> LLM: Parse response\nExtract answer text
+
+AS <-- LLM: string answer
+deactivate LLM
+
+== Step 8: Build Response ==
+
+AS -> AS: Stop Stopwatch\nprocessingTimeMs = stopwatch.ElapsedMilliseconds
+
+AS -> AS: Map SearchResults to SourceDocuments:\n- documentId\n- chunkIndex\n- relevanceScore\n- preview (first 200 chars)
+
+AS -> AS: Build AIAnswerResponse:\n- answer\n- sourceDocuments\n- taskSummary\n- processingTimeMs\n- generatedAt
+
+AC <-- AS: AIAnswerResponse
+deactivate AS
+
+U <-- AC: 200 OK\n{\n  "answer": "...",\n  "sourceDocuments": [...],\n  "taskSummary": {...},\n  "processingTimeMs": 1245\n}
+deactivate AC
+
+== Frontend Display ==
+
+U -> U: Display answer v?i\n- Source documents\n- Task statistics\n- Processing time
+
+@enduml

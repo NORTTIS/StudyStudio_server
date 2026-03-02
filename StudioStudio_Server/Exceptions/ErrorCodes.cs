@@ -84,6 +84,12 @@
         public const string ValidationGroupCreationNumber = "VALIDATION011";
         public const string ValidationRateLimitExceeded = "VALIDATION012";
 
+        // CONFIGURATION
+        public const string ConfigurationMissing = "CONFIG001";
+
+        // EXTERNAL SERVICES
+        public const string ExternalServiceError = "EXTERNAL001";
+
         // SUCCESS
         public const string SuccessRegister = "SUCCESS001";
         public const string SuccessLogin = "SUCCESS002";

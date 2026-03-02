@@ -8,9 +8,9 @@ using System.Security.Claims;
 namespace StudioStudio_Server.Controllers
 {
     /// <summary>
-    /// Controller qu?n l? Task Comments (l?ch s? comments)
+    /// Controller for managing Task Comments (comment history)
     /// Route: /api/task-comments
-    /// Note: Realtime commenting ðý?c handle b?i TaskCommentHub (SignalR)
+    /// Note: Realtime commenting is handled by TaskCommentHub (SignalR)
     /// </summary>
     [Route("api/task-comments")]
     [ApiController]
@@ -29,7 +29,7 @@ namespace StudioStudio_Server.Controllers
         }
 
         /// <summary>
-        /// Xác th?c và l?y userId t? JWT token
+        /// Authenticate and get userId from JWT token
         /// </summary>
         private Guid ValidateAndGetUserId()
         {
@@ -47,17 +47,17 @@ namespace StudioStudio_Server.Controllers
 
         /// <summary>
         /// [AUTHORIZED] GET /api/task-comments/{taskId}?limit=100&offset=0
-        /// L?y l?ch s? comments c?a task (pagination)
+        /// Get comment history for task (pagination)
         /// Validate:
-        /// - Task ph?i t?n t?i
-        /// - GroupTask: User ph?i là member c?a group
-        /// - PersonalTask: User ph?i là owner
+        /// - Task must exist
+        /// - GroupTask: User must be member of group
+        /// - PersonalTask: User must be owner
         /// Query:
-        /// - Ch? l?y parent comments (ParentCommentId = null)
+        /// - Only get parent comments (ParentCommentId = null)
         /// - Include: User info, Replies (1 level only)
-        /// - S?p x?p: CreatedAt DESC
+        /// - Order by: CreatedAt DESC
         /// - Pagination: offset + limit
-        /// Return: Danh sách comments + total count
+        /// Return: List of comments + total count
         /// </summary>
         [HttpGet("{taskId}")]
         public async Task<ActionResult<ApiResponse<TaskCommentListResponse>>> GetTaskComments(

@@ -6,10 +6,10 @@ using StudioStudio_Server.Models.DTOs.Response;
 using StudioStudio_Server.Services.Interfaces;
 using System.Security.Claims;
 
-namespace StudioStudio_Server.Controllers
+namespace StudioStudio_Server.Controllers.Admin
 {
     /// <summary>
-    /// Controller qu?n l? announcements cho Admin
+    /// Admin Controller for managing Announcements
     /// Route: /api/admin/announcements
     /// </summary>
     [Route("api/admin/announcements")]
@@ -29,8 +29,8 @@ namespace StudioStudio_Server.Controllers
         }
 
         /// <summary>
-        /// Xác th?c user là admin và l?y userId
-        /// Validate: User ph?i có IsAdmin = true
+        /// Validate user is admin
+        /// Throw 403 if not admin
         /// </summary>
         private Guid ValidateAdminUser()
         {
@@ -60,8 +60,8 @@ namespace StudioStudio_Server.Controllers
 
         /// <summary>
         /// [ADMIN] GET /api/admin/announcements
-        /// L?y t?t c? announcements (bao g?m inactive)
-        /// S?p x?p: CreatedAt DESC
+        /// Get all announcements (including inactive)
+        /// Order by: CreatedAt DESC
         /// </summary>
         [HttpGet]
         public async Task<ActionResult<ApiResponse<List<AnnouncementResponse>>>> GetAllAnnouncements()
@@ -79,8 +79,8 @@ namespace StudioStudio_Server.Controllers
 
         /// <summary>
         /// [ADMIN] GET /api/admin/announcements/{id}
-        /// L?y chi ti?t m?t announcement
-        /// Validate: Announcement ph?i t?n t?i
+        /// Get announcement details
+        /// Validate: Announcement must exist
         /// </summary>
         [HttpGet("{id}")]
         public async Task<ActionResult<ApiResponse<AnnouncementResponse>>> GetAnnouncementById(Guid id)
@@ -98,8 +98,8 @@ namespace StudioStudio_Server.Controllers
 
         /// <summary>
         /// [ADMIN] POST /api/admin/announcements
-        /// T?o m?i announcement
-        /// Auto-set: PublishedAt n?u IsActive = true
+        /// Create new announcement
+        /// Auto-set: PublishedAt if IsActive = true
         /// </summary>
         [HttpPost]
         public async Task<ActionResult<ApiResponse<AnnouncementResponse>>> CreateAnnouncement(
@@ -118,8 +118,8 @@ namespace StudioStudio_Server.Controllers
 
         /// <summary>
         /// [ADMIN] PUT /api/admin/announcements
-        /// C?p nh?t announcement
-        /// Validate: Announcement ph?i t?n t?i
+        /// Update announcement
+        /// Validate: Announcement must exist
         /// </summary>
         [HttpPut]
         public async Task<ActionResult<ApiResponse<AnnouncementResponse>>> UpdateAnnouncement(
@@ -138,8 +138,8 @@ namespace StudioStudio_Server.Controllers
 
         /// <summary>
         /// [ADMIN] DELETE /api/admin/announcements/{id}
-        /// Xóa announcement
-        /// Validate: Announcement ph?i t?n t?i
+        /// Delete announcement
+        /// Validate: Announcement must exist
         /// </summary>
         [HttpDelete("{id}")]
         public async Task<ActionResult<ApiResponse<object>>> DeleteAnnouncement(Guid id)

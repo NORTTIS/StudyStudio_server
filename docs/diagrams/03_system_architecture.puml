@@ -1,0 +1,111 @@
+@startuml Complete System Architecture
+!theme plain
+skinparam backgroundColor #FEFEFE
+
+title Study Studio - Document RAG System Architecture
+
+package "Frontend" {
+    [React/Next.js] as FE
+}
+
+package "Backend API\n(ASP.NET Core 8.0)" {
+    package "Controllers" {
+        [DocumentController] as DocCtrl
+        [AIController] as AICtrl
+    }
+    
+    package "Services" {
+        [DocumentService] as DocSvc
+        [AIService] as AISvc
+        [GroqLLMService] as GroqSvc
+        [GeminiEmbeddingService] as GeminiSvc
+        [QdrantService] as QdrantSvc
+        [BackblazeStorageService] as B2Svc
+    }
+    
+    package "Repositories" {
+        [GroupAttachmentRepository] as GARep
+        [TaskRepository] as TRep
+        [GroupParticipantRepository] as GPRep
+    }
+}
+
+database "PostgreSQL" {
+    [GroupAttachments] as GA_Table
+    [Tasks] as Task_Table
+    [Groups] as Group_Table
+    [Users] as User_Table
+}
+
+cloud "External Services" {
+    [Backblaze B2\nFile Storage] as B2
+    [Qdrant Cloud\nVector Database] as Qdrant
+    [Google Gemini\nEmbedding API] as Gemini
+    [Groq\nLLM API] as Groq
+}
+
+' Frontend connections
+FE --> DocCtrl: POST /api/documents/*
+FE --> AICtrl: POST /api/ai/ask
+FE --> B2: Direct upload/download\n(Presigned URLs)
+
+' Controller -> Service
+DocCtrl --> DocSvc
+AICtrl --> AISvc
+
+' Service -> Service
+DocSvc --> B2Svc
+DocSvc --> GeminiSvc
+DocSvc --> QdrantSvc
+
+AISvc --> GeminiSvc
+AISvc --> QdrantSvc
+AISvc --> GroqSvc
+
+B2Svc --> B2
+GeminiSvc --> Gemini
+QdrantSvc --> Qdrant
+GroqSvc --> Groq
+
+' Service -> Repository
+DocSvc --> GARep
+DocSvc --> GPRep
+AISvc --> TRep
+AISvc --> GPRep
+
+' Repository -> Database
+GARep --> GA_Table
+TRep --> Task_Table
+GPRep --> Group_Table
+GPRep --> User_Table
+
+note right of B2
+**File Storage**
+- Presigned URLs
+- Direct upload from FE
+- S3-compatible API
+end note
+
+note right of Qdrant
+**Vector Database**
+- 768-dim vectors
+- Cosine similarity
+- Filter by groupId
+- Metadata storage
+end note
+
+note right of Gemini
+**Embedding Generation**
+- Model: text-embedding-004
+- 768 dimensions
+- Batch processing
+end note
+
+note right of Groq
+**LLM Inference**
+- Model: llama-3.3-70b-versatile
+- Temperature: 0.7
+- Max tokens: 2000
+end note
+
+@enduml
