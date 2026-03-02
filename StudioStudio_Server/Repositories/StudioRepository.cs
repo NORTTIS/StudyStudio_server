@@ -102,12 +102,13 @@ namespace StudioStudio_Server.Repositories
         }
 
         /// <summary>
-        /// Hard delete studio
-        /// Note: Cascade delete s? xóa t?t c? groups thu?c studio
+        /// Soft delete studio
         /// </summary>
         public async Task DeleteStudioAsync(Studio studio)
         {
-            _context.Studios.Remove(studio);
+            studio.IsDeleted = true;
+            studio.UpdatedAt = DateTime.UtcNow;
+            _context.Studios.Update(studio);
             await _context.SaveChangesAsync();
         }
     }
