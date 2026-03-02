@@ -15,6 +15,7 @@ public class TaskItem
 
     public DateTime? DueDate { get; set; }
     public int Priority { get; set; }
+    public int Severity { get; set; }
 
     public bool IsPendingDeleted { get; set; }
 
