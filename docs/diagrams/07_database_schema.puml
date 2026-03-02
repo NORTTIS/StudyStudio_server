@@ -1,0 +1,147 @@
+@startuml Database Schema
+!theme plain
+skinparam backgroundColor #FEFEFE
+skinparam linetype ortho
+
+title Database Schema - Document & AI Features
+
+entity "GroupAttachments" as GA {
+    **PK** GroupAttachmentId : uuid
+    --
+    **FK** GroupId : uuid
+    **FK** UploadedBy : uuid
+    --
+    FileName : text
+    FileType : text
+    FileSize : bigint
+    FileUrl : text (B2 key)
+    --
+    UploadedAt : timestamp
+    ProcessingStatus : int? (enum)
+    ChunkCount : int?
+    ProcessedAt : timestamp?
+    ErrorMessage : text?
+    IsDeleted : bool
+}
+
+entity "Groups" as G {
+    **PK** GroupId : uuid
+    --
+    GroupName : text
+    Description : text?
+    **FK** StudioId : uuid?
+    **FK** CreatedBy : uuid
+    --
+    IsActive : bool
+    IsTemplate : bool
+    CreatedAt : timestamp
+    UpdatedAt : timestamp
+}
+
+entity "Tasks" as T {
+    **PK** TaskId : uuid
+    --
+    **FK** GroupId : uuid?
+    **FK** OwnerId : uuid
+    **FK** GroupStatusId : uuid?
+    **FK** PersonalStatusId : uuid?
+    --
+    Title : text
+    Description : text?
+    Priority : int (enum)
+    DueDate : timestamp?
+    --
+    IsPendingDeleted : bool
+    CreatedAt : timestamp
+    UpdatedAt : timestamp
+}
+
+entity "GroupTaskStatuses" as GTS {
+    **PK** StatusId : uuid
+    --
+    **FK** GroupId : uuid
+    --
+    StatusName : text
+    Position : int
+}
+
+entity "Users" as U {
+    **PK** UserId : uuid
+    --
+    Email : text <<unique>>
+    PasswordHash : text
+    FirstName : text
+    LastName : text
+    --
+    GoogleId : text?
+    AvatarUrl : text?
+    Bio : text?
+    PhoneNumber : text?
+    --
+    Status : int (enum)
+    IsAdmin : bool
+    Language : text
+    EmailNotificationEnabled : bool
+    DeletedFlag : bool
+    --
+    CreatedAt : timestamp
+    UpdatedAt : timestamp
+}
+
+entity "GroupParticipants" as GP {
+    **PK** ParticipantId : uuid
+    --
+    **FK** GroupId : uuid
+    **FK** UserId : uuid
+    --
+    Role : int (enum)
+    CreatedAt : timestamp
+}
+
+entity "AIRequestLogs" as AIL {
+    **PK** RequestId : uuid
+    --
+    **FK** UserId : uuid
+    --
+    TokenUsed : int
+    CreatedAt : timestamp
+}
+
+' Relationships
+GA }o--|| G: belongs to
+GA }o--|| U: uploaded by
+G ||--o{ GP: has members
+G }o--|| U: created by
+T }o--o| G: belongs to (optional)
+T }o--|| U: owned by
+T }o--o| GTS: has status
+GTS }o--|| G: belongs to
+GP }o--|| U: is user
+AIL }o--|| U: logged for
+
+note right of GA
+**Document Processing Status:**
+0 = Uploading (presigned URL created)
+1 = Processing (embedding in progress)
+2 = Completed (vectors stored)
+3 = Failed (error occurred)
+
+**FileUrl format:**
+group_{groupId}/doc_{attachmentId}.ext
+end note
+
+note right of AIL
+**AI Usage Tracking:**
+- Track token consumption
+- Rate limiting
+- Usage analytics
+end note
+
+note bottom of T
+**Task Statistics for AI:**
+Used in Hybrid RAG to provide
+real-time project status context
+alongside document content
+end note
+
+@enduml

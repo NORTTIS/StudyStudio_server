@@ -8,9 +8,9 @@ using System.Security.Claims;
 namespace StudioStudio_Server.Controllers
 {
     /// <summary>
-    /// Controller qu?n l? Reports (báo cáo/feedback)
+    /// Controller for managing Reports (reports/feedback)
     /// Route: /api/reports
-    /// Note: Public API - không c?n authentication
+    /// Note: Public API - authentication not required
     /// </summary>
     [Route("api/reports")]
     [ApiController]
@@ -28,8 +28,8 @@ namespace StudioStudio_Server.Controllers
         }
 
         /// <summary>
-        /// L?y userId t? claims (nullable - public API)
-        /// Return: userId n?u user ð? ðãng nh?p, null n?u anonymous
+        /// Get userId from claims (nullable - public API)
+        /// Return: userId if user is logged in, null if anonymous
         /// </summary>
         private Guid? GetUserIdOrNull()
         {
@@ -42,12 +42,12 @@ namespace StudioStudio_Server.Controllers
 
         /// <summary>
         /// [PUBLIC] POST /api/reports
-        /// G?i báo cáo/feedback (bug report, feature request, etc.)
+        /// Send report/feedback (bug report, feature request, etc.)
         /// Validate: Email format
         /// Action:
-        /// 1. Lýu report vào database (Status = Pending)
-        /// 2. G?i email notification t?i admin
-        /// Note: Không c?n authentication - anonymous users có th? g?i
+        /// 1. Save report to database (Status = Pending)
+        /// 2. Send email notification to admin
+        /// Note: Authentication not required - anonymous users can send
         /// </summary>
         [HttpPost]
         public async Task<IActionResult> SendReport([FromBody] ReportRequest request)

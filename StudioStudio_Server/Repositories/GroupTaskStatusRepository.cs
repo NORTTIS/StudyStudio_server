@@ -6,7 +6,7 @@ using StudioStudio_Server.Repositories.Interfaces;
 namespace StudioStudio_Server.Repositories
 {
     /// <summary>
-    /// Repository x? l? các thao tác v?i GroupTaskStatus entity
+    /// Repository handling operations with GroupTaskStatus entity
     /// Note: GroupTaskStatus = Kanban columns (To Do, In Progress, Done, etc.)
     /// </summary>
     public class GroupTaskStatusRepository : IGroupTaskStatusRepository
@@ -19,9 +19,9 @@ namespace StudioStudio_Server.Repositories
         }
 
         /// <summary>
-        /// L?y danh sách task statuses c?a group
-        /// Ði?u ki?n: GroupId = {groupId}
-        /// S?p x?p: Position ASC (theo th? t? Kanban columns)
+        /// Get list of task statuses for group
+        /// Condition: GroupId = {groupId}
+        /// Order by: Position ASC (according to Kanban columns order)
         /// </summary>
         public async Task<List<GroupTaskStatus>> GetByGroupIdAsync(Guid groupId)
         {
@@ -33,8 +33,8 @@ namespace StudioStudio_Server.Repositories
         }
 
         /// <summary>
-        /// Ki?m tra status có t?n t?i không
-        /// Ði?u ki?n: StatusId = {statusId}
+        /// Check if status exists
+        /// Condition: StatusId = {statusId}
         /// </summary>
         public async Task<bool> ExistsAsync(Guid statusId)
         {
@@ -43,7 +43,7 @@ namespace StudioStudio_Server.Repositories
         }
 
         /// <summary>
-        /// Thêm task status m?i vào group
+        /// Add new task status to group
         /// </summary>
         public async Task AddAsync(GroupTaskStatus status)
         {
@@ -52,8 +52,8 @@ namespace StudioStudio_Server.Repositories
         }
 
         /// <summary>
-        /// Thêm nhi?u task statuses (batch insert)
-        /// Use case: Initialize default statuses khi t?o group t? template
+        /// Add multiple task statuses (batch insert)
+        /// Use case: Initialize default statuses when creating group from template
         /// </summary>
         public async Task AddRangeAsync(List<GroupTaskStatus> statuses)
         {

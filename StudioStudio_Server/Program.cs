@@ -21,6 +21,14 @@ var builder = WebApplication.CreateBuilder(args);
 // Add services to the container.
 builder.Services.Configure<EmailOptions>(
     builder.Configuration.GetSection("Email"));
+builder.Services.Configure<BackblazeConfig>(
+    builder.Configuration.GetSection("Backblaze"));
+builder.Services.Configure<QdrantConfig>(
+    builder.Configuration.GetSection("Qdrant"));
+builder.Services.Configure<GeminiConfig>(
+    builder.Configuration.GetSection("Gemini"));
+builder.Services.Configure<GroqConfig>(
+    builder.Configuration.GetSection("Groq"));
 
 //redis connection
 builder.Services.AddSingleton<IConnectionMultiplexer>(r =>
@@ -30,6 +38,7 @@ builder.Services.AddSingleton<IConnectionMultiplexer>(r =>
 });
 
 builder.Services.AddHttpContextAccessor();
+builder.Services.AddHttpClient();
 builder.Services.AddScoped<IMessageService, MessageService>();
 builder.Services.AddScoped<IEmailService, SMTPEmailService>();
 builder.Services.AddScoped<IUserRepository, UserRepository>();
@@ -65,6 +74,15 @@ builder.Services.AddScoped<IGroupMessageService, GroupMessageService>();
 builder.Services.AddScoped<ITaskCommentService, TaskCommentService>();
 builder.Services.AddScoped<IReportRepository, ReportRepository>();
 builder.Services.AddScoped<IReportService, ReportService>();
+
+// AI & Document Services
+builder.Services.AddScoped<IFileStorageService, BackblazeStorageService>();
+builder.Services.AddScoped<IVectorDatabaseService, QdrantService>();
+builder.Services.AddScoped<IEmbeddingService, GeminiEmbeddingService>();
+builder.Services.AddScoped<ILLMService, GroqLLMService>();
+builder.Services.AddScoped<IGroupAttachmentRepository, GroupAttachmentRepository>();
+builder.Services.AddScoped<IDocumentService, DocumentService>();
+builder.Services.AddScoped<IAIService, AIService>();
 
 
 builder.Services.AddControllers(options =>

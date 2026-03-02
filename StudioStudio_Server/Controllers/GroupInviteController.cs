@@ -14,8 +14,9 @@ using System.Security.Claims;
 namespace StudioStudio_Server.Controllers
 {
     /// <summary>
-    /// Controller qu?n l? Group Invites (m?i thành viên vào group)
+    /// Controller for managing Group Invitations
     /// Route: /api/invite
+    /// Uses Redis for token storage (15 min expiry)
     /// </summary>
     [Route("api/invite")]
     [ApiController]
@@ -55,8 +56,8 @@ namespace StudioStudio_Server.Controllers
         }
 
         /// <summary>
-        /// Xác th?c và l?y userId t? JWT token
-        /// Validate: User không ðý?c là admin
+        /// Authenticate and get userId from JWT token
+        /// Validate: User must not be admin
         /// </summary>
         private Guid ValidateAndGetUserId()
         {
@@ -85,7 +86,8 @@ namespace StudioStudio_Server.Controllers
         }
 
         /// <summary>
-        /// Validate và parse GroupRole t? string
+        /// Validate and parse role string to GroupRole enum
+        /// Validate: Role must not be Owner
         /// </summary>
         private GroupRole ValidateAndParseRole(string roleString)
         {
@@ -107,7 +109,7 @@ namespace StudioStudio_Server.Controllers
         }
 
         /// <summary>
-        /// Validate user có quy?n t?o invite (Owner ho?c Moderator)
+        /// Validate user has permission to create invite (Owner or Moderator)
         /// </summary>
         private async Task ValidateInvitePermissionAsync(Guid groupId, Guid userId)
         {
@@ -125,7 +127,7 @@ namespace StudioStudio_Server.Controllers
         }
 
         /// <summary>
-        /// Validate role Moderator (ch? có th? có 1 Moderator)
+        /// Validate Moderator role (only 1 Moderator allowed)
         /// </summary>
         private async Task ValidateModeratorRoleAsync(Guid groupId, GroupRole role)
         {
@@ -149,13 +151,13 @@ namespace StudioStudio_Server.Controllers
 
         /// <summary>
         /// [AUTHORIZED] POST /api/invite/create
-        /// T?o invite link cho group
+        /// Create invite link for group
         /// Validate:
-        /// - User ph?i là Owner ho?c Moderator
-        /// - Role h?p l? (không ðý?c là Owner)
-        /// - Không vý?t quá rate limit (5 links/15 phút)
-        /// - Không th? t?o Moderator invite n?u ð? có Moderator
-        /// Expiry: 15 phút
+        /// - User must be Owner or Moderator
+        /// - Role must be valid (cannot be Owner)
+        /// - Must not exceed rate limit (5 links/15 minutes)
+        /// - Cannot create Moderator invite if Moderator already exists
+        /// Expiry: 15 minutes
         /// </summary>
         [HttpPost("create")]
         public async Task<ActionResult<ApiResponse<CreateInviteLinkResponse>>> CreateInviteLink(
@@ -228,9 +230,12 @@ namespace StudioStudio_Server.Controllers
 
         /// <summary>
         /// [AUTHORIZED] POST /api/invite/email
-        /// G?i email invite cho group
-        /// Validate: Týõng t? CreateInviteLink
-        /// Action: T?o token và g?i email v?i link invite
+        /// Send invite link via email
+        /// Validate:
+        /// - User must be Owner or Moderator
+        /// - Token must be valid
+        /// - Email must be valid format
+        /// Action: Send email with invite link
         /// </summary>
         [HttpPost("email")]
         public async Task<ActionResult<ApiResponse<object>>> SendInviteEmail(
@@ -319,13 +324,13 @@ namespace StudioStudio_Server.Controllers
 
         /// <summary>
         /// [AUTHORIZED] POST /api/invite/accept
-        /// Accept invite link và join group
+        /// Accept invite link and join group
         /// Validate:
-        /// - Token ph?i h?p l? và chýa expire
-        /// - Group ph?i t?n t?i
-        /// - User chýa là member
-        /// - Không vý?t quá member limit
-        /// - Role Moderator ch? có th? có 1
+        /// - Token must be valid and not expired
+        /// - User not already member
+        /// - Group member limit not exceeded
+        /// - Only 1 Moderator allowed
+        /// Action: Add user to group with specified role
         /// </summary>
         [HttpPost("accept")]
         public async Task<ActionResult<ApiResponse<AcceptInviteLinkResponse>>> AcceptInviteLink(

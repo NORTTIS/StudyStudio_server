@@ -11,9 +11,9 @@ using System.Security.Claims;
 namespace StudioStudio_Server.Hubs
 {
     /// <summary>
-    /// SignalR Hub x? l? realtime Task Comments
+    /// SignalR Hub handling realtime Task Comments
     /// Route: /hubs/task-comment
-    /// Features: Join/Leave task room, Send comment, Reply to comment, Delete comment
+    /// Features: Join/Leave task, Send comment, Reply to comment, Delete comment
     /// </summary>
     [Authorize]
     public class TaskCommentHub : Hub
@@ -42,7 +42,7 @@ namespace StudioStudio_Server.Hubs
         }
 
         /// <summary>
-        /// L?y userId t? SignalR Context
+        /// Get userId from SignalR Context
         /// </summary>
         private Guid GetUserId()
         {
@@ -59,7 +59,7 @@ namespace StudioStudio_Server.Hubs
         }
 
         /// <summary>
-        /// L?y localized error message theo ngôn ng? c?a user
+        /// Get localized error message according to user's language
         /// </summary>
         private async Task<string> GetLocalizedMessageAsync(string errorCode)
         {
@@ -85,9 +85,9 @@ namespace StudioStudio_Server.Hubs
         }
 
         /// <summary>
-        /// Validate user có quy?n access task không
-        /// GroupTask: User ph?i là member c?a group
-        /// PersonalTask: User ph?i là owner
+        /// Validate user has access permission to task
+        /// GroupTask: User must be member of group
+        /// PersonalTask: User must be owner
         /// </summary>
         private async Task<bool> ValidateTaskAccessAsync(TaskItem task, Guid userId)
         {
@@ -102,10 +102,10 @@ namespace StudioStudio_Server.Hubs
         }
 
         /// <summary>
-        /// Validate user có quy?n delete comment không
-        /// Owner c?a comment: Luôn có quy?n
-        /// Group Owner/Moderator: Có quy?n delete b?t k? comment nào
-        /// Personal task owner: Có quy?n delete b?t k? comment nào
+        /// Validate user has permission to delete comment
+        /// Comment owner: Always has permission
+        /// Group Owner/Moderator: Has permission to delete any comment
+        /// Personal task owner: Has permission to delete any comment
         /// </summary>
         private async Task<bool> ValidateDeletePermissionAsync(TaskComment comment, TaskItem task, Guid userId)
         {
@@ -130,8 +130,8 @@ namespace StudioStudio_Server.Hubs
         }
 
         /// <summary>
-        /// Join task room ð? nh?n realtime comments
-        /// Validate: User ph?i có quy?n access task
+        /// Join task room to receive realtime comments
+        /// Validate: User must have access permission to task
         /// SignalR Group Name: "task_{taskId}"
         /// </summary>
         public async Task JoinTask(Guid taskId)
@@ -179,6 +179,7 @@ namespace StudioStudio_Server.Hubs
 
         /// <summary>
         /// Leave task room
+        /// Action: Remove connection from SignalR group
         /// </summary>
         public async Task LeaveTask(Guid taskId)
         {
@@ -205,9 +206,11 @@ namespace StudioStudio_Server.Hubs
         }
 
         /// <summary>
-        /// G?i comment m?i vào task (realtime)
-        /// Validate: User ph?i có quy?n access task
-        /// Broadcast: "ReceiveComment" event t?i t?t c? members trong task room
+        /// Send comment to task
+        /// Validate: User must have access to task
+        /// Action:
+        /// - Save comment to database
+        /// - Broadcast to all users in task room
         /// </summary>
         public async Task SendComment(SendTaskCommentRequest request)
         {
@@ -284,11 +287,11 @@ namespace StudioStudio_Server.Hubs
         }
 
         /// <summary>
-        /// Reply t?i comment (threaded conversation)
+        /// Reply to comment
         /// Validate:
-        /// - User ph?i có quy?n access task
-        /// - Parent comment ph?i t?n t?i và chýa b? xóa
-        /// Broadcast: "CommentReplied" event t?i task room
+        /// - User must have access to task
+        /// - Parent comment must exist
+        /// Broadcast: "CommentReplied" event to task room
         /// </summary>
         public async Task ReplyToComment(ReplyToTaskCommentRequest request)
         {
@@ -373,12 +376,12 @@ namespace StudioStudio_Server.Hubs
         }
 
         /// <summary>
-        /// Xóa comment (soft delete) và t?t c? replies
+        /// Delete comment (soft delete) and all replies
         /// Validate:
-        /// - Comment owner: Có quy?n delete
-        /// - Group Owner/Moderator: Có quy?n delete b?t k? comment nào
-        /// - Personal task owner: Có quy?n delete b?t k? comment nào
-        /// Broadcast: "CommentDeleted" event t?i task room
+        /// - Comment owner: Has delete permission
+        /// - Group Owner/Moderator: Has delete permission for any comment
+        /// - Personal task owner: Has delete permission for any comment
+        /// Broadcast: "CommentDeleted" event to task room
         /// </summary>
         public async Task DeleteComment(DeleteTaskCommentRequest request)
         {
@@ -437,7 +440,7 @@ namespace StudioStudio_Server.Hubs
 
         /// <summary>
         /// Handle client disconnect
-        /// Auto-cleanup: SignalR t? ð?ng remove kh?i groups
+        /// Auto-cleanup: SignalR automatically removes from groups
         /// </summary>
         public override async Task OnDisconnectedAsync(Exception? exception)
         {

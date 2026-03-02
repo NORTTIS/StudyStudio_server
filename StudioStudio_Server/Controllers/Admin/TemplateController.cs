@@ -9,9 +9,8 @@ using System.Security.Claims;
 namespace StudioStudio_Server.Controllers.Admin
 {
     /// <summary>
-    /// Controller qu?n l? Templates cho Admin
+    /// Admin Controller for managing Templates
     /// Route: /api/admin/templates
-    /// Features: CRUD system templates
     /// </summary>
     [Route("api/admin/templates")]
     [ApiController]
@@ -30,8 +29,8 @@ namespace StudioStudio_Server.Controllers.Admin
         }
 
         /// <summary>
-        /// Xác th?c user là admin và l?y userId
-        /// Validate: User ph?i có IsAdmin = true
+        /// Validate user is admin
+        /// Throw 403 if not admin
         /// </summary>
         private Guid ValidateAdminUser()
         {
@@ -61,8 +60,8 @@ namespace StudioStudio_Server.Controllers.Admin
 
         /// <summary>
         /// [ADMIN] GET /api/admin/templates
-        /// L?y t?t c? templates (system + user-created)
-        /// S?p x?p: System templates trý?c, sau ðó CreatedAt DESC
+        /// Get all templates (system + user-created)
+        /// Order by: System templates first, then CreatedAt DESC
         /// </summary>
         [HttpGet]
         public async Task<ActionResult<ApiResponse<List<TemplateResponse>>>> GetAllTemplates()
@@ -80,8 +79,8 @@ namespace StudioStudio_Server.Controllers.Admin
 
         /// <summary>
         /// [ADMIN] GET /api/admin/templates/{templateId}
-        /// L?y chi ti?t m?t template
-        /// Validate: Template ph?i t?n t?i
+        /// Get template details
+        /// Validate: Template must exist
         /// </summary>
         [HttpGet("{templateId}")]
         public async Task<ActionResult<ApiResponse<TemplateResponse>>> GetTemplateById(Guid templateId)
@@ -99,8 +98,8 @@ namespace StudioStudio_Server.Controllers.Admin
 
         /// <summary>
         /// [ADMIN] POST /api/admin/templates
-        /// T?o m?i system template
-        /// Validate: Template name chýa t?n t?i
+        /// Create new system template
+        /// Validate: Template name must not exist
         /// Auto-set: IsSystemTemplate = true, CreatedBy = adminUserId
         /// </summary>
         [HttpPost]
@@ -120,10 +119,10 @@ namespace StudioStudio_Server.Controllers.Admin
 
         /// <summary>
         /// [ADMIN] PUT /api/admin/templates/{templateId}
-        /// C?p nh?t system template
+        /// Update system template
         /// Validate:
-        /// - Template ph?i t?n t?i
-        /// - Template name không trùng (n?u ð?i tên)
+        /// - Template must exist
+        /// - Template name must not duplicate (if changing name)
         /// Auto-set: UpdatedAt = UtcNow
         /// </summary>
         [HttpPut("{templateId}")]
@@ -144,10 +143,10 @@ namespace StudioStudio_Server.Controllers.Admin
 
         /// <summary>
         /// [ADMIN] DELETE /api/admin/templates/{templateId}
-        /// Xóa system template
+        /// Delete system template
         /// Validate:
-        /// - Template ph?i t?n t?i
-        /// - Template không ðang ðý?c s? d?ng b?i groups
+        /// - Template must exist
+        /// - Template must not be in use by groups
         /// </summary>
         [HttpDelete("{templateId}")]
         public async Task<ActionResult<ApiResponse<object>>> DeleteTemplate(Guid templateId)

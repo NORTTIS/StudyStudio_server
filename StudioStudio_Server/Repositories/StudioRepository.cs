@@ -6,7 +6,7 @@ using StudioStudio_Server.Repositories.Interfaces;
 namespace StudioStudio_Server.Repositories
 {
     /// <summary>
-    /// Repository x? l? các thao tác CRUD v?i Studio entity
+    /// Repository handling CRUD operations with Studio entity
     /// </summary>
     public class StudioRepository : IStudioRepository
     {
@@ -18,8 +18,8 @@ namespace StudioStudio_Server.Repositories
         }
 
         /// <summary>
-        /// L?y studio theo ID
-        /// Ði?u ki?n: StudioId = {studioId}
+        /// Get studio by ID
+        /// Condition: StudioId = {studioId}
         /// </summary>
         public async Task<Studio?> GetByIdAsync(Guid studioId)
         {
@@ -29,9 +29,9 @@ namespace StudioStudio_Server.Repositories
         }
 
         /// <summary>
-        /// L?y nhi?u studios theo danh sách IDs
-        /// Ði?u ki?n: StudioId IN {studioIds}
-        /// Return: Empty list n?u studioIds r?ng
+        /// Get multiple studios by list of IDs
+        /// Condition: StudioId IN {studioIds}
+        /// Return: Empty list if studioIds is empty
         /// </summary>
         public async Task<List<Studio>> GetByIdsAsync(List<Guid> studioIds)
         {
@@ -47,9 +47,9 @@ namespace StudioStudio_Server.Repositories
         }
 
         /// <summary>
-        /// L?y danh sách studios c?a user
-        /// Ði?u ki?n: OwnerId = {ownerId}
-        /// S?p x?p: StudioName DESC, CreatedAt DESC
+        /// Get list of studios owned by user
+        /// Condition: OwnerId = {ownerId}
+        /// Order by: StudioName DESC, CreatedAt DESC
         /// </summary>
         public async Task<List<Studio>> GetByOwnerIdAsync(Guid ownerId)
         {
@@ -62,9 +62,9 @@ namespace StudioStudio_Server.Repositories
         }
 
         /// <summary>
-        /// Ð?m s? studios do user t?o
-        /// Ði?u ki?n: OwnerId = {userId}
-        /// Use case: Check gi?i h?n s? studios có th? t?o
+        /// Count studios created by user
+        /// Condition: OwnerId = {userId}
+        /// Use case: Check studio creation limit
         /// </summary>
         public async Task<int> CountStudioCreatedByUserAsync(Guid userId)
         {
@@ -74,8 +74,8 @@ namespace StudioStudio_Server.Repositories
         }
 
         /// <summary>
-        /// Ki?m tra user có ph?i owner c?a studio không
-        /// Ði?u ki?n: StudioId = {studioId} AND OwnerId = {userId}
+        /// Check if user is owner of studio
+        /// Condition: StudioId = {studioId} AND OwnerId = {userId}
         /// </summary>
         public async Task<bool> IsUserStudioOwnerAsync(Guid studioId, Guid userId)
         {
@@ -84,7 +84,7 @@ namespace StudioStudio_Server.Repositories
         }
 
         /// <summary>
-        /// Thêm studio m?i vào database
+        /// Add new studio to database
         /// </summary>
         public async Task CreateStudioAsync(Studio studio)
         {
@@ -103,7 +103,7 @@ namespace StudioStudio_Server.Repositories
 
         /// <summary>
         /// Hard delete studio
-        /// Note: Cascade delete s? xóa t?t c? groups thu?c studio
+        /// Note: Cascade delete will remove all groups belonging to studio
         /// </summary>
         public async Task DeleteStudioAsync(Studio studio)
         {

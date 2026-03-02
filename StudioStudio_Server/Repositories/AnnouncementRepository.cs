@@ -6,7 +6,7 @@ using StudioStudio_Server.Repositories.Interfaces;
 namespace StudioStudio_Server.Repositories
 {
     /// <summary>
-    /// Repository xử lý các thao tác CRUD với Announcement entity
+    /// Repository handling CRUD operations with Announcement entity
     /// </summary>
     public class AnnouncementRepository : IAnnouncementRepository
     {
@@ -18,7 +18,7 @@ namespace StudioStudio_Server.Repositories
         }
 
         /// <summary>
-        /// Thêm mới một announcement vào database
+        /// Add new announcement to database
         /// </summary>
         public async Task AddAsync(Announcement announcement)
         {
@@ -27,7 +27,7 @@ namespace StudioStudio_Server.Repositories
         }
 
         /// <summary>
-        /// Lấy announcement theo ID (không có điều kiện)
+        /// Get announcement by ID (no conditions)
         /// </summary>
         public async Task<Announcement?> GetByIdAsync(Guid announcementId)
         {
@@ -37,8 +37,8 @@ namespace StudioStudio_Server.Repositories
         }
 
         /// <summary>
-        /// Lấy tất cả announcements đang active (IsActive = true)
-        /// Sắp xếp: PublishedAt DESC (ưu tiên), sau đó CreatedAt DESC
+        /// Get all active announcements (IsActive = true)
+        /// Order by: PublishedAt DESC (priority), then CreatedAt DESC
         /// </summary>
         public async Task<List<Announcement>> GetAllActiveAsync()
         {
@@ -50,8 +50,8 @@ namespace StudioStudio_Server.Repositories
         }
 
         /// <summary>
-        /// Lấy tất cả announcements (bao gồm cả inactive)
-        /// Sắp xếp: CreatedAt DESC (mới nhất trước)
+        /// Get all announcements (including inactive)
+        /// Order by: CreatedAt DESC (newest first)
         /// </summary>
         public async Task<List<Announcement>> GetAllAsync()
         {
@@ -62,7 +62,7 @@ namespace StudioStudio_Server.Repositories
         }
 
         /// <summary>
-        /// Cập nhật thông tin announcement
+        /// Update announcement information
         /// </summary>
         public async Task UpdateAsync(Announcement announcement)
         {
@@ -71,7 +71,7 @@ namespace StudioStudio_Server.Repositories
         }
 
         /// <summary>
-        /// Xóa announcement khỏi database (hard delete)
+        /// Delete announcement from database (hard delete)
         /// </summary>
         public async Task DeleteAsync(Announcement announcement)
         {

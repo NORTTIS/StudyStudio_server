@@ -14,7 +14,7 @@ using System.Text.RegularExpressions;
 namespace StudioStudio_Server.Hubs
 {
     /// <summary>
-    /// SignalR Hub x? l? realtime Group Discussions (Messages)
+    /// SignalR Hub handling realtime Group Discussions (Messages)
     /// Route: /hubs/group-discuss
     /// Features: Join/Leave group, Send message, Reply to message, Delete message, @mentions
     /// </summary>
@@ -51,7 +51,7 @@ namespace StudioStudio_Server.Hubs
         }
 
         /// <summary>
-        /// L?y userId t? SignalR Context
+        /// Get userId from SignalR Context
         /// </summary>
         private Guid GetUserId()
         {
@@ -68,7 +68,7 @@ namespace StudioStudio_Server.Hubs
         }
 
         /// <summary>
-        /// L?y localized error message theo ngôn ng? c?a user
+        /// Get localized error message according to user's language
         /// </summary>
         private async Task<string> GetLocalizedMessageAsync(string errorCode)
         {
@@ -94,7 +94,7 @@ namespace StudioStudio_Server.Hubs
         }
 
         /// <summary>
-        /// Extract user IDs t? @mentions trong message content
+        /// Extract user IDs from @mentions in message content
         /// Pattern: @{userId} (UUID format)
         /// Example: "Hello @550e8400-e29b-41d4-a716-446655440000"
         /// </summary>
@@ -105,9 +105,10 @@ namespace StudioStudio_Server.Hubs
         }
 
         /// <summary>
-        /// Validate user có quy?n delete message không
-        /// Message owner: Luôn có quy?n
-        /// Group Owner/Moderator: Có quy?n delete b?t k? message nào
+        /// Validate delete permission
+        /// Rules:
+        /// - Message owner: Can delete
+        /// - Group Owner/Moderator: Can delete any message
         /// </summary>
         private async Task<bool> ValidateDeletePermissionAsync(GroupMessage message, Guid userId)
         {
@@ -125,8 +126,8 @@ namespace StudioStudio_Server.Hubs
         }
 
         /// <summary>
-        /// G?i notification cho users ðý?c @mention
-        /// T?o announcement và g?i qua SignalR
+        /// Handle @mention notifications
+        /// Create UserAnnouncement for tagged users
         /// </summary>
         private async Task HandleMentionNotificationsAsync(
             Guid groupId,
@@ -180,9 +181,9 @@ namespace StudioStudio_Server.Hubs
         }
 
         /// <summary>
-        /// Join group room ð? nh?n realtime messages
-        /// Validate: User ph?i là member c?a group
-        /// SignalR Group Name: {groupId}
+        /// Join group discussion room
+        /// Validate: User must be member of group
+        /// Action: Add connection to SignalR group
         /// </summary>
         public async Task JoinGroup(Guid groupId)
         {
@@ -216,7 +217,8 @@ namespace StudioStudio_Server.Hubs
         }
 
         /// <summary>
-        /// Leave group room
+        /// Leave group discussion room
+        /// Action: Remove connection from SignalR group
         /// </summary>
         public async Task LeaveGroup(Guid groupId)
         {
@@ -242,10 +244,12 @@ namespace StudioStudio_Server.Hubs
         }
 
         /// <summary>
-        /// G?i message m?i vào group (realtime)
-        /// Validate: User ph?i là member c?a group
-        /// Features: @mentions notification
-        /// Broadcast: "ReceiveMessage" event t?i t?t c? members trong group
+        /// Send message to group
+        /// Validate: User must be member of group
+        /// Action:
+        /// - Save message to database
+        /// - Broadcast to all group members
+        /// - Handle @mentions notifications
         /// </summary>
         public async Task SendMessage(SendGroupMessageRequest request)
         {
@@ -313,11 +317,11 @@ namespace StudioStudio_Server.Hubs
         }
 
         /// <summary>
-        /// Reply t?i message (threaded conversation)
+        /// Reply to message
         /// Validate:
-        /// - User ph?i là member c?a group
-        /// - Parent message ph?i t?n t?i, chýa b? xóa, và thu?c cùng group
-        /// Broadcast: "MessageReplied" event t?i group
+        /// - User must be member of group
+        /// - Parent message must exist
+        /// Broadcast: "MessageReplied" event to group
         /// </summary>
         public async Task ReplyToMessage(ReplyToGroupMessageRequest request)
         {
@@ -422,12 +426,12 @@ namespace StudioStudio_Server.Hubs
         }
 
         /// <summary>
-        /// Xóa message (soft delete) và t?t c? replies
+        /// Delete message (soft delete) and all replies
         /// Validate:
-        /// - User ph?i là member c?a group
-        /// - Message owner: Có quy?n delete
-        /// - Group Owner/Moderator: Có quy?n delete b?t k? message nào
-        /// Broadcast: "MessageDeleted" event t?i group
+        /// - User must be member of group
+        /// - Message owner: Has delete permission
+        /// - Group Owner/Moderator: Has delete permission for any message
+        /// Broadcast: "MessageDeleted" event to group
         /// </summary>
         public async Task DeleteMessage(DeleteGroupMessageRequest request)
         {
@@ -486,7 +490,7 @@ namespace StudioStudio_Server.Hubs
 
         /// <summary>
         /// Handle client disconnect
-        /// Auto-cleanup: SignalR t? ð?ng remove kh?i groups
+        /// Auto-cleanup: SignalR automatically removes from groups
         /// </summary>
         public override async Task OnDisconnectedAsync(Exception? exception)
         {
