@@ -8,5 +8,8 @@ namespace StudioStudio_Server.Repositories.Interfaces
         Task AddAsync(GroupTaskStatus status);
         Task AddRangeAsync(List<GroupTaskStatus> statuses);
         Task<bool> ExistsAsync(Guid statusId);
+        Task SoftDeleteAsync(GroupTaskStatus status);
+        Task UpdateAsync(GroupTaskStatus status);
+        Task<GroupTaskStatus?> GetDetail(Guid statusId);
     }
 }

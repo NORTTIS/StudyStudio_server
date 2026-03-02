@@ -17,6 +17,8 @@ public class TaskItem
     public int Priority { get; set; }
     public int Severity { get; set; }
 
+    public int Position { get; set; }
+
     public bool IsPendingDeleted { get; set; }
 
     public DateTime CreatedAt { get; set; }
