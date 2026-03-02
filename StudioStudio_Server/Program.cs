@@ -50,6 +50,8 @@ builder.Services.AddScoped<ITaskRepository, TaskRepository>();
 builder.Services.AddScoped<ITemplateRepository, TemplateRepository>();
 builder.Services.AddScoped<ITemplateService, TemplateService>();
 builder.Services.AddScoped<IGroupTaskStatusRepository, GroupTaskStatusRepository>();
+builder.Services.AddScoped<IPersonalTaskStatusRepository, PersonalTaskStatusRepository>();
+builder.Services.AddScoped<ITaskHistoryRepository, TaskHistoryRepository>();
 builder.Services.AddScoped<ISeederService, SeederService>();
 builder.Services.AddScoped<IGroupInviteService, GroupInviteService>();
 builder.Services.AddScoped<IGroupMessageRepository, GroupMessageRepository>();
