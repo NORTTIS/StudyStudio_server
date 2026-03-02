@@ -4,10 +4,9 @@ namespace StudioStudio_Server.Models.DTOs.Response
 {
     public class TaskItemResponse
     {
-        Guid TaskId { get; set; }
-        public string TaskName { get; set; } = string.Empty;
+        public Guid TaskId { get; set; }
+        public string TaskTitle { get; set; } = string.Empty;
         public string TaskDescription { get; set; } = string.Empty;
-        public string TaskStatus { get; set; } = string.Empty;
         public int TaskPriority { get; set; }
         public int TaskSeverity { get; set; }
         public int Position { get; set; }
@@ -23,11 +22,17 @@ namespace StudioStudio_Server.Models.DTOs.Response
 
     public class GroupTaskStatusDto
     {
-
+        public Guid GroupId { get; set; }
+        public string StatusName { get; set; } = null!;
+        public int Position { get; set; }
     }
 
     public class PersonalTaskStatusDto
     {
+        public Guid UserId { get; set; }
 
+        public string StatusName { get; set; } = null!;
+
+        public int Position { get; set; }
     }
 }

@@ -8,7 +8,6 @@ namespace StudioStudio_Server.Models.DTOs.Request
         public Guid GroupId { get; set; }
         public string TaskName { get; set; } = string.Empty;
         public string TaskDescription { get; set; } = string.Empty;
-        public string TaskStatus { get; set; } = string.Empty;
         public int TaskPriority { get; set; }
         public int TaskSeverity { get; set; }
         public DateTime CreatedAt { get; set; }

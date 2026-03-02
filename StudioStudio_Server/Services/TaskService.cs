@@ -12,28 +12,47 @@ namespace StudioStudio_Server.Services
         private readonly IMessageService _messageService;
         private readonly ITaskRepository _taskRepository;
         private readonly IGroupParticipantRepository _participantRepository;
+        private readonly IGroupTaskStatusRepository _groupTaskStatusRepository;
 
         public TaskService(
             ITaskRepository taskRepository,
             ILogger<TaskService> logger,
             IMessageService message,
-            IGroupParticipantRepository participantRepository)
+            IGroupParticipantRepository participantRepository,
+            IGroupTaskStatusRepository groupTaskStatusRepository)
         {
             _taskRepository = taskRepository;
             _logger = logger;
             _messageService = message;
             _participantRepository = participantRepository;
+            _groupTaskStatusRepository = groupTaskStatusRepository;
         }
 
-        public Task<TaskItemResponse> AddGroupTaskAsync(TaskItemGroupRequest request)
+        public async Task<TaskItemResponse> AddGroupTaskAsync(TaskItemGroupRequest request)
         {
-            var userRole = _participantRepository.GetGroupRoleByUserIdAsync(request.CreatedById, request.GroupId);
+            var userRole = await _participantRepository.GetGroupRoleByUserIdAsync(request.CreatedById, request.GroupId);
             if (userRole.Equals(GroupRole.Viewer) || userRole.Equals(GroupRole.Commenter))
             {
                 throw new AppException(ErrorCodes.GroupCreateTaskDenied, StatusCodes.Status401Unauthorized);
             }
 
+            if (request.GroupStatusId == null)
+            {
+                throw new AppException(ErrorCodes.GroupCreateTaskDeniedMissingStatus, StatusCodes.Status400BadRequest);
+            }
+
+            var groupStatus = await _groupTaskStatusRepository.GetDetail(request.GroupId);
             var now = DateTime.UtcNow;
+
+            if (request.StartDate > request.DueDate)
+            {
+                request.StartDate = request.DueDate;
+            }
+            if (request.DueDate < now)
+            {
+                request.DueDate = now;
+            }
+
             var taskItem = new TaskItem
             {
                 TaskId = Guid.NewGuid(),
@@ -42,15 +61,35 @@ namespace StudioStudio_Server.Services
                 GroupStatusId = request.GroupStatusId,
                 Title = request.TaskName,
                 Description = request.TaskDescription,
+                StartDate = request.StartDate,
                 DueDate = request.DueDate,
                 Priority = request.TaskPriority,
                 Severity = request.TaskSeverity,
                 IsPendingDeleted = false
             };
 
+            await _taskRepository.AddAsync(taskItem);
 
-
-            return null;
+            return new TaskItemResponse
+            {
+                TaskId = taskItem.TaskId,
+                TaskTitle = taskItem.Title,
+                TaskDescription = taskItem.Description,
+                TaskPriority = taskItem.Priority,
+                TaskSeverity = taskItem.Severity,
+                Position = taskItem.Position,
+                CreatedById = taskItem.OwnerId,
+                CreatedAt = now,
+                StartDate = taskItem.StartDate.Value,
+                DueDate = taskItem.DueDate.Value,
+                GroupStatus = new GroupTaskStatusDto
+                {
+                    GroupId = request.GroupId,
+                    StatusName = groupStatus.StatusName,
+                    Position = groupStatus.Position
+                },
+                Assignee = new List<UserDto>()
+            };
         }
     }
 }

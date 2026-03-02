@@ -35,6 +35,7 @@
   "GROUP017": "Bạn không có quyền tạo công việc trong nhóm này",
   "GROUP018": "Bạn không có quyền tạo trạng thái công việc trong nhóm này",
   "GROUP019": "Bạn không có quyền xóa trạng thái công việc này. Chỉ chủ nhóm và người điều hành mới có thể xóa",
+  "GROUP020": "Bạn chỉ có thể tạo công việc khi có trạng thái",
 
   "STUDIO001": "Bạn đã đạt giới hạn số lượng studio có thể tạo",
 
@@ -112,6 +113,7 @@
   "SUCCESS034": "Tạo trạng thái công việc thành công",
   "SUCCESS035": "Cập nhật trạng thái công việc thành công",
   "SUCCESS036": "Xóa trạng thái công việc thành công",
+  "SUCCESS037": "Tạo công việc mới thành công",
 
   "SYS001": "Lỗi hệ thống không xác định"
 }

@@ -35,6 +35,7 @@
   "GROUP017": "You do not have permission to create task for this group",
   "GROUP018": "You do not have permission to create task status for this group",
   "GROUP019": "You do not have permission to delete this task status. Only owner and moderator can delete it",
+  "GROUP020": "You can only create task if only task status available",
 
   "STUDIO001": "You have reached the limit of studios you can create",
 
@@ -112,6 +113,7 @@
   "SUCCESS034": "Successfully create task status",
   "SUCCESS035": "Successfully update task status",
   "SUCCESS036": "Successfully delete task status",
+  "SUCCESS037": "Successfully create task",
 
   "SYS001": "Unexpected system error"
 }
