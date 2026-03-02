@@ -60,5 +60,25 @@ namespace StudioStudio_Server.Repositories
             _context.GroupTaskStatuses.AddRange(statuses);
             await _context.SaveChangesAsync();
         }
+
+        public async Task SoftDeleteAsync(GroupTaskStatus status)
+        {
+            status.IsDeleted = true;
+            _context.GroupTaskStatuses.Update(status);
+            await _context.SaveChangesAsync();
+        }
+
+        public async Task UpdateAsync(GroupTaskStatus status)
+        {
+            _context.GroupTaskStatuses.Update(status);
+            await _context.SaveChangesAsync();
+        }
+
+        public async Task<GroupTaskStatus?> GetDetail(Guid statusId)
+        {
+            return await _context.GroupTaskStatuses
+                .AsNoTracking()
+                .FirstOrDefaultAsync(s => s.StatusId == statusId);
+        }
     }
 }
