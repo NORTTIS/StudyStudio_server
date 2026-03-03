@@ -13,7 +13,7 @@ namespace StudioStudio_Server.Migrations
             migrationBuilder.AddColumn<int>(
                 name: "Position",
                 table: "TaskItem",
-                type: "int",
+                type: "integer",
                 nullable: false,
                 defaultValue: 0);
         }

@@ -11,5 +11,7 @@ namespace StudioStudio_Server.Repositories.Interfaces
         Task SoftDeleteAsync(GroupTaskStatus status);
         Task UpdateAsync(GroupTaskStatus status);
         Task<GroupTaskStatus?> GetDetailAsync(Guid statusId);
+        Task<List<GroupTaskStatus>> GetByIdsAndGroupIdAsync(List<Guid> statusIds, Guid groupId);
+        Task SaveChangesAsync();
     }
 }

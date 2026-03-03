@@ -36,7 +36,7 @@ namespace StudioStudio_Server.Services
                 throw new AppException(ErrorCodes.GroupCreateTaskDenied, StatusCodes.Status401Unauthorized);
             }
 
-            if (request.GroupStatusId.Value == null)
+            if (!request.GroupStatusId.HasValue)
             {
                 throw new AppException(ErrorCodes.GroupCreateTaskDeniedMissingStatus, StatusCodes.Status400BadRequest);
             }

@@ -80,5 +80,17 @@ namespace StudioStudio_Server.Repositories
                 .AsNoTracking()
                 .FirstOrDefaultAsync(s => s.StatusId == statusId && !s.IsDeleted);
         }
+
+        public async Task<List<GroupTaskStatus>> GetByIdsAndGroupIdAsync(List<Guid> statusIds, Guid groupId)
+        {
+            return await _context.GroupTaskStatuses
+                .Where(x => statusIds.Contains(x.StatusId) && x.GroupId == groupId)
+                .AsNoTracking()
+                .ToListAsync();
+        }
+        public async Task SaveChangesAsync()
+        {
+            await _context.SaveChangesAsync();
+        }
     }
 }
