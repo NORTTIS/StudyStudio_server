@@ -110,10 +110,10 @@
   "SUCCESS031": "Message and all replies deleted successfully",
   "SUCCESS032": "Reply sent successfully",
   "SUCCESS033": "Comment and all replies deleted successfully",
-  "SUCCESS034": "Successfully create task status",
-  "SUCCESS035": "Successfully update task status",
-  "SUCCESS036": "Successfully delete task status",
-  "SUCCESS037": "Successfully create task",
+  "SUCCESS034": "Successfully created task status",
+  "SUCCESS035": "Successfully updated task status",
+  "SUCCESS036": "Successfully deleted task status",
+  "SUCCESS037": "Successfully created task",
 
   "SYS001": "Unexpected system error"
 }

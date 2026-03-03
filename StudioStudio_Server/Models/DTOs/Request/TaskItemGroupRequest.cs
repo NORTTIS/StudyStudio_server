@@ -9,7 +9,6 @@ namespace StudioStudio_Server.Models.DTOs.Request
         public string TaskDescription { get; set; } = string.Empty;
         public int TaskPriority { get; set; }
         public int TaskSeverity { get; set; }
-        public DateTime CreatedAt { get; set; }
         public DateTime StartDate { get; set; }
         public DateTime DueDate { get; set; }
         public Guid? GroupStatusId { get; set; }
