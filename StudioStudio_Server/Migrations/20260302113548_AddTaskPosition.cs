@@ -12,7 +12,7 @@ namespace StudioStudio_Server.Migrations
         {
             migrationBuilder.AddColumn<int>(
                 name: "Position",
-                table: "TaskItem",
+                table: "Tasks",
                 type: "integer",
                 nullable: false,
                 defaultValue: 0);
@@ -22,7 +22,7 @@ namespace StudioStudio_Server.Migrations
         {
             migrationBuilder.DropColumn(
                 name: "Position",
-                table: "TaskItem");
+                table: "Tasks");
         }
     }
 }
