@@ -26,7 +26,7 @@ namespace StudioStudio_Server.Repositories
         public async Task<List<GroupTaskStatus>> GetByGroupIdAsync(Guid groupId)
         {
             return await _context.GroupTaskStatuses
-                .Where(s => s.GroupId == groupId)
+                .Where(s => s.GroupId == groupId && !s.IsDeleted)
                 .OrderBy(s => s.Position)
                 .AsNoTracking()
                 .ToListAsync();
@@ -74,11 +74,11 @@ namespace StudioStudio_Server.Repositories
             await _context.SaveChangesAsync();
         }
 
-        public async Task<GroupTaskStatus?> GetDetail(Guid statusId)
+        public async Task<GroupTaskStatus?> GetDetailAsync(Guid statusId)
         {
             return await _context.GroupTaskStatuses
                 .AsNoTracking()
-                .FirstOrDefaultAsync(s => s.StatusId == statusId);
+                .FirstOrDefaultAsync(s => s.StatusId == statusId && !s.IsDeleted);
         }
     }
 }

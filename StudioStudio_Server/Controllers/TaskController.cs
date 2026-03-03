@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Http;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using StudioStudio_Server.Exceptions;
 using StudioStudio_Server.Models.DTOs.Request;
@@ -10,6 +11,7 @@ namespace StudioStudio_Server.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
+    [Authorize]
     public class TaskController : ControllerBase
     {
         private readonly ITaskService _taskService;
@@ -23,11 +25,11 @@ namespace StudioStudio_Server.Controllers
         }
 
         [HttpPost]
-        public async Task<ActionResult<ApiResponse<TaskItemResponse>>> CreateGroup(
+        public async Task<ActionResult<ApiResponse<TaskItemResponse>>> CreateGroupTask(
             [FromBody] TaskItemGroupRequest request)
         {
-            ValidateAndGetUserId();
-            var result = await _taskService.AddGroupTaskAsync(request);
+            var userId = ValidateAndGetUserId();
+            var result = await _taskService.AddGroupTaskAsync(userId, request);
             var message = _messageService.GetMessage(ErrorCodes.SuccessCreateTask);
 
             return Ok(ApiResponse<TaskItemResponse>.Success(

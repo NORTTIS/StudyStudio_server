@@ -138,7 +138,7 @@ namespace StudioStudio_Server.Repositories
             var user = await _context.GroupParticipants.FirstOrDefaultAsync(
                 u => u.UserId == userId &&
                 u.GroupId == groupId);
-            return user.Role;
+            return user?.Role ?? GroupRole.Viewer;
         }
     }
 }

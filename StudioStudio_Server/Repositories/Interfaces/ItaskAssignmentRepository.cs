@@ -2,7 +2,7 @@
 
 namespace StudioStudio_Server.Repositories.Interfaces
 {
-    public interface ItaskAssignmentRepository
+    public interface ITaskAssignmentRepository
     {
         Task AddAsync(TaskAssignment assignment);
     }

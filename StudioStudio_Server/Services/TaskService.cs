@@ -28,20 +28,20 @@ namespace StudioStudio_Server.Services
             _groupTaskStatusRepository = groupTaskStatusRepository;
         }
 
-        public async Task<TaskItemResponse> AddGroupTaskAsync(TaskItemGroupRequest request)
+        public async Task<TaskItemResponse> AddGroupTaskAsync(Guid userId, TaskItemGroupRequest request)
         {
-            var userRole = await _participantRepository.GetGroupRoleByUserIdAsync(request.CreatedById, request.GroupId);
+            var userRole = await _participantRepository.GetGroupRoleByUserIdAsync(userId, request.GroupId);
             if (userRole.Equals(GroupRole.Viewer) || userRole.Equals(GroupRole.Commenter))
             {
                 throw new AppException(ErrorCodes.GroupCreateTaskDenied, StatusCodes.Status401Unauthorized);
             }
 
-            if (request.GroupStatusId == null)
+            if (request.GroupStatusId.Value == null)
             {
                 throw new AppException(ErrorCodes.GroupCreateTaskDeniedMissingStatus, StatusCodes.Status400BadRequest);
             }
 
-            var groupStatus = await _groupTaskStatusRepository.GetDetail(request.GroupId);
+            var groupStatus = await _groupTaskStatusRepository.GetDetailAsync(request.GroupId);
             var now = DateTime.UtcNow;
 
             if (request.StartDate > request.DueDate)
@@ -57,7 +57,7 @@ namespace StudioStudio_Server.Services
             {
                 TaskId = Guid.NewGuid(),
                 GroupId = request.GroupId,
-                OwnerId = request.CreatedById,
+                OwnerId = userId,
                 GroupStatusId = request.GroupStatusId,
                 Title = request.TaskName,
                 Description = request.TaskDescription,
@@ -65,7 +65,9 @@ namespace StudioStudio_Server.Services
                 DueDate = request.DueDate,
                 Priority = request.TaskPriority,
                 Severity = request.TaskSeverity,
-                IsPendingDeleted = false
+                IsPendingDeleted = false,
+                CreatedAt = now,
+                UpdatedAt = now,
             };
 
             await _taskRepository.AddAsync(taskItem);

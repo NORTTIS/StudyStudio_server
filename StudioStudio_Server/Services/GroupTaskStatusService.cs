@@ -46,7 +46,7 @@ namespace StudioStudio_Server.Services
 
         public async Task<GroupTaskStatusResponse> GetGroupTaskStatusDetail(Guid taskStatusId)
         {
-            var taskStatus = await _groupTaskStatusRepository.GetDetail(taskStatusId);
+            var taskStatus = await _groupTaskStatusRepository.GetDetailAsync(taskStatusId);
             return new GroupTaskStatusResponse
             {
                 GroupId = taskStatus.GroupId,
@@ -58,15 +58,15 @@ namespace StudioStudio_Server.Services
         public async Task SoftDeleteGroupTaskStatus(Guid userId, Guid groupId, Guid taskStatusId)
         {
             var userRole = await _participantRepository.GetGroupRoleByUserIdAsync(userId, groupId);
-            if (!userRole.Equals(GroupRole.Moderator) || !userRole.Equals(GroupRole.Owner))
+            if (!userRole.Equals(GroupRole.Moderator) && !userRole.Equals(GroupRole.Owner))
             {
                 throw new AppException(ErrorCodes.GroupDeleteTaskStatusDenied, StatusCodes.Status401Unauthorized);
             }
-            var taskStatus = await _groupTaskStatusRepository.GetDetail(taskStatusId);
+            var taskStatus = await _groupTaskStatusRepository.GetDetailAsync(taskStatusId);
             await _groupTaskStatusRepository.SoftDeleteAsync(taskStatus);
         }
 
-        public async Task UpdateAllTaskStatusPostion(Guid userId, Guid groupId, List<GroupTaskStatusPositionRequest> requestList)
+        public async Task UpdateAllTaskStatusPosition(Guid userId, Guid groupId, List<GroupTaskStatusPositionRequest> requestList)
         {
             var userRole = await _participantRepository.GetGroupRoleByUserIdAsync(userId, groupId);
             if (userRole.Equals(GroupRole.Viewer) || userRole.Equals(GroupRole.Commenter))
@@ -75,7 +75,7 @@ namespace StudioStudio_Server.Services
             }
             foreach (var item in requestList)
             {
-                var taskStatusUpdate = await _groupTaskStatusRepository.GetDetail(item.StatusId);
+                var taskStatusUpdate = await _groupTaskStatusRepository.GetDetailAsync(item.StatusId);
                 taskStatusUpdate.Position = item.Position;
 
                 await _groupTaskStatusRepository.UpdateAsync(taskStatusUpdate);
@@ -85,11 +85,11 @@ namespace StudioStudio_Server.Services
         public async Task UpdateGroupTaskStatus(Guid userId, Guid groupId, Guid taskStatusId, GroupTaskStatusRequest request)
         {
             var userRole = await _participantRepository.GetGroupRoleByUserIdAsync(userId, groupId);
-            if (!userRole.Equals(GroupRole.Moderator) || !userRole.Equals(GroupRole.Owner))
+            if (!userRole.Equals(GroupRole.Moderator) && !userRole.Equals(GroupRole.Owner))
             {
                 throw new AppException(ErrorCodes.GroupDeleteTaskStatusDenied, StatusCodes.Status401Unauthorized);
             }
-            var taskStatus = await _groupTaskStatusRepository.GetDetail(taskStatusId);
+            var taskStatus = await _groupTaskStatusRepository.GetDetailAsync(taskStatusId);
 
             taskStatus.StatusName = request.StatusName;
             taskStatus.Position = request.Position;

@@ -4,7 +4,7 @@ using StudioStudio_Server.Repositories.Interfaces;
 
 namespace StudioStudio_Server.Repositories
 {
-    public class TaskAssignmentRepository : ItaskAssignmentRepository
+    public class TaskAssignmentRepository : ITaskAssignmentRepository
     {
         private readonly StudioDbContext _db;
         public TaskAssignmentRepository(StudioDbContext db)
