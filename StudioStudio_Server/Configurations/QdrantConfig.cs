@@ -1,7 +1,7 @@
 namespace StudioStudio_Server.Configurations
 {
     /// <summary>
-    /// C?u h?nh Qdrant Cloud vector database
+    /// Qdrant Cloud vector database configuration
     /// Binds: appsettings.json -> "Qdrant" section
     /// </summary>
     public class QdrantConfig
@@ -13,23 +13,23 @@ namespace StudioStudio_Server.Configurations
         public string Endpoint { get; set; } = string.Empty;
 
         /// <summary>
-        /// API Key (t? Qdrant Cloud dashboard)
+        /// API Key (from Qdrant Cloud dashboard)
         /// </summary>
         public string ApiKey { get; set; } = string.Empty;
 
         /// <summary>
-        /// Collection name ð? lýu vectors
+        /// Collection name to store vectors
         /// </summary>
         public string CollectionName { get; set; } = string.Empty;
 
         /// <summary>
-        /// Vector dimension size (m?c ð?nh: 1536 cho OpenAI embeddings)
+        /// Vector dimension size
         /// </summary>
-        public int VectorSize { get; set; } = 1536;
+        public int VectorSize { get; set; } = 758;
 
         /// <summary>
-        /// Timeout cho requests (seconds, m?c ð?nh: 30)
+        /// Timeout for requests (seconds, default: 10)
         /// </summary>
-        public int TimeoutSeconds { get; set; } = 30;
+        public int TimeoutSeconds { get; set; } = 10;
     }
 }

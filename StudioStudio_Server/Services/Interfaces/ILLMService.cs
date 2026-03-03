@@ -2,12 +2,12 @@ namespace StudioStudio_Server.Services.Interfaces
 {
     /// <summary>
     /// Service interface cho LLM (Large Language Model) inference
-    /// S? d?ng Groq API ð? x? l? chat completion
+    /// Implementation: GeminiLLMService s? d?ng Gemini 2.5 Flash (primary) v?i fallback sang Gemini 1.5 Flash
     /// </summary>
     public interface ILLMService
     {
         /// <summary>
-        /// G?i Groq API ð? generate câu tr? l?i
+        /// G?i LLM API ð? generate câu tr? l?i
         /// </summary>
         /// <param name="systemPrompt">System prompt ð? ð?nh ngh?a behavior c?a AI</param>
         /// <param name="userMessage">Câu h?i t? user</param>

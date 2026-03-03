@@ -1,4 +1,4 @@
-using StudioStudio_Server.Exceptions;
+ï»¿using StudioStudio_Server.Exceptions;
 using StudioStudio_Server.Models.DTOs.Request;
 using StudioStudio_Server.Models.DTOs.Response;
 using StudioStudio_Server.Models.Entities;
@@ -9,9 +9,10 @@ using System.Diagnostics;
 namespace StudioStudio_Server.Services
 {
     /// <summary>
-    /// Service x? l? AI Question & Answer v?i Hybrid RAG
-    /// Flow: Question ? Embed ? Qdrant Search ? Task Stats ? LLM ? Response
+    /// Service xá»­ lÃ½ AI Question & Answer vá»›i Hybrid RAG
+    /// Flow: Question â†’ Embed â†’ Qdrant Search â†’ Task Stats â†’ LLM â†’ Response
     /// Hybrid RAG = Document Context + Task Statistics
+    /// LLM: Gemini 2.5 Flash (primary) with fallback to Gemini 1.5 Flash
     /// </summary>
     public class AIService : IAIService
     {
@@ -21,20 +22,6 @@ namespace StudioStudio_Server.Services
         private readonly ITaskRepository _taskRepository;
         private readonly ILLMService _llmService;
         private readonly ILogger<AIService> _logger;
-
-        // System prompt ğ?nh ngh?a behavior c?a AI
-        private const string SYSTEM_PROMPT = @"B?n là tr? l? AI c?a Study Studio, m?t n?n t?ng h?c t?p nhóm.
-Nhi?m v? c?a b?n là tr? l?i câu h?i d?a trên:
-1. Tài li?u (documents) ğ? ğı?c upload vào nhóm
-2. Thông tin v? tasks (công vi?c) c?a nhóm
-
-H?y tr? l?i m?t cách:
-- Chính xác d?a trên context ğı?c cung c?p
-- Ng?n g?n, súc tích
-- Thân thi?n và h?u ích
-- B?ng ti?ng Vi?t
-
-N?u thông tin không có trong context, h?y nói r? là không có ğ? thông tin ğ? tr? l?i.";
 
         public AIService(
             IGroupParticipantRepository groupParticipantRepository,
@@ -53,7 +40,7 @@ N?u thông tin không có trong context, h?y nói r? là không có ğ? thông tin ğ? tr?
         }
 
         /// <summary>
-        /// X? l? câu h?i t? user v?i Hybrid RAG approach
+        /// Xá»­ lÃ½ cÃ¢u há»i tá»« user vá»›i Hybrid RAG approach
         /// Step 1: Validate permission
         /// Step 2: Embed question
         /// Step 3: Search Qdrant (filtered by groupId)
@@ -72,7 +59,7 @@ N?u thông tin không có trong context, h?y nói r? là không có ğ? thông tin ğ? tr?
 
             try
             {
-                // Step 1: Validate permission - User ph?i là member c?a group
+                // Step 1: Validate permission - User pháº£i lÃ  member cá»§a group
                 bool isMember = await _groupParticipantRepository.IsUserInGroupAsync(
                     request.GroupId,
                     userId);
@@ -88,13 +75,13 @@ N?u thông tin không có trong context, h?y nói r? là không có ğ? thông tin ğ? tr?
                     "AI Question: UserId={UserId}, GroupId={GroupId}, Question={Question}, Language={Language}",
                     userId, request.GroupId, request.Question, language);
 
-                // Step 2: Embed question - Chuy?n câu h?i thành vector 768 dimensions
+                // Step 2: Embed question - Chuyá»ƒn cÃ¢u há»i thÃ nh vector 768 dimensions
                 _logger.LogInformation("Step 2: Embedding question...");
                 float[] questionEmbedding = await _embeddingService.GenerateEmbeddingAsync(
                     request.Question,
                     cancellationToken);
 
-                // Step 3: Search Qdrant - T?m top 3 chunks liên quan nh?t trong group
+                // Step 3: Search Qdrant - TÃ¬m top 3 chunks liÃªn quan nháº¥t trong group
                 _logger.LogInformation("Step 3: Searching Qdrant for relevant documents...");
                 List<VectorSearchResponse.SearchResult> searchResults =
                     await _vectorDbService.SearchVectorsAsync(
@@ -105,18 +92,18 @@ N?u thông tin không có trong context, h?y nói r? là không có ğ? thông tin ğ? tr?
 
                 _logger.LogInformation("Found {Count} relevant document chunks", searchResults.Count);
 
-                // Step 4: Task Statistics - L?y th?ng kê tasks c?a group
+                // Step 4: Task Statistics - Láº¥y thá»‘ng kÃª tasks cá»§a group
                 _logger.LogInformation("Step 4: Calculating task statistics...");
                 TaskSummaryResponse taskSummary = await GetTaskSummaryAsync(
                     request.GroupId,
                     cancellationToken);
 
-                // Step 5: Build Context - K?t h?p document context + task stats
+                // Step 5: Build Context - Káº¿t há»£p document context + task stats
                 _logger.LogInformation("Step 5: Building context...");
                 string context = BuildContext(searchResults, taskSummary, language);
 
-                // Step 6: Call LLM (Groq) - Generate answer
-                _logger.LogInformation("Step 6: Calling Groq LLM...");
+                // Step 6: Call LLM (Gemini) - Generate answer
+                _logger.LogInformation("Step 6: Calling Gemini LLM (2.5 Flash with 1.5 Flash fallback)...");
                 string systemPrompt = GetSystemPrompt(language);
                 string answer = await _llmService.GenerateAnswerAsync(
                     systemPrompt,
@@ -166,43 +153,43 @@ N?u thông tin không có trong context, h?y nói r? là không có ğ? thông tin ğ? tr?
         }
 
         /// <summary>
-        /// L?y system prompt theo ngôn ng?
+        /// Láº¥y system prompt theo ngÃ´n ngá»¯
         /// </summary>
         private string GetSystemPrompt(string language)
         {
             return language.ToLower() switch
             {
                 "en" => @"You are an AI assistant for Study Studio, a group learning platform.
-Your task is to answer questions based on:
-1. Documents that have been uploaded to the group
-2. Task information for the group
+                Your task is to answer questions based on:
+                1. Documents that have been uploaded to the group
+                2. Task information for the group
 
-Please respond:
-- Accurately based on the provided context
-- Concisely and clearly
-- In a friendly and helpful manner
-- In English
+                Please respond:
+                - Accurately based on the provided context
+                - Concisely and clearly
+                - In a friendly and helpful manner
+                - In English
 
-If the information is not available in the context, clearly state that you don't have enough information to answer.",
+                If the information is not available in the context, clearly state that you don't have enough information to answer.",
 
-                _ => @"B?n là tr? l? AI c?a Study Studio, m?t n?n t?ng h?c t?p nhóm.
-Nhi?m v? c?a b?n là tr? l?i câu h?i d?a trên:
-1. Tài li?u (documents) ğ? ğı?c upload vào nhóm
-2. Thông tin v? tasks (công vi?c) c?a nhóm
+                _ => @"Báº¡n lÃ  trá»£ lÃ½ AI cá»§a Study Studio, má»™t ná»n táº£ng há»c táº­p nhÃ³m.
+                Nhiá»‡m vá»¥ cá»§a báº¡n lÃ  tráº£ lá»i cÃ¢u há»i dá»±a trÃªn:
+                1. TÃ i liá»‡u (documents) Ä‘Ã£ Ä‘Æ°á»£c upload vÃ o nhÃ³m
+                2. ThÃ´ng tin vá» tasks (cÃ´ng viá»‡c) cá»§a nhÃ³m
 
-H?y tr? l?i m?t cách:
-- Chính xác d?a trên context ğı?c cung c?p
-- Ng?n g?n, súc tích
-- Thân thi?n và h?u ích
-- B?ng ti?ng Vi?t
+                HÃ£y tráº£ lá»i má»™t cÃ¡ch:
+                - ChÃ­nh xÃ¡c dá»±a trÃªn context Ä‘Æ°á»£c cung cáº¥p
+                - Ngáº¯n gá»n, sÃºc tÃ­ch
+                - ThÃ¢n thiá»‡n vÃ  há»¯u Ã­ch
+                - Báº±ng tiáº¿ng Viá»‡t
 
-N?u thông tin không có trong context, h?y nói r? là không có ğ? thông tin ğ? tr? l?i."
+                Náº¿u thÃ´ng tin khÃ´ng cÃ³ trong context, hÃ£y nÃ³i rÃµ lÃ  khÃ´ng cÃ³ Ä‘á»§ thÃ´ng tin Ä‘á»ƒ tráº£ lá»i."
             };
         }
 
         /// <summary>
-        /// L?y th?ng kê tasks c?a group t? PostgreSQL
-        /// S? d?ng repository method ğ? l?y thông tin ğ?y ğ?
+        /// Láº¥y thá»‘ng kÃª tasks cá»§a group tá»« PostgreSQL
+        /// Sá»­ dá»¥ng repository method Ä‘á»ƒ láº¥y thÃ´ng tin Ä‘áº§y Ä‘á»§
         /// </summary>
         private async Task<TaskSummaryResponse> GetTaskSummaryAsync(
             Guid groupId,
@@ -212,8 +199,8 @@ N?u thông tin không có trong context, h?y nói r? là không có ğ? thông tin ğ? tr?
         }
 
         /// <summary>
-        /// Build context string ğ? g?i cho LLM
-        /// K?t h?p: Document chunks + Task statistics
+        /// Build context string Ä‘á»ƒ gá»­i cho LLM
+        /// Káº¿t há»£p: Document chunks + Task statistics
         /// Support multi-language
         /// </summary>
         private string BuildContext(
@@ -226,7 +213,7 @@ N?u thông tin không có trong context, h?y nói r? là không có ğ? thông tin ğ? tr?
             bool isEnglish = language.ToLower() == "en";
 
             // Section 1: Document Context
-            context.AppendLine(isEnglish ? "=== RELEVANT DOCUMENTS ===" : "=== TÀI LI?U LIÊN QUAN ===");
+            context.AppendLine(isEnglish ? "=== RELEVANT DOCUMENTS ===" : "=== TÃ€I LIá»†U LIÃŠN QUAN ===");
             if (documents.Count > 0)
             {
                 for (int i = 0; i < documents.Count; i++)
@@ -234,44 +221,44 @@ N?u thông tin không có trong context, h?y nói r? là không có ğ? thông tin ğ? tr?
                     string content = documents[i].Payload.GetValueOrDefault("content")?.ToString() ?? "";
                     string fileName = documents[i].Payload.GetValueOrDefault("fileName")?.ToString() ?? "Unknown";
 
-                    context.AppendLine(isEnglish 
-                        ? $"\n[Document {i + 1}] {fileName}" 
-                        : $"\n[Tài li?u {i + 1}] {fileName}");
-                    context.AppendLine(isEnglish 
-                        ? $"Relevance: {documents[i].Score:F2}" 
-                        : $"Ğ? liên quan: {documents[i].Score:F2}");
+                    context.AppendLine(isEnglish
+                        ? $"\n[Document {i + 1}] {fileName}"
+                        : $"\n[TÃ i liá»‡u {i + 1}] {fileName}");
+                    context.AppendLine(isEnglish
+                        ? $"Relevance: {documents[i].Score:F2}"
+                        : $"Äá»™ liÃªn quan: {documents[i].Score:F2}");
                     context.AppendLine(content);
                 }
             }
             else
             {
-                context.AppendLine(isEnglish 
-                    ? "No relevant documents found." 
-                    : "Không t?m th?y tài li?u liên quan.");
+                context.AppendLine(isEnglish
+                    ? "No relevant documents found."
+                    : "KhÃ´ng tÃ¬m tháº¥y tÃ i liá»‡u liÃªn quan.");
             }
 
             // Section 2: Task Statistics
-            context.AppendLine(isEnglish ? "\n=== TASK STATISTICS ===" : "\n=== TH?NG KÊ CÔNG VI?C ===");
-            context.AppendLine(isEnglish 
-                ? $"Total tasks: {taskSummary.TotalTasks}" 
-                : $"T?ng s? tasks: {taskSummary.TotalTasks}");
-            context.AppendLine(isEnglish 
-                ? $"Completed: {taskSummary.CompletedTasks}/{taskSummary.TotalTasks} ({taskSummary.CompletionPercentage}%)" 
-                : $"Ğ? hoàn thành: {taskSummary.CompletedTasks}/{taskSummary.TotalTasks} ({taskSummary.CompletionPercentage}%)");
-            context.AppendLine(isEnglish 
-                ? $"Overdue tasks: {taskSummary.OverdueTasks}" 
-                : $"Tasks quá h?n: {taskSummary.OverdueTasks}");
+            context.AppendLine(isEnglish ? "\n=== TASK STATISTICS ===" : "\n=== THá»NG KÃŠ CÃ”NG VIá»†C ===");
+            context.AppendLine(isEnglish
+                ? $"Total tasks: {taskSummary.TotalTasks}"
+                : $"Tá»•ng sá»‘ tasks: {taskSummary.TotalTasks}");
+            context.AppendLine(isEnglish
+                ? $"Completed: {taskSummary.CompletedTasks}/{taskSummary.TotalTasks} ({taskSummary.CompletionPercentage}%)"
+                : $"ÄÃ£ hoÃ n thÃ nh: {taskSummary.CompletedTasks}/{taskSummary.TotalTasks} ({taskSummary.CompletionPercentage}%)");
+            context.AppendLine(isEnglish
+                ? $"Overdue tasks: {taskSummary.OverdueTasks}"
+                : $"Tasks quÃ¡ háº¡n: {taskSummary.OverdueTasks}");
 
             if (taskSummary.NearestDeadline.HasValue)
             {
-                context.AppendLine(isEnglish 
-                    ? $"Nearest deadline: {taskSummary.NearestDeadline.Value:MM/dd/yyyy HH:mm}" 
-                    : $"Deadline g?n nh?t: {taskSummary.NearestDeadline.Value:dd/MM/yyyy HH:mm}");
+                context.AppendLine(isEnglish
+                    ? $"Nearest deadline: {taskSummary.NearestDeadline.Value:MM/dd/yyyy HH:mm}"
+                    : $"Deadline gáº§n nháº¥t: {taskSummary.NearestDeadline.Value:dd/MM/yyyy HH:mm}");
             }
 
             if (taskSummary.RiskFlags.Count > 0)
             {
-                context.AppendLine(isEnglish ? "\nWarnings:" : "\nC?nh báo:");
+                context.AppendLine(isEnglish ? "\nWarnings:" : "\nCáº£nh bÃ¡o:");
                 foreach (string flag in taskSummary.RiskFlags)
                 {
                     context.AppendLine($"- {flag}");
@@ -282,7 +269,7 @@ N?u thông tin không có trong context, h?y nói r? là không có ğ? thông tin ğ? tr?
         }
 
         /// <summary>
-        /// Truncate text ğ? t?o preview
+        /// Truncate text Ä‘á»ƒ táº¡o preview
         /// </summary>
         private string TruncateText(string text, int maxLength)
         {
