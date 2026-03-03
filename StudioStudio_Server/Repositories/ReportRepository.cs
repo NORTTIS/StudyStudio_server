@@ -5,7 +5,7 @@ using StudioStudio_Server.Repositories.Interfaces;
 namespace StudioStudio_Server.Repositories
 {
     /// <summary>
-    /// Repository x? l? các thao tác v?i Report entity
+    /// Repository handling operations with Report entity
     /// </summary>
     public class ReportRepository : IReportRepository
     {
@@ -17,7 +17,7 @@ namespace StudioStudio_Server.Repositories
         }
 
         /// <summary>
-        /// Thêm report vào database
+        /// Add report to database
         /// Auto-set: ReportId, Status = Pending, CreatedAt = UtcNow
         /// </summary>
         public async Task AddAsync(Report report)

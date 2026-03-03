@@ -6,7 +6,7 @@ using StudioStudio_Server.Repositories.Interfaces;
 namespace StudioStudio_Server.Repositories
 {
     /// <summary>
-    /// Repository xử lý các thao tác CRUD với User entity
+    /// Repository handling CRUD operations with User entity
     /// </summary>
     public class UserRepository : IUserRepository
     {
@@ -18,7 +18,7 @@ namespace StudioStudio_Server.Repositories
         }
 
         /// <summary>
-        /// Thêm user mới vào database
+        /// Add new user to database
         /// </summary>
         public async Task AddAsync(User user)
         {
@@ -27,8 +27,8 @@ namespace StudioStudio_Server.Repositories
         }
 
         /// <summary>
-        /// Lấy user theo email
-        /// Điều kiện: Email = {email} AND DeletedFlag = false
+        /// Get user by email
+        /// Condition: Email = {email} AND DeletedFlag = false
         /// Include: RefreshToken
         /// </summary>
         public async Task<User?> GetByEmailAsync(string email)
@@ -40,8 +40,8 @@ namespace StudioStudio_Server.Repositories
         }
 
         /// <summary>
-        /// Lấy user theo ID
-        /// Điều kiện: UserId = {id} AND DeletedFlag = false
+        /// Get user by ID
+        /// Condition: UserId = {id} AND DeletedFlag = false
         /// Include: RefreshToken
         /// </summary>
         public async Task<User?> GetByIdAsync(Guid id)
@@ -62,9 +62,9 @@ namespace StudioStudio_Server.Repositories
         }
 
         /// <summary>
-        /// Lấy nhiều users theo danh sách IDs
-        /// Điều kiện: UserId IN {userIds} AND DeletedFlag = false
-        /// Use case: Load user info cho group members, mentions, etc.
+        /// Get multiple users by list of IDs
+        /// Condition: UserId IN {userIds} AND DeletedFlag = false
+        /// Use case: Load user info for group members, mentions, etc.
         /// </summary>
         public async Task<List<User>> GetByIdsAsync(List<Guid> userIds)
         {

@@ -6,7 +6,7 @@ using StudioStudio_Server.Repositories.Interfaces;
 namespace StudioStudio_Server.Repositories
 {
     /// <summary>
-    /// Repository xử lý các thao tác với RefreshToken entity
+    /// Repository handling operations with RefreshToken entity
     /// </summary>
     public class RefreshTokenRepository : IRefreshTokenRepository
     {
@@ -18,8 +18,8 @@ namespace StudioStudio_Server.Repositories
         }
 
         /// <summary>
-        /// Lấy valid refresh token
-        /// Điều kiện: Token = {token} AND IsRevoked = false AND ExpiresAt > UtcNow
+        /// Get valid refresh token
+        /// Condition: Token = {token} AND IsRevoked = false AND ExpiresAt > UtcNow
         /// Include: User
         /// </summary>
         public async Task<RefreshToken?> GetValidAsync(string token)
@@ -34,7 +34,7 @@ namespace StudioStudio_Server.Repositories
         }
 
         /// <summary>
-        /// Thêm refresh token mới vào database
+        /// Add new refresh token to database
         /// </summary>
         public async Task AddAsync(RefreshToken token)
         {

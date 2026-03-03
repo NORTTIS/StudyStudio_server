@@ -9,7 +9,7 @@ using System.Security.Claims;
 namespace StudioStudio_Server.Controllers
 {
     /// <summary>
-    /// Controller quản lý User Profile (thông tin cá nhân)
+    /// Controller for managing User Profile
     /// Route: /api
     /// </summary>
     [Route("api")]
@@ -27,7 +27,8 @@ namespace StudioStudio_Server.Controllers
         }
 
         /// <summary>
-        /// Xác thực và lấy userId từ JWT token
+        /// Authenticate and get userId from JWT token
+        /// Validate: User must not be admin (admin cannot use user APIs)
         /// </summary>
         private Guid ValidateAndGetUserId()
         {
@@ -44,8 +45,8 @@ namespace StudioStudio_Server.Controllers
         }
 
         /// <summary>
-        /// Build absolute URL cho avatar từ relative path
-        /// Convert: /uploads/avatars/xxx.jpg → https://domain.com/uploads/avatars/xxx.jpg
+        /// Build absolute avatar URL from relative path
+        /// Return: Full URL with domain, or null if no avatar
         /// </summary>
         private string? BuildAbsoluteAvatarUrl(string? avatarUrl)
         {
@@ -60,7 +61,7 @@ namespace StudioStudio_Server.Controllers
 
         /// <summary>
         /// [AUTHORIZED] GET /api/user-profile
-        /// Lấy thông tin profile của user hiện tại
+        /// Get profile information of current user
         /// Include: Avatar URL (absolute), settings, Google OAuth status
         /// </summary>
         [HttpGet("user-profile")]
@@ -104,9 +105,9 @@ namespace StudioStudio_Server.Controllers
 
         /// <summary>
         /// [AUTHORIZED] PUT /api/user-profile
-        /// Cập nhật thông tin profile
+        /// Update profile information
         /// Support: FirstName, LastName, PhoneNumber, Bio, Language, EmailNotificationEnabled
-        /// Avatar upload: Multipart form-data với file
+        /// Avatar upload: Multipart form-data with file
         /// </summary>
         [HttpPut("user-profile")]
         public async Task<IActionResult> UpdateUserProfile([FromForm] UpdateUserProfileRequest request)
@@ -123,11 +124,11 @@ namespace StudioStudio_Server.Controllers
 
         /// <summary>
         /// [AUTHORIZED] POST /api/change-password
-        /// Đổi password (cho accounts không dùng Google OAuth)
+        /// Change password (for accounts not using Google OAuth)
         /// Validate:
-        /// - CurrentPassword phải đúng
-        /// - NewPassword đủ mạnh
-        /// - NewPassword khác CurrentPassword
+        /// - CurrentPassword must be correct
+        /// - NewPassword must be strong enough
+        /// - NewPassword must be different from CurrentPassword
         /// </summary>
         [HttpPost("change-password")]
         public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordRequest request)
@@ -144,9 +145,9 @@ namespace StudioStudio_Server.Controllers
 
         /// <summary>
         /// [AUTHORIZED] DELETE /api/user-profile
-        /// Xóa tài khoản (soft delete)
+        /// Delete account (soft delete)
         /// Action: Set DeletedFlag = true
-        /// Effect: User không thể login lại
+        /// Effect: User cannot login again
         /// </summary>
         [HttpDelete("user-profile")]
         public async Task<IActionResult> DeleteAccount()

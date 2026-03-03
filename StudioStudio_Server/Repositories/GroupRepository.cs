@@ -18,10 +18,10 @@ namespace StudioStudio_Server.Repositories
         }
 
         /// <summary>
-        /// Lấy danh sách groups mà user tham gia
-        /// Điều kiện: Participants contains {userId} AND IsActive = true
-        /// Include: Participants
-        /// Sắp xếp: CreatedAt DESC
+        /// Get list of groups user is member of
+        /// Condition: Participants contains {userId} AND IsActive = true
+        /// Include: Studio, Participants
+        /// Order by: UpdatedAt DESC
         /// </summary>
         public async Task<List<Group>> GetUserGroupsAsync(Guid userId)
         {
@@ -34,9 +34,9 @@ namespace StudioStudio_Server.Repositories
         }
 
         /// <summary>
-        /// Lấy group theo ID
-        /// Điều kiện: GroupId = {groupId} AND IsActive = true
-        /// Include: Participants
+        /// Get group by ID
+        /// Condition: GroupId = {groupId} AND IsActive = true
+        /// No Include
         /// </summary>
         public async Task<Group?> GetByIdAsync(Guid groupId)
         {
@@ -46,10 +46,9 @@ namespace StudioStudio_Server.Repositories
         }
 
         /// <summary>
-        /// Lấy group với chi tiết (read-only)
-        /// Điều kiện: GroupId = {groupId} AND IsActive = true
-        /// Include: Participants
-        /// Use case: View group details (không update)
+        /// Get group with details
+        /// Condition: GroupId = {groupId} AND IsActive = true
+        /// Include: Studio, Participants → User
         /// </summary>
         public async Task<Group?> GetGroupWithDetailsAsync(Guid groupId)
         {
@@ -60,9 +59,9 @@ namespace StudioStudio_Server.Repositories
         }
 
         /// <summary>
-        /// Lấy danh sách groups trong studio
-        /// Điều kiện: StudioId = {studioId} AND IsActive = true
-        /// Sắp xếp: GroupName DESC, CreatedAt DESC
+        /// Get list of groups in studio
+        /// Condition: StudioId = {studioId} AND IsActive = true
+        /// Order by: GroupName DESC, then CreatedAt DESC
         /// </summary>
         public async Task<List<Group>> GetStudioGroupsAsync(Guid studioId)
         {
@@ -74,9 +73,9 @@ namespace StudioStudio_Server.Repositories
         }
 
         /// <summary>
-        /// Đếm số groups do user tạo (Owner)
-        /// Điều kiện: Participants contains {userId với Role = Owner} AND IsActive = true
-        /// Use case: Check giới hạn số groups có thể tạo
+        /// Count groups created by user (Owner)
+        /// Condition: Participants contains {userId with Role = Owner} AND IsActive = true
+        /// Use case: Check group creation limit
         /// </summary>
         public async Task<int> CountGroupsCreatedByUserAsync(Guid userId)
         {
@@ -86,8 +85,8 @@ namespace StudioStudio_Server.Repositories
         }
 
         /// <summary>
-        /// Đếm số groups trong studio
-        /// Điều kiện: StudioId = {studioId} AND IsActive = true
+        /// Count groups in studio
+        /// Condition: StudioId = {studioId} AND IsActive = true
         /// </summary>
         public async Task<int> GetGroupCountByStudioIdAsync(Guid studioId)
         {
@@ -97,9 +96,9 @@ namespace StudioStudio_Server.Repositories
         }
 
         /// <summary>
-        /// Kiểm tra group name có tồn tại trong studio không
-        /// Điều kiện: StudioId = {studioId} AND GroupName = {groupName} AND IsActive = true
-        /// Use case: Validate khi tạo group mới
+        /// Check if group name exists in studio
+        /// Condition: StudioId = {studioId} AND GroupName = {groupName} AND IsActive = true
+        /// Use case: Validate when creating new group
         /// </summary>
         public async Task<bool> GroupNameExistsInStudioAsync(Guid? studioId, string groupName)
         {
@@ -110,9 +109,9 @@ namespace StudioStudio_Server.Repositories
         }
 
         /// <summary>
-        /// Kiểm tra group name có tồn tại trong studio (exclude group đang update)
-        /// Điều kiện: StudioId = {studioId} AND GroupName = {groupName} AND GroupId != {excludeGroupId} AND IsActive = true
-        /// Use case: Validate khi update group name
+        /// Check if group name exists in studio (excluding group being updated)
+        /// Condition: StudioId = {studioId} AND GroupName = {groupName} AND GroupId != {excludeGroupId} AND IsActive = true
+        /// Use case: Validate when updating group name
         /// </summary>
         public async Task<bool> GroupNameExistsInStudioExcludingGroupAsync(
             Guid? studioId,
@@ -127,8 +126,8 @@ namespace StudioStudio_Server.Repositories
         }
 
         /// <summary>
-        /// Kiểm tra user có phải Owner của group không
-        /// Điều kiện: GroupId = {groupId} AND IsActive = true AND Participants contains {userId với Role = Owner}
+        /// Check if user is Owner of group
+        /// Condition: GroupId = {groupId} AND IsActive = true AND Participants contains {userId with Role = Owner}
         /// </summary>
         public async Task<bool> IsUserGroupOwnerAsync(Guid groupId, Guid userId)
         {
@@ -138,7 +137,7 @@ namespace StudioStudio_Server.Repositories
         }
 
         /// <summary>
-        /// Thêm group mới vào database
+        /// Add new group to database
         /// </summary>
         public async Task AddAsync(Group group)
         {
@@ -160,7 +159,7 @@ namespace StudioStudio_Server.Repositories
         /// <summary>
         /// Soft delete group
         /// Set IsActive = false, UpdatedAt = UtcNow
-        /// Note: Participants, tasks, messages vẫn giữ nguyên trong DB
+        /// Note: Participants, tasks, messages remain in database
         /// </summary>
         public async Task DeleteAsync(Group group)
         {

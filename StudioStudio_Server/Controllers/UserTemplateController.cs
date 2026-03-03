@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Authorization;
+ï»¿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using StudioStudio_Server.Exceptions;
 using StudioStudio_Server.Models.DTOs.Response;
@@ -8,9 +8,9 @@ using System.Security.Claims;
 namespace StudioStudio_Server.Controllers
 {
     /// <summary>
-    /// Controller qu?n l? Templates (user side)
+    /// Controller for managing Templates (user side)
     /// Route: /api/templates
-    /// Bao g?m: L?y danh sách templates (system + user-created)
+    /// Includes: Get template list (system + user-created)
     /// </summary>
     [Route("api/templates")]
     [ApiController]
@@ -29,7 +29,7 @@ namespace StudioStudio_Server.Controllers
         }
 
         /// <summary>
-        /// Xác th?c và l?y userId t? JWT token
+        /// Authenticate and get userId from JWT token
         /// </summary>
         private Guid ValidateAndGetUserId()
         {
@@ -47,10 +47,10 @@ namespace StudioStudio_Server.Controllers
 
         /// <summary>
         /// [AUTHORIZED] GET /api/templates
-        /// L?y danh sách templates available cho user
+        /// Get list of templates available for user
         /// Include: System templates + User's own templates
-        /// Exclude: Templates c?a users khác
-        /// S?p x?p: System templates trý?c, sau ðó CreatedAt DESC
+        /// Exclude: Templates from other users
+        /// Order by: System templates first, then CreatedAt DESC
         /// </summary>
         [HttpGet]
         public async Task<ActionResult<ApiResponse<List<TemplateResponse>>>> GetAvailableTemplates()
@@ -67,11 +67,11 @@ namespace StudioStudio_Server.Controllers
 
         /// <summary>
         /// [AUTHORIZED] GET /api/templates/{templateId}
-        /// L?y chi ti?t m?t template
+        /// Get template details
         /// Validate:
-        /// - Template ph?i t?n t?i
-        /// - N?u là user template ? ph?i là owner
-        /// - System templates ? t?t c? users ð?u xem ðý?c
+        /// - Template must exist
+        /// - If user template â†’ must be owner
+        /// - System templates â†’ all users can view
         /// </summary>
         [HttpGet("{templateId}")]
         public async Task<ActionResult<ApiResponse<TemplateResponse>>> GetTemplateById(Guid templateId)

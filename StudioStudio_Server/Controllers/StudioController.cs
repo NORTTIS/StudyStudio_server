@@ -9,7 +9,7 @@ using System.Security.Claims;
 namespace StudioStudio_Server.Controllers
 {
     /// <summary>
-    /// Controller qu?n l? Studios (không gian làm vi?c)
+    /// Controller for managing Studios
     /// Route: /api/studio
     /// </summary>
     [Route("api/studio")]
@@ -32,8 +32,8 @@ namespace StudioStudio_Server.Controllers
         }
 
         /// <summary>
-        /// Xác th?c và l?y userId t? JWT token
-        /// Validate: User không ðý?c là admin
+        /// Authenticate and get userId from JWT token
+        /// Validate: User must not be admin (admin cannot use user APIs)
         /// </summary>
         private Guid ValidateAndGetUserId()
         {
@@ -63,10 +63,10 @@ namespace StudioStudio_Server.Controllers
 
         /// <summary>
         /// [AUTHORIZED] GET /api/studio
-        /// L?y danh sách t?t c? studios c?a user
-        /// Ði?u ki?n: OwnerId = userId
-        /// S?p x?p: CreatedAt DESC
-        /// Bao g?m: GroupCount c?a m?i studio
+        /// Get list of studios owned by user
+        /// Condition: OwnerId = userId
+        /// Order by: CreatedAt DESC
+        /// Include: GroupCount for each studio
         /// </summary>
         [HttpGet]
         public async Task<ActionResult<ApiResponse<List<StudioResponse>>>> GetUserStudios()
@@ -83,10 +83,10 @@ namespace StudioStudio_Server.Controllers
 
         /// <summary>
         /// [AUTHORIZED] GET /api/studio/{studioId}/groups
-        /// L?y danh sách groups trong studio
-        /// Validate: User ph?i là owner c?a studio
-        /// S?p x?p: Groups theo UpdatedAt DESC
-        /// Bao g?m: Studio info + danh sách groups
+        /// Get list of groups in studio
+        /// Validate: User must be owner of studio
+        /// Order by: Groups by UpdatedAt DESC
+        /// Include: Studio info + list of groups
         /// </summary>
         [HttpGet("{studioId}/groups")]
         public async Task<ActionResult<ApiResponse<StudioGroupListResponse>>> ViewStudioGroupList(Guid studioId)
@@ -103,8 +103,8 @@ namespace StudioStudio_Server.Controllers
 
         /// <summary>
         /// [AUTHORIZED] POST /api/studio
-        /// T?o m?i m?t studio
-        /// Validate: Studio limit theo subscription plan
+        /// Create new studio
+        /// Validate: Studio limit according to subscription plan
         /// Auto-set: CreatedAt, UpdatedAt = UtcNow
         /// </summary>
         [HttpPost]
@@ -123,10 +123,10 @@ namespace StudioStudio_Server.Controllers
 
         /// <summary>
         /// [AUTHORIZED] PUT /api/studio
-        /// C?p nh?t thông tin studio
+        /// Update studio information
         /// Validate:
-        /// - Studio ph?i t?n t?i
-        /// - User ph?i là owner c?a studio
+        /// - Studio must exist
+        /// - User must be owner of studio
         /// Auto-set: UpdatedAt = UtcNow
         /// </summary>
         [HttpPut]
@@ -145,11 +145,11 @@ namespace StudioStudio_Server.Controllers
 
         /// <summary>
         /// [AUTHORIZED] DELETE /api/studio/{studioId}
-        /// Xóa (soft delete) m?t studio
+        /// Delete (soft delete) a studio
         /// Validate:
-        /// - Studio ph?i t?n t?i
-        /// - User ph?i là owner c?a studio
-        /// Effect: Set IsActive = false (ho?c DeletedFlag = true)
+        /// - Studio must exist
+        /// - User must be owner of studio
+        /// Effect: Set IsActive = false (or DeletedFlag = true)
         /// </summary>
         [HttpDelete("{studioId}")]
         public async Task<ActionResult<ApiResponse<object>>> DeleteStudio(Guid studioId)

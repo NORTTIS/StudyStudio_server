@@ -9,7 +9,7 @@ using System.Security.Claims;
 namespace StudioStudio_Server.Controllers
 {
     /// <summary>
-    /// Controller qu?n l? members trong Group
+    /// Controller for managing members in Group
     /// Route: /api/group/member
     /// </summary>
     [Route("api/group/member")]
@@ -29,8 +29,8 @@ namespace StudioStudio_Server.Controllers
         }
 
         /// <summary>
-        /// Xác th?c và l?y userId t? JWT token
-        /// Validate: User không ðý?c là admin
+        /// Authenticate and get userId from JWT token
+        /// Validate: User must not be admin
         /// </summary>
         private Guid ValidateAndGetUserId()
         {
@@ -60,12 +60,12 @@ namespace StudioStudio_Server.Controllers
 
         /// <summary>
         /// [AUTHORIZED] DELETE /api/group/member/remove
-        /// Remove member kh?i group
+        /// Remove member from group
         /// Validate:
-        /// - Current user ph?i là Owner ho?c Moderator
-        /// - Không th? remove chính m?nh
-        /// - Không th? remove Owner
-        /// - Moderator không th? remove Moderator khác
+        /// - Current user must be Owner or Moderator
+        /// - Cannot remove yourself
+        /// - Cannot remove Owner
+        /// - Moderator cannot remove another Moderator
         /// </summary>
         [HttpDelete("remove")]
         public async Task<ActionResult<ApiResponse<RemoveMemberResponse>>> RemoveMember(
@@ -83,12 +83,12 @@ namespace StudioStudio_Server.Controllers
 
         /// <summary>
         /// [AUTHORIZED] PUT /api/group/member/assign-role
-        /// Thay ð?i role c?a member trong group
+        /// Change member's role in group
         /// Validate:
-        /// - Ch? Owner m?i có quy?n assign role
-        /// - Không th? ð?i role c?a chính m?nh
-        /// - Không th? assign role Owner (ch? có 1 Owner)
-        /// - Ch? có th? có 1 Moderator trong group
+        /// - Only Owner can assign roles
+        /// - Cannot change your own role
+        /// - Cannot assign Owner role (only 1 Owner allowed)
+        /// - Only 1 Moderator allowed in group
         /// </summary>
         [HttpPut("assign-role")]
         public async Task<ActionResult<ApiResponse<AssignRoleResponse>>> AssignRole(

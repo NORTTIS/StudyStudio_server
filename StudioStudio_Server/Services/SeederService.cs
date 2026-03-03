@@ -58,10 +58,10 @@ namespace StudioStudio_Server.Services
             var freePlan = new SubscriptionPlan
             {
                 PlanId = freePlanId,
-                PlanName = "Gói miễn phí",
+                PlanName = "Free Plan",
                 Price = 0m,
                 BillingCycle = BillingCycle.Free,
-                Description = "Phù hợp cho người dùng cá nhân và các nhóm nhỏ trải nghiệm",
+                Description = "Suitable for individual users and small groups to try out",
                 MaxStudios = 3,
                 MaxStorageMb = 500,
                 MaxAiRequestsPerDay = 20,
@@ -73,10 +73,10 @@ namespace StudioStudio_Server.Services
             var premiumPlan = new SubscriptionPlan
             {
                 PlanId = premiumPlanId,
-                PlanName = "Gói nâng cấp",
+                PlanName = "Premium Plan",
                 Price = 299000m,
                 BillingCycle = BillingCycle.Monthly,
-                Description = "Phù hợp cho các nhóm lớn cần sự linh hoạt hơn",
+                Description = "Suitable for large groups that need more flexibility",
                 MaxStudios = 10,
                 MaxStorageMb = 1024,
                 MaxAiRequestsPerDay = 100,

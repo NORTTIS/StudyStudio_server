@@ -6,7 +6,7 @@ using StudioStudio_Server.Repositories.Interfaces;
 namespace StudioStudio_Server.Repositories
 {
     /// <summary>
-    /// Repository x? l? các thao tác CRUD v?i Template entity
+    /// Repository handling CRUD operations with Template entity
     /// </summary>
     public class TemplateRepository : ITemplateRepository
     {
@@ -18,8 +18,8 @@ namespace StudioStudio_Server.Repositories
         }
 
         /// <summary>
-        /// L?y template theo ID
-        /// Ði?u ki?n: TemplateId = {templateId} AND IsActive = true
+        /// Get template by ID
+        /// Condition: TemplateId = {templateId} AND IsActive = true
         /// Include: Group, User
         /// </summary>
         public async Task<Template?> GetByIdAsync(Guid templateId)
@@ -32,10 +32,10 @@ namespace StudioStudio_Server.Repositories
         }
 
         /// <summary>
-        /// L?y template theo GroupId
-        /// Ði?u ki?n: GroupId = {groupId} AND IsActive = true
+        /// Get template by GroupId
+        /// Condition: GroupId = {groupId} AND IsActive = true
         /// Include: Group, User
-        /// Use case: Check template ðang ðý?c s? d?ng b?i group nào
+        /// Use case: Check which group is using this template
         /// </summary>
         public async Task<Template?> GetByGroupIdAsync(Guid groupId)
         {
@@ -47,8 +47,8 @@ namespace StudioStudio_Server.Repositories
         }
 
         /// <summary>
-        /// L?y t?t c? templates
-        /// Ði?u ki?n: IsActive = true
+        /// Get all templates
+        /// Condition: IsActive = true
         /// Include: Group, User
         /// </summary>
         public async Task<List<Template>> GetAllAsync()
@@ -62,8 +62,8 @@ namespace StudioStudio_Server.Repositories
         }
 
         /// <summary>
-        /// L?y templates do user t?o
-        /// Ði?u ki?n: UserId = {userId} AND IsActive = true
+        /// Get templates created by user
+        /// Condition: UserId = {userId} AND IsActive = true
         /// Include: Group, User
         /// </summary>
         public async Task<List<Template>> GetByUserIdAsync(Guid userId)
@@ -77,8 +77,8 @@ namespace StudioStudio_Server.Repositories
         }
 
         /// <summary>
-        /// L?y system templates (built-in templates)
-        /// Ði?u ki?n: IsSystemTemplate = true AND IsActive = true
+        /// Get system templates (built-in templates)
+        /// Condition: IsSystemTemplate = true AND IsActive = true
         /// Include: Group, User
         /// </summary>
         public async Task<List<Template>> GetSystemTemplatesAsync()
@@ -92,8 +92,8 @@ namespace StudioStudio_Server.Repositories
         }
 
         /// <summary>
-        /// L?y user-created templates (không ph?i system templates)
-        /// Ði?u ki?n: UserId = {userId} AND IsSystemTemplate = false AND IsActive = true
+        /// Get user-created templates (not system templates)
+        /// Condition: UserId = {userId} AND IsSystemTemplate = false AND IsActive = true
         /// Include: Group, User
         /// </summary>
         public async Task<List<Template>> GetUserTemplatesAsync(Guid userId)
@@ -107,8 +107,8 @@ namespace StudioStudio_Server.Repositories
         }
 
         /// <summary>
-        /// Ki?m tra template có t?n t?i không
-        /// Ði?u ki?n: TemplateId = {templateId} AND IsActive = true
+        /// Check if template exists
+        /// Condition: TemplateId = {templateId} AND IsActive = true
         /// </summary>
         public async Task<bool> ExistsAsync(Guid templateId)
         {
@@ -117,7 +117,7 @@ namespace StudioStudio_Server.Repositories
         }
 
         /// <summary>
-        /// Thêm template m?i vào database
+        /// Add new template to database
         /// </summary>
         public async Task AddAsync(Template template)
         {

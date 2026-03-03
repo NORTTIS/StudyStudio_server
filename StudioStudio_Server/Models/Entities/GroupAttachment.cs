@@ -1,4 +1,6 @@
-﻿namespace StudioStudio_Server.Models.Entities
+﻿using StudioStudio_Server.Models.Enums;
+
+namespace StudioStudio_Server.Models.Entities
 {
     public class GroupAttachment
     {
@@ -13,5 +15,12 @@
         public string FileUrl { get; set; } = null!;
 
         public DateTime UploadedAt { get; set; }
+
+        // Document processing fields
+        public DocumentStatus? ProcessingStatus { get; set; }
+        public int? ChunkCount { get; set; }
+        public DateTime? ProcessedAt { get; set; }
+        public string? ErrorMessage { get; set; }
+        public bool IsDeleted { get; set; } = false;
     }
 }

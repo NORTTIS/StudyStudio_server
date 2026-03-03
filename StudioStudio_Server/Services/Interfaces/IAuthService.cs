@@ -4,7 +4,7 @@ using StudioStudio_Server.Models.DTOs.Response;
 namespace StudioStudio_Server.Services.Interfaces
 {
     /// <summary>
-    /// Service interface cho Authentication và Authorization
+    /// Service interface for Authentication and Authorization
     /// </summary>
     public interface IAuthService
     {
