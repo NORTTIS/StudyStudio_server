@@ -34,6 +34,11 @@ namespace StudioStudio_Server.Services
                 StatusName = request.StatusName,
                 Position = request.Position,
             };
+
+            if (await _groupTaskStatusRepository.NameExistsInGroupAsync(newStatus))
+            {
+                throw new AppException(ErrorCodes.GroupTaskStatusNameExist, StatusCodes.Status400BadRequest);
+            }
             await _groupTaskStatusRepository.AddAsync(newStatus);
 
             return new GroupTaskStatusResponse
@@ -101,6 +106,10 @@ namespace StudioStudio_Server.Services
 
             if (taskStatus != null)
             {
+                if (await _groupTaskStatusRepository.NameExistsInGroupAsync(taskStatus))
+                {
+                    throw new AppException(ErrorCodes.GroupTaskStatusNameExist, StatusCodes.Status400BadRequest);
+                }
                 taskStatus.StatusName = request.StatusName;
                 await _groupTaskStatusRepository.UpdateAsync(taskStatus);
             }

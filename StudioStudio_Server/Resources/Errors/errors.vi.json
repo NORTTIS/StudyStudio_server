@@ -36,6 +36,7 @@
   "GROUP018": "Bạn không có quyền tạo trạng thái công việc trong nhóm này",
   "GROUP019": "Bạn không có quyền xóa trạng thái công việc này. Chỉ chủ nhóm và người điều hành mới có thể xóa",
   "GROUP020": "Bạn chỉ có thể tạo công việc khi có trạng thái",
+  "GROUP021": "Trạng thái này đã tồn tại trong nhóm",
 
   "STUDIO001": "Bạn đã đạt giới hạn số lượng studio có thể tạo",
 
