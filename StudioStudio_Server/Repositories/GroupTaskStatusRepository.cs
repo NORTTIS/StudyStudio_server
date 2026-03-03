@@ -92,5 +92,14 @@ namespace StudioStudio_Server.Repositories
         {
             await _context.SaveChangesAsync();
         }
+
+        public async Task<bool> NameExistsInGroupAsync(GroupTaskStatus taskStatus)
+        {
+            return await _context.GroupTaskStatuses.AnyAsync(t =>
+                t.StatusName == taskStatus.StatusName &&
+                t.GroupId == taskStatus.GroupId &&
+                t.StatusId != taskStatus.StatusId
+            );
+        }
     }
 }

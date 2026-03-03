@@ -13,5 +13,6 @@ namespace StudioStudio_Server.Repositories.Interfaces
         Task<GroupTaskStatus?> GetDetailAsync(Guid statusId);
         Task<List<GroupTaskStatus>> GetByIdsAndGroupIdAsync(List<Guid> statusIds, Guid groupId);
         Task SaveChangesAsync();
+        Task<bool> NameExistsInGroupAsync(GroupTaskStatus taskStatus);
     }
 }
