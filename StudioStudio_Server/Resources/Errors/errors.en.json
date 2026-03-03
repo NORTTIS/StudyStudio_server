@@ -32,6 +32,10 @@
   "GROUP014": "You cannot change your own role",
   "GROUP015": "You do not have permission to update this group. Only owner and moderator can update it",
   "GROUP016": "You do not have permission to access this group",
+  "GROUP017": "You do not have permission to create task for this group",
+  "GROUP018": "You do not have permission to create task status for this group",
+  "GROUP019": "You do not have permission to delete this task status. Only owner and moderator can delete it",
+  "GROUP020": "You can only create a task when a task status is provided",
 
   "STUDIO001": "You have reached the limit of studios you can create",
 
@@ -106,6 +110,10 @@
   "SUCCESS031": "Message and all replies deleted successfully",
   "SUCCESS032": "Reply sent successfully",
   "SUCCESS033": "Comment and all replies deleted successfully",
+  "SUCCESS034": "Successfully created task status",
+  "SUCCESS035": "Successfully updated task status",
+  "SUCCESS036": "Successfully deleted task status",
+  "SUCCESS037": "Successfully created task",
 
   "SYS001": "Unexpected system error"
 }

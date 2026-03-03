@@ -32,6 +32,10 @@
   "GROUP014": "Bạn không thể thay đổi vai trò của chính mình",
   "GROUP015": "Bạn không có quyền cập nhật nhóm này. Chỉ chủ nhóm và người điều hành mới có thể cập nhật",
   "GROUP016": "Bạn không có quyền truy cập nhóm này",
+  "GROUP017": "Bạn không có quyền tạo công việc trong nhóm này",
+  "GROUP018": "Bạn không có quyền tạo trạng thái công việc trong nhóm này",
+  "GROUP019": "Bạn không có quyền xóa trạng thái công việc này. Chỉ chủ nhóm và người điều hành mới có thể xóa",
+  "GROUP020": "Bạn chỉ có thể tạo công việc khi có trạng thái",
 
   "STUDIO001": "Bạn đã đạt giới hạn số lượng studio có thể tạo",
 
@@ -106,6 +110,10 @@
   "SUCCESS031": "Đã xóa tin nhắn và tất cả phản hồi thành công",
   "SUCCESS032": "Gửi phản hồi thành công",
   "SUCCESS033": "Đã xóa bình luận và tất cả phản hồi thành công",
+  "SUCCESS034": "Tạo trạng thái công việc thành công",
+  "SUCCESS035": "Cập nhật trạng thái công việc thành công",
+  "SUCCESS036": "Xóa trạng thái công việc thành công",
+  "SUCCESS037": "Tạo công việc mới thành công",
 
   "SYS001": "Lỗi hệ thống không xác định"
 }

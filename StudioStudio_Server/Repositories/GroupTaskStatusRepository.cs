@@ -26,7 +26,7 @@ namespace StudioStudio_Server.Repositories
         public async Task<List<GroupTaskStatus>> GetByGroupIdAsync(Guid groupId)
         {
             return await _context.GroupTaskStatuses
-                .Where(s => s.GroupId == groupId)
+                .Where(s => s.GroupId == groupId && !s.IsDeleted)
                 .OrderBy(s => s.Position)
                 .AsNoTracking()
                 .ToListAsync();
@@ -58,6 +58,38 @@ namespace StudioStudio_Server.Repositories
         public async Task AddRangeAsync(List<GroupTaskStatus> statuses)
         {
             _context.GroupTaskStatuses.AddRange(statuses);
+            await _context.SaveChangesAsync();
+        }
+
+        public async Task SoftDeleteAsync(GroupTaskStatus status)
+        {
+            status.IsDeleted = true;
+            _context.GroupTaskStatuses.Update(status);
+            await _context.SaveChangesAsync();
+        }
+
+        public async Task UpdateAsync(GroupTaskStatus status)
+        {
+            _context.GroupTaskStatuses.Update(status);
+            await _context.SaveChangesAsync();
+        }
+
+        public async Task<GroupTaskStatus?> GetDetailAsync(Guid statusId)
+        {
+            return await _context.GroupTaskStatuses
+                .AsNoTracking()
+                .FirstOrDefaultAsync(s => s.StatusId == statusId && !s.IsDeleted);
+        }
+
+        public async Task<List<GroupTaskStatus>> GetByIdsAndGroupIdAsync(List<Guid> statusIds, Guid groupId)
+        {
+            return await _context.GroupTaskStatuses
+                .Where(x => statusIds.Contains(x.StatusId) && x.GroupId == groupId)
+                .AsNoTracking()
+                .ToListAsync();
+        }
+        public async Task SaveChangesAsync()
+        {
             await _context.SaveChangesAsync();
         }
     }
