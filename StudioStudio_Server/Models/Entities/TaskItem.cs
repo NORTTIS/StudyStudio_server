@@ -13,8 +13,12 @@ public class TaskItem
     public string Title { get; set; } = null!;
     public string? Description { get; set; }
 
+    public DateTime? StartDate { get; set; }
     public DateTime? DueDate { get; set; }
     public int Priority { get; set; }
+    public int Severity { get; set; }
+
+    public int Position { get; set; }
 
     public bool IsPendingDeleted { get; set; }
 

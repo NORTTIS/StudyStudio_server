@@ -40,6 +40,11 @@
         public const string GroupCannotChangeOwnRole = "GROUP014";
         public const string GroupUpdatePermissionDenied = "GROUP015";
         public const string GroupAccessDenied = "GROUP016";
+        public const string GroupCreateTaskDenied = "GROUP017";
+        public const string GroupCreateTaskStatusDenied = "GROUP018";
+        public const string GroupDeleteTaskStatusDenied = "GROUP019";
+        public const string GroupCreateTaskDeniedMissingStatus = "GROUP020";
+        public const string GroupTaskStatusNameExist = "GROUP021";
 
         // STUDIO
         public const string StudioLimitReached = "STUDIO001";
@@ -124,6 +129,10 @@
         public const string SuccessDeleteMessage = "SUCCESS031";
         public const string SuccessSendReply = "SUCCESS032";
         public const string SuccessDeleteComment = "SUCCESS033";
+        public const string SuccessCreateTaskStatus = "SUCCESS034";
+        public const string SuccessUpdateTaskStatus = "SUCCESS035";
+        public const string SuccessDeleteTaskStatus = "SUCCESS036";
+        public const string SuccessCreateTask = "SUCCESS037";
 
         // ANNOUNCEMENT
         public const string AnnouncementTagTitle = "ANNOUNCEMENTTAGTITLE";

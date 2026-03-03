@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using StudioStudio_Server.Data;
@@ -11,9 +12,11 @@ using StudioStudio_Server.Data;
 namespace StudioStudio_Server.Migrations
 {
     [DbContext(typeof(StudioDbContext))]
-    partial class StudioDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260302113548_AddTaskPosition")]
+    partial class AddTaskPosition
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -46,7 +49,7 @@ namespace StudioStudio_Server.Migrations
                     b.HasIndex("UserId", "Position")
                         .IsUnique();
 
-                    b.ToTable("PersonalTaskStatuses", (string)null);
+                    b.ToTable("PersonalTaskStatuses");
                 });
 
             modelBuilder.Entity("StudioStudio_Server.Models.Entities.AIRequestLog", b =>
@@ -66,7 +69,7 @@ namespace StudioStudio_Server.Migrations
 
                     b.HasKey("RequestId");
 
-                    b.ToTable("AIRequestLogs", (string)null);
+                    b.ToTable("AIRequestLogs");
                 });
 
             modelBuilder.Entity("StudioStudio_Server.Models.Entities.ActivityLog", b =>
@@ -91,7 +94,7 @@ namespace StudioStudio_Server.Migrations
 
                     b.HasKey("LogId");
 
-                    b.ToTable("ActivityLogs", (string)null);
+                    b.ToTable("ActivityLogs");
                 });
 
             modelBuilder.Entity("StudioStudio_Server.Models.Entities.Announcement", b =>
@@ -132,7 +135,7 @@ namespace StudioStudio_Server.Migrations
 
                     b.HasIndex("PublishedAt");
 
-                    b.ToTable("Announcements", (string)null);
+                    b.ToTable("Announcements");
                 });
 
             modelBuilder.Entity("StudioStudio_Server.Models.Entities.EmailVerificationToken", b =>
@@ -161,7 +164,7 @@ namespace StudioStudio_Server.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("EmailVerificationTokens", (string)null);
+                    b.ToTable("EmailVerificationTokens");
                 });
 
             modelBuilder.Entity("StudioStudio_Server.Models.Entities.Favourite", b =>
@@ -185,7 +188,7 @@ namespace StudioStudio_Server.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("Favourites", (string)null);
+                    b.ToTable("Favourites");
                 });
 
             modelBuilder.Entity("StudioStudio_Server.Models.Entities.Group", b =>
@@ -223,7 +226,7 @@ namespace StudioStudio_Server.Migrations
 
                     b.HasIndex("StudioId", "GroupName");
 
-                    b.ToTable("Groups", (string)null);
+                    b.ToTable("Groups");
                 });
 
             modelBuilder.Entity("StudioStudio_Server.Models.Entities.GroupAttachment", b =>
@@ -231,12 +234,6 @@ namespace StudioStudio_Server.Migrations
                     b.Property<Guid>("GroupAttachmentId")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
-
-                    b.Property<int?>("ChunkCount")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("ErrorMessage")
-                        .HasColumnType("text");
 
                     b.Property<string>("FileName")
                         .IsRequired()
@@ -256,15 +253,6 @@ namespace StudioStudio_Server.Migrations
                     b.Property<Guid>("GroupId")
                         .HasColumnType("uuid");
 
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("boolean");
-
-                    b.Property<DateTime?>("ProcessedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<int?>("ProcessingStatus")
-                        .HasColumnType("integer");
-
                     b.Property<DateTime>("UploadedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -273,7 +261,7 @@ namespace StudioStudio_Server.Migrations
 
                     b.HasKey("GroupAttachmentId");
 
-                    b.ToTable("GroupAttachments", (string)null);
+                    b.ToTable("GroupAttachments");
                 });
 
             modelBuilder.Entity("StudioStudio_Server.Models.Entities.GroupMessage", b =>
@@ -314,7 +302,7 @@ namespace StudioStudio_Server.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("GroupMessages", (string)null);
+                    b.ToTable("GroupMessages");
                 });
 
             modelBuilder.Entity("StudioStudio_Server.Models.Entities.GroupParticipant", b =>
@@ -342,7 +330,7 @@ namespace StudioStudio_Server.Migrations
                     b.HasIndex("GroupId", "UserId")
                         .IsUnique();
 
-                    b.ToTable("GroupParticipants", (string)null);
+                    b.ToTable("GroupParticipants");
                 });
 
             modelBuilder.Entity("StudioStudio_Server.Models.Entities.GroupTaskStatus", b =>
@@ -353,9 +341,6 @@ namespace StudioStudio_Server.Migrations
 
                     b.Property<Guid>("GroupId")
                         .HasColumnType("uuid");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("boolean");
 
                     b.Property<int>("Position")
                         .HasColumnType("integer");
@@ -369,7 +354,7 @@ namespace StudioStudio_Server.Migrations
                     b.HasIndex("GroupId", "Position")
                         .IsUnique();
 
-                    b.ToTable("GroupTaskStatuses", (string)null);
+                    b.ToTable("GroupTaskStatuses");
                 });
 
             modelBuilder.Entity("StudioStudio_Server.Models.Entities.Payment", b =>
@@ -400,7 +385,7 @@ namespace StudioStudio_Server.Migrations
 
                     b.HasKey("PaymentId");
 
-                    b.ToTable("Payments", (string)null);
+                    b.ToTable("Payments");
                 });
 
             modelBuilder.Entity("StudioStudio_Server.Models.Entities.PersonalAttachment", b =>
@@ -432,7 +417,7 @@ namespace StudioStudio_Server.Migrations
 
                     b.HasKey("AttachmentId");
 
-                    b.ToTable("PersonalAttachments", (string)null);
+                    b.ToTable("PersonalAttachments");
                 });
 
             modelBuilder.Entity("StudioStudio_Server.Models.Entities.RefreshToken", b =>
@@ -460,7 +445,7 @@ namespace StudioStudio_Server.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("RefreshToken", (string)null);
+                    b.ToTable("RefreshToken");
                 });
 
             modelBuilder.Entity("StudioStudio_Server.Models.Entities.Report", b =>
@@ -484,7 +469,7 @@ namespace StudioStudio_Server.Migrations
 
                     b.HasKey("ReportId");
 
-                    b.ToTable("Reports", (string)null);
+                    b.ToTable("Reports");
                 });
 
             modelBuilder.Entity("StudioStudio_Server.Models.Entities.Studio", b =>
@@ -516,7 +501,7 @@ namespace StudioStudio_Server.Migrations
 
                     b.HasIndex("OwnerId");
 
-                    b.ToTable("Studios", (string)null);
+                    b.ToTable("Studios");
                 });
 
             modelBuilder.Entity("StudioStudio_Server.Models.Entities.SubscriptionPlan", b =>
@@ -562,7 +547,7 @@ namespace StudioStudio_Server.Migrations
                     b.HasIndex("PlanName")
                         .IsUnique();
 
-                    b.ToTable("SubscriptionPlans", (string)null);
+                    b.ToTable("SubscriptionPlans");
                 });
 
             modelBuilder.Entity("StudioStudio_Server.Models.Entities.TaskAssignment", b =>
@@ -588,7 +573,7 @@ namespace StudioStudio_Server.Migrations
                     b.HasIndex("TaskId", "AssignedTo")
                         .IsUnique();
 
-                    b.ToTable("TaskAssignments", (string)null);
+                    b.ToTable("TaskAssignments");
                 });
 
             modelBuilder.Entity("StudioStudio_Server.Models.Entities.TaskComment", b =>
@@ -629,7 +614,7 @@ namespace StudioStudio_Server.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("TaskComments", (string)null);
+                    b.ToTable("TaskComments");
                 });
 
             modelBuilder.Entity("StudioStudio_Server.Models.Entities.TaskHistory", b =>
@@ -655,7 +640,7 @@ namespace StudioStudio_Server.Migrations
 
                     b.HasKey("HistoryId");
 
-                    b.ToTable("TaskHistories", (string)null);
+                    b.ToTable("TaskHistories");
                 });
 
             modelBuilder.Entity("StudioStudio_Server.Models.Entities.Template", b =>
@@ -691,7 +676,7 @@ namespace StudioStudio_Server.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("Templates", (string)null);
+                    b.ToTable("Templates");
                 });
 
             modelBuilder.Entity("StudioStudio_Server.Models.Entities.User", b =>
@@ -755,7 +740,7 @@ namespace StudioStudio_Server.Migrations
                     b.HasIndex("Email")
                         .IsUnique();
 
-                    b.ToTable("Users", (string)null);
+                    b.ToTable("Users");
                 });
 
             modelBuilder.Entity("StudioStudio_Server.Models.Entities.UserAnnouncement", b =>
@@ -788,7 +773,7 @@ namespace StudioStudio_Server.Migrations
 
                     b.HasIndex("MetionedId");
 
-                    b.ToTable("UserAnnouncements", (string)null);
+                    b.ToTable("UserAnnouncements");
                 });
 
             modelBuilder.Entity("StudioStudio_Server.Models.Entities.UserSubscription", b =>
@@ -818,7 +803,7 @@ namespace StudioStudio_Server.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("UserSubscriptions", (string)null);
+                    b.ToTable("UserSubscriptions");
                 });
 
             modelBuilder.Entity("TaskItem", b =>
@@ -860,9 +845,6 @@ namespace StudioStudio_Server.Migrations
                     b.Property<int>("Severity")
                         .HasColumnType("integer");
 
-                    b.Property<DateTime?>("StartDate")
-                        .HasColumnType("timestamp with time zone");
-
                     b.Property<string>("Title")
                         .IsRequired()
                         .HasColumnType("text");
@@ -880,7 +862,7 @@ namespace StudioStudio_Server.Migrations
 
                     b.HasIndex("PersonalStatusId");
 
-                    b.ToTable("Tasks", (string)null);
+                    b.ToTable("Tasks");
                 });
 
             modelBuilder.Entity("PersonalTaskStatus", b =>

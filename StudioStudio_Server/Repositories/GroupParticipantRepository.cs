@@ -1,4 +1,4 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using StudioStudio_Server.Data;
 using StudioStudio_Server.Models.Entities;
 using StudioStudio_Server.Repositories.Interfaces;
@@ -128,6 +128,17 @@ namespace StudioStudio_Server.Repositories
         {
             _context.GroupParticipants.Remove(participant);
             await _context.SaveChangesAsync();
+        }
+
+        /// <summary>
+        /// Trả về role của người dùng trong group
+        /// </summary>
+        public async Task<GroupRole> GetGroupRoleByUserIdAsync(Guid userId, Guid groupId)
+        {
+            var user = await _context.GroupParticipants.FirstOrDefaultAsync(
+                u => u.UserId == userId &&
+                u.GroupId == groupId);
+            return user?.Role ?? GroupRole.Viewer;
         }
     }
 }

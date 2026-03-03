@@ -108,5 +108,71 @@ namespace StudioStudio_Server.Repositories
                 RiskFlags = riskFlags
             };
         }
+        
+        /// Thêm task vào db
+        /// </summary>
+        public async Task AddAsync(TaskItem task)
+        {
+            _context.Tasks.Add(task);
+            await _context.SaveChangesAsync();
+        }
+
+        /// <summary>
+        /// Restore task
+        /// Set IsPendingDeleted = false, UpdatedAt = UtcNow
+        /// </summary>
+        public async Task RestoreAsync(Guid taskId)
+        {
+            var task = await _context.Tasks.FirstOrDefaultAsync(t => t.TaskId == taskId);
+            if (task != null)
+            {
+                task.IsPendingDeleted = false;
+                task.UpdatedAt = DateTime.UtcNow;
+                _context.Tasks.Update(task);
+                await _context.SaveChangesAsync();
+            }
+        }
+
+        /// <summary>
+        /// Soft delete task
+        /// Set IsPendingDeleted = true, UpdatedAt = UtcNow
+        /// </summary>
+        public async Task SoftDeleteAsync(Guid taskId)
+        {
+            var task = await _context.Tasks.FirstOrDefaultAsync(t => t.TaskId == taskId);
+            if (task != null)
+            {
+                task.IsPendingDeleted = true;
+                task.UpdatedAt = DateTime.UtcNow;
+                _context.Tasks.Update(task);
+                await _context.SaveChangesAsync();
+            }
+        }
+
+        /// <summary>
+        /// Update task 
+        /// Auto-set: UpdatedAt = UtcNow
+        /// </summary>
+        public async Task UpdateAsync(TaskItem task)
+        {
+            task.UpdatedAt = DateTime.UtcNow;
+            _context.Tasks.Update(task);
+            await _context.SaveChangesAsync();
+        }
+
+        /// <summary>
+        /// Lấy danh sách soft tasks trong group
+        /// Điều kiện: GroupId = {groupId} AND IsPendingDeleted = true
+        /// Sắp xếp: UpdatedAt DESC, Title DESC
+        /// </summary>
+        public async Task<List<TaskItem>> GetSoftDeleteTaskByGroup(Guid groupId)
+        {
+            return await _context.Tasks
+                .Where(t => t.GroupId == groupId && t.IsPendingDeleted)
+                .OrderByDescending(t => t.UpdatedAt)
+                .ThenByDescending(t => t.Title)
+                .AsNoTracking()
+                .ToListAsync();
+        }
     }
 }
