@@ -4,7 +4,6 @@ namespace StudioStudio_Server.Models.DTOs.Request
 {
     public class TaskItemGroupRequest
     {
-        public Guid CreatedById { get; set; }
         public Guid GroupId { get; set; }
         public string TaskName { get; set; } = string.Empty;
         public string TaskDescription { get; set; } = string.Empty;

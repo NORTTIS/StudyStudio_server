@@ -10,6 +10,6 @@ namespace StudioStudio_Server.Repositories.Interfaces
         Task<bool> ExistsAsync(Guid statusId);
         Task SoftDeleteAsync(GroupTaskStatus status);
         Task UpdateAsync(GroupTaskStatus status);
-        Task<GroupTaskStatus?> GetDetail(Guid statusId);
+        Task<GroupTaskStatus?> GetDetailAsync(Guid statusId);
     }
 }

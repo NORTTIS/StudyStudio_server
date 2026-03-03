@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Http;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using StudioStudio_Server.Exceptions;
 using StudioStudio_Server.Models.DTOs.Request;
@@ -11,6 +12,7 @@ namespace StudioStudio_Server.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
+    [Authorize]
     public class GroupTaskStatusController : ControllerBase
     {
         private readonly IGroupTaskStatusService _groupTaskStatusService;
@@ -62,9 +64,9 @@ namespace StudioStudio_Server.Controllers
                 result));
         }
 
-        [HttpPost]
+        [HttpPost("{groupId}")]
         public async Task<ActionResult<ApiResponse<GroupTaskStatusResponse>>> CreateGroupTaskStatus(
-           [FromBody] Guid groupId, [FromBody] GroupTaskStatusRequest request)
+           Guid groupId, [FromBody] GroupTaskStatusRequest request)
         {
             var userId = ValidateAndGetUserId();
             var result = await _groupTaskStatusService.CreateNewGroupTaskStatus(userId, groupId, request);
@@ -76,30 +78,30 @@ namespace StudioStudio_Server.Controllers
                 result));
         }
 
-        [HttpPut]
+        [HttpPut("{groupId}")]
         public async Task<ActionResult<ApiResponse<object>>> UpdateAllTaskStatusPosition(
-            [FromBody] List<GroupTaskStatusPositionRequest> request, [FromBody] Guid groupId)
+            [FromBody] List<GroupTaskStatusPositionRequest> request, Guid groupId)
         {
             var userId = ValidateAndGetUserId();
-            await _groupTaskStatusService.UpdateAllTaskStatusPostion(userId, groupId, request);
+            await _groupTaskStatusService.UpdateAllTaskStatusPosition(userId, groupId, request);
             var message = _messageService.GetMessage(ErrorCodes.SuccessUpdateTaskStatus);
 
             return Ok(ApiResponse<object>.Success(
-                ErrorCodes.SuccessUpdateGroup,
+                ErrorCodes.SuccessUpdateTaskStatus,
                 message,
                 null));
         }
 
-        [HttpPut("update-detail")]
+        [HttpPut("{groupId}/{statusId}")]
         public async Task<ActionResult<ApiResponse<object>>> UpdateTaskStatusDetail(
-            [FromBody] GroupTaskStatusRequest request, [FromBody] Guid groupId, [FromBody] Guid statusId)
+            [FromBody] GroupTaskStatusRequest request, Guid groupId, Guid statusId)
         {
             var userId = ValidateAndGetUserId();
             await _groupTaskStatusService.UpdateGroupTaskStatus(userId, groupId, statusId, request);
             var message = _messageService.GetMessage(ErrorCodes.SuccessUpdateTaskStatus);
 
             return Ok(ApiResponse<object>.Success(
-                ErrorCodes.SuccessUpdateGroup,
+                ErrorCodes.SuccessUpdateTaskStatus,
                 message,
                 null));
         }
@@ -112,7 +114,7 @@ namespace StudioStudio_Server.Controllers
             var message = _messageService.GetMessage(ErrorCodes.SuccessDeleteTaskStatus);
 
             return Ok(ApiResponse<object>.Success(
-                ErrorCodes.SuccessDeleteGroup,
+                ErrorCodes.SuccessDeleteTaskStatus,
                 message,
                 null));
         }

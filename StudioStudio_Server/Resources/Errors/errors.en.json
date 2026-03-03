@@ -35,7 +35,7 @@
   "GROUP017": "You do not have permission to create task for this group",
   "GROUP018": "You do not have permission to create task status for this group",
   "GROUP019": "You do not have permission to delete this task status. Only owner and moderator can delete it",
-  "GROUP020": "You can only create task if only task status available",
+  "GROUP020": "You can only create a task when a task status is provided",
 
   "STUDIO001": "You have reached the limit of studios you can create",
 

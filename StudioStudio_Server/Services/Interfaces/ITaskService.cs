@@ -5,6 +5,6 @@ namespace StudioStudio_Server.Services.Interfaces
 {
     public interface ITaskService
     {
-        Task<TaskItemResponse> AddGroupTaskAsync(TaskItemGroupRequest request);
+        Task<TaskItemResponse> AddGroupTaskAsync(Guid userId, TaskItemGroupRequest request);
     }
 }
