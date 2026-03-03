@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using StudioStudio_Server.Data;
@@ -11,9 +12,11 @@ using StudioStudio_Server.Data;
 namespace StudioStudio_Server.Migrations
 {
     [DbContext(typeof(StudioDbContext))]
-    partial class StudioDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260302044213_AddTaskSeverity")]
+    partial class AddTaskSeverity
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -339,9 +342,6 @@ namespace StudioStudio_Server.Migrations
                     b.Property<Guid>("GroupId")
                         .HasColumnType("uuid");
 
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("boolean");
-
                     b.Property<int>("Position")
                         .HasColumnType("integer");
 
@@ -483,9 +483,6 @@ namespace StudioStudio_Server.Migrations
 
                     b.Property<string>("Description")
                         .HasColumnType("text");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("boolean");
 
                     b.Property<Guid>("OwnerId")
                         .HasColumnType("uuid");
@@ -836,17 +833,11 @@ namespace StudioStudio_Server.Migrations
                     b.Property<Guid?>("PersonalStatusId")
                         .HasColumnType("uuid");
 
-                    b.Property<int>("Position")
-                        .HasColumnType("integer");
-
                     b.Property<int>("Priority")
                         .HasColumnType("integer");
 
                     b.Property<int>("Severity")
                         .HasColumnType("integer");
-
-                    b.Property<DateTime?>("StartDate")
-                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Title")
                         .IsRequired()

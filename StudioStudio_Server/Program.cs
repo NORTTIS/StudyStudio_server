@@ -50,6 +50,9 @@ builder.Services.AddScoped<ITaskRepository, TaskRepository>();
 builder.Services.AddScoped<ITemplateRepository, TemplateRepository>();
 builder.Services.AddScoped<ITemplateService, TemplateService>();
 builder.Services.AddScoped<IGroupTaskStatusRepository, GroupTaskStatusRepository>();
+builder.Services.AddScoped<IPersonalTaskStatusRepository, PersonalTaskStatusRepository>();
+builder.Services.AddScoped<ITaskHistoryRepository, TaskHistoryRepository>();
+builder.Services.AddScoped<ITaskAssignmentRepository, TaskAssignmentRepository>();
 builder.Services.AddScoped<ISeederService, SeederService>();
 builder.Services.AddScoped<IGroupInviteService, GroupInviteService>();
 builder.Services.AddScoped<IGroupMessageRepository, GroupMessageRepository>();
@@ -65,6 +68,8 @@ builder.Services.AddScoped<IGroupMessageService, GroupMessageService>();
 builder.Services.AddScoped<ITaskCommentService, TaskCommentService>();
 builder.Services.AddScoped<IReportRepository, ReportRepository>();
 builder.Services.AddScoped<IReportService, ReportService>();
+builder.Services.AddScoped<ITaskService, TaskService>();
+builder.Services.AddScoped<IGroupTaskStatusService, GroupTaskStatusService>();
 
 
 builder.Services.AddControllers(options =>
