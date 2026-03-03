@@ -9,8 +9,8 @@ using System.Text.Json;
 namespace StudioStudio_Server.Services
 {
     /// <summary>
-    /// Service x? l? vector database operations s? d?ng Qdrant Cloud
-    /// Pattern: REST API client cho semantic search và vector storage
+    /// Service for vector database operations using Qdrant Cloud
+    /// Pattern: REST API client for semantic search and vector storage
     /// </summary>
     public class QdrantService : IVectorDatabaseService
     {
@@ -19,8 +19,8 @@ namespace StudioStudio_Server.Services
         private readonly HttpClient _httpClient;
 
         /// <summary>
-        /// Kh?i t?o Qdrant Service
-        /// Note: N?u config không ð?y ð?, service ho?t ð?ng ? degraded mode
+        /// Initialize Qdrant Service
+        /// Note: If config is incomplete, service operates in degraded mode
         /// </summary>
         public QdrantService(
             IOptions<QdrantConfig> config,
@@ -32,7 +32,7 @@ namespace StudioStudio_Server.Services
 
             if (string.IsNullOrEmpty(_config.Endpoint) || string.IsNullOrEmpty(_config.ApiKey))
             {
-                _logger.LogWarning("Qdrant Cloud chýa ðý?c c?u h?nh. Vector operations s? b? b? qua.");
+                _logger.LogWarning("Qdrant Cloud not configured. Vector operations will be skipped.");
                 _httpClient = null!;
                 return;
             }
@@ -44,20 +44,20 @@ namespace StudioStudio_Server.Services
         }
 
         /// <summary>
-        /// Thêm/c?p nh?t vector vào collection
+        /// Add/update vector to collection
         /// Flow: Convert data ? Generate embedding ? Store in Qdrant
         /// </summary>
         public async Task<bool> UpsertVectorAsync(string id, float[] vector, Dictionary<string, object> payload)
         {
             if (_httpClient == null)
             {
-                _logger.LogWarning("Qdrant Cloud chýa ðý?c c?u h?nh. Không th? upsert vector v?i ID: {Id}", id);
+                _logger.LogWarning("Qdrant Cloud not configured. Cannot upsert vector with ID: {Id}", id);
                 return false;
             }
 
             if (vector.Length != _config.VectorSize)
             {
-                _logger.LogError("Vector size không kh?p. Expected: {Expected}, Got: {Actual}", _config.VectorSize, vector.Length);
+                _logger.LogError("Vector size mismatch. Expected: {Expected}, Got: {Actual}", _config.VectorSize, vector.Length);
                 return false;
             }
 
@@ -85,7 +85,7 @@ namespace StudioStudio_Server.Services
 
             if (response.IsSuccessStatusCode)
             {
-                _logger.LogInformation("Vector upserted thành công. ID: {Id}", id);
+                _logger.LogInformation("Vector upserted successfully. ID: {Id}", id);
                 return true;
             }
 
@@ -95,7 +95,7 @@ namespace StudioStudio_Server.Services
         }
 
         /// <summary>
-        /// T?m ki?m vectors týõng t? (semantic search)
+        /// Search for similar vectors (semantic search)
         /// Flow: Query vector ? Qdrant search ? Return top K results
         /// </summary>
         public async Task<List<VectorSearchResult>> SearchSimilarAsync(
@@ -105,13 +105,13 @@ namespace StudioStudio_Server.Services
         {
             if (_httpClient == null)
             {
-                _logger.LogWarning("Qdrant Cloud chýa ðý?c c?u h?nh. Không th? search vectors.");
+                _logger.LogWarning("Qdrant Cloud not configured. Cannot search vectors.");
                 return new List<VectorSearchResult>();
             }
 
             if (queryVector.Length != _config.VectorSize)
             {
-                _logger.LogError("Query vector size không kh?p. Expected: {Expected}, Got: {Actual}", _config.VectorSize, queryVector.Length);
+                _logger.LogError("Query vector size mismatch. Expected: {Expected}, Got: {Actual}", _config.VectorSize, queryVector.Length);
                 return new List<VectorSearchResult>();
             }
 
@@ -168,13 +168,13 @@ namespace StudioStudio_Server.Services
                 }
             }
 
-            _logger.LogInformation("Qdrant search hoàn thành. T?m th?y {Count} k?t qu?", results.Count);
+            _logger.LogInformation("Qdrant search completed. Found {Count} results", results.Count);
             return results;
         }
 
         /// <summary>
-        /// T?m ki?m vectors v?i filter groupId (cho AI Q&A)
-        /// Ch? tr? v? documents thu?c v? group c? th?
+        /// Search vectors with groupId filter (for AI Q&A)
+        /// Only returns documents belonging to specific group
         /// </summary>
         public async Task<List<VectorSearchResponse.SearchResult>> SearchVectorsAsync(
             float[] queryVector,
@@ -184,20 +184,20 @@ namespace StudioStudio_Server.Services
         {
             if (_httpClient == null)
             {
-                _logger.LogWarning("Qdrant Cloud chýa ðý?c c?u h?nh. Không th? search vectors.");
+                _logger.LogWarning("Qdrant Cloud not configured. Cannot search vectors.");
                 return new List<VectorSearchResponse.SearchResult>();
             }
 
             if (queryVector.Length != _config.VectorSize)
             {
-                _logger.LogError("Query vector size không kh?p. Expected: {Expected}, Got: {Actual}", 
+                _logger.LogError("Query vector size mismatch. Expected: {Expected}, Got: {Actual}", 
                     _config.VectorSize, queryVector.Length);
                 return new List<VectorSearchResponse.SearchResult>();
             }
 
             string url = $"/collections/{_config.CollectionName}/points/search";
 
-            // Build filter cho groupId
+            // Build filter for groupId
             // Qdrant filter format: { "must": [{ "key": "groupId", "match": { "value": "guid" }}]}
             object requestBody = new
             {
@@ -252,11 +252,11 @@ namespace StudioStudio_Server.Services
                     float score = item.GetProperty("score").GetSingle();
                     JsonElement payloadElement = item.GetProperty("payload");
 
-                    // Parse payload thành Dictionary
+                    // Parse payload to Dictionary
                     Dictionary<string, object> payload = new Dictionary<string, object>();
                     foreach (JsonProperty prop in payloadElement.EnumerateObject())
                     {
-                        // Lýu value dý?i d?ng string ho?c parse theo type
+                        // Store value as string or parse by type
                         if (prop.Value.ValueKind == JsonValueKind.String)
                         {
                             payload[prop.Name] = prop.Value.GetString() ?? string.Empty;
@@ -299,13 +299,13 @@ namespace StudioStudio_Server.Services
         }
 
         /// <summary>
-        /// Xóa vector theo ID
+        /// Delete vector by ID
         /// </summary>
         public async Task<bool> DeleteVectorAsync(string id)
         {
             if (_httpClient == null)
             {
-                _logger.LogWarning("Qdrant Cloud chýa ðý?c c?u h?nh. Không th? xóa vector v?i ID: {Id}", id);
+                _logger.LogWarning("Qdrant Cloud not configured. Cannot delete vector with ID: {Id}", id);
                 return false;
             }
 
@@ -325,7 +325,7 @@ namespace StudioStudio_Server.Services
 
             if (response.IsSuccessStatusCode)
             {
-                _logger.LogInformation("Vector xóa thành công. ID: {Id}", id);
+                _logger.LogInformation("Vector deleted successfully. ID: {Id}", id);
                 return true;
             }
 
@@ -335,13 +335,20 @@ namespace StudioStudio_Server.Services
         }
 
         /// <summary>
-        /// Xóa nhi?u vectors theo filter
+        /// Delete multiple vectors by filter
+        /// Qdrant Filter DSL format:
+        /// {
+        ///   "filter": {
+        ///     "must": [{ "key": "field", "match": { "value": "value" }}],
+        ///     "must_not": [{ "key": "field", "match": { "value": "value" }}]
+        ///   }
+        /// }
         /// </summary>
         public async Task<bool> DeleteVectorsByFilterAsync(Dictionary<string, object> filters)
         {
             if (_httpClient == null)
             {
-                _logger.LogWarning("Qdrant Cloud chýa ðý?c c?u h?nh. Không th? xóa vectors theo filter.");
+                _logger.LogWarning("Qdrant Cloud not configured. Cannot delete vectors by filter.");
                 return false;
             }
 
@@ -361,7 +368,7 @@ namespace StudioStudio_Server.Services
 
             if (response.IsSuccessStatusCode)
             {
-                _logger.LogInformation("Vectors xóa thành công theo filter");
+                _logger.LogInformation("Vectors deleted successfully by filter");
                 return true;
             }
 
@@ -371,13 +378,134 @@ namespace StudioStudio_Server.Services
         }
 
         /// <summary>
-        /// L?y vector theo ID
+        /// Delete all vectors belonging to a group
+        /// Filter: groupId = {groupId}
+        /// </summary>
+        public async Task<bool> DeleteVectorsByGroupIdAsync(Guid groupId)
+        {
+            var filter = new
+            {
+                must = new[]
+                {
+                    new
+                    {
+                        key = "groupId",
+                        match = new
+                        {
+                            value = groupId.ToString()
+                        }
+                    }
+                }
+            };
+
+            _logger.LogInformation("Deleting all vectors for group: {GroupId}", groupId);
+            return await DeleteVectorsByFilterAsync(
+                new Dictionary<string, object> { ["must"] = filter.must });
+        }
+
+        /// <summary>
+        /// Delete all vectors of a user
+        /// Filter: userId = {userId}
+        /// </summary>
+        public async Task<bool> DeleteVectorsByUserIdAsync(Guid userId)
+        {
+            var filter = new
+            {
+                must = new[]
+                {
+                    new
+                    {
+                        key = "userId",
+                        match = new
+                        {
+                            value = userId.ToString()
+                        }
+                    }
+                }
+            };
+
+            _logger.LogInformation("Deleting all vectors for user: {UserId}", userId);
+            return await DeleteVectorsByFilterAsync(
+                new Dictionary<string, object> { ["must"] = filter.must });
+        }
+
+        /// <summary>
+        /// Delete vectors of user NOT belonging to specific group
+        /// Filter: userId = {userId} AND groupId != {groupId}
+        /// </summary>
+        public async Task<bool> DeleteVectorsByUserNotInGroupAsync(Guid userId, Guid groupId)
+        {
+            var filter = new
+            {
+                must = new[]
+                {
+                    new
+                    {
+                        key = "userId",
+                        match = new
+                        {
+                            value = userId.ToString()
+                        }
+                    }
+                },
+                must_not = new[]
+                {
+                    new
+                    {
+                        key = "groupId",
+                        match = new
+                        {
+                            value = groupId.ToString()
+                        }
+                    }
+                }
+            };
+
+            _logger.LogInformation("Deleting vectors for user {UserId} not in group {GroupId}", userId, groupId);
+            
+            Dictionary<string, object> filterDict = new Dictionary<string, object>
+            {
+                ["must"] = filter.must,
+                ["must_not"] = filter.must_not
+            };
+
+            return await DeleteVectorsByFilterAsync(filterDict);
+        }
+
+        /// <summary>
+        /// Delete all vectors of a specific document
+        /// Filter: documentId = {documentId}
+        /// </summary>
+        public async Task<bool> DeleteVectorsByDocumentIdAsync(Guid documentId)
+        {
+            var filter = new
+            {
+                must = new[]
+                {
+                    new
+                    {
+                        key = "documentId",
+                        match = new
+                        {
+                            value = documentId.ToString()
+                        }
+                    }
+                }
+            };
+
+            _logger.LogInformation("Deleting all vectors for document: {DocumentId}", documentId);
+            return await DeleteVectorsByFilterAsync(
+                new Dictionary<string, object> { ["must"] = filter.must });
+        }
+
+        /// <summary>
+        /// Get vector by ID
         /// </summary>
         public async Task<VectorSearchResult?> GetVectorByIdAsync(string id)
         {
             if (_httpClient == null)
             {
-                _logger.LogWarning("Qdrant Cloud chýa ðý?c c?u h?nh. Không th? l?y vector v?i ID: {Id}", id);
+                _logger.LogWarning("Qdrant Cloud not configured. Cannot get vector with ID: {Id}", id);
                 return null;
             }
 
@@ -387,7 +515,7 @@ namespace StudioStudio_Server.Services
 
             if (!response.IsSuccessStatusCode)
             {
-                _logger.LogWarning("Vector không t?m th?y. ID: {Id}", id);
+                _logger.LogWarning("Vector not found. ID: {Id}", id);
                 return null;
             }
 

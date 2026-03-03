@@ -3,37 +3,37 @@ using StudioStudio_Server.Models.DTOs.Response;
 namespace StudioStudio_Server.Services.Interfaces
 {
     /// <summary>
-    /// Interface cho vector database operations (Qdrant)
+    /// Interface for vector database operations (Qdrant)
     /// Implementations: QdrantService
     /// </summary>
     public interface IVectorDatabaseService
     {
         /// <summary>
-        /// Thêm vector vào collection
+        /// Add vector to collection
         /// </summary>
-        /// <param name="id">Unique ID cho vector</param>
+        /// <param name="id">Unique ID for vector</param>
         /// <param name="vector">Vector embeddings (float array)</param>
         /// <param name="payload">Metadata (JSON object)</param>
-        /// <returns>True n?u thành công</returns>
+        /// <returns>True if successful</returns>
         Task<bool> UpsertVectorAsync(string id, float[] vector, Dictionary<string, object> payload);
 
         /// <summary>
-        /// T?m ki?m vectors týõng t?
+        /// Search for similar vectors
         /// </summary>
-        /// <param name="queryVector">Query vector ð? search</param>
-        /// <param name="limit">S? lý?ng k?t qu? (m?c ð?nh: 5)</param>
-        /// <param name="filters">Filters cho payload (optional)</param>
-        /// <returns>Danh sách vectors týõng t? kèm score</returns>
+        /// <param name="queryVector">Query vector for search</param>
+        /// <param name="limit">Number of results (default: 5)</param>
+        /// <param name="filters">Filters for payload (optional)</param>
+        /// <returns>List of similar vectors with scores</returns>
         Task<List<VectorSearchResult>> SearchSimilarAsync(float[] queryVector, int limit = 5, Dictionary<string, object>? filters = null);
 
         /// <summary>
-        /// T?m ki?m vectors v?i filter groupId (cho AI Q&A)
+        /// Search vectors with groupId filter (for AI Q&A)
         /// </summary>
-        /// <param name="queryVector">Query vector ð? search</param>
-        /// <param name="topK">S? lý?ng k?t qu? tr? v?</param>
-        /// <param name="groupId">Group ID ð? filter</param>
+        /// <param name="queryVector">Query vector for search</param>
+        /// <param name="topK">Number of results to return</param>
+        /// <param name="groupId">Group ID to filter</param>
         /// <param name="cancellationToken">Cancellation token</param>
-        /// <returns>Danh sách search results</returns>
+        /// <returns>List of search results</returns>
         Task<List<VectorSearchResponse.SearchResult>> SearchVectorsAsync(
             float[] queryVector,
             int topK,
@@ -41,29 +41,58 @@ namespace StudioStudio_Server.Services.Interfaces
             CancellationToken cancellationToken = default);
 
         /// <summary>
-        /// Xóa vector kh?i collection
+        /// Delete vector from collection
         /// </summary>
-        /// <param name="id">ID c?a vector c?n xóa</param>
-        /// <returns>True n?u xóa thành công</returns>
+        /// <param name="id">ID of vector to delete</param>
+        /// <returns>True if delete successful</returns>
         Task<bool> DeleteVectorAsync(string id);
 
         /// <summary>
-        /// Xóa nhi?u vectors theo filter
+        /// Delete multiple vectors by filter (Qdrant DSL format)
         /// </summary>
-        /// <param name="filters">Filters ð? xác ð?nh vectors c?n xóa</param>
-        /// <returns>True n?u xóa thành công</returns>
+        /// <param name="filters">Filters to identify vectors to delete</param>
+        /// <returns>True if delete successful</returns>
         Task<bool> DeleteVectorsByFilterAsync(Dictionary<string, object> filters);
 
         /// <summary>
-        /// L?y thông tin vector theo ID
+        /// Delete all vectors belonging to a group
         /// </summary>
-        /// <param name="id">ID c?a vector</param>
-        /// <returns>Vector data ho?c null n?u không t?m th?y</returns>
+        /// <param name="groupId">Group ID</param>
+        /// <returns>True if delete successful</returns>
+        Task<bool> DeleteVectorsByGroupIdAsync(Guid groupId);
+
+        /// <summary>
+        /// Delete all vectors of a user
+        /// </summary>
+        /// <param name="userId">User ID</param>
+        /// <returns>True if delete successful</returns>
+        Task<bool> DeleteVectorsByUserIdAsync(Guid userId);
+
+        /// <summary>
+        /// Delete vectors of user NOT belonging to specific group
+        /// </summary>
+        /// <param name="userId">User ID</param>
+        /// <param name="groupId">Group ID (exclude)</param>
+        /// <returns>True if delete successful</returns>
+        Task<bool> DeleteVectorsByUserNotInGroupAsync(Guid userId, Guid groupId);
+
+        /// <summary>
+        /// Delete all vectors of a specific document
+        /// </summary>
+        /// <param name="documentId">Document ID</param>
+        /// <returns>True if delete successful</returns>
+        Task<bool> DeleteVectorsByDocumentIdAsync(Guid documentId);
+
+        /// <summary>
+        /// Get vector information by ID
+        /// </summary>
+        /// <param name="id">ID of vector</param>
+        /// <returns>Vector data or null if not found</returns>
         Task<VectorSearchResult?> GetVectorByIdAsync(string id);
     }
 
     /// <summary>
-    /// K?t qu? t?m ki?m vector
+    /// Vector search result
     /// </summary>
     public class VectorSearchResult
     {

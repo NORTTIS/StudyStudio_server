@@ -27,8 +27,6 @@ builder.Services.Configure<QdrantConfig>(
     builder.Configuration.GetSection("Qdrant"));
 builder.Services.Configure<GeminiConfig>(
     builder.Configuration.GetSection("Gemini"));
-builder.Services.Configure<GroqConfig>(
-    builder.Configuration.GetSection("Groq"));
 
 //redis connection
 builder.Services.AddSingleton<IConnectionMultiplexer>(r =>
@@ -79,10 +77,14 @@ builder.Services.AddScoped<IReportService, ReportService>();
 builder.Services.AddScoped<IFileStorageService, BackblazeStorageService>();
 builder.Services.AddScoped<IVectorDatabaseService, QdrantService>();
 builder.Services.AddScoped<IEmbeddingService, GeminiEmbeddingService>();
-builder.Services.AddScoped<ILLMService, GroqLLMService>();
+builder.Services.AddScoped<ILLMService, GeminiLLMService>();
 builder.Services.AddScoped<IGroupAttachmentRepository, GroupAttachmentRepository>();
 builder.Services.AddScoped<IDocumentService, DocumentService>();
 builder.Services.AddScoped<IAIService, AIService>();
+
+// Embedding Queue & Background Service
+builder.Services.AddSingleton<StudioStudio_Server.Services.EmbeddingQueue.IEmbeddingQueue, StudioStudio_Server.Services.EmbeddingQueue.EmbeddingQueue>();
+builder.Services.AddHostedService<StudioStudio_Server.Services.EmbeddingQueue.EmbeddingBackgroundService>();
 
 
 builder.Services.AddControllers(options =>
