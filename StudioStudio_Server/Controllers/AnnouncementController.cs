@@ -8,7 +8,7 @@ using System.Security.Claims;
 namespace StudioStudio_Server.Controllers
 {
     /// <summary>
-    /// Controller quản lý announcements cho users (không phải admin)
+    /// Controller for managing Announcements
     /// Route: /api/announcements
     /// </summary>
     [Route("api/announcements")]
@@ -27,8 +27,8 @@ namespace StudioStudio_Server.Controllers
         }
 
         /// <summary>
-        /// Xác thực và lấy userId từ JWT token
-        /// Validate: User không được là admin
+        /// Authenticate and get userId from JWT token
+        /// Validate: User must not be admin
         /// </summary>
         private Guid ValidateAndGetUserId()
         {
@@ -58,8 +58,8 @@ namespace StudioStudio_Server.Controllers
 
         /// <summary>
         /// [PUBLIC] GET /api/announcements
-        /// Lấy danh sách announcements công khai (IsActive = true)
-        /// Sắp xếp: PublishedAt/CreatedAt DESC
+        /// Get list of public announcements (IsActive = true)
+        /// Order by: PublishedAt/CreatedAt DESC
         /// </summary>
         [HttpGet]
         public async Task<ActionResult<ApiResponse<List<AnnouncementResponse>>>> GetAnnouncements()
@@ -75,8 +75,8 @@ namespace StudioStudio_Server.Controllers
 
         /// <summary>
         /// [PUBLIC] GET /api/announcements/{id}
-        /// Lấy chi tiết một announcement công khai
-        /// Validate: Announcement phải active
+        /// Get details of a public announcement
+        /// Validate: Announcement must be active
         /// </summary>
         [HttpGet("{id}")]
         public async Task<ActionResult<ApiResponse<AnnouncementResponse>>> GetAnnouncementById(Guid id)
@@ -92,8 +92,8 @@ namespace StudioStudio_Server.Controllers
 
         /// <summary>
         /// [AUTHORIZED] GET /api/announcements/user
-        /// Lấy danh sách announcements cá nhân của user (được mention/tag)
-        /// Sắp xếp: CreatedAt DESC
+        /// Get list of user's personal announcements (mentioned/tagged)
+        /// Order by: CreatedAt DESC
         /// </summary>
         [HttpGet("user")]
         [Authorize]
@@ -111,8 +111,8 @@ namespace StudioStudio_Server.Controllers
 
         /// <summary>
         /// [AUTHORIZED] PUT /api/announcements/user/{userAnnouncementId}/read
-        /// Đánh dấu announcement cá nhân là đã đọc (IsRead = true)
-        /// Validate: User phải sở hữu announcement này
+        /// Mark personal announcement as read (IsRead = true)
+        /// Validate: User must own this announcement
         /// </summary>
         [HttpPut("user/{userAnnouncementId}/read")]
         [Authorize]
@@ -131,8 +131,8 @@ namespace StudioStudio_Server.Controllers
 
         /// <summary>
         /// [AUTHORIZED] DELETE /api/announcements/user/{userAnnouncementId}
-        /// Xóa (soft delete) announcement cá nhân (IsDelete = true)
-        /// Validate: User phải sở hữu announcement này
+        /// Delete (soft delete) personal announcement (IsDelete = true)
+        /// Validate: User must own this announcement
         /// </summary>
         [HttpDelete("user/{userAnnouncementId}")]
         [Authorize]

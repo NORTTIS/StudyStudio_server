@@ -6,7 +6,7 @@ using StudioStudio_Server.Repositories.Interfaces;
 namespace StudioStudio_Server.Repositories
 {
     /// <summary>
-    /// Repository x? l? các thao tác v?i Favourite entity (user's favourite groups)
+    /// Repository handling operations with Favourite entity (user's favourite groups)
     /// </summary>
     public class FavouriteRepository : IFavouriteRepository
     {
@@ -18,9 +18,9 @@ namespace StudioStudio_Server.Repositories
         }
 
         /// <summary>
-        /// L?y favourite record c?a user và group
-        /// Ði?u ki?n: UserId = {userId} AND GroupId = {groupId}
-        /// Use case: Check trý?c khi add/remove favourite
+        /// Get favourite record of user and group
+        /// Condition: UserId = {userId} AND GroupId = {groupId}
+        /// Use case: Check before add/remove favourite
         /// </summary>
         public async Task<Favourite?> GetByUserAndGroupIdAsync(Guid userId, Guid groupId)
         {
@@ -30,10 +30,10 @@ namespace StudioStudio_Server.Repositories
         }
 
         /// <summary>
-        /// L?y danh sách favourites c?a user (batch query cho nhi?u groups)
-        /// Ði?u ki?n: UserId = {userId} AND GroupId IN {groupIds}
-        /// S?p x?p: CreatedAt DESC
-        /// Use case: Check favourite status cho danh sách groups
+        /// Get list of user's favourites (batch query for multiple groups)
+        /// Condition: UserId = {userId} AND GroupId IN {groupIds}
+        /// Order by: CreatedAt DESC
+        /// Use case: Check favourite status for list of groups
         /// </summary>
         public async Task<List<Favourite>> GetByUserAndGroupIdsAsync(Guid userId, List<Guid> groupIds)
         {
@@ -45,8 +45,8 @@ namespace StudioStudio_Server.Repositories
         }
 
         /// <summary>
-        /// Ki?m tra group có trong favourites c?a user không
-        /// Ði?u ki?n: UserId = {userId} AND GroupId = {groupId}
+        /// Check if group is in user's favourites
+        /// Condition: UserId = {userId} AND GroupId = {groupId}
         /// </summary>
         public async Task<bool> IsFavouriteAsync(Guid userId, Guid groupId)
         {
@@ -55,7 +55,7 @@ namespace StudioStudio_Server.Repositories
         }
 
         /// <summary>
-        /// Ki?m tra favourite record có t?n t?i không (alias c?a IsFavouriteAsync)
+        /// Check if favourite record exists (alias of IsFavouriteAsync)
         /// </summary>
         public async Task<bool> ExistsAsync(Guid userId, Guid groupId)
         {
@@ -64,7 +64,7 @@ namespace StudioStudio_Server.Repositories
         }
 
         /// <summary>
-        /// Thêm group vào favourites
+        /// Add group to favourites
         /// </summary>
         public async Task AddAsync(Favourite favourite)
         {
@@ -73,7 +73,7 @@ namespace StudioStudio_Server.Repositories
         }
 
         /// <summary>
-        /// Xóa group kh?i favourites (hard delete)
+        /// Remove group from favourites (hard delete)
         /// </summary>
         public async Task RemoveAsync(Favourite favourite)
         {

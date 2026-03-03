@@ -7,9 +7,9 @@ using StudioStudio_Server.Services.Interfaces;
 namespace StudioStudio_Server.Services
 {
     /// <summary>
-    /// Service x? l? business logic cho Group Messages
-    /// Note: Realtime messaging ðý?c handle b?i GroupDiscussHub (SignalR)
-    /// Service này ch? handle HTTP queries (l?ch s? tin nh?n)
+    /// Service handling business logic for Group Messages
+    /// Note: Realtime messaging is handled by GroupDiscussHub (SignalR)
+    /// This service only handles HTTP queries (message history)
     /// </summary>
     public class GroupMessageService : IGroupMessageService
     {
@@ -28,12 +28,12 @@ namespace StudioStudio_Server.Services
         }
 
         /// <summary>
-        /// L?y l?ch s? tin nh?n trong group (pagination)
-        /// Validate: User ph?i là member c?a group
+        /// Get message history in group (pagination)
+        /// Validate: User must be member of group
         /// Query:
-        /// - Ði?u ki?n: GroupId = {groupId} AND IsDeleted = false AND ParentMessageId = null
+        /// - Condition: GroupId = {groupId} AND IsDeleted = false AND ParentMessageId = null
         /// - Include: User info, Replies (1 level)
-        /// - S?p x?p: CreatedAt DESC (tin nh?n m?i nh?t trý?c)
+        /// - Order by: CreatedAt DESC (newest message first)
         /// - Pagination: Skip({offset}).Take({limit})
         /// </summary>
         public async Task<GroupMessageListResponse> GetGroupMessagesAsync(
@@ -64,7 +64,7 @@ namespace StudioStudio_Server.Services
         }
 
         /// <summary>
-        /// Validate user là member c?a group
+        /// Validate user is member of group
         /// </summary>
         private async Task ValidateUserIsGroupMemberAsync(Guid groupId, Guid userId)
         {

@@ -9,7 +9,7 @@ using System.Security.Claims;
 namespace StudioStudio_Server.Controllers
 {
     /// <summary>
-    /// Controller quản lý Groups (nhóm học tập)
+    /// Controller for managing Groups
     /// Route: /api/group
     /// </summary>
     [Route("api/group")]
@@ -29,8 +29,8 @@ namespace StudioStudio_Server.Controllers
         }
 
         /// <summary>
-        /// Xác thực và lấy userId từ JWT token
-        /// Validate: User không được là admin (admin không dùng user APIs)
+        /// Authenticate and get userId from JWT token
+        /// Validate: User must not be admin (admin cannot use user APIs)
         /// </summary>
         private Guid ValidateAndGetUserId()
         {
@@ -60,9 +60,9 @@ namespace StudioStudio_Server.Controllers
 
         /// <summary>
         /// [AUTHORIZED] GET /api/group
-        /// Lấy danh sách tất cả groups của user
-        /// Bao gồm: Favorites, Studio Groups, Independent Groups
-        /// Sắp xếp: Theo category và UpdatedAt DESC
+        /// Get list of groups user is member of
+        /// Include: Studio info, Task count, Member count, Favourite status, Role
+        /// Order by: CreatedAt DESC
         /// </summary>
         [HttpGet]
         public async Task<ActionResult<ApiResponse<GroupListResponse>>> GetGroups()
@@ -79,8 +79,9 @@ namespace StudioStudio_Server.Controllers
 
         /// <summary>
         /// [AUTHORIZED] GET /api/group/{groupId}/detail
-        /// Lấy chi tiết một group
-        /// Validate: User phải là member của group
+        /// Get detailed information about group
+        /// Validate: User must be member of group
+        /// Include: Studio info, Members with User info, Role, Task statistics
         /// </summary>
         [HttpGet("{groupId}/detail")]
         public async Task<ActionResult<ApiResponse<GroupDetailResponse>>> GetGroupDetail(Guid groupId)
@@ -97,9 +98,10 @@ namespace StudioStudio_Server.Controllers
 
         /// <summary>
         /// [AUTHORIZED] GET /api/group/{groupId}/members
-        /// Lấy danh sách members trong group
-        /// Validate: User phải là member của group
-        /// Sắp xếp: Owner → Moderator → Member, sau đó theo JoinedAt ASC
+        /// Get list of members in group
+        /// Validate: User must be member of group
+        /// Include: User info (FirstName, LastName, Avatar, Email), Role
+        /// Order by: CreatedAt ASC (oldest member first)
         /// </summary>
         [HttpGet("{groupId}/members")]
         public async Task<ActionResult<ApiResponse<GroupMemberListResponse>>> GetGroupMembers(Guid groupId)
@@ -116,11 +118,11 @@ namespace StudioStudio_Server.Controllers
 
         /// <summary>
         /// [AUTHORIZED] POST /api/group
-        /// Tạo mới một group (Studio hoặc Independent)
+        /// Create new group (Studio or Independent)
         /// Validate:
-        /// - Group limit theo subscription plan
-        /// - Group name không trùng trong cùng studio (nếu có)
-        /// - User phải là owner của studio (nếu tạo trong studio)
+        /// - Group limit according to subscription plan
+        /// - Group name must not duplicate within same studio (if applicable)
+        /// - User must be owner of studio (if creating within studio)
         /// </summary>
         [HttpPost]
         public async Task<ActionResult<ApiResponse<CreateGroupResponse>>> CreateGroup(
@@ -138,12 +140,12 @@ namespace StudioStudio_Server.Controllers
 
         /// <summary>
         /// [AUTHORIZED] POST /api/group/studio-groups
-        /// Tạo nhiều groups cùng lúc trong một studio (batch create)
-        /// Use case: Giáo viên tạo nhiều nhóm lớp học cùng lúc
+        /// Create multiple groups at once in a studio (batch create)
+        /// Use case: Teacher creates multiple class groups at once
         /// Validate:
-        /// - User phải là owner của studio
-        /// - Tổng số groups không vượt quá limit
-        /// - Group names không trùng lặp
+        /// - User must be owner of studio
+        /// - Total groups must not exceed limit
+        /// - Group names must not duplicate
         /// </summary>
         [HttpPost("studio-groups")]
         public async Task<ActionResult<ApiResponse<CreateStudioGroupsResponse>>> CreateStudioGroups(
@@ -161,11 +163,11 @@ namespace StudioStudio_Server.Controllers
 
         /// <summary>
         /// [AUTHORIZED] PUT /api/group
-        /// Cập nhật thông tin group
+        /// Update group information
         /// Validate:
-        /// - User phải là Owner hoặc Moderator
-        /// - Group name không trùng (nếu đổi tên)
-        /// - Template chỉ user-created groups mới có thể set
+        /// - User must be Owner or Moderator
+        /// - Group name must not duplicate (if changing name)
+        /// - Template can only be set for user-created groups
         /// </summary>
         [HttpPut]
         public async Task<ActionResult<ApiResponse<UpdateGroupResponse>>> UpdateGroup(
@@ -183,8 +185,8 @@ namespace StudioStudio_Server.Controllers
 
         /// <summary>
         /// [AUTHORIZED] DELETE /api/group/{groupId}
-        /// Xóa (soft delete) một group
-        /// Validate: User phải là Owner của group
+        /// Delete (soft delete) a group
+        /// Validate: User must be Owner of group
         /// Effect: Set IsActive = false
         /// </summary>
         [HttpDelete("{groupId}")]

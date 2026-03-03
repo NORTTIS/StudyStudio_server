@@ -232,6 +232,12 @@ namespace StudioStudio_Server.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<int?>("ChunkCount")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("ErrorMessage")
+                        .HasColumnType("text");
+
                     b.Property<string>("FileName")
                         .IsRequired()
                         .HasColumnType("text");
@@ -249,6 +255,15 @@ namespace StudioStudio_Server.Migrations
 
                     b.Property<Guid>("GroupId")
                         .HasColumnType("uuid");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime?>("ProcessedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int?>("ProcessingStatus")
+                        .HasColumnType("integer");
 
                     b.Property<DateTime>("UploadedAt")
                         .HasColumnType("timestamp with time zone");

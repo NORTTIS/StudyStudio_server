@@ -6,7 +6,7 @@ using StudioStudio_Server.Repositories.Interfaces;
 namespace StudioStudio_Server.Repositories
 {
     /// <summary>
-    /// Repository x? l? các thao tác v?i GroupParticipant entity (members trong group)
+    /// Repository handling operations with GroupParticipant entity (members in group)
     /// </summary>
     public class GroupParticipantRepository : IGroupParticipantRepository
     {
@@ -18,8 +18,8 @@ namespace StudioStudio_Server.Repositories
         }
 
         /// <summary>
-        /// L?y participant record theo GroupId và UserId
-        /// Ði?u ki?n: GroupId = {groupId} AND UserId = {userId}
+        /// Get participant record by GroupId and UserId
+        /// Condition: GroupId = {groupId} AND UserId = {userId}
         /// Use case: Check role, permissions
         /// </summary>
         public async Task<GroupParticipant?> GetByGroupAndUserAsync(Guid groupId, Guid userId)
@@ -30,7 +30,7 @@ namespace StudioStudio_Server.Repositories
         }
 
         /// <summary>
-        /// L?y participant record theo UserId và GroupId (alias c?a GetByGroupAndUserAsync)
+        /// Get participant record by UserId and GroupId (alias of GetByGroupAndUserAsync)
         /// </summary>
         public async Task<GroupParticipant?> GetByUserAndGroupAsync(Guid userId, Guid groupId)
         {
@@ -40,9 +40,9 @@ namespace StudioStudio_Server.Repositories
         }
 
         /// <summary>
-        /// L?y t?t c? participants c?a group
-        /// Ði?u ki?n: GroupId = {groupId}
-        /// S?p x?p: CreatedAt ASC (member c? nh?t trý?c)
+        /// Get all participants of group
+        /// Condition: GroupId = {groupId}
+        /// Order by: CreatedAt ASC (oldest member first)
         /// </summary>
         public async Task<List<GroupParticipant>> GetAllByGroupIdAsync(Guid groupId)
         {
@@ -54,10 +54,10 @@ namespace StudioStudio_Server.Repositories
         }
 
         /// <summary>
-        /// L?y participants cho nhi?u groups (batch query)
-        /// Ði?u ki?n: GroupId IN {groupIds}
-        /// S?p x?p: CreatedAt ASC
-        /// Use case: Load members info cho danh sách groups
+        /// Get participants for multiple groups (batch query)
+        /// Condition: GroupId IN {groupIds}
+        /// Order by: CreatedAt ASC
+        /// Use case: Load members info for list of groups
         /// </summary>
         public async Task<List<GroupParticipant>> GetByGroupIdsAsync(List<Guid> groupIds)
         {
@@ -69,9 +69,9 @@ namespace StudioStudio_Server.Repositories
         }
 
         /// <summary>
-        /// Ð?m s? participants trong group
-        /// Ði?u ki?n: GroupId = {groupId}
-        /// Use case: Check gi?i h?n members
+        /// Count participants in group
+        /// Condition: GroupId = {groupId}
+        /// Use case: Check member limit
         /// </summary>
         public async Task<int> GetParticipantCountByGroupIdAsync(Guid groupId)
         {
@@ -81,9 +81,9 @@ namespace StudioStudio_Server.Repositories
         }
 
         /// <summary>
-        /// Ð?m s? members có role c? th? trong group
-        /// Ði?u ki?n: GroupId = {groupId} AND Role = {role}
-        /// Use case: Check s? Moderators (ch? cho phép 1), s? Owners (luôn 1)
+        /// Count members with specific role in group
+        /// Condition: GroupId = {groupId} AND Role = {role}
+        /// Use case: Check number of Moderators (only allow 1), Owners (always 1)
         /// </summary>
         public async Task<int> GetRoleCountByGroupIdAsync(Guid groupId, GroupRole role)
         {
@@ -93,8 +93,8 @@ namespace StudioStudio_Server.Repositories
         }
 
         /// <summary>
-        /// Ki?m tra user có ph?i member c?a group không
-        /// Ði?u ki?n: GroupId = {groupId} AND UserId = {userId}
+        /// Check if user is member of group
+        /// Condition: GroupId = {groupId} AND UserId = {userId}
         /// </summary>
         public async Task<bool> IsUserInGroupAsync(Guid groupId, Guid userId)
         {
@@ -103,7 +103,7 @@ namespace StudioStudio_Server.Repositories
         }
 
         /// <summary>
-        /// Thêm participant m?i vào group
+        /// Add new participant to group
         /// </summary>
         public async Task AddAsync(GroupParticipant participant)
         {
@@ -112,7 +112,7 @@ namespace StudioStudio_Server.Repositories
         }
 
         /// <summary>
-        /// Update participant information (ch? y?u là Role)
+        /// Update participant information (mainly Role)
         /// </summary>
         public async Task UpdateAsync(GroupParticipant participant)
         {
@@ -121,7 +121,7 @@ namespace StudioStudio_Server.Repositories
         }
 
         /// <summary>
-        /// Xóa participant kh?i group (hard delete)
+        /// Delete participant from group (hard delete)
         /// Use case: Leave group, kick member
         /// </summary>
         public async Task RemoveAsync(GroupParticipant participant)

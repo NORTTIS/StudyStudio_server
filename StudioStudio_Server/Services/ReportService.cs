@@ -10,7 +10,7 @@ using System.Text.RegularExpressions;
 namespace StudioStudio_Server.Services
 {
     /// <summary>
-    /// Service x? l? business logic cho Reports
+    /// Service handling business logic for Reports
     /// </summary>
     public class ReportService : IReportService
     {
@@ -33,12 +33,12 @@ namespace StudioStudio_Server.Services
         }
 
         /// <summary>
-        /// G?i report/feedback
+        /// Send report/feedback
         /// Validate: Email format
         /// Action:
-        /// 1. Lýu report vào database v?i Status = Pending
-        /// 2. G?i email thông báo t?i admin
-        /// Note: userId có th? null n?u user chýa ðãng nh?p (public API)
+        /// 1. Save report to database with Status = Pending
+        /// 2. Send email notification to admin
+        /// Note: userId can be null if user is not logged in (public API)
         /// </summary>
         public async Task SendReportAsync(Guid? userId, ReportRequest request)
         {

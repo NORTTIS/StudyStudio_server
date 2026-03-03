@@ -7,9 +7,9 @@ using StudioStudio_Server.Services.Interfaces;
 namespace StudioStudio_Server.Controllers
 {
     /// <summary>
-    /// Controller xử lý Authentication và Authorization
+    /// Controller for Authentication
     /// Route: /api/auth
-    /// Bao gồm: Register, Login, Logout, Email verification, Password reset, Google OAuth
+    /// Includes: Register, Login, Google OAuth, Email verification, Password reset
     /// </summary>
     [Route("api/auth")]
     [ApiController]
@@ -25,7 +25,8 @@ namespace StudioStudio_Server.Controllers
         }
 
         /// <summary>
-        /// Lấy refresh token từ HTTP cookie
+        /// Get RefreshToken from HTTP-only cookie
+        /// Return: Token string or null
         /// </summary>
         private string GetRefreshTokenFromCookie()
         {
@@ -43,12 +44,9 @@ namespace StudioStudio_Server.Controllers
 
         /// <summary>
         /// [PUBLIC] POST /api/auth/register
-        /// Đăng ký tài khoản mới
-        /// Validate:
-        /// - Email chưa tồn tại
-        /// - Password đủ mạnh
-        /// - ConfirmPassword khớp với Password
-        /// Action: Gửi email xác thực
+        /// Register new user account
+        /// Validate: Email format, Password strength
+        /// Action: Create user with Status = Pending, Send verification email
         /// </summary>
         [HttpPost("register")]
         public async Task<IActionResult> Register([FromBody] RegisterRequests request)
@@ -64,12 +62,9 @@ namespace StudioStudio_Server.Controllers
 
         /// <summary>
         /// [PUBLIC] POST /api/auth/login
-        /// Đăng nhập với email và password
-        /// Validate:
-        /// - Email tồn tại
-        /// - Password đúng
-        /// - Email đã được xác thực
-        /// Return: AccessToken (JWT) + RefreshToken (HTTP-only cookie)
+        /// Login with email and password
+        /// Validate: Email verified, Password correct
+        /// Return: JWT AccessToken + RefreshToken (HTTP-only cookie)
         /// </summary>
         [HttpPost("login")]
         public async Task<ActionResult<ApiResponse<LoginResponse>>> Login([FromBody] LoginRequests request)
@@ -85,10 +80,9 @@ namespace StudioStudio_Server.Controllers
 
         /// <summary>
         /// [PUBLIC] POST /api/auth/google
-        /// Đăng nhập/Đăng ký với Google OAuth
-        /// Validate: Google token hợp lệ
-        /// Action: Tự động tạo tài khoản nếu chưa có
-        /// Return: AccessToken (JWT) + RefreshToken (HTTP-only cookie)
+        /// Login with Google OAuth
+        /// Validate: Google ID Token
+        /// Action: Create user if not exists, Return JWT + RefreshToken
         /// </summary>
         [HttpPost("google")]
         public async Task<IActionResult> GoogleLogin([FromBody] GoogleLoginRequest request)
@@ -104,9 +98,9 @@ namespace StudioStudio_Server.Controllers
 
         /// <summary>
         /// [PUBLIC] POST /api/auth/refresh
-        /// Refresh access token using refresh token from cookie
-        /// Validate: RefreshToken phải hợp lệ và chưa expire
-        /// Return: AccessToken mới + RefreshToken mới
+        /// Refresh access token using refresh token
+        /// Validate: RefreshToken exists and not expired
+        /// Return: New JWT AccessToken + new RefreshToken
         /// </summary>
         [HttpPost("refresh")]
         public async Task<ActionResult<ApiResponse<LoginResponse>>> Refresh()
@@ -123,8 +117,8 @@ namespace StudioStudio_Server.Controllers
 
         /// <summary>
         /// [PUBLIC] POST /api/auth/logout
-        /// Đăng xuất và xóa refresh token
-        /// Action: Xóa refresh token khỏi database và clear cookie
+        /// Logout and invalidate refresh token
+        /// Action: Delete RefreshToken from database and clear cookie
         /// </summary>
         [HttpPost("logout")]
         public async Task<IActionResult> Logout()
@@ -146,9 +140,9 @@ namespace StudioStudio_Server.Controllers
 
         /// <summary>
         /// [PUBLIC] GET /api/auth/verify-email?token={token}
-        /// Xác thực email sau khi register
-        /// Validate: Token phải hợp lệ và chưa expire (30 phút)
-        /// Action: Set email verified status = true
+        /// Verify email with token from email link
+        /// Validate: Token exists and not expired (30 minutes)
+        /// Action: Set User Status = Active
         /// </summary>
         [HttpGet("verify-email")]
         public async Task<IActionResult> VerifyEmail([FromQuery] string token)
@@ -171,11 +165,11 @@ namespace StudioStudio_Server.Controllers
 
         /// <summary>
         /// [PUBLIC] POST /api/auth/resend-email-verify
-        /// Gửi lại email xác thực
+        /// Resend verification email
         /// Validate:
-        /// - Email tồn tại
-        /// - Email chưa được xác thực
-        /// Action: Gửi email mới với token mới (expire 30 phút)
+        /// - Email exists
+        /// - Email not yet verified
+        /// Action: Send new email with new token (expire 30 minutes)
         /// </summary>
         [HttpPost("resend-email-verify")]
         public async Task<IActionResult> ResendEmailVerify([FromBody] ResendVerifyEmailRequest request)
@@ -191,9 +185,9 @@ namespace StudioStudio_Server.Controllers
 
         /// <summary>
         /// [PUBLIC] POST /api/auth/forgot
-        /// Gửi link reset password qua email
-        /// Validate: Email tồn tại
-        /// Action: Gửi email với reset token (expire 15 phút, lưu trong Redis)
+        /// Send password reset link via email
+        /// Validate: Email exists
+        /// Action: Send email with reset token (expire 15 minutes, stored in Redis)
         /// </summary>
         [HttpPost("forgot")]
         public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordRequest request)
@@ -209,9 +203,9 @@ namespace StudioStudio_Server.Controllers
 
         /// <summary>
         /// [PUBLIC] GET /api/auth/verify-reset-token?token={token}
-        /// Kiểm tra reset password token có hợp lệ không
-        /// Validate: Token tồn tại trong Redis và chưa expire
-        /// Use case: Frontend validate token trước khi show reset password form
+        /// Check if password reset token is valid
+        /// Validate: Token exists in Redis and not expired
+        /// Use case: Frontend validates token before showing reset password form
         /// </summary>
         [HttpGet("verify-reset-token")]
         public async Task<IActionResult> VerifyResetToken([FromQuery] string token)
@@ -242,11 +236,11 @@ namespace StudioStudio_Server.Controllers
 
         /// <summary>
         /// [PUBLIC] POST /api/auth/reset-password
-        /// Reset password với token từ email
+        /// Reset password with token from email
         /// Validate:
-        /// - Token hợp lệ và chưa expire
-        /// - New password đủ mạnh
-        /// Action: Update password và xóa token khỏi Redis
+        /// - Token is valid and not expired
+        /// - New password is strong enough
+        /// Action: Update password and delete token from Redis
         /// </summary>
         [HttpPost("reset-password")]
         public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordRequest request)

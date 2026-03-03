@@ -8,9 +8,9 @@ using System.Security.Claims;
 namespace StudioStudio_Server.Controllers
 {
     /// <summary>
-    /// Controller qu?n l? Group Messages (l?ch s? tin nh?n)
+    /// Controller for managing Group Messages (message history)
     /// Route: /api/group-messages
-    /// Note: Realtime messaging ðý?c handle b?i GroupDiscussHub (SignalR)
+    /// Note: Realtime messaging is handled by GroupDiscussHub (SignalR)
     /// </summary>
     [Route("api/group-messages")]
     [ApiController]
@@ -29,7 +29,7 @@ namespace StudioStudio_Server.Controllers
         }
 
         /// <summary>
-        /// Xác th?c và l?y userId t? JWT token
+        /// Authenticate and get userId from JWT token
         /// </summary>
         private Guid ValidateAndGetUserId()
         {
@@ -47,14 +47,14 @@ namespace StudioStudio_Server.Controllers
 
         /// <summary>
         /// [AUTHORIZED] GET /api/group-messages/{groupId}?limit=100&offset=0
-        /// L?y l?ch s? tin nh?n trong group (pagination)
-        /// Validate: User ph?i là member c?a group
+        /// Get message history in group (pagination)
+        /// Validate: User must be member of group
         /// Query:
-        /// - Ch? l?y parent messages (ParentMessageId = null)
+        /// - Only get parent messages (ParentMessageId = null)
         /// - Include: User info, Replies (1 level only)
-        /// - S?p x?p: CreatedAt DESC
+        /// - Order by: CreatedAt DESC
         /// - Pagination: offset + limit
-        /// Return: Danh sách messages + total count
+        /// Return: List of messages + total count
         /// </summary>
         [HttpGet("{groupId}")]
         public async Task<ActionResult<ApiResponse<GroupMessageListResponse>>> GetGroupMessages(

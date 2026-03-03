@@ -21,6 +21,12 @@ var builder = WebApplication.CreateBuilder(args);
 // Add services to the container.
 builder.Services.Configure<EmailOptions>(
     builder.Configuration.GetSection("Email"));
+builder.Services.Configure<BackblazeConfig>(
+    builder.Configuration.GetSection("Backblaze"));
+builder.Services.Configure<QdrantConfig>(
+    builder.Configuration.GetSection("Qdrant"));
+builder.Services.Configure<GeminiConfig>(
+    builder.Configuration.GetSection("Gemini"));
 
 //redis connection
 builder.Services.AddSingleton<IConnectionMultiplexer>(r =>
@@ -30,6 +36,7 @@ builder.Services.AddSingleton<IConnectionMultiplexer>(r =>
 });
 
 builder.Services.AddHttpContextAccessor();
+builder.Services.AddHttpClient();
 builder.Services.AddScoped<IMessageService, MessageService>();
 builder.Services.AddScoped<IEmailService, SMTPEmailService>();
 builder.Services.AddScoped<IUserRepository, UserRepository>();
@@ -70,6 +77,19 @@ builder.Services.AddScoped<IReportRepository, ReportRepository>();
 builder.Services.AddScoped<IReportService, ReportService>();
 builder.Services.AddScoped<ITaskService, TaskService>();
 builder.Services.AddScoped<IGroupTaskStatusService, GroupTaskStatusService>();
+
+// AI & Document Services
+builder.Services.AddScoped<IFileStorageService, BackblazeStorageService>();
+builder.Services.AddScoped<IVectorDatabaseService, QdrantService>();
+builder.Services.AddScoped<IEmbeddingService, GeminiEmbeddingService>();
+builder.Services.AddScoped<ILLMService, GeminiLLMService>();
+builder.Services.AddScoped<IGroupAttachmentRepository, GroupAttachmentRepository>();
+builder.Services.AddScoped<IDocumentService, DocumentService>();
+builder.Services.AddScoped<IAIService, AIService>();
+
+// Embedding Queue & Background Service
+builder.Services.AddSingleton<StudioStudio_Server.Services.EmbeddingQueue.IEmbeddingQueue, StudioStudio_Server.Services.EmbeddingQueue.EmbeddingQueue>();
+builder.Services.AddHostedService<StudioStudio_Server.Services.EmbeddingQueue.EmbeddingBackgroundService>();
 
 
 builder.Services.AddControllers(options =>

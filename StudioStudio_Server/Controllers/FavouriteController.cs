@@ -9,7 +9,7 @@ using System.Security.Claims;
 namespace StudioStudio_Server.Controllers
 {
     /// <summary>
-    /// Controller qu?n l? Favourites (groups yêu thích)
+    /// Controller for managing Favourites (favourite groups)
     /// Route: /api/favourite
     /// </summary>
     [Route("api/favourite")]
@@ -29,8 +29,8 @@ namespace StudioStudio_Server.Controllers
         }
 
         /// <summary>
-        /// Xác th?c và l?y userId t? JWT token
-        /// Validate: User không ðý?c là admin
+        /// Authenticate and get userId from JWT token
+        /// Validate: User must not be admin
         /// </summary>
         private Guid ValidateAndGetUserId()
         {
@@ -60,11 +60,11 @@ namespace StudioStudio_Server.Controllers
 
         /// <summary>
         /// [AUTHORIZED] POST /api/favourite/add
-        /// Thêm group vào danh sách yêu thích
+        /// Add group to favourites list
         /// Validate:
-        /// - Group ph?i t?n t?i
-        /// - User ph?i là member c?a group
-        /// - Group chýa có trong favourites
+        /// - Group must exist
+        /// - User must be member of group
+        /// - Group not already in favourites
         /// </summary>
         [HttpPost("add")]
         public async Task<ActionResult<ApiResponse<FavouriteResponse>>> AddFavourite(
@@ -82,8 +82,8 @@ namespace StudioStudio_Server.Controllers
 
         /// <summary>
         /// [AUTHORIZED] DELETE /api/favourite/remove
-        /// Xóa group kh?i danh sách yêu thích
-        /// Validate: Favourite ph?i t?n t?i
+        /// Remove group from favourites list
+        /// Validate: Favourite must exist
         /// </summary>
         [HttpDelete("remove")]
         public async Task<ActionResult<ApiResponse<object>>> RemoveFavourite(
