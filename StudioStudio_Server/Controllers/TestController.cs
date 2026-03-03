@@ -117,6 +117,7 @@ namespace StudioStudio_Server.Controllers
                 Title = "My Personal Task",
                 Description = "Test personal task",
                 Priority = 1,
+                Severity = 1,
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow,
                 IsPendingDeleted = false

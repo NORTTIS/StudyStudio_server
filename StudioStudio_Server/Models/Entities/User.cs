@@ -21,7 +21,7 @@
 
         public string Language { get; set; } = "vi";
         public bool EmailNotificationEnabled { get; set; } = true;
-        public RefreshToken? RefreshToken { get; set; }
+        public ICollection<RefreshToken> RefreshTokens { get; set; } = new List<RefreshToken>();
         public ICollection<EmailVerificationToken> EmailVerificationToken { get; set; } = new List<EmailVerificationToken>();
         public string? GoogleId { get; set; } = null;
         public ICollection<GroupParticipant> GroupParticipants { get; set; } = new List<GroupParticipant>();

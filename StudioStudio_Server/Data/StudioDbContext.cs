@@ -51,16 +51,20 @@ namespace StudioStudio_Server.Data
                 e.Property(x => x.PasswordHash).IsRequired();
                 e.Property(x => x.FirstName).IsRequired();
                 e.Property(x => x.LastName).IsRequired();
-                e.HasOne(u => u.RefreshToken)
-                    .WithOne(r => r.User)
-                    .HasForeignKey<RefreshToken>(r => r.UserId)
-                    .OnDelete(DeleteBehavior.Cascade);
             });
 
             //Refresh Token
             modelBuilder.Entity<RefreshToken>(e =>
             {
                 e.HasKey(x => x.Id);
+                
+                e.HasOne(r => r.User)
+                    .WithMany(u => u.RefreshTokens)
+                    .HasForeignKey(r => r.UserId)
+                    .OnDelete(DeleteBehavior.Cascade);
+                
+                e.HasIndex(x => x.UserId);
+                e.HasIndex(x => x.Token);
             });
 
             //Email verify token

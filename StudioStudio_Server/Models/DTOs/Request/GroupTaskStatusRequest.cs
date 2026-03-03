@@ -12,4 +12,11 @@ namespace StudioStudio_Server.Models.DTOs.Request
         [Required(ErrorMessage = ErrorCodes.ValidationRequiredField)]
         public int Position { get; set; }
     }
+
+    public class GroupTaskStatusPositionRequest
+    {
+        public Guid StatusId { get; set; }
+        [Required(ErrorMessage = ErrorCodes.ValidationRequiredField)]
+        public int Position { get; set; }
+    }
 }
