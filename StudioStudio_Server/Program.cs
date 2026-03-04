@@ -15,6 +15,7 @@ using Microsoft.AspNetCore.Mvc;
 using StudioStudio_Server.Filters;
 using StackExchange.Redis;
 using StudioStudio_Server.Hubs;
+using Microsoft.Extensions.FileProviders;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -228,6 +229,12 @@ if (app.Environment.IsDevelopment())
 
 app.UseMiddleware<ExceptionHandlingMiddleware>();
 app.UseStaticFiles();
+app.UseStaticFiles(new StaticFileOptions
+{
+    FileProvider = new PhysicalFileProvider(
+        Path.Combine(app.Environment.WebRootPath, "uploads")),
+    RequestPath = "/uploads"
+});
 
 app.UseCors("WebAppPolicy");
 
