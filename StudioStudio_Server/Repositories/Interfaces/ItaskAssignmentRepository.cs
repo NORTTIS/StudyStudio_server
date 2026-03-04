@@ -4,6 +4,6 @@ namespace StudioStudio_Server.Repositories.Interfaces
 {
     public interface ITaskAssignmentRepository
     {
-        Task AddAsync(TaskAssignment assignment);
+        Task AddRangeAsync(List<TaskAssignment> assignment);
     }
 }

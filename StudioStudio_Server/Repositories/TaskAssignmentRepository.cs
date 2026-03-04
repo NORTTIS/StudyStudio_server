@@ -11,9 +11,12 @@ namespace StudioStudio_Server.Repositories
         {
             _db = db;
         }
-        public async Task AddAsync(TaskAssignment assignment)
+        public async Task AddRangeAsync(List<TaskAssignment> assignees)
         {
-            _db.TaskAssignments.Add(assignment);
+            foreach (var assignee in assignees)
+            {
+                _db.TaskAssignments.Add(assignee);
+            }
             await _db.SaveChangesAsync();
         }
     }

@@ -3,6 +3,7 @@ using Org.BouncyCastle.Asn1.Ocsp;
 using StudioStudio_Server.Exceptions;
 using StudioStudio_Server.Models.DTOs.Request;
 using StudioStudio_Server.Models.DTOs.Response;
+using StudioStudio_Server.Models.Entities;
 using StudioStudio_Server.Repositories.Interfaces;
 using StudioStudio_Server.Services.Interfaces;
 
@@ -15,19 +16,25 @@ namespace StudioStudio_Server.Services
         private readonly ITaskRepository _taskRepository;
         private readonly IGroupParticipantRepository _participantRepository;
         private readonly IGroupTaskStatusRepository _groupTaskStatusRepository;
+        private readonly ITaskAssignmentRepository _taskAssignmentRepository;
+        private readonly IUserRepository _userRepository;
 
         public TaskService(
             ITaskRepository taskRepository,
             ILogger<TaskService> logger,
             IMessageService message,
             IGroupParticipantRepository participantRepository,
-            IGroupTaskStatusRepository groupTaskStatusRepository)
+            IGroupTaskStatusRepository groupTaskStatusRepository,
+            ITaskAssignmentRepository taskAssignmentRepository,
+            IUserRepository userRepository)
         {
             _taskRepository = taskRepository;
             _logger = logger;
             _messageService = message;
             _participantRepository = participantRepository;
             _groupTaskStatusRepository = groupTaskStatusRepository;
+            _taskAssignmentRepository = taskAssignmentRepository;
+            _userRepository = userRepository;
         }
 
         public async Task<TaskItemResponse> AddGroupTaskAsync(Guid userId, TaskItemGroupRequest request)
@@ -87,6 +94,37 @@ namespace StudioStudio_Server.Services
 
             await _taskRepository.AddAsync(taskItem);
 
+            List<TaskAssignment> taskAssignments = new List<TaskAssignment>();
+            if (request.Assignees.Any())
+            {
+                taskAssignments = request.Assignees.Select(assignedId => new TaskAssignment
+                {
+                    AssignmentId = Guid.NewGuid(),
+                    TaskId = taskItem.TaskId,
+                    AssignedTo = assignedId,
+                    AssignedBy = userId,
+                    AssignedAt = now
+                }).ToList();
+
+                await _taskAssignmentRepository.AddRangeAsync(taskAssignments);
+            }
+
+            List<UserDto> assignerDetail = new List<UserDto>();
+            if (taskAssignments.Any())
+            {
+                foreach (var u in taskAssignments)
+                {
+                    var user = await _userRepository.GetByIdAsync(u.AssignedTo);
+                    assignerDetail.Add(new UserDto
+                    {
+                        Id = user!.UserId,
+                        FirstName = user!.FirstName,
+                        LastName = user!.LastName,
+                        AvatarUrl = user!.AvatarUrl,
+                    });
+                }
+            }
+
             return new TaskItemResponse
             {
                 TaskId = taskItem.TaskId,
@@ -102,10 +140,10 @@ namespace StudioStudio_Server.Services
                 GroupStatus = new GroupTaskStatusDto
                 {
                     GroupId = request.GroupId,
-                    StatusName = groupStatus.StatusName,
+                    StatusName = groupStatus!.StatusName,
                     Position = groupStatus.Position
                 },
-                Assignee = new List<UserDto>()
+                Assignee = assignerDetail
             };
         }
 
