@@ -61,6 +61,15 @@ namespace StudioStudio_Server.Controllers
                 message,
                 null));
         }
+
+        [HttpGet("{groupId}/deleted-task")]
+        public async Task<ActionResult<ApiResponse<List<TaskDeleteResponse>>>> GetDeleteTaskList(Guid groupId)
+        {
+            var userId = ValidateAndGetUserId();
+            var result = await _taskService.GetDeleteTaskListAsync(userId, groupId);
+            var message = _messageService.GetMessage(ErrorCodes.SuccessGetData);
+            return Ok(ApiResponse<List<TaskDeleteResponse>>.Success(ErrorCodes.SuccessRestoreTask, message, result));
+        }
         private Guid ValidateAndGetUserId()
         {
             var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;

@@ -18,6 +18,7 @@ namespace StudioStudio_Server.Services
         private readonly IGroupTaskStatusRepository _groupTaskStatusRepository;
         private readonly ITaskAssignmentRepository _taskAssignmentRepository;
         private readonly IUserRepository _userRepository;
+        private readonly ITaskHistoryRepository _taskHistoryRepository;
 
         public TaskService(
             ITaskRepository taskRepository,
@@ -26,7 +27,8 @@ namespace StudioStudio_Server.Services
             IGroupParticipantRepository participantRepository,
             IGroupTaskStatusRepository groupTaskStatusRepository,
             ITaskAssignmentRepository taskAssignmentRepository,
-            IUserRepository userRepository)
+            IUserRepository userRepository,
+            ITaskHistoryRepository taskHistoryRepository)
         {
             _taskRepository = taskRepository;
             _logger = logger;
@@ -35,6 +37,7 @@ namespace StudioStudio_Server.Services
             _groupTaskStatusRepository = groupTaskStatusRepository;
             _taskAssignmentRepository = taskAssignmentRepository;
             _userRepository = userRepository;
+            _taskHistoryRepository = taskHistoryRepository;
         }
 
         public async Task<TaskItemResponse> AddGroupTaskAsync(Guid userId, TaskItemGroupRequest request)
@@ -156,6 +159,14 @@ namespace StudioStudio_Server.Services
             }
 
             await _taskRepository.SoftDeleteAsync(taskId);
+            await _taskHistoryRepository.AddAsync(new TaskHistory
+            {
+                HistoryId = Guid.NewGuid(),
+                TaskId = taskId,
+                ChangedBy = userId,
+                ChangedAt = DateTime.UtcNow,
+                ChangedContent = "DELETE"
+            });
         }
 
         public async Task RestoreGroupTaskAsync(Guid userId, Guid groupId, Guid taskId)
@@ -201,6 +212,27 @@ namespace StudioStudio_Server.Services
 
             task.UpdatedAt = DateTime.UtcNow;
             await _taskRepository.RestoreAsync(task);
+        }
+        public async Task<List<TaskDeleteResponse>> GetDeleteTaskListAsync(Guid userId, Guid groupId)
+        {
+            var existedUser = await _participantRepository.GetByGroupAndUserAsync(groupId, userId);
+            if (existedUser == null)
+            {
+                throw new AppException(ErrorCodes.AuthForbidden, StatusCodes.Status400BadRequest);
+            }
+
+            var taskList = await _taskRepository.GetSoftDeleteTaskByGroup(groupId);
+            var taskListId = taskList.Select(t => t.TaskId).ToList();
+            var taskHistory = await _taskHistoryRepository.GetListTaskHistoryByTaskIdsAsync(taskListId);
+
+            var result = taskHistory.Select(t => new TaskDeleteResponse
+            {
+                TaskName = taskList.FirstOrDefault(task => task.TaskId == t.TaskId)?.Title ?? "Unknown Task",
+                DeletedOn = t.ChangedAt,
+                DeletedBy = t.ChangedBy
+            }).ToList();
+
+            return result;
         }
     }
 }
