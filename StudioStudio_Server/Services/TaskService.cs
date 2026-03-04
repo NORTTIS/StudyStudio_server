@@ -42,6 +42,18 @@ namespace StudioStudio_Server.Services
             }
 
             var groupStatus = await _groupTaskStatusRepository.GetDetailAsync(request.GroupId);
+
+            var existingTask = await _taskRepository.GetAllTasksByStatusId(request.GroupStatusId.Value);
+            int newTaskPosition = 0;
+            if (existingTask.Any())
+            {
+                newTaskPosition = existingTask.Max(s => s.Position) + 1000;
+            }
+            else
+            {
+                newTaskPosition = 1000;
+            }
+
             var now = DateTime.UtcNow;
 
             if (request.StartDate > request.DueDate)
@@ -60,6 +72,7 @@ namespace StudioStudio_Server.Services
                 OwnerId = userId,
                 GroupStatusId = request.GroupStatusId,
                 Title = request.TaskName,
+                Position = newTaskPosition,
                 Description = request.TaskDescription,
                 StartDate = request.StartDate,
                 DueDate = request.DueDate,

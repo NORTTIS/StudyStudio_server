@@ -28,7 +28,7 @@ namespace StudioStudio_Server.Services
             }
 
             var existingStatuses = await _groupTaskStatusRepository.GetByGroupIdAsync(groupId);
-            
+
             int newPosition;
             if (existingStatuses.Any())
             {
@@ -94,7 +94,7 @@ namespace StudioStudio_Server.Services
             {
                 throw new AppException(ErrorCodes.GroupUpdatePermissionDenied, StatusCodes.Status401Unauthorized);
             }
-            
+
             var taskStatus = await _groupTaskStatusRepository.GetDetailAsync(taskStatusId);
             if (taskStatus == null || taskStatus.GroupId != groupId)
             {
@@ -126,9 +126,9 @@ namespace StudioStudio_Server.Services
             }
 
             await _groupTaskStatusRepository.ReorderStatusAsync(
-                request.StatusId, 
-                request.PrevStatusId, 
-                request.NextStatusId, 
+                request.StatusId,
+                request.PrevStatusId,
+                request.NextStatusId,
                 groupId
             );
         }
