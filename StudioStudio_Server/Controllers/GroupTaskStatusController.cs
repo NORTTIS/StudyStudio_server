@@ -78,12 +78,12 @@ namespace StudioStudio_Server.Controllers
                 result));
         }
 
-        [HttpPut("{groupId}")]
-        public async Task<ActionResult<ApiResponse<object>>> UpdateAllTaskStatusPosition(
-            [FromBody] List<GroupTaskStatusPositionRequest> request, Guid groupId)
+        [HttpPut("{groupId}/reorder")]
+        public async Task<ActionResult<ApiResponse<object>>> ReorderTaskStatus(
+            Guid groupId, [FromBody] ReorderGroupTaskStatusRequest request)
         {
             var userId = ValidateAndGetUserId();
-            await _groupTaskStatusService.UpdateAllTaskStatusPosition(userId, groupId, request);
+            await _groupTaskStatusService.ReorderGroupTaskStatus(userId, groupId, request);
             var message = _messageService.GetMessage(ErrorCodes.SuccessUpdateTaskStatus);
 
             return Ok(ApiResponse<object>.Success(

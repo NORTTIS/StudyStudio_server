@@ -27,25 +27,38 @@ namespace StudioStudio_Server.Services
                 throw new AppException(ErrorCodes.GroupCreateTaskStatusDenied, StatusCodes.Status401Unauthorized);
             }
 
+            var existingStatuses = await _groupTaskStatusRepository.GetByGroupIdAsync(groupId);
+            
+            int newPosition;
+            if (existingStatuses.Any())
+            {
+                newPosition = existingStatuses.Max(s => s.Position) + 1000;
+            }
+            else
+            {
+                newPosition = 1000;
+            }
+
             var newStatus = new GroupTaskStatus
             {
                 StatusId = Guid.NewGuid(),
                 GroupId = groupId,
                 StatusName = request.StatusName,
-                Position = request.Position,
+                Position = newPosition,
             };
 
             if (await _groupTaskStatusRepository.NameExistsInGroupAsync(newStatus))
             {
                 throw new AppException(ErrorCodes.GroupTaskStatusNameExist, StatusCodes.Status400BadRequest);
             }
+
             await _groupTaskStatusRepository.AddAsync(newStatus);
 
             return new GroupTaskStatusResponse
             {
                 GroupId = groupId,
                 StatusName = request.StatusName,
-                Position = request.Position,
+                Position = newPosition,
             };
         }
 
@@ -74,27 +87,6 @@ namespace StudioStudio_Server.Services
             }
         }
 
-        public async Task UpdateAllTaskStatusPosition(Guid userId, Guid groupId, List<GroupTaskStatusPositionRequest> requestList)
-        {
-            var userRole = await _participantRepository.GetGroupRoleByUserIdAsync(userId, groupId);
-            if (userRole.Equals(GroupRole.Viewer) || userRole.Equals(GroupRole.Commenter))
-            {
-                throw new AppException(ErrorCodes.GroupUpdatePermissionDenied, StatusCodes.Status401Unauthorized);
-            }
-
-            var statusIds = requestList.Select(x => x.StatusId).ToList();
-
-            var statuses = await _groupTaskStatusRepository.GetByIdsAndGroupIdAsync(statusIds, groupId);
-
-            var positionMap = requestList.ToDictionary(x => x.StatusId, x => x.Position);
-            foreach (var item in statuses)
-            {
-                item.Position = positionMap[item.StatusId];
-            }
-
-            await _groupTaskStatusRepository.SaveChangesAsync();
-        }
-
         public async Task UpdateGroupTaskStatus(Guid userId, Guid groupId, Guid taskStatusId, GroupTaskStatusRequest request)
         {
             var userRole = await _participantRepository.GetGroupRoleByUserIdAsync(userId, groupId);
@@ -102,17 +94,43 @@ namespace StudioStudio_Server.Services
             {
                 throw new AppException(ErrorCodes.GroupUpdatePermissionDenied, StatusCodes.Status401Unauthorized);
             }
+            
             var taskStatus = await _groupTaskStatusRepository.GetDetailAsync(taskStatusId);
-
-            if (taskStatus != null)
+            if (taskStatus == null || taskStatus.GroupId != groupId)
             {
-                if (await _groupTaskStatusRepository.NameExistsInGroupAsync(taskStatus))
-                {
-                    throw new AppException(ErrorCodes.GroupTaskStatusNameExist, StatusCodes.Status400BadRequest);
-                }
-                taskStatus.StatusName = request.StatusName;
-                await _groupTaskStatusRepository.UpdateAsync(taskStatus);
+                throw new AppException(ErrorCodes.TaskNotFound, StatusCodes.Status404NotFound);
             }
+
+            taskStatus.StatusName = request.StatusName;
+
+            if (await _groupTaskStatusRepository.NameExistsInGroupAsync(taskStatus))
+            {
+                throw new AppException(ErrorCodes.GroupTaskStatusNameExist, StatusCodes.Status400BadRequest);
+            }
+
+            await _groupTaskStatusRepository.UpdateAsync(taskStatus);
+        }
+
+        public async Task ReorderGroupTaskStatus(Guid userId, Guid groupId, ReorderGroupTaskStatusRequest request)
+        {
+            var userRole = await _participantRepository.GetGroupRoleByUserIdAsync(userId, groupId);
+            if (userRole.Equals(GroupRole.Viewer) || userRole.Equals(GroupRole.Commenter))
+            {
+                throw new AppException(ErrorCodes.GroupUpdatePermissionDenied, StatusCodes.Status401Unauthorized);
+            }
+
+            var status = await _groupTaskStatusRepository.GetDetailAsync(request.StatusId);
+            if (status == null || status.GroupId != groupId)
+            {
+                throw new AppException(ErrorCodes.TaskNotFound, StatusCodes.Status404NotFound);
+            }
+
+            await _groupTaskStatusRepository.ReorderStatusAsync(
+                request.StatusId, 
+                request.PrevStatusId, 
+                request.NextStatusId, 
+                groupId
+            );
         }
     }
 }
