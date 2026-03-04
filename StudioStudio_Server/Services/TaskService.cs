@@ -93,5 +93,16 @@ namespace StudioStudio_Server.Services
                 Assignee = new List<UserDto>()
             };
         }
+
+        public async Task SoftDeleteTaskAsync(Guid userId, Guid groupId, Guid taskId)
+        {
+            var userRole = await _participantRepository.GetGroupRoleByUserIdAsync(userId, groupId);
+            if (!userRole.Equals(GroupRole.Owner) && !userRole.Equals(GroupRole.Moderator))
+            {
+                throw new AppException(ErrorCodes.GroupDeleteTaskDenined, StatusCodes.Status401Unauthorized);
+            }
+
+            await _taskRepository.SoftDeleteAsync(taskId);
+        }
     }
 }
