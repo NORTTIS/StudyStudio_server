@@ -72,11 +72,11 @@ namespace StudioStudio_Server.Repositories
                 .ToListAsync();
 
             int totalTasks = tasks.Count;
-            int completedTasks = tasks.Count(t => t.GroupStatus != null && 
+            int completedTasks = tasks.Count(t => t.GroupStatus != null &&
                                                    t.GroupStatus.StatusName.ToLower().Contains("done"));
-            int overdueTasks = tasks.Count(t => t.DueDate.HasValue && 
-                                                 t.DueDate.Value < now && 
-                                                 (t.GroupStatus == null || 
+            int overdueTasks = tasks.Count(t => t.DueDate.HasValue &&
+                                                 t.DueDate.Value < now &&
+                                                 (t.GroupStatus == null ||
                                                   !t.GroupStatus.StatusName.ToLower().Contains("done")));
 
             DateTime? nearestDeadline = tasks
@@ -84,8 +84,8 @@ namespace StudioStudio_Server.Repositories
                 .OrderBy(t => t.DueDate)
                 .FirstOrDefault()?.DueDate;
 
-            int completionPercentage = totalTasks > 0 
-                ? (int)Math.Round((double)completedTasks / totalTasks * 100) 
+            int completionPercentage = totalTasks > 0
+                ? (int)Math.Round((double)completedTasks / totalTasks * 100)
                 : 0;
 
             List<string> riskFlags = new List<string>();
@@ -108,7 +108,7 @@ namespace StudioStudio_Server.Repositories
                 RiskFlags = riskFlags
             };
         }
-        
+
         /// Thêm task vào db
         /// </summary>
         public async Task AddAsync(TaskItem task)
@@ -172,6 +172,15 @@ namespace StudioStudio_Server.Repositories
                 .OrderByDescending(t => t.UpdatedAt)
                 .ThenByDescending(t => t.Title)
                 .AsNoTracking()
+                .ToListAsync();
+        }
+
+        public async Task<List<TaskItem>> GetAllTasksByStatusId(Guid statusId)
+        {
+            return await _context.Tasks
+                .Where(t => t.GroupStatusId == statusId && !t.IsPendingDeleted)
+                .AsNoTracking()
+                .OrderBy(t => t.Position)
                 .ToListAsync();
         }
     }

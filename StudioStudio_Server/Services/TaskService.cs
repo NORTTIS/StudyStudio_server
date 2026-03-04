@@ -42,6 +42,18 @@ namespace StudioStudio_Server.Services
             }
 
             var groupStatus = await _groupTaskStatusRepository.GetDetailAsync(request.GroupId);
+
+            var existingTask = await _taskRepository.GetAllTasksByStatusId(request.GroupStatusId.Value);
+            int newTaskPosition = 0;
+            if (existingTask.Any())
+            {
+                newTaskPosition = existingTask.Max(s => s.Position) + 1000;
+            }
+            else
+            {
+                newTaskPosition = 1000;
+            }
+
             var now = DateTime.UtcNow;
 
             if (request.StartDate > request.DueDate)
@@ -60,6 +72,7 @@ namespace StudioStudio_Server.Services
                 OwnerId = userId,
                 GroupStatusId = request.GroupStatusId,
                 Title = request.TaskName,
+                Position = newTaskPosition,
                 Description = request.TaskDescription,
                 StartDate = request.StartDate,
                 DueDate = request.DueDate,
@@ -92,6 +105,27 @@ namespace StudioStudio_Server.Services
                 },
                 Assignee = new List<UserDto>()
             };
+        }
+
+        public async Task SoftDeleteTaskAsync(Guid userId, Guid groupId, Guid taskId)
+        {
+            var userRole = await _participantRepository.GetGroupRoleByUserIdAsync(userId, groupId);
+            if (!userRole.Equals(GroupRole.Owner) && !userRole.Equals(GroupRole.Moderator))
+            {
+                throw new AppException(ErrorCodes.GroupDeleteTaskDenined, StatusCodes.Status401Unauthorized);
+            }
+
+            await _taskRepository.SoftDeleteAsync(taskId);
+        }
+
+        public async Task RestoreTaskAsync(Guid userId, Guid groupId, Guid taskId)
+        {
+            var userRole = await _participantRepository.GetGroupRoleByUserIdAsync(userId, groupId);
+            if (!userRole.Equals(GroupRole.Owner) && !userRole.Equals(GroupRole.Moderator))
+            {
+                throw new AppException(ErrorCodes.GroupRestoreTaskDenined, StatusCodes.Status401Unauthorized);
+            }
+            await _taskRepository.RestoreAsync(taskId);
         }
     }
 }

@@ -46,6 +46,8 @@
         public const string GroupCreateTaskDeniedMissingStatus = "GROUP020";
         public const string GroupTaskStatusNameExist = "GROUP021";
         public const string GroupTaskStatusPositionExist = "GROUP022";
+        public const string GroupDeleteTaskDenined = "GROUP023";
+        public const string GroupRestoreTaskDenined = "GROUP024";
 
         // STUDIO
         public const string StudioLimitReached = "STUDIO001";
@@ -134,6 +136,8 @@
         public const string SuccessUpdateTaskStatus = "SUCCESS035";
         public const string SuccessDeleteTaskStatus = "SUCCESS036";
         public const string SuccessCreateTask = "SUCCESS037";
+        public const string SuccessDeleteTask = "SUCCESS038";
+        public const string SuccessRestoreTask = "SUCCESS039";
 
         // ANNOUNCEMENT
         public const string AnnouncementTagTitle = "ANNOUNCEMENTTAGTITLE";
