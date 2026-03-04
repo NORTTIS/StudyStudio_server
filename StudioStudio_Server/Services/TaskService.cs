@@ -1,4 +1,5 @@
 ﻿using Microsoft.IdentityModel.Tokens;
+using Org.BouncyCastle.Asn1.Ocsp;
 using StudioStudio_Server.Exceptions;
 using StudioStudio_Server.Models.DTOs.Request;
 using StudioStudio_Server.Models.DTOs.Response;
@@ -145,12 +146,22 @@ namespace StudioStudio_Server.Services
             //case where old task status have been deleted
             if (!task.GroupStatusId.HasValue)
             {
-                task.GroupStatusId = statusList
-                    .OrderBy(s => s.Position)
-                    .First()
-                    .StatusId;
+                var firstStatus = statusList.OrderBy(s => s.Position).First();
+                task.GroupStatusId = firstStatus.StatusId;
+                var existingTask = await _taskRepository.GetAllTasksByStatusIdAsync(firstStatus.StatusId);
+                int newTaskPosition = 0;
+                if (existingTask.Any())
+                {
+                    newTaskPosition = existingTask.Max(s => s.Position) + 1000;
+                }
+                else
+                {
+                    newTaskPosition = 1000;
+                }
+                task.Position = newTaskPosition;
             }
 
+            task.UpdatedAt = DateTime.UtcNow;
             await _taskRepository.RestoreAsync(task);
         }
     }
