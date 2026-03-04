@@ -73,6 +73,12 @@ public class ExceptionHandlingMiddleware
     private static string GetCulture(HttpContext context)
     {
         var lang = context.Request.Headers["Accept-Language"].FirstOrDefault();
-        return string.IsNullOrWhiteSpace(lang) ? "vi" : lang.Split(',')[0];
+
+        if (string.IsNullOrWhiteSpace(lang))
+            return "vi";
+
+        var culture = lang.Split(',')[0].Split('-')[0];
+
+        return culture;
     }
 }

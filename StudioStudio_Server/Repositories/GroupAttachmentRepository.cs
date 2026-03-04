@@ -66,5 +66,12 @@ namespace StudioStudio_Server.Repositories
             return await _context.GroupAttachments
                 .AnyAsync(a => a.FileUrl == fileKey && !a.IsDeleted);
         }
+
+        public async Task<long> GetTotalStorageUsedByGroupAsync(Guid groupId)
+        {
+            return await _context.GroupAttachments
+                .Where(a => a.GroupId == groupId && !a.IsDeleted)
+                .SumAsync(a => (long?)a.FileSize) ?? 0L;
+        }
     }
 }

@@ -19,17 +19,39 @@ namespace StudioStudio_Server.Repositories
 
         /// <summary>
         /// Lấy subscription plan của user
-        /// Điều kiện: UserId = {userId}
-        /// Select: Plan info (MaxMembersPerGroup, MaxGroupsPerUser, etc.)
-        /// Use case: Check limits khi tạo group hoặc add member
+        /// Điều kiện: 
+        /// - UserId = {userId} AND IsActive = true AND EndDate > Now
+        /// - Nếu không có active subscription → trả về Free Plan (BillingCycle = Free)
+        /// 
+        /// Select: Plan info (MaxMembersPerGroup, MaxGroups, MaxStorageMb, etc.)
+        /// Use case: Check limits khi tạo group, add member, upload document
         /// </summary>
         public async Task<SubscriptionPlan?> GetSubscriptionPlanByUserIdAsync(Guid userId)
         {
-            return await _db.UserSubscriptions
-                .Where(us => us.UserId == userId)
+            DateTime now = DateTime.UtcNow;
+
+            // Try to get active paid subscription
+            SubscriptionPlan? activePlan = await _db.UserSubscriptions
+                .Where(us => us.UserId == userId && 
+                            us.IsActive && 
+                            us.EndDate > now)
                 .Select(us => us.Plan)
                 .AsNoTracking()
                 .FirstOrDefaultAsync();
+
+            // If user has active subscription, return it
+            if (activePlan != null)
+            {
+                return activePlan;
+            }
+
+            // Otherwise, return Free Plan (BillingCycle = Free)
+            SubscriptionPlan? freePlan = await _db.SubscriptionPlans
+                .Where(sp => sp.BillingCycle == BillingCycle.Free && sp.IsActive)
+                .AsNoTracking()
+                .FirstOrDefaultAsync();
+
+            return freePlan;
         }
     }
 }

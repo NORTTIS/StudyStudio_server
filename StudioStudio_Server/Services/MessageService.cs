@@ -1,10 +1,13 @@
 using StudioStudio_Server.Localization;
+using StudioStudio_Server.Models.Enums;
 
 namespace StudioStudio_Server.Services.Interfaces
 {
     public interface IMessageService
     {
         string GetMessage(string code);
+        string GetMessage(string code, SupportedLanguage language);
+        SupportedLanguage GetCurrentLanguage();
     }
 
     public class MessageService : IMessageService
@@ -20,18 +23,33 @@ namespace StudioStudio_Server.Services.Interfaces
 
         public string GetMessage(string code)
         {
-            var culture = GetCulture();
-            var localizer = new JsonStringLocalizer(_env, culture);
+            var language = GetCurrentLanguage();
+            return GetMessage(code, language);
+        }
+
+        public string GetMessage(string code, SupportedLanguage language)
+        {
+            var cultureCode = language.ToCultureCode();
+            var localizer = new JsonStringLocalizer(_env, cultureCode);
             return localizer.Get(code);
+        }
+
+        public SupportedLanguage GetCurrentLanguage()
+        {
+            var context = _httpContextAccessor.HttpContext;
+            if (context == null)
+            {
+                return SupportedLanguage.Vietnamese; // Default
+            }
+
+            var acceptLanguage = context.Request.Headers["Accept-Language"].FirstOrDefault();
+            return SupportedLanguageExtensions.FromCultureCode(acceptLanguage);
         }
 
         private string GetCulture()
         {
-            var context = _httpContextAccessor.HttpContext;
-            if (context == null) return "vi";
-
-            var lang = context.Request.Headers["Accept-Language"].FirstOrDefault();
-            return string.IsNullOrWhiteSpace(lang) ? "vi" : lang.Split(',')[0];
+            var language = GetCurrentLanguage();
+            return language.ToCultureCode();
         }
     }
 }

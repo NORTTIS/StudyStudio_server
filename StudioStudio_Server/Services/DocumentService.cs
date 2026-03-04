@@ -7,6 +7,7 @@ using StudioStudio_Server.Models.Enums;
 using StudioStudio_Server.Repositories.Interfaces;
 using StudioStudio_Server.Services.Interfaces;
 using StudioStudio_Server.Services.EmbeddingQueue;
+using StudioStudio_Server.Services.DeleteQueue;
 using System.Diagnostics;
 using System.Security.Cryptography;
 using System.Text;
@@ -34,7 +35,10 @@ namespace StudioStudio_Server.Services
         private readonly IUserRepository _userRepository;
         private readonly IServiceScopeFactory _serviceScopeFactory;
         private readonly IEmbeddingQueue _embeddingQueue;
+        private readonly IDeleteQueue _deleteQueue;
         private readonly ILogger<DocumentService> _logger;
+        private readonly IGroupRepository _groupRepository;
+        private readonly IUserSubscriptionRepository _userSubscriptionRepository;
 
         // Allowed file extensions for upload
         private static readonly HashSet<string> AllowedExtensions = new()
@@ -60,7 +64,10 @@ namespace StudioStudio_Server.Services
             IUserRepository userRepository,
             IServiceScopeFactory serviceScopeFactory,
             IEmbeddingQueue embeddingQueue,
-            ILogger<DocumentService> logger)
+            IDeleteQueue deleteQueue,
+            ILogger<DocumentService> logger,
+            IGroupRepository groupRepository,
+            IUserSubscriptionRepository userSubscriptionRepository)
         {
             _attachmentRepository = attachmentRepository;
             _groupParticipantRepository = groupParticipantRepository;
@@ -70,12 +77,15 @@ namespace StudioStudio_Server.Services
             _userRepository = userRepository;
             _serviceScopeFactory = serviceScopeFactory;
             _embeddingQueue = embeddingQueue;
+            _deleteQueue = deleteQueue;
             _logger = logger;
+            _groupRepository = groupRepository;
+            _userSubscriptionRepository = userSubscriptionRepository;
         }
 
         /// <summary>
         /// STEP 1: Request upload URL
-        /// Validate permission → Create metadata → Generate presigned URL
+        /// Validate permission → Check storage quota → Create metadata → Generate presigned URL
         /// </summary>
         public async Task<RequestDocumentUploadResponse> RequestUploadAsync(
             Guid userId,
@@ -110,13 +120,54 @@ namespace StudioStudio_Server.Services
                     StatusCodes.Status400BadRequest);
             }
 
-            // Validate file size (max 10MB)
+            // Validate file size (max 10MB per file)
             if (request.FileSize > 10 * 1024 * 1024)
             {
                 throw new AppException(
                     ErrorCodes.ValidationFileSizeExceeded,
                     StatusCodes.Status400BadRequest);
             }
+
+            // Check storage quota for group
+            Guid groupOwnerId = await _groupRepository.GetGroupOwnerIdAsync(request.GroupId);
+            
+            // Get owner's subscription plan
+            SubscriptionPlan? subscriptionPlan = await _userSubscriptionRepository.GetSubscriptionPlanByUserIdAsync(groupOwnerId);
+            int storageLimit = subscriptionPlan?.MaxStorageMb ?? 500; // Default 500MB
+            long storageLimitBytes = storageLimit * 1024L * 1024L;
+
+            // Get current storage used by group
+            long currentStorageUsed = await _attachmentRepository.GetTotalStorageUsedByGroupAsync(request.GroupId);
+
+            // Check if adding this file exceeds storage quota
+            if (currentStorageUsed + request.FileSize > storageLimitBytes)
+            {
+                long availableStorage = storageLimitBytes - currentStorageUsed;
+                
+                _logger.LogWarning(
+                    "Storage quota exceeded for group {GroupId}. " +
+                    "Current: {CurrentMB:F2}MB, Limit: {LimitMB}MB, " +
+                    "Requested: {RequestedMB:F2}MB, Available: {AvailableMB:F2}MB",
+                    request.GroupId,
+                    currentStorageUsed / (1024.0 * 1024.0),
+                    storageLimit,
+                    request.FileSize / (1024.0 * 1024.0),
+                    availableStorage / (1024.0 * 1024.0));
+
+                throw new AppException(
+                    ErrorCodes.StorageQuotaExceeded,
+                    StatusCodes.Status403Forbidden);
+            }
+
+            _logger.LogInformation(
+                "Storage check passed for group {GroupId}. " +
+                "Current: {CurrentMB:F2}MB/{LimitMB}MB, " +
+                "After upload: {AfterMB:F2}MB ({Percent:F1}%)",
+                request.GroupId,
+                currentStorageUsed / (1024.0 * 1024.0),
+                storageLimit,
+                (currentStorageUsed + request.FileSize) / (1024.0 * 1024.0),
+                (currentStorageUsed + request.FileSize) / (double)storageLimitBytes * 100);
 
             // Create attachment ID and file key for B2
             Guid attachmentId = Guid.NewGuid();
@@ -1127,9 +1178,9 @@ namespace StudioStudio_Server.Services
         }
 
         /// <summary>
-        /// Delete document (soft delete)
+        /// Delete document (soft delete + queue-based vector deletion)
         /// - Set IsDeleted = true in database
-        /// - Delete vectors from Qdrant
+        /// - Enqueue background job to delete vectors from Qdrant
         /// </summary>
         public async Task DeleteDocumentAsync(Guid userId, Guid attachmentId)
         {
@@ -1158,20 +1209,76 @@ namespace StudioStudio_Server.Services
             attachment.IsDeleted = true;
             await _attachmentRepository.UpdateAsync(attachment);
 
-            // Delete vectors from Qdrant
-            if (attachment.ChunkCount.HasValue)
+            // Enqueue delete job for background processing (if document was processed)
+            if (attachment.ChunkCount.HasValue && attachment.ChunkCount.Value > 0)
             {
-                for (int i = 0; i < attachment.ChunkCount.Value; i++)
+                var deleteJob = new DeleteJob
                 {
-                    string vectorId = $"{attachment.GroupId}_{attachment.GroupAttachmentId}_{i}";
-                    await _vectorDbService.DeleteVectorAsync(vectorId);
-                }
+                    AttachmentId = attachmentId,
+                    GroupId = attachment.GroupId,
+                    UserId = userId,
+                    FileName = attachment.FileName,
+                    ChunkCount = attachment.ChunkCount.Value,
+                    QueuedAt = DateTime.UtcNow,
+                    RetryCount = 0,
+                    MaxRetries = 3
+                };
+
+                await _deleteQueue.EnqueueAsync(deleteJob);
+
+                _logger.LogInformation(
+                    "Document deletion queued: AttachmentId={AttachmentId}, " +
+                    "ChunkCount={ChunkCount}, Queue depth={Depth}",
+                    attachmentId, attachment.ChunkCount, _deleteQueue.GetQueueDepth());
+            }
+            else
+            {
+                _logger.LogInformation(
+                    "Document soft-deleted without vector cleanup: AttachmentId={AttachmentId} " +
+                    "(not yet processed or no chunks)",
+                    attachmentId);
+            }
+        }
+
+        /// <summary>
+        /// Generate presigned download URL for document
+        /// Validates user permission before generating URL
+        /// </summary>
+        public async Task<string> GetDocumentDownloadUrlAsync(Guid userId, Guid attachmentId, int expirationMinutes = 60)
+        {
+            GroupAttachment? attachment = await _attachmentRepository.GetByIdAsync(attachmentId);
+
+            if (attachment == null || attachment.IsDeleted)
+            {
+                throw new AppException(
+                    ErrorCodes.ValidationRequiredField,
+                    StatusCodes.Status404NotFound);
             }
 
-            _logger.LogInformation("Document deleted: {AttachmentId}, Chunks deleted: {ChunkCount}",
-                attachmentId, attachment.ChunkCount ?? 0);
+            // Check if user has permission to download document
+            bool isMember = await _groupParticipantRepository.IsUserInGroupAsync(
+                attachment.GroupId,
+                userId);
+
+            if (!isMember)
+            {
+                throw new AppException(
+                    ErrorCodes.GroupPermissionDenied,
+                    StatusCodes.Status403Forbidden);
+            }
+
+            // Generate presigned download URL
+            string downloadUrl = await _fileStorageService.GeneratePresignedDownloadUrlAsync(
+                attachment.FileUrl,
+                expirationMinutes);
+
+            _logger.LogInformation(
+                "Download URL generated: AttachmentId={AttachmentId}, File={FileName}, ExpiresIn={Minutes}min",
+                attachmentId, attachment.FileName, expirationMinutes);
+
+            return downloadUrl;
         }
-        
+
         private string GenerateDeterministicUuid(string input)
         {
             using var md5 = MD5.Create();
