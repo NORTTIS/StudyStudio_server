@@ -37,6 +37,7 @@
   "GROUP019": "You do not have permission to delete this task status. Only owner and moderator can delete it",
   "GROUP020": "You can only create a task when a task status is provided",
   "GROUP021": "This task status name already existed",
+  "GROUP022": "This position is already taken by another task status",
 
   "STUDIO001": "You have reached the limit of studios you can create",
 

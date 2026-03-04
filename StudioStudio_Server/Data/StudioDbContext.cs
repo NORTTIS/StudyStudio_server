@@ -130,7 +130,7 @@ namespace StudioStudio_Server.Data
                 e.HasKey(x => x.StatusId);
 
                 e.Property(x => x.StatusName).IsRequired();
-
+                
                 e.HasIndex(x => new { x.GroupId, x.Position })
                     .IsUnique();
             });

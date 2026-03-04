@@ -45,6 +45,7 @@
         public const string GroupDeleteTaskStatusDenied = "GROUP019";
         public const string GroupCreateTaskDeniedMissingStatus = "GROUP020";
         public const string GroupTaskStatusNameExist = "GROUP021";
+        public const string GroupTaskStatusPositionExist = "GROUP022";
 
         // STUDIO
         public const string StudioLimitReached = "STUDIO001";
