@@ -87,10 +87,15 @@ builder.Services.AddScoped<ILLMService, GeminiLLMService>();
 builder.Services.AddScoped<IGroupAttachmentRepository, GroupAttachmentRepository>();
 builder.Services.AddScoped<IDocumentService, DocumentService>();
 builder.Services.AddScoped<IAIService, AIService>();
+builder.Services.AddScoped<IAIRequestLogRepository, AIRequestLogRepository>();
 
 // Embedding Queue & Background Service
 builder.Services.AddSingleton<StudioStudio_Server.Services.EmbeddingQueue.IEmbeddingQueue, StudioStudio_Server.Services.EmbeddingQueue.EmbeddingQueue>();
 builder.Services.AddHostedService<StudioStudio_Server.Services.EmbeddingQueue.EmbeddingBackgroundService>();
+
+// Delete Queue & Background Service
+builder.Services.AddSingleton<StudioStudio_Server.Services.DeleteQueue.IDeleteQueue, StudioStudio_Server.Services.DeleteQueue.DeleteQueue>();
+builder.Services.AddHostedService<StudioStudio_Server.Services.DeleteQueue.DeleteBackgroundService>();
 
 
 builder.Services.AddControllers(options =>

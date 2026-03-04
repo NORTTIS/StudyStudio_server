@@ -177,5 +177,47 @@ namespace StudioStudio_Server.Controllers
                 message,
                 null));
         }
+
+        /// <summary>
+        /// [AUTHORIZED] GET /api/documents/{attachmentId}/download
+        /// Get presigned download URL for document
+        /// 
+        /// Validate: User must be member of group
+        /// Returns: Presigned URL valid for 60 minutes (default)
+        /// </summary>
+        [HttpGet("{attachmentId}/download")]
+        public async Task<ActionResult<ApiResponse<DocumentDownloadUrlResponse>>> GetDownloadUrl(
+            Guid attachmentId,
+            [FromQuery] int expirationMinutes = 60)
+        {
+            Guid userId = ValidateAndGetUserId();
+
+            // Validate expiration range (1-1440 minutes = 1 minute to 24 hours)
+            if (expirationMinutes < 1 || expirationMinutes > 1440)
+            {
+                throw new AppException(
+                    ErrorCodes.ValidationRequiredField,
+                    StatusCodes.Status400BadRequest);
+            }
+
+            string downloadUrl = await _documentService.GetDocumentDownloadUrlAsync(
+                userId,
+                attachmentId,
+                expirationMinutes);
+
+            string message = _messageService.GetMessage(ErrorCodes.SuccessGetData);
+
+            var response = new DocumentDownloadUrlResponse
+            {
+                AttachmentId = attachmentId,
+                DownloadUrl = downloadUrl,
+                ExpiresIn = expirationMinutes * 60 // Convert to seconds
+            };
+
+            return Ok(ApiResponse<DocumentDownloadUrlResponse>.Success(
+                ErrorCodes.SuccessGetData,
+                message,
+                response));
+        }
     }
 }

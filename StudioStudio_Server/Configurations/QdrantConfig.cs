@@ -28,8 +28,9 @@ namespace StudioStudio_Server.Configurations
         public int VectorSize { get; set; } = 758;
 
         /// <summary>
-        /// Timeout for requests (seconds, default: 10)
+        /// Timeout for requests (seconds, default: 30)
+        /// Increased from 20 to 30 to handle slower delete operations
         /// </summary>
-        public int TimeoutSeconds { get; set; } = 10;
+        public int TimeoutSeconds { get; set; } = 30;
     }
 }

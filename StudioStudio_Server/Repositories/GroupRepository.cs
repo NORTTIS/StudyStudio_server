@@ -168,5 +168,20 @@ namespace StudioStudio_Server.Repositories
             _db.Groups.Update(group);
             await _db.SaveChangesAsync();
         }
+
+        /// <summary>
+        /// Get group owner ID
+        /// Condition: GroupId = {groupId} AND IsActive = true
+        /// Returns: UserId of Owner
+        /// </summary>
+        public async Task<Guid> GetGroupOwnerIdAsync(Guid groupId)
+        {
+            var owner = await _db.GroupParticipants
+                .Where(p => p.GroupId == groupId && p.Role == GroupRole.Owner)
+                .Select(p => p.UserId)
+                .FirstOrDefaultAsync();
+            
+            return owner;
+        }
     }
 }

@@ -9,7 +9,7 @@ using System.Diagnostics;
 namespace StudioStudio_Server.Services
 {
     /// <summary>
-    /// Service xử lý AI Question & Answer với Hybrid RAG
+    /// Service for AI Question & Answer with Hybrid RAG
     /// Flow: Question → Embed → Qdrant Search → Task Stats → LLM → Response
     /// Hybrid RAG = Document Context + Task Statistics
     /// LLM: Gemini 2.5 Flash (primary) with fallback to Gemini 1.5 Flash
@@ -21,6 +21,8 @@ namespace StudioStudio_Server.Services
         private readonly IVectorDatabaseService _vectorDbService;
         private readonly ITaskRepository _taskRepository;
         private readonly ILLMService _llmService;
+        private readonly IUserSubscriptionRepository _userSubscriptionRepository;
+        private readonly IAIRequestLogRepository _aiRequestLogRepository;
         private readonly ILogger<AIService> _logger;
 
         public AIService(
@@ -29,6 +31,8 @@ namespace StudioStudio_Server.Services
             IVectorDatabaseService vectorDbService,
             ITaskRepository taskRepository,
             ILLMService llmService,
+            IUserSubscriptionRepository userSubscriptionRepository,
+            IAIRequestLogRepository aiRequestLogRepository,
             ILogger<AIService> logger)
         {
             _groupParticipantRepository = groupParticipantRepository;
@@ -36,18 +40,22 @@ namespace StudioStudio_Server.Services
             _vectorDbService = vectorDbService;
             _taskRepository = taskRepository;
             _llmService = llmService;
+            _userSubscriptionRepository = userSubscriptionRepository;
+            _aiRequestLogRepository = aiRequestLogRepository;
             _logger = logger;
         }
 
         /// <summary>
-        /// Xử lý câu hỏi từ user với Hybrid RAG approach
+        /// Process user question with Hybrid RAG approach
+        /// Step 0: Check AI rate limiting
         /// Step 1: Validate permission
         /// Step 2: Embed question
         /// Step 3: Search Qdrant (filtered by groupId)
         /// Step 4: Get task statistics
         /// Step 5: Build context
         /// Step 6: Call LLM
-        /// Step 7: Return response
+        /// Step 7: Log AI request
+        /// Step 8: Return response
         /// </summary>
         public async Task<AIAnswerResponse> AskQuestionAsync(
             Guid userId,
@@ -59,7 +67,30 @@ namespace StudioStudio_Server.Services
 
             try
             {
-                // Step 1: Validate permission - User phải là member của group
+                // Step 0: Check AI rate limiting
+                DateTime startOfDay = DateTime.UtcNow.Date;
+                int todayRequests = await _aiRequestLogRepository.CountTodayRequestsAsync(userId, startOfDay);
+
+                // Get user's subscription plan to check rate limit
+                SubscriptionPlan? subscriptionPlan = await _userSubscriptionRepository.GetSubscriptionPlanByUserIdAsync(userId);
+                int dailyLimit = subscriptionPlan?.MaxAiRequestsPerDay ?? 20; // Default: Free Plan = 20
+
+                if (todayRequests >= dailyLimit)
+                {
+                    _logger.LogWarning(
+                        "AI rate limit exceeded: UserId={UserId}, Today={Today}, Limit={Limit}",
+                        userId, todayRequests, dailyLimit);
+
+                    throw new AppException(
+                        ErrorCodes.AIRateLimitExceeded,
+                        StatusCodes.Status429TooManyRequests);
+                }
+
+                _logger.LogInformation(
+                    "AI rate limit check passed: UserId={UserId}, Requests={Today}/{Limit}",
+                    userId, todayRequests, dailyLimit);
+
+                // Step 1: Validate permission - User must be a member of the group
                 bool isMember = await _groupParticipantRepository.IsUserInGroupAsync(
                     request.GroupId,
                     userId);
@@ -75,13 +106,13 @@ namespace StudioStudio_Server.Services
                     "AI Question: UserId={UserId}, GroupId={GroupId}, Question={Question}, Language={Language}",
                     userId, request.GroupId, request.Question, language);
 
-                // Step 2: Embed question - Chuyển câu hỏi thành vector 768 dimensions
+                // Step 2: Embed question - Convert question to 768-dimensional vector
                 _logger.LogInformation("Step 2: Embedding question...");
                 float[] questionEmbedding = await _embeddingService.GenerateEmbeddingAsync(
                     request.Question,
                     cancellationToken);
 
-                // Step 3: Search Qdrant - Tìm top 3 chunks liên quan nhất trong group
+                // Step 3: Search Qdrant - Find top 3 most relevant chunks in the group
                 _logger.LogInformation("Step 3: Searching Qdrant for relevant documents...");
                 List<VectorSearchResponse.SearchResult> searchResults =
                     await _vectorDbService.SearchVectorsAsync(
@@ -92,13 +123,13 @@ namespace StudioStudio_Server.Services
 
                 _logger.LogInformation("Found {Count} relevant document chunks", searchResults.Count);
 
-                // Step 4: Task Statistics - Lấy thống kê tasks của group
+                // Step 4: Task Statistics - Get task statistics for the group
                 _logger.LogInformation("Step 4: Calculating task statistics...");
                 TaskSummaryResponse taskSummary = await GetTaskSummaryAsync(
                     request.GroupId,
                     cancellationToken);
 
-                // Step 5: Build Context - Kết hợp document context + task stats
+                // Step 5: Build Context - Combine document context + task stats
                 _logger.LogInformation("Step 5: Building context...");
                 string context = BuildContext(searchResults, taskSummary, language);
 
@@ -113,7 +144,21 @@ namespace StudioStudio_Server.Services
 
                 sw.Stop();
 
-                // Step 7: Build Response
+                // Step 7: Log AI request (estimate tokens)
+                int estimatedTokens = EstimateTokenUsage(request.Question, answer, context);
+                await _aiRequestLogRepository.AddAsync(new AIRequestLog
+                {
+                    RequestId = Guid.NewGuid(),
+                    UserId = userId,
+                    TokenUsed = estimatedTokens,
+                    CreatedAt = DateTime.UtcNow
+                });
+
+                _logger.LogInformation(
+                    "AI request logged: UserId={UserId}, Tokens={Tokens}, Requests today={Today}/{Limit}",
+                    userId, estimatedTokens, todayRequests + 1, dailyLimit);
+
+                // Step 8: Build Response
                 AIAnswerResponse response = new AIAnswerResponse
                 {
                     Answer = answer,
@@ -153,7 +198,7 @@ namespace StudioStudio_Server.Services
         }
 
         /// <summary>
-        /// Lấy system prompt theo ngôn ngữ
+        /// Get system prompt based on language
         /// </summary>
         private string GetSystemPrompt(string language)
         {
@@ -188,8 +233,8 @@ namespace StudioStudio_Server.Services
         }
 
         /// <summary>
-        /// Lấy thống kê tasks của group từ PostgreSQL
-        /// Sử dụng repository method để lấy thông tin đầy đủ
+        /// Get task statistics for the group from PostgreSQL
+        /// Uses repository method to retrieve complete information
         /// </summary>
         private async Task<TaskSummaryResponse> GetTaskSummaryAsync(
             Guid groupId,
@@ -199,9 +244,9 @@ namespace StudioStudio_Server.Services
         }
 
         /// <summary>
-        /// Build context string để gửi cho LLM
-        /// Kết hợp: Document chunks + Task statistics
-        /// Support multi-language
+        /// Build context string to send to LLM
+        /// Combines: Document chunks + Task statistics
+        /// Supports multi-language
         /// </summary>
         private string BuildContext(
             List<VectorSearchResponse.SearchResult> documents,
@@ -269,7 +314,7 @@ namespace StudioStudio_Server.Services
         }
 
         /// <summary>
-        /// Truncate text để tạo preview
+        /// Truncate text to create preview
         /// </summary>
         private string TruncateText(string text, int maxLength)
         {
@@ -279,6 +324,22 @@ namespace StudioStudio_Server.Services
             }
 
             return text.Substring(0, maxLength) + "...";
+        }
+
+        /// <summary>
+        /// Estimate token usage for AI request
+        /// Formula: Question + Answer + Context (approx 1 token per 4 chars)
+        /// Use case: Logging, analytics, potential future billing
+        /// </summary>
+        private int EstimateTokenUsage(string question, string answer, string context)
+        {
+            int totalChars = question.Length + answer.Length + context.Length;
+            
+            // Rough estimate: 1 token ≈ 4 characters
+            int estimatedTokens = totalChars / 4;
+            
+            // Minimum 100 tokens (for very short requests)
+            return Math.Max(estimatedTokens, 100);
         }
     }
 }
