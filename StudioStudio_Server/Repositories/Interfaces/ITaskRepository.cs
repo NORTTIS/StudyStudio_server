@@ -11,8 +11,9 @@ namespace StudioStudio_Server.Repositories.Interfaces
         Task AddAsync(TaskItem task);
         Task UpdateAsync(TaskItem task);
         Task SoftDeleteAsync(Guid taskId);
-        Task RestoreAsync(Guid taskId);
+        Task RestoreAsync(TaskItem task);
         Task<List<TaskItem>> GetSoftDeleteTaskByGroup(Guid groupId);
-        Task<List<TaskItem>> GetAllTasksByStatusId(Guid statusId);
+        Task<List<TaskItem>> GetAllTasksByStatusIdAsync(Guid statusId);
+        Task SaveChangesAsync();
     }
 }

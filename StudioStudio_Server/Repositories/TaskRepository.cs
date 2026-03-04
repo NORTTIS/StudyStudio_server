@@ -121,16 +121,12 @@ namespace StudioStudio_Server.Repositories
         /// Restore task
         /// Set IsPendingDeleted = false, UpdatedAt = UtcNow
         /// </summary>
-        public async Task RestoreAsync(Guid taskId)
+        public async Task RestoreAsync(TaskItem task)
         {
-            var task = await _context.Tasks.FirstOrDefaultAsync(t => t.TaskId == taskId);
-            if (task != null)
-            {
-                task.IsPendingDeleted = false;
-                task.UpdatedAt = DateTime.UtcNow;
-                _context.Tasks.Update(task);
-                await _context.SaveChangesAsync();
-            }
+            task.IsPendingDeleted = false;
+            task.UpdatedAt = DateTime.UtcNow;
+            _context.Tasks.Update(task);
+            await _context.SaveChangesAsync();
         }
 
         /// <summary>
@@ -175,13 +171,17 @@ namespace StudioStudio_Server.Repositories
                 .ToListAsync();
         }
 
-        public async Task<List<TaskItem>> GetAllTasksByStatusId(Guid statusId)
+        public async Task<List<TaskItem>> GetAllTasksByStatusIdAsync(Guid statusId)
         {
             return await _context.Tasks
                 .Where(t => t.GroupStatusId == statusId && !t.IsPendingDeleted)
                 .AsNoTracking()
                 .OrderBy(t => t.Position)
                 .ToListAsync();
+        }
+        public async Task SaveChangesAsync()
+        {
+            await _context.SaveChangesAsync();
         }
     }
 }

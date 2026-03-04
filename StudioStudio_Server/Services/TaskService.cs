@@ -1,4 +1,5 @@
-﻿using StudioStudio_Server.Exceptions;
+﻿using Microsoft.IdentityModel.Tokens;
+using StudioStudio_Server.Exceptions;
 using StudioStudio_Server.Models.DTOs.Request;
 using StudioStudio_Server.Models.DTOs.Response;
 using StudioStudio_Server.Repositories.Interfaces;
@@ -43,7 +44,7 @@ namespace StudioStudio_Server.Services
 
             var groupStatus = await _groupTaskStatusRepository.GetDetailAsync(request.GroupId);
 
-            var existingTask = await _taskRepository.GetAllTasksByStatusId(request.GroupStatusId.Value);
+            var existingTask = await _taskRepository.GetAllTasksByStatusIdAsync(request.GroupStatusId.Value);
             int newTaskPosition = 0;
             if (existingTask.Any())
             {
@@ -118,14 +119,39 @@ namespace StudioStudio_Server.Services
             await _taskRepository.SoftDeleteAsync(taskId);
         }
 
-        public async Task RestoreTaskAsync(Guid userId, Guid groupId, Guid taskId)
+        public async Task RestoreGroupTaskAsync(Guid userId, Guid groupId, Guid taskId)
         {
             var userRole = await _participantRepository.GetGroupRoleByUserIdAsync(userId, groupId);
             if (!userRole.Equals(GroupRole.Owner) && !userRole.Equals(GroupRole.Moderator))
             {
                 throw new AppException(ErrorCodes.GroupRestoreTaskDenined, StatusCodes.Status401Unauthorized);
             }
-            await _taskRepository.RestoreAsync(taskId);
+
+            var task = await _taskRepository.GetByIdAsync(taskId);
+
+            if (task == null)
+            {
+                return;
+            }
+
+            var statusList = await _groupTaskStatusRepository.GetByGroupIdAsync(groupId);
+
+            //case where group delete all status
+            if (!statusList.Any())
+            {
+                throw new AppException(ErrorCodes.GroupRestoreTaskFailed, StatusCodes.Status400BadRequest);
+            }
+
+            //case where old task status have been deleted
+            if (!task.GroupStatusId.HasValue)
+            {
+                task.GroupStatusId = statusList
+                    .OrderBy(s => s.Position)
+                    .First()
+                    .StatusId;
+            }
+
+            await _taskRepository.RestoreAsync(task);
         }
     }
 }
