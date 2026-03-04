@@ -123,7 +123,16 @@ namespace StudioStudio_Server.Services
                     StatusCodes.Status400BadRequest);
             }
 
-            var targetMember = await GetParticipantOrThrowAsync(request.GroupId, request.UserId);
+            var targetMember = await _groupParticipantRepository
+                .GetByGroupAndUserTrackedAsync(request.GroupId, request.UserId);
+
+            if (targetMember == null)
+            {
+                throw new AppException(
+                    ErrorCodes.GroupMemberNotFound,
+                    StatusCodes.Status404NotFound);
+            }
+
             var oldRole = targetMember.Role;
 
             if (newRole == GroupRole.Owner)

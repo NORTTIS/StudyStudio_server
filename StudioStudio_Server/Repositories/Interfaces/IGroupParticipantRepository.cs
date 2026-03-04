@@ -9,6 +9,7 @@ namespace StudioStudio_Server.Repositories.Interfaces
         Task<int> GetParticipantCountByGroupIdAsync(Guid groupId);
         Task<bool> IsUserInGroupAsync(Guid groupId, Guid userId);
         Task<GroupParticipant?> GetByGroupAndUserAsync(Guid groupId, Guid userId);
+        Task<GroupParticipant?> GetByGroupAndUserTrackedAsync(Guid groupId, Guid userId);
         Task<GroupParticipant?> GetByUserAndGroupAsync(Guid userId, Guid groupId);
         Task RemoveAsync(GroupParticipant participant);
         Task UpdateAsync(GroupParticipant participant);
