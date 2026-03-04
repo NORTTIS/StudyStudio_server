@@ -30,6 +30,17 @@ namespace StudioStudio_Server.Repositories
         }
 
         /// <summary>
+        /// Get participant record by GroupId and UserId with tracking enabled
+        /// Condition: GroupId = {groupId} AND UserId = {userId}
+        /// Use case: For updates
+        /// </summary>
+        public async Task<GroupParticipant?> GetByGroupAndUserTrackedAsync(Guid groupId, Guid userId)
+        {
+            return await _context.GroupParticipants
+                .FirstOrDefaultAsync(gp => gp.GroupId == groupId && gp.UserId == userId);
+        }
+
+        /// <summary>
         /// Get participant record by UserId and GroupId (alias of GetByGroupAndUserAsync)
         /// </summary>
         public async Task<GroupParticipant?> GetByUserAndGroupAsync(Guid userId, Guid groupId)
@@ -116,7 +127,18 @@ namespace StudioStudio_Server.Repositories
         /// </summary>
         public async Task UpdateAsync(GroupParticipant participant)
         {
-            _context.GroupParticipants.Update(participant);
+            var existingEntry = _context.ChangeTracker.Entries<GroupParticipant>()
+                .FirstOrDefault(e => e.Entity.ParticipantId == participant.ParticipantId);
+
+            if (existingEntry != null)
+            {
+                existingEntry.CurrentValues.SetValues(participant);
+            }
+            else
+            {
+                _context.GroupParticipants.Update(participant);
+            }
+            
             await _context.SaveChangesAsync();
         }
 
