@@ -23,6 +23,7 @@ namespace StudioStudio_Server.Services
         private readonly ITaskRepository _taskRepository;
         private readonly ITemplateRepository _templateRepository;
         private readonly IGroupTaskStatusRepository _groupTaskStatusRepository;
+        private readonly ITaskAssignmentRepository _taskAssignmentRepository;
 
         public GroupService(
             ILogger<GroupService> logger,
@@ -35,7 +36,8 @@ namespace StudioStudio_Server.Services
             IGroupParticipantRepository groupParticipantRepository,
             ITaskRepository taskRepository,
             ITemplateRepository templateRepository,
-            IGroupTaskStatusRepository groupTaskStatusRepository)
+            IGroupTaskStatusRepository groupTaskStatusRepository,
+            ITaskAssignmentRepository taskAssignmentRepository)
         {
             _logger = logger;
             _messageService = messageService;
@@ -48,6 +50,7 @@ namespace StudioStudio_Server.Services
             _taskRepository = taskRepository;
             _templateRepository = templateRepository;
             _groupTaskStatusRepository = groupTaskStatusRepository;
+            _taskAssignmentRepository = taskAssignmentRepository;
         }
 
         public async Task<GroupListResponse> GetGroupsAsync(Guid userId)
@@ -206,6 +209,17 @@ namespace StudioStudio_Server.Services
             // Get task statuses
             var taskStatuses = await _groupTaskStatusRepository.GetByGroupIdAsync(groupId);
 
+            // Get tasks
+            var taskStatusIdList = taskStatuses.Select(s => s.StatusId).ToList();
+            var taskList = await _taskRepository.GetListTasksByListStatusId(taskStatusIdList);
+
+            // Get assinees
+            var taskIdList = taskList.SelectMany(t => t.Value).Select(id => id.TaskId).ToList();
+            var assignees = await _taskAssignmentRepository.GetListAssigneesByListTaskId(taskIdList);
+            var userIdList = assignees.SelectMany(t => t.Value).Select(a => a.AssignedTo).Distinct().ToList();
+            var assigneeUsers = await _userRepository.GetByIdsAsync(userIdList);
+            var assigneeUserDict = assigneeUsers.ToDictionary(u => u.UserId, u => u);
+
             // Check if group is a template
             var template = await _templateRepository.GetByGroupIdAsync(groupId);
 
@@ -236,7 +250,33 @@ namespace StudioStudio_Server.Services
                 {
                     StatusId = ts.StatusId,
                     StatusName = ts.StatusName,
-                    Position = ts.Position
+                    Position = ts.Position,
+                    TaskList = taskList[ts.StatusId].Select(t => new TaskItemResponse
+                    {
+                        TaskId = t.TaskId,
+                        TaskTitle = t.Title,
+                        TaskDescription = t.Description,
+                        TaskPriority = t.Priority,
+                        TaskSeverity = t.Severity,
+                        Position = t.Position,
+                        CreatedById = t.OwnerId,
+                        CreatedAt = t.CreatedAt,
+                        StartDate = t.StartDate!.Value,
+                        DueDate = t.DueDate!.Value,
+                        Assignee = assignees.TryGetValue(t.TaskId, out var taskAssignees)
+                            ? taskAssignees.Select(a =>
+                            {
+                                var user = assigneeUserDict.GetValueOrDefault(a.AssignedTo);
+                                return user != null ? new UserDto
+                                {
+                                    Id = user.UserId,
+                                    FirstName = user.FirstName,
+                                    LastName = user.LastName,
+                                    AvatarUrl = user.AvatarUrl
+                                } : new UserDto();
+                            }).Where(u => u != null).ToList()
+                            : new List<UserDto>()
+                    }).ToList()
                 }).ToList()
             };
         }

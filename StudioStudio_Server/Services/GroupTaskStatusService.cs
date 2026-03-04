@@ -12,12 +12,15 @@ namespace StudioStudio_Server.Services
     {
         private readonly IGroupTaskStatusRepository _groupTaskStatusRepository;
         private readonly IGroupParticipantRepository _participantRepository;
+        private readonly ITaskRepository _taskRepository;
         public GroupTaskStatusService(
             IGroupTaskStatusRepository groupTaskStatusRepository,
-            IGroupParticipantRepository participantRepository)
+            IGroupParticipantRepository participantRepository,
+            ITaskRepository taskRepository)
         {
             _groupTaskStatusRepository = groupTaskStatusRepository;
             _participantRepository = participantRepository;
+            _taskRepository = taskRepository;
         }
         public async Task<GroupTaskStatusResponse> CreateNewGroupTaskStatus(Guid userId, Guid groupId, GroupTaskStatusRequest request)
         {
@@ -83,6 +86,17 @@ namespace StudioStudio_Server.Services
             var taskStatus = await _groupTaskStatusRepository.GetDetailAsync(taskStatusId);
             if (taskStatus != null)
             {
+                var taskList = await _taskRepository.GetAllTasksByStatusIdAsync(taskStatusId);
+                if (taskList != null)
+                {
+                    foreach (var task in taskList)
+                    {
+                        task.IsPendingDeleted = true;
+                        task.GroupStatusId = null;
+                        task.UpdatedAt = DateTime.UtcNow;
+                    }
+                    await _taskRepository.SaveChangesAsync();
+                }
                 await _groupTaskStatusRepository.SoftDeleteAsync(taskStatus);
             }
         }

@@ -48,6 +48,7 @@
         public const string GroupTaskStatusPositionExist = "GROUP022";
         public const string GroupDeleteTaskDenined = "GROUP023";
         public const string GroupRestoreTaskDenined = "GROUP024";
+        public const string GroupRestoreTaskFailed = "GROUP025";
 
         // STUDIO
         public const string StudioLimitReached = "STUDIO001";

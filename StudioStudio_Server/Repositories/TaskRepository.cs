@@ -3,6 +3,7 @@ using StudioStudio_Server.Data;
 using StudioStudio_Server.Models.DTOs.Response;
 using StudioStudio_Server.Models.Entities;
 using StudioStudio_Server.Repositories.Interfaces;
+using System.Collections.Generic;
 
 namespace StudioStudio_Server.Repositories
 {
@@ -121,16 +122,12 @@ namespace StudioStudio_Server.Repositories
         /// Restore task
         /// Set IsPendingDeleted = false, UpdatedAt = UtcNow
         /// </summary>
-        public async Task RestoreAsync(Guid taskId)
+        public async Task RestoreAsync(TaskItem task)
         {
-            var task = await _context.Tasks.FirstOrDefaultAsync(t => t.TaskId == taskId);
-            if (task != null)
-            {
-                task.IsPendingDeleted = false;
-                task.UpdatedAt = DateTime.UtcNow;
-                _context.Tasks.Update(task);
-                await _context.SaveChangesAsync();
-            }
+            task.IsPendingDeleted = false;
+            task.UpdatedAt = DateTime.UtcNow;
+            _context.Tasks.Update(task);
+            await _context.SaveChangesAsync();
         }
 
         /// <summary>
@@ -175,13 +172,34 @@ namespace StudioStudio_Server.Repositories
                 .ToListAsync();
         }
 
-        public async Task<List<TaskItem>> GetAllTasksByStatusId(Guid statusId)
+        public async Task<List<TaskItem>> GetAllTasksByStatusIdAsync(Guid statusId)
         {
             return await _context.Tasks
                 .Where(t => t.GroupStatusId == statusId && !t.IsPendingDeleted)
                 .AsNoTracking()
                 .OrderBy(t => t.Position)
                 .ToListAsync();
+        }
+        public async Task SaveChangesAsync()
+        {
+            await _context.SaveChangesAsync();
+        }
+
+        public async Task<Dictionary<Guid, List<TaskItem>>> GetListTasksByListStatusId(List<Guid> listStatusIds)
+        {
+            Dictionary<Guid, List<TaskItem>> result = new Dictionary<Guid, List<TaskItem>>();
+
+            foreach (var statusId in listStatusIds)
+            {
+                var tasks = await _context.Tasks
+                    .Where(t => t.GroupStatusId == statusId && !t.IsPendingDeleted)
+                    .AsNoTracking()
+                    .ToListAsync();
+
+                result[statusId] = tasks;
+            }
+
+            return result;
         }
     }
 }

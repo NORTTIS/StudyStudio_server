@@ -1,6 +1,9 @@
-﻿using StudioStudio_Server.Exceptions;
+﻿using Microsoft.IdentityModel.Tokens;
+using Org.BouncyCastle.Asn1.Ocsp;
+using StudioStudio_Server.Exceptions;
 using StudioStudio_Server.Models.DTOs.Request;
 using StudioStudio_Server.Models.DTOs.Response;
+using StudioStudio_Server.Models.Entities;
 using StudioStudio_Server.Repositories.Interfaces;
 using StudioStudio_Server.Services.Interfaces;
 
@@ -13,19 +16,28 @@ namespace StudioStudio_Server.Services
         private readonly ITaskRepository _taskRepository;
         private readonly IGroupParticipantRepository _participantRepository;
         private readonly IGroupTaskStatusRepository _groupTaskStatusRepository;
+        private readonly ITaskAssignmentRepository _taskAssignmentRepository;
+        private readonly IUserRepository _userRepository;
+        private readonly ITaskHistoryRepository _taskHistoryRepository;
 
         public TaskService(
             ITaskRepository taskRepository,
             ILogger<TaskService> logger,
             IMessageService message,
             IGroupParticipantRepository participantRepository,
-            IGroupTaskStatusRepository groupTaskStatusRepository)
+            IGroupTaskStatusRepository groupTaskStatusRepository,
+            ITaskAssignmentRepository taskAssignmentRepository,
+            IUserRepository userRepository,
+            ITaskHistoryRepository taskHistoryRepository)
         {
             _taskRepository = taskRepository;
             _logger = logger;
             _messageService = message;
             _participantRepository = participantRepository;
             _groupTaskStatusRepository = groupTaskStatusRepository;
+            _taskAssignmentRepository = taskAssignmentRepository;
+            _userRepository = userRepository;
+            _taskHistoryRepository = taskHistoryRepository;
         }
 
         public async Task<TaskItemResponse> AddGroupTaskAsync(Guid userId, TaskItemGroupRequest request)
@@ -43,7 +55,7 @@ namespace StudioStudio_Server.Services
 
             var groupStatus = await _groupTaskStatusRepository.GetDetailAsync(request.GroupId);
 
-            var existingTask = await _taskRepository.GetAllTasksByStatusId(request.GroupStatusId.Value);
+            var existingTask = await _taskRepository.GetAllTasksByStatusIdAsync(request.GroupStatusId.Value);
             int newTaskPosition = 0;
             if (existingTask.Any())
             {
@@ -85,6 +97,37 @@ namespace StudioStudio_Server.Services
 
             await _taskRepository.AddAsync(taskItem);
 
+            List<TaskAssignment> taskAssignments = new List<TaskAssignment>();
+            if (request.Assignees.Any())
+            {
+                taskAssignments = request.Assignees.Select(assignedId => new TaskAssignment
+                {
+                    AssignmentId = Guid.NewGuid(),
+                    TaskId = taskItem.TaskId,
+                    AssignedTo = assignedId,
+                    AssignedBy = userId,
+                    AssignedAt = now
+                }).ToList();
+
+                await _taskAssignmentRepository.AddRangeAsync(taskAssignments);
+            }
+
+            List<UserDto> assignerDetail = new List<UserDto>();
+            if (taskAssignments.Any())
+            {
+                foreach (var u in taskAssignments)
+                {
+                    var user = await _userRepository.GetByIdAsync(u.AssignedTo);
+                    assignerDetail.Add(new UserDto
+                    {
+                        Id = user!.UserId,
+                        FirstName = user!.FirstName,
+                        LastName = user!.LastName,
+                        AvatarUrl = user!.AvatarUrl,
+                    });
+                }
+            }
+
             return new TaskItemResponse
             {
                 TaskId = taskItem.TaskId,
@@ -100,10 +143,10 @@ namespace StudioStudio_Server.Services
                 GroupStatus = new GroupTaskStatusDto
                 {
                     GroupId = request.GroupId,
-                    StatusName = groupStatus.StatusName,
+                    StatusName = groupStatus!.StatusName,
                     Position = groupStatus.Position
                 },
-                Assignee = new List<UserDto>()
+                Assignee = assignerDetail
             };
         }
 
@@ -116,16 +159,80 @@ namespace StudioStudio_Server.Services
             }
 
             await _taskRepository.SoftDeleteAsync(taskId);
+            await _taskHistoryRepository.AddAsync(new TaskHistory
+            {
+                HistoryId = Guid.NewGuid(),
+                TaskId = taskId,
+                ChangedBy = userId,
+                ChangedAt = DateTime.UtcNow,
+                ChangedContent = "DELETE"
+            });
         }
 
-        public async Task RestoreTaskAsync(Guid userId, Guid groupId, Guid taskId)
+        public async Task RestoreGroupTaskAsync(Guid userId, Guid groupId, Guid taskId)
         {
             var userRole = await _participantRepository.GetGroupRoleByUserIdAsync(userId, groupId);
             if (!userRole.Equals(GroupRole.Owner) && !userRole.Equals(GroupRole.Moderator))
             {
                 throw new AppException(ErrorCodes.GroupRestoreTaskDenined, StatusCodes.Status401Unauthorized);
             }
-            await _taskRepository.RestoreAsync(taskId);
+
+            var task = await _taskRepository.GetByIdAsync(taskId);
+
+            if (task == null)
+            {
+                return;
+            }
+
+            var statusList = await _groupTaskStatusRepository.GetByGroupIdAsync(groupId);
+
+            //case where group delete all status
+            if (!statusList.Any())
+            {
+                throw new AppException(ErrorCodes.GroupRestoreTaskFailed, StatusCodes.Status400BadRequest);
+            }
+
+            //case where old task status have been deleted
+            if (!task.GroupStatusId.HasValue)
+            {
+                var firstStatus = statusList.OrderBy(s => s.Position).First();
+                task.GroupStatusId = firstStatus.StatusId;
+                var existingTask = await _taskRepository.GetAllTasksByStatusIdAsync(firstStatus.StatusId);
+                int newTaskPosition = 0;
+                if (existingTask.Any())
+                {
+                    newTaskPosition = existingTask.Max(s => s.Position) + 1000;
+                }
+                else
+                {
+                    newTaskPosition = 1000;
+                }
+                task.Position = newTaskPosition;
+            }
+
+            task.UpdatedAt = DateTime.UtcNow;
+            await _taskRepository.RestoreAsync(task);
+        }
+        public async Task<List<TaskDeleteResponse>> GetDeleteTaskListAsync(Guid userId, Guid groupId)
+        {
+            var existedUser = await _participantRepository.GetByGroupAndUserAsync(groupId, userId);
+            if (existedUser == null)
+            {
+                throw new AppException(ErrorCodes.AuthForbidden, StatusCodes.Status400BadRequest);
+            }
+
+            var taskList = await _taskRepository.GetSoftDeleteTaskByGroup(groupId);
+            var taskListId = taskList.Select(t => t.TaskId).ToList();
+            var taskHistory = await _taskHistoryRepository.GetListTaskHistoryByTaskIdsAsync(taskListId);
+
+            var result = taskHistory.Select(t => new TaskDeleteResponse
+            {
+                TaskName = taskList.FirstOrDefault(task => task.TaskId == t.TaskId)?.Title ?? "Unknown Task",
+                DeletedOn = t.ChangedAt,
+                DeletedBy = t.ChangedBy
+            }).ToList();
+
+            return result;
         }
     }
 }

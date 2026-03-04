@@ -54,12 +54,21 @@ namespace StudioStudio_Server.Controllers
         public async Task<ActionResult<ApiResponse<object>>> RestoreTask(Guid groupId, Guid taskId)
         {
             var userId = ValidateAndGetUserId();
-            await _taskService.RestoreTaskAsync(userId, groupId, taskId);
+            await _taskService.RestoreGroupTaskAsync(userId, groupId, taskId);
             var message = _messageService.GetMessage(ErrorCodes.SuccessRestoreTask);
             return Ok(ApiResponse<object>.Success(
                 ErrorCodes.SuccessRestoreTask,
                 message,
                 null));
+        }
+
+        [HttpGet("{groupId}/deleted-task")]
+        public async Task<ActionResult<ApiResponse<List<TaskDeleteResponse>>>> GetDeleteTaskList(Guid groupId)
+        {
+            var userId = ValidateAndGetUserId();
+            var result = await _taskService.GetDeleteTaskListAsync(userId, groupId);
+            var message = _messageService.GetMessage(ErrorCodes.SuccessGetData);
+            return Ok(ApiResponse<List<TaskDeleteResponse>>.Success(ErrorCodes.SuccessRestoreTask, message, result));
         }
         private Guid ValidateAndGetUserId()
         {
