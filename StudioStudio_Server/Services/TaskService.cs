@@ -104,5 +104,15 @@ namespace StudioStudio_Server.Services
 
             await _taskRepository.SoftDeleteAsync(taskId);
         }
+
+        public async Task RestoreTaskAsync(Guid userId, Guid groupId, Guid taskId)
+        {
+            var userRole = await _participantRepository.GetGroupRoleByUserIdAsync(userId, groupId);
+            if (!userRole.Equals(GroupRole.Owner) && !userRole.Equals(GroupRole.Moderator))
+            {
+                throw new AppException(ErrorCodes.GroupRestoreTaskDenined, StatusCodes.Status401Unauthorized);
+            }
+            await _taskRepository.RestoreAsync(taskId);
+        }
     }
 }

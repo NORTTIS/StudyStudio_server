@@ -38,6 +38,7 @@
   "GROUP020": "You can only create a task when a task status is provided",
   "GROUP021": "This task status name already existed",
   "GROUP022": "You do not have permission to delete this task. Only owner and moderator can delete it",
+  "GROUP023": "You do not have permission to restore this task. Only owner and moderator can restore it",
 
   "STUDIO001": "You have reached the limit of studios you can create",
 
@@ -117,6 +118,7 @@
   "SUCCESS036": "Successfully deleted task status",
   "SUCCESS037": "Successfully created task",
   "SUCCESS038": "Successfully deleted task",
+  "SUCCESS039": "Successfully restore task",
 
   "SYS001": "Unexpected system error"
 }

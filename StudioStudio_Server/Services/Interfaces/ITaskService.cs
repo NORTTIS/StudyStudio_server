@@ -7,5 +7,6 @@ namespace StudioStudio_Server.Services.Interfaces
     {
         Task<TaskItemResponse> AddGroupTaskAsync(Guid userId, TaskItemGroupRequest request);
         Task SoftDeleteTaskAsync(Guid userId, Guid groupId, Guid taskId);
+        Task RestoreTaskAsync(Guid userId, Guid groupId, Guid taskId);
     }
 }
