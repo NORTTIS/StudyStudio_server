@@ -38,6 +38,7 @@
   "GROUP020": "Bạn chỉ có thể tạo công việc khi có trạng thái",
   "GROUP021": "Trạng thái này đã tồn tại trong nhóm",
   "GROUP022": "Bạn không có quyền xóa công việc này. Chỉ chủ nhóm và người điều hành mới có thể xóa",
+  "GROUP023": "Bạn không có quyền khôi phục công việc này. Chỉ chủ nhóm và người điều hành mới có thể khôi phục",
 
   "STUDIO001": "Bạn đã đạt giới hạn số lượng studio có thể tạo",
 
@@ -117,6 +118,7 @@
   "SUCCESS036": "Xóa trạng thái công việc thành công",
   "SUCCESS037": "Tạo công việc mới thành công",
   "SUCCESS038": "Xóa công việc thành công",
+  "SUCCESS039": "Khôi phục công việc thành công",
 
   "SYS001": "Lỗi hệ thống không xác định"
 }
