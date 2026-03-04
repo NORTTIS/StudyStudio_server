@@ -9,6 +9,6 @@ namespace StudioStudio_Server.Services.Interfaces
         Task<GroupTaskStatusResponse> GetGroupTaskStatusDetail(Guid taskStatusId);
         Task UpdateGroupTaskStatus(Guid userId, Guid groupId, Guid taskStatusId, GroupTaskStatusRequest request);
         Task SoftDeleteGroupTaskStatus(Guid userId, Guid groupId, Guid taskStatusId);
-        Task UpdateAllTaskStatusPosition(Guid userId, Guid groupId, List<GroupTaskStatusPositionRequest> requestList);
+        Task ReorderGroupTaskStatus(Guid userId, Guid groupId, ReorderGroupTaskStatusRequest request);
     }
 }
