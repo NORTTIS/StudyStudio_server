@@ -38,6 +38,18 @@ namespace StudioStudio_Server.Controllers
                 result));
         }
 
+        [HttpDelete("{groupId}/{taskId}")]
+        public async Task<ActionResult<ApiResponse<object>>> DeleteTask(Guid groupId, Guid taskId)
+        {
+            var userId = ValidateAndGetUserId();
+            await _taskService.SoftDeleteTaskAsync(userId, groupId, taskId);
+            var message = _messageService.GetMessage(ErrorCodes.SuccessDeleteTask);
+            return Ok(ApiResponse<object>.Success(
+                ErrorCodes.SuccessDeleteTask,
+                message,
+                null));
+        }
+
         private Guid ValidateAndGetUserId()
         {
             var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
