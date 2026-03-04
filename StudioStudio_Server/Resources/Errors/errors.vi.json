@@ -37,8 +37,9 @@
   "GROUP019": "Bạn không có quyền xóa trạng thái công việc này. Chỉ chủ nhóm và người điều hành mới có thể xóa",
   "GROUP020": "Bạn chỉ có thể tạo công việc khi có trạng thái",
   "GROUP021": "Trạng thái này đã tồn tại trong nhóm",
-  "GROUP022": "Bạn không có quyền xóa công việc này. Chỉ chủ nhóm và người điều hành mới có thể xóa",
-  "GROUP023": "Bạn không có quyền khôi phục công việc này. Chỉ chủ nhóm và người điều hành mới có thể khôi phục",
+  "GROUP022": "Vị trí này đã được sử dụng bởi trạng thái công việc khác",
+  "GROUP023": "Bạn không có quyền xóa công việc này. Chỉ chủ nhóm và người điều hành mới có thể xóa",
+  "GROUP024": "Bạn không có quyền khôi phục công việc này. Chỉ chủ nhóm và người điều hành mới có thể khôi phục",
 
   "STUDIO001": "Bạn đã đạt giới hạn số lượng studio có thể tạo",
 
