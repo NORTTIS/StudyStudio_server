@@ -3,6 +3,7 @@ using StudioStudio_Server.Data;
 using StudioStudio_Server.Models.DTOs.Response;
 using StudioStudio_Server.Models.Entities;
 using StudioStudio_Server.Repositories.Interfaces;
+using System.Collections.Generic;
 
 namespace StudioStudio_Server.Repositories
 {
@@ -182,6 +183,23 @@ namespace StudioStudio_Server.Repositories
         public async Task SaveChangesAsync()
         {
             await _context.SaveChangesAsync();
+        }
+
+        public async Task<Dictionary<Guid, List<TaskItem>>> GetListTasksByListStatusId(List<Guid> listStatusIds)
+        {
+            Dictionary<Guid, List<TaskItem>> result = new Dictionary<Guid, List<TaskItem>>();
+
+            foreach (var statusId in listStatusIds)
+            {
+                var tasks = await _context.Tasks
+                    .Where(t => t.GroupStatusId == statusId && !t.IsPendingDeleted)
+                    .AsNoTracking()
+                    .ToListAsync();
+
+                result[statusId] = tasks;
+            }
+
+            return result;
         }
     }
 }

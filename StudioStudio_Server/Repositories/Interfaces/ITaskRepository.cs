@@ -14,6 +14,7 @@ namespace StudioStudio_Server.Repositories.Interfaces
         Task RestoreAsync(TaskItem task);
         Task<List<TaskItem>> GetSoftDeleteTaskByGroup(Guid groupId);
         Task<List<TaskItem>> GetAllTasksByStatusIdAsync(Guid statusId);
+        Task<Dictionary<Guid, List<TaskItem>>> GetListTasksByListStatusId(List<Guid> listStatusIds);
         Task SaveChangesAsync();
     }
 }
