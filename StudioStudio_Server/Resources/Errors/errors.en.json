@@ -126,6 +126,7 @@
   "SUCCESS037": "Successfully created task",
   "SUCCESS038": "Successfully deleted task",
   "SUCCESS039": "Successfully restore task",
+  "SUCCESS040": "Successfully update task",
 
   "SYS001": "Unexpected system error"
 }

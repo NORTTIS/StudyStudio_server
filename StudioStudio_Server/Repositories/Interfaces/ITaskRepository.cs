@@ -1,4 +1,5 @@
 using StudioStudio_Server.Models.DTOs.Response;
+using StudioStudio_Server.Models.Entities;
 
 namespace StudioStudio_Server.Repositories.Interfaces
 {
@@ -17,5 +18,8 @@ namespace StudioStudio_Server.Repositories.Interfaces
         Task<List<TaskItem>> GetAllTasksByStatusIdAsync(Guid statusId);
         Task<Dictionary<Guid, List<TaskItem>>> GetListTasksByListStatusId(List<Guid> listStatusIds);
         Task SaveChangesAsync();
+        Task ReorderTaskAsync(Guid taskId, Guid targetStatusId, Guid? prevTaskId, Guid? nextTaskId);
+        Task RebalanceTasksInStatusAsync(Guid statusId);
+        Task<TaskItem?> FindNextAfterAsync(Guid statusId, long position);
     }
 }
