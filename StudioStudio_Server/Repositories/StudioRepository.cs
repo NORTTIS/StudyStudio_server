@@ -54,7 +54,7 @@ namespace StudioStudio_Server.Repositories
         public async Task<List<Studio>> GetByOwnerIdAsync(Guid ownerId)
         {
             return await _context.Studios
-                .Where(s => s.OwnerId == ownerId)
+                .Where(s => s.OwnerId == ownerId && !s.IsDeleted)
                 .OrderByDescending(s => s.StudioName)
                 .ThenByDescending(s => s.CreatedAt)
                 .AsNoTracking()
@@ -69,7 +69,7 @@ namespace StudioStudio_Server.Repositories
         public async Task<int> CountStudioCreatedByUserAsync(Guid userId)
         {
             return await _context.Studios
-                .Where(s => s.OwnerId == userId)
+                .Where(s => s.OwnerId == userId && !s.IsDeleted)
                 .CountAsync();
         }
 
