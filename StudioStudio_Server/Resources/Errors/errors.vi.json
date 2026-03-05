@@ -78,6 +78,9 @@
   "VALIDATION011": "Cần ít nhất một nhóm.",
   "VALIDATION012": "Bạn đã vượt quá giới hạn gửi email (5 lần/15 phút). Vui lòng thử lại sau",
 
+  "STORAGE001": "Dung lượng lưu trữ của nhóm đã đầy. Vui lòng xóa bớt tài liệu hoặc nâng cấp gói",
+  "AI001": "Bạn đã vượt quá giới hạn số lượng câu hỏi AI trong ngày. Vui lòng thử lại vào ngày mai hoặc nâng cấp gói Premium",
+
   "ANNOUNCEMENTTAGTITLE": "Bạn đã được nhắc đến",
   "ANNOUNCEMENTTAGCONTENT": "đã nhắc đến bạn từ nhóm",
   "ANNOUNCEMENT001": "Không tìm thấy thông báo",

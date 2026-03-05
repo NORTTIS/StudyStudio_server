@@ -93,6 +93,12 @@
         public const string ValidationGroupCreationNumber = "VALIDATION011";
         public const string ValidationRateLimitExceeded = "VALIDATION012";
 
+        // STORAGE
+        public const string StorageQuotaExceeded = "STORAGE001";
+
+        // AI
+        public const string AIRateLimitExceeded = "AI001";
+
         // CONFIGURATION
         public const string ConfigurationMissing = "CONFIG001";
 

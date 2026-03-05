@@ -15,6 +15,9 @@ namespace StudioStudio_Server.Services
         private readonly IConfiguration _configuration;
         private readonly IHttpContextAccessor _httpContextAccessor;
         private readonly IWebHostEnvironment _environment;
+        private readonly IUserSubscriptionRepository _userSubscriptionRepository;
+        private readonly IAIRequestLogRepository _aiRequestLogRepository;
+
         // Password must be 10-20 characters long, contain at least one uppercase letter, one lowercase letter, and one digit
         private readonly Regex PasswordRegex = new(@"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)[A-Za-z\d@$!%*?&]{10,20}$", RegexOptions.Compiled);
 
@@ -23,13 +26,17 @@ namespace StudioStudio_Server.Services
             IPasswordHasher<User> passwordHasher,
             IConfiguration configuration,
             IHttpContextAccessor httpContextAccessor,
-            IWebHostEnvironment environment)
+            IWebHostEnvironment environment,
+            IUserSubscriptionRepository userSubscriptionRepository,
+            IAIRequestLogRepository aiRequestLogRepository)
         {
             _userRepository = userRepository;
             _passwordHasher = passwordHasher;
             _configuration = configuration;
             _httpContextAccessor = httpContextAccessor;
             _environment = environment;
+            _userSubscriptionRepository = userSubscriptionRepository;
+            _aiRequestLogRepository = aiRequestLogRepository;
         }
 
         public async Task<User?> GetByIdAsync(Guid userId)
@@ -199,6 +206,24 @@ namespace StudioStudio_Server.Services
 
             // Return relative path that works with UseStaticFiles()
             return $"/uploads/avatars/{fileName}";
+        }
+
+        // Implement new method
+        public async Task<(int usedToday, int dailyLimit)> GetAiRequestLimitInfoAsync(Guid userId)
+        {
+            // Get today's start time
+            DateTime startOfDay = DateTime.UtcNow.Date;
+
+            // Count today's requests
+            int usedToday = await _aiRequestLogRepository.CountTodayRequestsAsync(userId, startOfDay);
+
+            // Get user's subscription plan
+            SubscriptionPlan? subscriptionPlan = await _userSubscriptionRepository.GetSubscriptionPlanByUserIdAsync(userId);
+            int dailyLimit = subscriptionPlan?.MaxAiRequestsPerDay ?? 20; // Default: Free Plan = 20
+            Console.WriteLine($"User {userId} has used {usedToday}/{dailyLimit} AI requests today.");
+            Console.WriteLine($"Subscription Plan: {subscriptionPlan?.PlanName ?? "Free Plan"}, Max AI Requests/Day: {dailyLimit}");
+
+            return (usedToday, dailyLimit);
         }
     }
 }

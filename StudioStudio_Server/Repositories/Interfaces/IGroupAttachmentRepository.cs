@@ -15,5 +15,6 @@ namespace StudioStudio_Server.Repositories.Interfaces
         Task CreateAsync(GroupAttachment attachment);
         Task UpdateAsync(GroupAttachment attachment);
         Task<bool> FileKeyExistsAsync(string fileKey);
+        Task<long> GetTotalStorageUsedByGroupAsync(Guid groupId);
     }
 }
