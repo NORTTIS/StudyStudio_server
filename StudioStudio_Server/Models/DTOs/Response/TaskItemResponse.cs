@@ -1,4 +1,5 @@
 ﻿using StudioStudio_Server.Models.Entities;
+using StudioStudio_Server.Models.Enums;
 
 namespace StudioStudio_Server.Models.DTOs.Response
 {
@@ -7,8 +8,8 @@ namespace StudioStudio_Server.Models.DTOs.Response
         public Guid TaskId { get; set; }
         public string TaskTitle { get; set; } = string.Empty;
         public string TaskDescription { get; set; } = string.Empty;
-        public int TaskPriority { get; set; }
-        public int TaskSeverity { get; set; }
+        public TaskPriority TaskPriority { get; set; }
+        public TaskSeverity TaskSeverity { get; set; }
         public int Position { get; set; }
         public Guid CreatedById { get; set; }
         public DateTime CreatedAt { get; set; }

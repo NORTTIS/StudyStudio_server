@@ -1,4 +1,5 @@
 ﻿using StudioStudio_Server.Models.Entities;
+using StudioStudio_Server.Models.Enums;
 
 namespace StudioStudio_Server.Models.DTOs.Request
 {
@@ -7,8 +8,8 @@ namespace StudioStudio_Server.Models.DTOs.Request
         public Guid GroupId { get; set; }
         public string TaskName { get; set; } = string.Empty;
         public string TaskDescription { get; set; } = string.Empty;
-        public int TaskPriority { get; set; }
-        public int TaskSeverity { get; set; }
+        public TaskPriority TaskPriority { get; set; }
+        public TaskSeverity TaskSeverity { get; set; }
         public DateTime? StartDate { get; set; }
         public DateTime? DueDate { get; set; }
         public Guid? GroupStatusId { get; set; }

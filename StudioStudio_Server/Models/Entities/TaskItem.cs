@@ -1,4 +1,5 @@
 ﻿using StudioStudio_Server.Models.Entities;
+using StudioStudio_Server.Models.Enums;
 
 public class TaskItem
 {
@@ -15,8 +16,8 @@ public class TaskItem
 
     public DateTime? StartDate { get; set; }
     public DateTime? DueDate { get; set; }
-    public int Priority { get; set; }
-    public int Severity { get; set; }
+    public TaskPriority Priority { get; set; }
+    public TaskSeverity Severity { get; set; }
 
     public int Position { get; set; }
 

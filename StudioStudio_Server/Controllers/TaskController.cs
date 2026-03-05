@@ -39,6 +39,20 @@ namespace StudioStudio_Server.Controllers
                 result));
         }
 
+        [HttpPut("{groupId}/{taskId}")]
+        public async Task<ActionResult<ApiResponse<TaskItemResponse>>> UpdateGroupTask(
+            Guid groupId, Guid taskId, [FromBody] UpdateTaskRequest request)
+        {
+            var userId = ValidateAndGetUserId();
+            var result = await _taskService.UpdateGroupTaskAsync(userId, groupId, taskId, request);
+            var message = _messageService.GetMessage(ErrorCodes.SuccessUpdateTask);
+
+            return Ok(ApiResponse<TaskItemResponse>.Success(
+                ErrorCodes.SuccessUpdateTask,
+                message,
+                result));
+        }
+
         [HttpDelete("{groupId}/{taskId}")]
         public async Task<ActionResult<ApiResponse<object>>> DeleteTask(Guid groupId, Guid taskId)
         {

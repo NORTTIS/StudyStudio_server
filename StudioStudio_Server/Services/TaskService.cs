@@ -69,9 +69,22 @@ namespace StudioStudio_Server.Services
 
             var now = DateTime.UtcNow;
 
-            if (request.StartDate > request.DueDate)
+            // Convert dates to UTC if provided
+            DateTime? startDateUtc = request.StartDate.HasValue 
+                ? DateTime.SpecifyKind(request.StartDate.Value, DateTimeKind.Utc) 
+                : null;
+            
+            DateTime? dueDateUtc = request.DueDate.HasValue 
+                ? DateTime.SpecifyKind(request.DueDate.Value, DateTimeKind.Utc) 
+                : null;
+
+            // Validate dates
+            if (startDateUtc.HasValue && dueDateUtc.HasValue)
             {
-                throw new AppException(ErrorCodes.TaskDateTimeError, StatusCodes.Status400BadRequest);
+                if (startDateUtc.Value > dueDateUtc.Value)
+                {
+                    throw new AppException(ErrorCodes.TaskDateTimeError, StatusCodes.Status400BadRequest);
+                }
             }
 
             var taskItem = new TaskItem
@@ -83,8 +96,8 @@ namespace StudioStudio_Server.Services
                 Title = request.TaskName,
                 Position = newTaskPosition,
                 Description = request.TaskDescription,
-                StartDate = request.StartDate,
-                DueDate = request.DueDate,
+                StartDate = startDateUtc,
+                DueDate = dueDateUtc,
                 Priority = request.TaskPriority,
                 Severity = request.TaskSeverity,
                 IsPendingDeleted = false,
@@ -138,6 +151,184 @@ namespace StudioStudio_Server.Services
                     StatusName = groupStatus!.StatusName,
                     Position = groupStatus.Position
                 },
+                Assignee = assigneeDetail,
+            };
+        }
+
+        public async Task<TaskItemResponse> UpdateGroupTaskAsync(Guid userId, Guid groupId, Guid taskId, UpdateTaskRequest request)
+        {
+            var userRole = await _participantRepository.GetGroupRoleByUserIdAsync(userId, groupId);
+            if (userRole.Equals(GroupRole.Viewer) || userRole.Equals(GroupRole.Commenter))
+            {
+                throw new AppException(ErrorCodes.GroupUpdatePermissionDenied, StatusCodes.Status403Forbidden);
+            }
+
+            var task = await _taskRepository.GetByIdAsync(taskId);
+            if (task == null)
+            {
+                throw new AppException(ErrorCodes.TaskNotFound, StatusCodes.Status404NotFound);
+            }
+
+            if (task.GroupId != groupId)
+            {
+                throw new AppException(ErrorCodes.TaskNotFound, StatusCodes.Status404NotFound);
+            }
+
+            // Validate GroupStatusId if provided
+            if (request.GroupStatusId.HasValue)
+            {
+                var statusExists = await _groupTaskStatusRepository.GetDetailAsync(request.GroupStatusId.Value);
+                if (statusExists == null || statusExists.GroupId != groupId)
+                {
+                    throw new AppException(ErrorCodes.GroupStatusNotFound, StatusCodes.Status404NotFound);
+                }
+            }
+
+            // Convert dates to UTC if provided
+            DateTime? startDateUtc = request.StartDate.HasValue 
+                ? DateTime.SpecifyKind(request.StartDate.Value, DateTimeKind.Utc) 
+                : null;
+            
+            DateTime? dueDateUtc = request.DueDate.HasValue 
+                ? DateTime.SpecifyKind(request.DueDate.Value, DateTimeKind.Utc) 
+                : null;
+
+            // Validate dates
+            if (startDateUtc.HasValue && dueDateUtc.HasValue)
+            {
+                if (startDateUtc.Value > dueDateUtc.Value)
+                {
+                    throw new AppException(ErrorCodes.TaskDateTimeError, StatusCodes.Status400BadRequest);
+                }
+            }
+
+            // Update basic fields
+            if (!string.IsNullOrWhiteSpace(request.TaskName))
+            {
+                task.Title = request.TaskName;
+            }
+
+            if (request.TaskDescription != null)
+            {
+                task.Description = request.TaskDescription;
+            }
+
+            if (request.TaskPriority.HasValue)
+            {
+                task.Priority = request.TaskPriority.Value;
+            }
+
+            if (request.TaskSeverity.HasValue)
+            {
+                task.Severity = request.TaskSeverity.Value;
+            }
+
+            if (startDateUtc.HasValue)
+            {
+                task.StartDate = startDateUtc.Value;
+            }
+
+            if (dueDateUtc.HasValue)
+            {
+                task.DueDate = dueDateUtc.Value;
+            }
+
+            // Update GroupStatusId if provided
+            if (request.GroupStatusId.HasValue)
+            {
+                task.GroupStatusId = request.GroupStatusId.Value;
+            }
+
+            await _taskRepository.UpdateAsync(task);
+
+            // Handle assignee update if provided
+            if (request.AssigneeId.HasValue)
+            {
+                // Get existing assignments
+                var existingAssignments = await _taskAssignmentRepository.GetAssigneesByTaskId(taskId);
+
+                // If AssigneeId is Guid.Empty, remove all assignments
+                if (request.AssigneeId.Value == Guid.Empty)
+                {
+                    if (existingAssignments.Any())
+                    {
+                        await _taskAssignmentRepository.RemoveAsync(existingAssignments);
+                    }
+                }
+                else
+                {
+                    // Validate new assignee exists
+                    var newAssignee = await _userRepository.GetByIdAsync(request.AssigneeId.Value);
+                    if (newAssignee == null)
+                    {
+                        throw new AppException(ErrorCodes.UserNotFound, StatusCodes.Status404NotFound);
+                    }
+
+                    // Check if assignee is already assigned
+                    var alreadyAssigned = existingAssignments.Any(a => a.AssignedTo == request.AssigneeId.Value);
+
+                    if (!alreadyAssigned)
+                    {
+                        // Remove existing assignments
+                        if (existingAssignments.Any())
+                        {
+                            await _taskAssignmentRepository.RemoveAsync(existingAssignments);
+                        }
+
+                        // Add new assignment
+                        await _taskAssignmentRepository.AddAsync(new TaskAssignment
+                        {
+                            AssignmentId = Guid.NewGuid(),
+                            AssignedTo = request.AssigneeId.Value,
+                            AssignedBy = userId,
+                            AssignedAt = DateTime.UtcNow,
+                            TaskId = taskId
+                        });
+                    }
+                }
+            }
+
+            // Prepare response
+            var groupStatus = task.GroupStatusId.HasValue 
+                ? await _groupTaskStatusRepository.GetDetailAsync(task.GroupStatusId.Value) 
+                : null;
+
+            var assignmentList = await _taskAssignmentRepository.GetAssigneesByTaskId(taskId);
+            var assignment = assignmentList.FirstOrDefault();
+            var assigneeDetail = new UserDto();
+
+            if (assignment != null)
+            {
+                var assignee = await _userRepository.GetByIdAsync(assignment.AssignedTo);
+                if (assignee != null)
+                {
+                    assigneeDetail = new UserDto
+                    {
+                        Id = assignee.UserId,
+                        FirstName = assignee.FirstName,
+                        LastName = assignee.LastName
+                    };
+                }
+            }
+
+            return new TaskItemResponse
+            {
+                TaskId = task.TaskId,
+                TaskTitle = task.Title,
+                TaskDescription = task.Description ?? string.Empty,
+                TaskPriority = task.Priority,
+                TaskSeverity = task.Severity,
+                Position = task.Position,
+                CreatedById = task.OwnerId,
+                CreatedAt = task.CreatedAt,
+                StartDate = task.StartDate,
+                DueDate = task.DueDate,
+                GroupStatus = groupStatus != null ? new GroupTaskStatusDto
+                {
+                    GroupId = groupId,
+                    StatusName = groupStatus.StatusName,
+                    Position = groupStatus.Position
+                } : null,
                 Assignee = assigneeDetail,
             };
         }
@@ -251,7 +442,7 @@ namespace StudioStudio_Server.Services
             {
                 throw new AppException(ErrorCodes.GroupUpdatePermissionDenied, StatusCodes.Status403Forbidden);
             }
-            var task = _taskRepository.GetByIdAsync(request.TaskId);
+            var task = await _taskRepository.GetByIdAsync(request.TaskId);
             if (task == null)
             {
                 throw new AppException(ErrorCodes.TaskNotFound, StatusCodes.Status404NotFound);

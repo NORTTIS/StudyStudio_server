@@ -76,7 +76,7 @@
   "VALIDATION006": "Verification token has expired",
   "VALIDATION007": "Email has already been verified",
   "VALIDATION008": "File size exceeds the maximum limit of 5MB",
-  "VALIDATION009": "Invalid file format. Only image files are allowed",
+  "VALIDATION009": "Invalid file format.",
   "VALIDATION010": "New password cannot be the same as current password",
   "VALIDATION011": "Required at least one group.",
   "VALIDATION012": "You have exceeded the rate limit (5 times/15 minutes). Please try again later",

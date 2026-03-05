@@ -118,7 +118,8 @@ namespace StudioStudio_Server.Repositories
             };
         }
 
-        /// Thêm task vào db
+        /// <summary>
+        /// Add task to database
         /// </summary>
         public async Task AddAsync(TaskItem task)
         {
@@ -166,9 +167,9 @@ namespace StudioStudio_Server.Repositories
         }
 
         /// <summary>
-        /// Lấy danh sách soft tasks trong group
-        /// Điều kiện: GroupId = {groupId} AND IsPendingDeleted = true
-        /// Sắp xếp: UpdatedAt DESC, Title DESC
+        /// Get list of soft deleted tasks in group
+        /// Condition: GroupId = {groupId} AND IsPendingDeleted = true
+        /// Order by: UpdatedAt ASC, Title DESC
         /// </summary>
         public async Task<List<TaskItem>> GetSoftDeleteTaskByGroup(Guid groupId)
         {
@@ -212,16 +213,11 @@ namespace StudioStudio_Server.Repositories
         }
 
         /// <summary>
-        /// Reorder (và đổi status nếu cần) cho một task dựa trên vị trí kéo thả.
-        /// Hỗ trợ: kéo trong cùng status, kéo sang status khác.
+        /// Reorder (and change status if needed) for a task based on drag-and-drop position.
+        /// Supports: dragging within same status, dragging to different status (including empty columns).
         /// </summary>
         public async Task ReorderTaskAsync(Guid taskId, Guid targetStatusId, Guid? prevTaskId, Guid? nextTaskId)
         {
-            if (!prevTaskId.HasValue && !nextTaskId.HasValue)
-            {
-                throw new InvalidOperationException("Both prevTaskId and nextTaskId cannot be null");
-            }
-
             for (int attemp = 1; attemp <= MAX_TRY; attemp++)
             {
                 using var transaction = await _context.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
@@ -232,11 +228,17 @@ namespace StudioStudio_Server.Repositories
                         .FirstOrDefaultAsync(s => s.StatusId == targetStatusId && !s.IsDeleted)
                     ?? throw new InvalidOperationException($"Status {targetStatusId} not found");
 
-                    // Load prev/next task (phải thuộc đúng targetStatus)
+                    // Load task to be moved first
+                    var task = await _context.Tasks
+                        .FirstOrDefaultAsync(t => t.TaskId == taskId && !t.IsPendingDeleted)
+                        ?? throw new InvalidOperationException($"Task {taskId} not found");
+
+                    // Load prev/next task (must belong to targetStatus and exclude the moving task)
                     var prev = prevTaskId.HasValue
                         ? await _context.Tasks
                             .FirstOrDefaultAsync(t => t.TaskId == prevTaskId.Value
                                                    && t.GroupStatusId == targetStatusId
+                                                   && t.TaskId != taskId
                                                    && !t.IsPendingDeleted)
                         : null;
 
@@ -244,12 +246,36 @@ namespace StudioStudio_Server.Repositories
                         ? await _context.Tasks
                             .FirstOrDefaultAsync(t => t.TaskId == nextTaskId.Value
                                                    && t.GroupStatusId == targetStatusId
+                                                   && t.TaskId != taskId
                                                    && !t.IsPendingDeleted)
                         : null;
 
                     long newPos;
 
-                    if (prev != null && next != null)
+                    // Case 1: Moving to empty column (both prev and next are null)
+                    if (prev == null && next == null)
+                    {
+                        // Check if there are other tasks in the target status (excluding the moving task)
+                        var existingTasks = await _context.Tasks
+                            .Where(t => t.GroupStatusId == targetStatusId 
+                                     && t.TaskId != taskId 
+                                     && !t.IsPendingDeleted)
+                            .OrderBy(t => t.Position)
+                            .ToListAsync();
+
+                        if (existingTasks.Any())
+                        {
+                            // Place at the end
+                            newPos = existingTasks.Max(t => t.Position) + STEP;
+                        }
+                        else
+                        {
+                            // Truly empty column
+                            newPos = STEP;
+                        }
+                    }
+                    // Case 2: Between two tasks
+                    else if (prev != null && next != null)
                     {
                         long gap = next.Position - prev.Position;
 
@@ -257,7 +283,7 @@ namespace StudioStudio_Server.Repositories
                         {
                             await RebalanceTasksInStatusInternalAsync(targetStatusId);
 
-                            // Reload sau rebalance
+                            // Reload after rebalance
                             prev = await _context.Tasks
                                 .FirstOrDefaultAsync(t => t.TaskId == prevTaskId!.Value && !t.IsPendingDeleted);
                             next = await _context.Tasks
@@ -266,27 +292,37 @@ namespace StudioStudio_Server.Repositories
 
                         newPos = Midpoint(prev!.Position, next!.Position);
                     }
+                    // Case 3: After last task (only prev exists)
                     else if (prev != null)
                     {
                         newPos = prev.Position + STEP;
                     }
+                    // Case 4: Before first task (only next exists)
                     else if (next != null)
                     {
                         newPos = next.Position / 2;
+                        
+                        // If calculated position is too small, rebalance and recalculate
+                        if (newPos < 1)
+                        {
+                            await RebalanceTasksInStatusInternalAsync(targetStatusId);
+                            
+                            next = await _context.Tasks
+                                .FirstOrDefaultAsync(t => t.TaskId == nextTaskId!.Value && !t.IsPendingDeleted);
+                            
+
+                            newPos = next!.Position / 2;
+                        }
                     }
                     else
                     {
                         throw new InvalidOperationException("Invalid prev/next task state after rebalance");
                     }
 
-                    // Load task cần di chuyển
-                    var task = await _context.Tasks
-                        .FirstOrDefaultAsync(t => t.TaskId == taskId && !t.IsPendingDeleted)
-                        ?? throw new InvalidOperationException($"Task {taskId} not found");
-
-                    // Cập nhật vị trí + status (cho phép đổi cột)
+                    // Update position + status (allows changing column)
                     task.Position = (int)newPos;
                     task.GroupStatusId = targetStatusId;
+                    task.UpdatedAt = DateTime.UtcNow;
 
                     await _context.SaveChangesAsync();
                     await transaction.CommitAsync();
@@ -313,7 +349,7 @@ namespace StudioStudio_Server.Repositories
         }
 
         /// <summary>
-        /// Rebalance public (có transaction riêng)
+        /// Rebalance all tasks in status (public method with separate transaction)
         /// </summary>
         public async Task RebalanceTasksInStatusAsync(Guid statusId)
         {
@@ -332,7 +368,7 @@ namespace StudioStudio_Server.Repositories
         }
 
         /// <summary>
-        /// Tìm task kế tiếp sau position trong cùng status
+        /// Find next task after position in same status
         /// </summary>
         public async Task<TaskItem?> FindNextAfterAsync(Guid statusId, long position)
         {

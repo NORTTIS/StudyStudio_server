@@ -76,7 +76,7 @@
   "VALIDATION006": "Mã xác thực đã hết hạn",
   "VALIDATION007": "Email đã được xác thực trước đó",
   "VALIDATION008": "Kích thước file vượt quá giới hạn tối đa 5MB",
-  "VALIDATION009": "Định dạng file không hợp lệ. Chỉ chấp nhận file ảnh",
+  "VALIDATION009": "Định dạng file không hợp lệ.",
   "VALIDATION010": "Mật khẩu mới không được trùng với mật khẩu hiện tại",
   "VALIDATION011": "Cần ít nhất một nhóm.",
   "VALIDATION012": "Bạn đã vượt quá giới hạn gửi email (5 lần/15 phút). Vui lòng thử lại sau",

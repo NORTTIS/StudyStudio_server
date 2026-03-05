@@ -2,6 +2,7 @@
 using Microsoft.EntityFrameworkCore;
 using StudioStudio_Server.Data;
 using StudioStudio_Server.Models.Entities;
+using StudioStudio_Server.Models.Enums;
 
 namespace StudioStudio_Server.Controllers
 {
@@ -116,8 +117,9 @@ namespace StudioStudio_Server.Controllers
                 PersonalStatusId = statusId,
                 Title = "My Personal Task",
                 Description = "Test personal task",
-                Priority = 1,
-                Severity = 1,
+                Priority = TaskPriority.Low,
+                Severity = TaskSeverity.Minor,
+                Position = 1000,
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow,
                 IsPendingDeleted = false

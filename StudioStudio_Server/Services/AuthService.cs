@@ -356,7 +356,7 @@ namespace StudioStudio_Server.Services
             }
             catch (Exception ex)
             {
-
+                Console.WriteLine(ex.ToString());
                 throw new AppException(ErrorCodes.AuthInvalidCredential, StatusCodes.Status401Unauthorized);
             }
         }

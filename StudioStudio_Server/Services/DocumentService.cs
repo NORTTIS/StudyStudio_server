@@ -52,6 +52,7 @@ namespace StudioStudio_Server.Services
             "application/pdf",
             "text/plain",
             "text/markdown",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
             "application/msword"
         };
 
@@ -130,7 +131,7 @@ namespace StudioStudio_Server.Services
 
             // Check storage quota for group
             Guid groupOwnerId = await _groupRepository.GetGroupOwnerIdAsync(request.GroupId);
-            
+
             // Get owner's subscription plan
             SubscriptionPlan? subscriptionPlan = await _userSubscriptionRepository.GetSubscriptionPlanByUserIdAsync(groupOwnerId);
             int storageLimit = subscriptionPlan?.MaxStorageMb ?? 500; // Default 500MB
@@ -143,7 +144,7 @@ namespace StudioStudio_Server.Services
             if (currentStorageUsed + request.FileSize > storageLimitBytes)
             {
                 long availableStorage = storageLimitBytes - currentStorageUsed;
-                
+
                 _logger.LogWarning(
                     "Storage quota exceeded for group {GroupId}. " +
                     "Current: {CurrentMB:F2}MB, Limit: {LimitMB}MB, " +
@@ -262,7 +263,7 @@ namespace StudioStudio_Server.Services
                 "AttachmentId: {AttachmentId}, File: {FileName}, " +
                 "Size: {Size} bytes, Estimated tokens: {Tokens:N0}, " +
                 "Queue depth: {Depth}",
-                attachmentId, attachment.FileName, 
+                attachmentId, attachment.FileName,
                 attachment.FileSize, estimatedTokens,
                 _embeddingQueue.GetQueueDepth());
         }
@@ -275,13 +276,13 @@ namespace StudioStudio_Server.Services
         {
             // Convert bytes to MB
             double fileSizeMB = fileSizeBytes / (1024.0 * 1024.0);
-            
+
             // Estimate: 1MB ≈ 5,000 tokens (conservative estimate)
             int estimatedTokens = (int)(fileSizeMB * 5000);
-            
+
             // Add 20% buffer for safety
             estimatedTokens = (int)(estimatedTokens * 1.2);
-            
+
             // Minimum 100 tokens, maximum 100K tokens per file
             return Math.Clamp(estimatedTokens, 100, 100_000);
         }
@@ -376,7 +377,7 @@ namespace StudioStudio_Server.Services
                 int textLengthChars = fullText.Length;
                 int textLengthBytes = Encoding.UTF8.GetByteCount(fullText);
                 int estimatedTokens = EstimateTokenCount(fullText);
-                
+
                 logger.LogInformation(
                     "Text extraction completed in {Ms}ms. " +
                     "Text size: {Chars} characters, {Bytes} bytes, " +
@@ -454,17 +455,17 @@ namespace StudioStudio_Server.Services
                     // Generate embedding for this chunk
                     float[] embedding = await embeddingService.GenerateEmbeddingAsync(chunks[i], CancellationToken.None);
                     embeddings.Add(embedding);
-                    
+
                     // Update progress in queue (every 5 chunks or last chunk)
                     if ((i + 1) % 5 == 0 || i == chunks.Count - 1)
                     {
                         _embeddingQueue.UpdateJobStatus(
-                            attachmentId, 
-                            EmbeddingJobStatus.Processing, 
-                            null, 
-                            i + 1, 
+                            attachmentId,
+                            EmbeddingJobStatus.Processing,
+                            null,
+                            i + 1,
                             chunks.Count);
-                        
+
                         logger.LogInformation(
                             "Embedding progress: {Current}/{Total} ({Percent:F0}%)",
                             i + 1, chunks.Count, (i + 1) * 100.0 / chunks.Count);
@@ -490,7 +491,7 @@ namespace StudioStudio_Server.Services
                 // Upsert each chunk to Qdrant
                 logger.LogInformation("Starting vector upsert to Qdrant for {Count} chunks", chunks.Count);
                 Stopwatch upsertSw = Stopwatch.StartNew();
-                
+
                 for (int i = 0; i < chunks.Count; i++)
                 {
                     // Vector ID format: documentId_chunkIndex
@@ -654,7 +655,7 @@ namespace StudioStudio_Server.Services
                 using (PdfDocument pdfDoc = new PdfDocument(pdfReader))
                 {
                     int pageCount = pdfDoc.GetNumberOfPages();
-                    
+
                     // FIX 3: Early detection for empty/scan PDFs
                     if (pageCount == 0)
                     {
@@ -666,7 +667,7 @@ namespace StudioStudio_Server.Services
                     int pagesToProcess = Math.Min(pageCount, MAX_PAGES);
                     if (pageCount > MAX_PAGES)
                     {
-                        _logger.LogWarning("PDF has {PageCount} pages, processing only first {MaxPages}", 
+                        _logger.LogWarning("PDF has {PageCount} pages, processing only first {MaxPages}",
                             pageCount, MAX_PAGES);
                     }
 
@@ -675,7 +676,7 @@ namespace StudioStudio_Server.Services
                         // FIX C: Use LocationTextExtractionStrategy for better layout preservation
                         ITextExtractionStrategy strategy = new LocationTextExtractionStrategy();
                         string pageText = PdfTextExtractor.GetTextFromPage(pdfDoc.GetPage(page), strategy);
-                        
+
                         if (!string.IsNullOrWhiteSpace(pageText))
                         {
                             // FIX 2: Pre-clean before append to reduce memory
@@ -694,7 +695,7 @@ namespace StudioStudio_Server.Services
                 }
 
                 string result = text.ToString().Trim();
-                
+
                 // FIX 6: Better scan detection message
                 if (string.IsNullOrWhiteSpace(result))
                 {
@@ -824,7 +825,7 @@ namespace StudioStudio_Server.Services
                 }
 
                 string result = text.ToString().Trim();
-                
+
                 if (string.IsNullOrWhiteSpace(result))
                 {
                     _logger.LogWarning("DOCX text extraction resulted in empty content");
@@ -897,7 +898,7 @@ namespace StudioStudio_Server.Services
             foreach (var line in lines)
             {
                 string trimmedLine = line.Trim();
-                
+
                 if (string.IsNullOrWhiteSpace(trimmedLine))
                 {
                     result.AppendLine(line);
@@ -955,7 +956,7 @@ namespace StudioStudio_Server.Services
                 int paragraphTokens = trimmedParagraph.Length / 4;
 
                 // If adding paragraph to current chunk exceeds limits
-                if (currentChunk.Length + trimmedParagraph.Length > maxChars || 
+                if (currentChunk.Length + trimmedParagraph.Length > maxChars ||
                     estimatedTokens + paragraphTokens > MAX_ESTIMATED_TOKENS)
                 {
                     // Save current chunk if not empty
@@ -971,7 +972,7 @@ namespace StudioStudio_Server.Services
                     {
                         // Split by sentences first (better semantic boundaries)
                         var sentences = Regex.Split(trimmedParagraph, @"(?<=[.!?])\s+");
-                        
+
                         foreach (var sentence in sentences)
                         {
                             if (currentChunk.Length + sentence.Length > maxChars)
