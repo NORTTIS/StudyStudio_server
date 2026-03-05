@@ -41,6 +41,7 @@
   "GROUP023": "You do not have permission to delete this task. Only owner and moderator can delete it",
   "GROUP024": "You do not have permission to restore this task. Only owner and moderator can restore it",
   "GROUP025": "Group need at least one task status to restore this task",
+  "GROUP026": "Task status must empty to able to delete it",
 
   "STUDIO001": "You have reached the limit of studios you can create",
 

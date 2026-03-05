@@ -41,6 +41,7 @@
   "GROUP023": "Bạn không có quyền xóa công việc này. Chỉ chủ nhóm và người điều hành mới có thể xóa",
   "GROUP024": "Bạn không có quyền khôi phục công việc này. Chỉ chủ nhóm và người điều hành mới có thể khôi phục",
   "GROUP025": "Nhóm cần ít nhất một trạng thái công việc để có thể khôi phục công việc",
+  "GROUP026": "Trạng thái công việc cần phải trống để có thể xóa",
 
   "STUDIO001": "Bạn đã đạt giới hạn số lượng studio có thể tạo",
 
