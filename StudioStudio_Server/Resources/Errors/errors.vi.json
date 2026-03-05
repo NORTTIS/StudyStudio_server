@@ -15,6 +15,7 @@
 
   "TASK001": "Không tìm thấy công việc",
   "TASK002": "Bạn không có quyền truy cập công việc này",
+  "TASK003": "Hạn phải lớn hơn thời gian bắt đầu",
 
   "GROUP001": "Không tìm thấy nhóm",
   "GROUP002": "Tên nhóm đã tồn tại trong studio này",

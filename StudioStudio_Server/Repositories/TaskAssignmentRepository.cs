@@ -12,12 +12,9 @@ namespace StudioStudio_Server.Repositories
         {
             _db = db;
         }
-        public async Task AddRangeAsync(List<TaskAssignment> assignees)
+        public async Task AddAsync(TaskAssignment assignee)
         {
-            foreach (var assignee in assignees)
-            {
-                _db.TaskAssignments.Add(assignee);
-            }
+            _db.TaskAssignments.Add(assignee);
             await _db.SaveChangesAsync();
         }
 
@@ -40,17 +37,13 @@ namespace StudioStudio_Server.Repositories
 
         public async Task<List<TaskAssignment>> GetListAssigneesByListTaskId(List<Guid> taskIds)
         {
-            List<TaskAssignment> result = new List<TaskAssignment>();
+            if (taskIds == null || taskIds.Count == 0)
+                return new List<TaskAssignment>();
 
-            foreach (var taskId in taskIds)
-            {
-                var asssignee = await _db.TaskAssignments
-                    .Where(a => a.TaskId == taskId)
-                    .AsNoTracking()
-                    .ToListAsync();
-            }
-
-            return result;
+            return await _db.TaskAssignments
+                .Where(a => taskIds.Contains(a.TaskId))
+                .AsNoTracking()
+                .ToListAsync();
         }
     }
 }

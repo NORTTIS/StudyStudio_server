@@ -12,8 +12,8 @@ namespace StudioStudio_Server.Models.DTOs.Response
         public int Position { get; set; }
         public Guid CreatedById { get; set; }
         public DateTime CreatedAt { get; set; }
-        public DateTime StartDate { get; set; }
-        public DateTime DueDate { get; set; }
+        public DateTime? StartDate { get; set; }
+        public DateTime? DueDate { get; set; }
         public GroupTaskStatusDto? GroupStatus { get; set; }
         public PersonalTaskStatusDto? PersonalStatus { get; set; }
         public UserDto Assignee { get; set; } = new UserDto();

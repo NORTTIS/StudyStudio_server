@@ -216,26 +216,28 @@ namespace StudioStudio_Server.Services
             var taskList = await _taskRepository.GetListTasksByListStatusId(taskStatusIdList);
 
             // Get assinees
-            var taskIdList = taskList.SelectMany(t => t.Value).Select(id => id.TaskId).ToList();
-            var assignees = await _taskAssignmentRepository.GetListAssigneesByListTaskId(taskIdList);
+            var taskIdList = taskList.SelectMany(t => t.Value).Select(t => t.TaskId).ToList();
 
-            var userIds = assignees.Select(a => a.AssignedTo).Distinct().ToList();
-            var users = await _userRepository.GetByIdsAsync(userIds);
-            var userDict = users.ToDictionary(u => u.UserId);
-
-            var assigneeDict = new Dictionary<Guid, UserDto>();
-
-            foreach (var assignee in assignees)
+            Dictionary<Guid, UserDto> assigneeDict = new();
+            if (taskIdList.Count > 0)
             {
-                if (userDict.TryGetValue(assignee.AssignedTo, out var user))
+                var assignees = await _taskAssignmentRepository.GetListAssigneesByListTaskId(taskIdList);
+                var userIds = assignees.Select(a => a.AssignedTo).Distinct().ToList();
+                var users = await _userRepository.GetByIdsAsync(userIds);
+                var userDict = users.ToDictionary(u => u.UserId);
+
+                foreach (var assignee in assignees)
                 {
-                    assigneeDict[assignee.TaskId] = new UserDto
+                    if (userDict.TryGetValue(assignee.AssignedTo, out var user))
                     {
-                        Id = user.UserId,
-                        FirstName = user.FirstName,
-                        LastName = user.LastName,
-                        AvatarUrl = user.AvatarUrl
-                    };
+                        assigneeDict[assignee.TaskId] = new UserDto
+                        {
+                            Id = user.UserId,
+                            FirstName = user.FirstName,
+                            LastName = user.LastName,
+                            AvatarUrl = user.AvatarUrl
+                        };
+                    }
                 }
             }
 
@@ -271,20 +273,22 @@ namespace StudioStudio_Server.Services
                     StatusId = ts.StatusId,
                     StatusName = ts.StatusName,
                     Position = ts.Position,
-                    TaskList = taskList[ts.StatusId].Select(t => new TaskItemResponse
-                    {
-                        TaskId = t.TaskId,
-                        TaskTitle = t.Title,
-                        TaskDescription = t.Description!,
-                        TaskPriority = t.Priority,
-                        TaskSeverity = t.Severity,
-                        Position = t.Position,
-                        CreatedById = t.OwnerId,
-                        CreatedAt = t.CreatedAt,
-                        StartDate = t.StartDate!.Value,
-                        DueDate = t.DueDate!.Value,
-                        Assignee = assigneeDict.TryGetValue(t.TaskId, out var user) ? user : null
-                    }).ToList()
+                    TaskList = taskList.TryGetValue(ts.StatusId, out var tasks)
+                        ? tasks.Select(t => new TaskItemResponse
+                        {
+                            TaskId = t.TaskId,
+                            TaskTitle = t.Title,
+                            TaskDescription = t.Description!,
+                            TaskPriority = t.Priority,
+                            TaskSeverity = t.Severity,
+                            Position = t.Position,
+                            CreatedById = t.OwnerId,
+                            CreatedAt = t.CreatedAt,
+                            StartDate = t.StartDate,
+                            DueDate = t.DueDate,
+                            Assignee = assigneeDict.TryGetValue(t.TaskId, out var assignee) ? assignee : null
+                        }).ToList()
+            : new List<TaskItemResponse>()
                 }).ToList()
             };
         }

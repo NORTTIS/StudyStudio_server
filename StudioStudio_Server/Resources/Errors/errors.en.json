@@ -15,6 +15,7 @@
 
   "TASK001": "Task not found",
   "TASK002": "You are not allowed to access this task",
+  "TASK003": "Due date must later than start date",
 
   "GROUP001": "Group not found",
   "GROUP002": "Group name already exists in this studio",
