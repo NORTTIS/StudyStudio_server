@@ -1,4 +1,5 @@
-﻿using Microsoft.IdentityModel.Tokens;
+﻿using DocumentFormat.OpenXml.Spreadsheet;
+using Microsoft.IdentityModel.Tokens;
 using Org.BouncyCastle.Asn1.Ocsp;
 using StudioStudio_Server.Exceptions;
 using StudioStudio_Server.Models.DTOs.Request;
@@ -213,5 +214,26 @@ namespace StudioStudio_Server.Services
 
             return result;
         }
+
+        public async Task ReorderTaskAsync(Guid userId, Guid groupId, ReorderTaskRequest request)
+        {
+            var userRole = await _participantRepository.GetGroupRoleByUserIdAsync(userId, groupId);
+            if (userRole.Equals(GroupRole.Viewer) || userRole.Equals(GroupRole.Commenter))
+            {
+                throw new AppException(ErrorCodes.GroupUpdatePermissionDenied, StatusCodes.Status401Unauthorized);
+            }
+            var task = _taskRepository.GetByIdAsync(request.TaskId);
+            if (task == null)
+            {
+                throw new AppException(ErrorCodes.TaskNotFound, StatusCodes.Status404NotFound);
+            }
+
+            await _taskRepository.ReorderTaskAsync(
+            request.TaskId,
+            request.TargetStatusId,
+            request.PrevTaskId,
+            request.NextTaskId);
+        }
+
     }
 }

@@ -42,6 +42,7 @@
   "GROUP024": "You do not have permission to restore this task. Only owner and moderator can restore it",
   "GROUP025": "Group need at least one task status to restore this task",
   "GROUP026": "Task status must empty to able to delete it",
+  "GROUP027": "Status not found",
 
   "STUDIO001": "You have reached the limit of studios you can create",
 
@@ -126,6 +127,7 @@
   "SUCCESS037": "Successfully created task",
   "SUCCESS038": "Successfully deleted task",
   "SUCCESS039": "Successfully restore task",
+  "SUCCESS040": "Successfully update task",
 
   "SYS001": "Unexpected system error"
 }

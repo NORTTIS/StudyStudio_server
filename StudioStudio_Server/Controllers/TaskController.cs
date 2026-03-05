@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using StudioStudio_Server.Exceptions;
 using StudioStudio_Server.Models.DTOs.Request;
 using StudioStudio_Server.Models.DTOs.Response;
+using StudioStudio_Server.Services;
 using StudioStudio_Server.Services.Interfaces;
 using System.Security.Claims;
 
@@ -69,6 +70,20 @@ namespace StudioStudio_Server.Controllers
             var result = await _taskService.GetDeleteTaskListAsync(userId, groupId);
             var message = _messageService.GetMessage(ErrorCodes.SuccessGetData);
             return Ok(ApiResponse<List<TaskDeleteResponse>>.Success(ErrorCodes.SuccessRestoreTask, message, result));
+        }
+
+        [HttpPut("{groupId}/reorder")]
+        public async Task<ActionResult<ApiResponse<object>>> ReorderTask(
+            Guid groupId, [FromBody] ReorderTaskRequest request)
+        {
+            var userId = ValidateAndGetUserId();
+            await _taskService.ReorderTaskAsync(userId, groupId, request);
+            var message = _messageService.GetMessage(ErrorCodes.SuccessUpdateTask);
+
+            return Ok(ApiResponse<object>.Success(
+                ErrorCodes.SuccessUpdateTask,
+                message,
+                null));
         }
         private Guid ValidateAndGetUserId()
         {

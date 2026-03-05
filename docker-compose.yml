@@ -13,6 +13,8 @@ services:
     depends_on:
       - postgres
       - redis
+    volumes:
+      - ./uploads:/app/wwwroot/uploads
     networks:
       - studiostudio_net
 

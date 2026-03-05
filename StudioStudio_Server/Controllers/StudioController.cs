@@ -4,7 +4,7 @@ using StudioStudio_Server.Exceptions;
 using StudioStudio_Server.Models.DTOs.Request;
 using StudioStudio_Server.Models.DTOs.Response;
 using StudioStudio_Server.Services.Interfaces;
-using System.Security.Claims;
+using StudioStudio_Server.Utils;
 
 namespace StudioStudio_Server.Controllers
 {
@@ -32,36 +32,6 @@ namespace StudioStudio_Server.Controllers
         }
 
         /// <summary>
-        /// Authenticate and get userId from JWT token
-        /// Validate: User must not be admin (admin cannot use user APIs)
-        /// </summary>
-        private Guid ValidateAndGetUserId()
-        {
-            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-
-            if (string.IsNullOrEmpty(userIdClaim) || !Guid.TryParse(userIdClaim, out Guid userId))
-            {
-                throw new AppException(
-                    ErrorCodes.AuthInvalidCredential,
-                    StatusCodes.Status401Unauthorized);
-            }
-
-            var isAdminClaim = User.FindFirst("IsAdmin")?.Value;
-            var isAdmin = isAdminClaim != null &&
-                          bool.TryParse(isAdminClaim, out var adminResult) &&
-                          adminResult;
-
-            if (isAdmin)
-            {
-                throw new AppException(
-                    ErrorCodes.AuthForbidden,
-                    StatusCodes.Status403Forbidden);
-            }
-
-            return userId;
-        }
-
-        /// <summary>
         /// [AUTHORIZED] GET /api/studio
         /// Get list of studios owned by user
         /// Condition: OwnerId = userId
@@ -71,11 +41,30 @@ namespace StudioStudio_Server.Controllers
         [HttpGet]
         public async Task<ActionResult<ApiResponse<List<StudioResponse>>>> GetUserStudios()
         {
-            var userId = ValidateAndGetUserId();
+            var userId = JwtHelper.ValidateAndGetUserId(User);
             var result = await _studioService.GetUserStudiosAsync(userId);
             var message = _messageService.GetMessage(ErrorCodes.SuccessGetData);
 
             return Ok(ApiResponse<List<StudioResponse>>.Success(
+                ErrorCodes.SuccessGetData,
+                message,
+                result));
+        }
+
+        /// <summary>
+        /// [AUTHORIZED] GET /api/studio/{studioId}
+        /// Get studio details by ID
+        /// Validate: User must be owner of studio
+        /// Include: Studio info + GroupCount
+        /// </summary>
+        [HttpGet("{studioId}")]
+        public async Task<ActionResult<ApiResponse<StudioResponse>>> GetStudioDetail(Guid studioId)
+        {
+            var userId = JwtHelper.ValidateAndGetUserId(User);
+            var result = await _studioService.GetStudioDetailAsync(userId, studioId);
+            var message = _messageService.GetMessage(ErrorCodes.SuccessGetData);
+
+            return Ok(ApiResponse<StudioResponse>.Success(
                 ErrorCodes.SuccessGetData,
                 message,
                 result));
@@ -91,7 +80,7 @@ namespace StudioStudio_Server.Controllers
         [HttpGet("{studioId}/groups")]
         public async Task<ActionResult<ApiResponse<StudioGroupListResponse>>> ViewStudioGroupList(Guid studioId)
         {
-            var userId = ValidateAndGetUserId();
+            var userId = JwtHelper.ValidateAndGetUserId(User);
             var result = await _groupService.GetStudioGroupsAsync(userId, studioId);
             var message = _messageService.GetMessage(ErrorCodes.SuccessGetGroup);
 
@@ -111,7 +100,7 @@ namespace StudioStudio_Server.Controllers
         public async Task<ActionResult<ApiResponse<StudioResponse>>> CreateNewStudio(
             [FromBody] CreateStudioRequest request)
         {
-            var userId = ValidateAndGetUserId();
+            var userId = JwtHelper.ValidateAndGetUserId(User);
             var result = await _studioService.CreateStudioAsync(userId, request);
             var message = _messageService.GetMessage(ErrorCodes.SuccessCreateStudio);
 
@@ -133,7 +122,7 @@ namespace StudioStudio_Server.Controllers
         public async Task<ActionResult<ApiResponse<UpdateStudioResponse>>> UpdateStudio(
             [FromBody] UpdateStudioRequest request)
         {
-            var userId = ValidateAndGetUserId();
+            var userId = JwtHelper.ValidateAndGetUserId(User);
             var result = await _studioService.UpdateStudioAsync(userId, request);
             var message = _messageService.GetMessage(ErrorCodes.SuccessUpdateStudio);
 
@@ -154,7 +143,7 @@ namespace StudioStudio_Server.Controllers
         [HttpDelete("{studioId}")]
         public async Task<ActionResult<ApiResponse<object>>> DeleteStudio(Guid studioId)
         {
-            var userId = ValidateAndGetUserId();
+            var userId = JwtHelper.ValidateAndGetUserId(User);
             await _studioService.DeleteStudioAsync(userId, studioId);
             var message = _messageService.GetMessage(ErrorCodes.SuccessDeleteStudio);
 
