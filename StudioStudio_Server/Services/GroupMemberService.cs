@@ -8,7 +8,7 @@ using StudioStudio_Server.Services.Interfaces;
 namespace StudioStudio_Server.Services
 {
     /// <summary>
-    /// Service x? l? business logic cho Group Members
+    /// Service for handling business logic for Group Members
     /// </summary>
     public class GroupMemberService : IGroupMemberService
     {
@@ -30,13 +30,13 @@ namespace StudioStudio_Server.Services
         }
 
         /// <summary>
-        /// Remove member kh?i group
+        /// Remove member from group
         /// Validate:
-        /// - Group ph?i t?n t?i
-        /// - Current user ph?i là Owner ho?c Moderator
-        /// - Không th? remove chính m?nh
-        /// - Không th? remove Owner
-        /// - Moderator ch? có th? remove Member/Commenter/Viewer (không remove Moderator khác)
+        /// - Group must exist
+        /// - Current user must be Owner or Moderator
+        /// - Cannot remove yourself
+        /// - Cannot remove Owner
+        /// - Moderator can only remove Member/Commenter/Viewer (cannot remove another Moderator)
         /// </summary>
         public async Task<RemoveMemberResponse> RemoveMemberAsync(
             Guid currentUserId,
@@ -55,7 +55,15 @@ namespace StudioStudio_Server.Services
                     StatusCodes.Status400BadRequest);
             }
 
-            var targetMember = await GetParticipantOrThrowAsync(request.GroupId, request.UserId);
+            var targetMember = await _groupParticipantRepository
+                .GetByGroupAndUserTrackedAsync(request.GroupId, request.UserId);
+
+            if (targetMember == null)
+            {
+                throw new AppException(
+                    ErrorCodes.GroupMemberNotFound,
+                    StatusCodes.Status404NotFound);
+            }
 
             if (targetMember.Role == GroupRole.Owner)
             {
@@ -91,13 +99,13 @@ namespace StudioStudio_Server.Services
         }
 
         /// <summary>
-        /// Assign (thay ð?i) role c?a member trong group
+        /// Assign (change) role of member in group
         /// Validate:
-        /// - Group ph?i t?n t?i
-        /// - Ch? Owner m?i có quy?n assign role
-        /// - Không th? ð?i role c?a chính m?nh
-        /// - Không th? assign role Owner (ch? có 1 Owner)
-        /// - Ch? có th? có 1 Moderator
+        /// - Group must exist
+        /// - Only Owner can assign roles
+        /// - Cannot change your own role
+        /// - Cannot assign Owner role (only 1 Owner allowed)
+        /// - Only 1 Moderator allowed
         /// </summary>
         public async Task<AssignRoleResponse> AssignRoleAsync(
             Guid currentUserId,
@@ -177,7 +185,7 @@ namespace StudioStudio_Server.Services
         }
 
         /// <summary>
-        /// Validate group t?n t?i
+        /// Validate group exists
         /// </summary>
         private async Task<Group> ValidateGroupExistsAsync(Guid groupId)
         {
@@ -194,7 +202,7 @@ namespace StudioStudio_Server.Services
         }
 
         /// <summary>
-        /// Validate user là Owner ho?c Moderator c?a group
+        /// Validate user is Owner or Moderator of group
         /// </summary>
         private async Task<GroupParticipant> ValidateUserIsModeratorOrOwnerAsync(
             Guid groupId,
@@ -216,7 +224,7 @@ namespace StudioStudio_Server.Services
         }
 
         /// <summary>
-        /// Validate user là Owner c?a group
+        /// Validate user is Owner of group
         /// </summary>
         private async Task<GroupParticipant> ValidateUserIsOwnerAsync(
             Guid groupId,
@@ -236,7 +244,7 @@ namespace StudioStudio_Server.Services
         }
 
         /// <summary>
-        /// L?y GroupParticipant ho?c throw exception
+        /// Get GroupParticipant or throw exception
         /// </summary>
         private async Task<GroupParticipant> GetParticipantOrThrowAsync(
             Guid groupId,
@@ -256,7 +264,7 @@ namespace StudioStudio_Server.Services
         }
 
         /// <summary>
-        /// L?y User ho?c throw exception
+        /// Get User or throw exception
         /// </summary>
         private async Task<User> GetUserOrThrowAsync(Guid userId)
         {

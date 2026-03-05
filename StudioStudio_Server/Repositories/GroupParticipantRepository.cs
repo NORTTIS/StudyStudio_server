@@ -148,12 +148,23 @@ namespace StudioStudio_Server.Repositories
         /// </summary>
         public async Task RemoveAsync(GroupParticipant participant)
         {
-            _context.GroupParticipants.Remove(participant);
+            var existingEntry = _context.ChangeTracker.Entries<GroupParticipant>()
+                .FirstOrDefault(e => e.Entity.ParticipantId == participant.ParticipantId);
+
+            if (existingEntry != null)
+            {
+                _context.GroupParticipants.Remove(existingEntry.Entity);
+            }
+            else
+            {
+                _context.GroupParticipants.Remove(participant);
+            }
+            
             await _context.SaveChangesAsync();
         }
 
         /// <summary>
-        /// Trả về role của người dùng trong group
+        /// Get the role of the user in the group
         /// </summary>
         public async Task<GroupRole> GetGroupRoleByUserIdAsync(Guid userId, Guid groupId)
         {
