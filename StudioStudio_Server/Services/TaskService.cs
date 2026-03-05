@@ -46,7 +46,7 @@ namespace StudioStudio_Server.Services
             var userRole = await _participantRepository.GetGroupRoleByUserIdAsync(userId, request.GroupId);
             if (userRole.Equals(GroupRole.Viewer) || userRole.Equals(GroupRole.Commenter))
             {
-                throw new AppException(ErrorCodes.GroupCreateTaskDenied, StatusCodes.Status401Unauthorized);
+                throw new AppException(ErrorCodes.GroupCreateTaskDenied, StatusCodes.Status403Forbidden);
             }
 
             if (!request.GroupStatusId.HasValue)
@@ -71,11 +71,7 @@ namespace StudioStudio_Server.Services
 
             if (request.StartDate > request.DueDate)
             {
-                request.StartDate = request.DueDate;
-            }
-            if (request.DueDate < now)
-            {
-                request.DueDate = now;
+                throw new AppException(ErrorCodes.TaskDateTimeError, StatusCodes.Status400BadRequest);
             }
 
             var taskItem = new TaskItem
@@ -98,15 +94,32 @@ namespace StudioStudio_Server.Services
 
             await _taskRepository.AddAsync(taskItem);
 
-            var assigneeId = request.Assignees.HasValue ? request.Assignees : userId;
-            var assignee = await _userRepository.GetByIdAsync(assigneeId!.Value);
-            var assigneeDetail = new UserDto
-            {
-                Id = assigneeId.Value,
-                FirstName = assignee!.FirstName,
-                LastName = assignee.LastName
-            };
+            var assigneeId = request.Assignees;
+            var assigneeDetail = new UserDto();
 
+            if (assigneeId.HasValue && assigneeId.Value != Guid.Empty)
+            {
+                var assignee = await _userRepository.GetByIdAsync(assigneeId.Value);
+
+                if (assignee == null)
+                    throw new AppException(ErrorCodes.UserNotFound, StatusCodes.Status404NotFound);
+
+                assigneeDetail = new UserDto
+                {
+                    Id = assignee.UserId,
+                    FirstName = assignee.FirstName,
+                    LastName = assignee.LastName
+                };
+
+                await _taskAssignmentRepository.AddAsync(new TaskAssignment
+                {
+                    AssignmentId = Guid.NewGuid(),
+                    AssignedTo = assigneeDetail.Id,
+                    AssignedBy = userId,
+                    AssignedAt = DateTime.UtcNow,
+                    TaskId = taskItem.TaskId
+                });
+            }
             return new TaskItemResponse
             {
                 TaskId = taskItem.TaskId,
@@ -117,8 +130,8 @@ namespace StudioStudio_Server.Services
                 Position = taskItem.Position,
                 CreatedById = taskItem.OwnerId,
                 CreatedAt = now,
-                StartDate = taskItem.StartDate.Value,
-                DueDate = taskItem.DueDate.Value,
+                StartDate = taskItem.StartDate,
+                DueDate = taskItem.DueDate,
                 GroupStatus = new GroupTaskStatusDto
                 {
                     GroupId = request.GroupId,
@@ -134,7 +147,7 @@ namespace StudioStudio_Server.Services
             var userRole = await _participantRepository.GetGroupRoleByUserIdAsync(userId, groupId);
             if (!userRole.Equals(GroupRole.Owner) && !userRole.Equals(GroupRole.Moderator))
             {
-                throw new AppException(ErrorCodes.GroupDeleteTaskDenined, StatusCodes.Status401Unauthorized);
+                throw new AppException(ErrorCodes.GroupDeleteTaskDenined, StatusCodes.Status403Forbidden);
             }
 
             await _taskRepository.SoftDeleteAsync(taskId);
@@ -168,7 +181,7 @@ namespace StudioStudio_Server.Services
             //case where group delete all status
             if (!statusList.Any())
             {
-                throw new AppException(ErrorCodes.GroupRestoreTaskFailed, StatusCodes.Status400BadRequest);
+                throw new AppException(ErrorCodes.GroupRestoreTaskFailed, StatusCodes.Status403Forbidden);
             }
 
             //case where old task status have been deleted
@@ -189,6 +202,22 @@ namespace StudioStudio_Server.Services
                 task.Position = newTaskPosition;
             }
 
+            //normal case
+            if (task.GroupStatusId.HasValue)
+            {
+                var statusExistTask = await _taskRepository.GetAllTasksByStatusIdAsync(task.GroupStatusId.Value);
+                int taskNewPosition = 0;
+                if (statusExistTask.Any())
+                {
+                    taskNewPosition = statusExistTask.Max(s => s.Position) + 1000;
+                }
+                else
+                {
+                    taskNewPosition = 1000;
+                }
+                task.Position = taskNewPosition;
+            }
+
             task.UpdatedAt = DateTime.UtcNow;
             await _taskRepository.RestoreAsync(task);
         }
@@ -197,7 +226,7 @@ namespace StudioStudio_Server.Services
             var existedUser = await _participantRepository.GetByGroupAndUserAsync(groupId, userId);
             if (existedUser == null)
             {
-                throw new AppException(ErrorCodes.AuthForbidden, StatusCodes.Status400BadRequest);
+                throw new AppException(ErrorCodes.AuthForbidden, StatusCodes.Status403Forbidden);
             }
 
             var taskList = await _taskRepository.GetSoftDeleteTaskByGroup(groupId);
@@ -220,7 +249,7 @@ namespace StudioStudio_Server.Services
             var userRole = await _participantRepository.GetGroupRoleByUserIdAsync(userId, groupId);
             if (userRole.Equals(GroupRole.Viewer) || userRole.Equals(GroupRole.Commenter))
             {
-                throw new AppException(ErrorCodes.GroupUpdatePermissionDenied, StatusCodes.Status401Unauthorized);
+                throw new AppException(ErrorCodes.GroupUpdatePermissionDenied, StatusCodes.Status403Forbidden);
             }
             var task = _taskRepository.GetByIdAsync(request.TaskId);
             if (task == null)

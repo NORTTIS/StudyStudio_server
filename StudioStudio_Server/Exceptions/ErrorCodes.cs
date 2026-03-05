@@ -22,6 +22,7 @@
         // TASK
         public const string TaskNotFound = "TASK001";
         public const string TaskPermissionDenied = "TASK002";
+        public const string TaskDateTimeError = "TASK003";
 
         // GROUP
         public const string GroupNotFound = "GROUP001";
