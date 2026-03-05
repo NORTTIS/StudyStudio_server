@@ -76,7 +76,7 @@ namespace StudioStudio_Server.Services
             };
         }
 
-        public async Task SoftDeleteGroupTaskStatus(Guid userId, Guid groupId, Guid taskStatusId)
+        public async Task DeleteGroupTaskStatus(Guid userId, Guid groupId, Guid taskStatusId)
         {
             var userRole = await _participantRepository.GetGroupRoleByUserIdAsync(userId, groupId);
             if (!userRole.Equals(GroupRole.Moderator) && !userRole.Equals(GroupRole.Owner))
@@ -97,7 +97,7 @@ namespace StudioStudio_Server.Services
                     }
                     await _taskRepository.SaveChangesAsync();
                 }
-                await _groupTaskStatusRepository.SoftDeleteAsync(taskStatus);
+                await _groupTaskStatusRepository.DeleteAsync(taskStatus);
             }
         }
 

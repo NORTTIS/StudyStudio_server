@@ -38,9 +38,9 @@ namespace StudioStudio_Server.Repositories
             await _db.SaveChangesAsync();
         }
 
-        public async Task<Dictionary<Guid, List<TaskAssignment>>> GetListAssigneesByListTaskId(List<Guid> taskIds)
+        public async Task<List<TaskAssignment>> GetListAssigneesByListTaskId(List<Guid> taskIds)
         {
-            Dictionary<Guid, List<TaskAssignment>> result = new Dictionary<Guid, List<TaskAssignment>>();
+            List<TaskAssignment> result = new List<TaskAssignment>();
 
             foreach (var taskId in taskIds)
             {
@@ -48,8 +48,6 @@ namespace StudioStudio_Server.Repositories
                     .Where(a => a.TaskId == taskId)
                     .AsNoTracking()
                     .ToListAsync();
-
-                result[taskId] = asssignee;
             }
 
             return result;

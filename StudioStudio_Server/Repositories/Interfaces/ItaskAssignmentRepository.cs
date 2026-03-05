@@ -7,6 +7,6 @@ namespace StudioStudio_Server.Repositories.Interfaces
         Task AddRangeAsync(List<TaskAssignment> assignment);
         Task RemoveAsync(List<TaskAssignment> assignees);
         Task<List<TaskAssignment>> GetAssigneesByTaskId(Guid taskId);
-        Task<Dictionary<Guid, List<TaskAssignment>>> GetListAssigneesByListTaskId(List<Guid> taskIds);
+        Task<List<TaskAssignment>> GetListAssigneesByListTaskId(List<Guid> taskIds);
     }
 }

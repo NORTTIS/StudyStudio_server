@@ -8,7 +8,7 @@ namespace StudioStudio_Server.Services.Interfaces
         Task<GroupTaskStatusResponse> CreateNewGroupTaskStatus(Guid userId, Guid groupId, GroupTaskStatusRequest request);
         Task<GroupTaskStatusResponse> GetGroupTaskStatusDetail(Guid taskStatusId);
         Task UpdateGroupTaskStatus(Guid userId, Guid groupId, Guid taskStatusId, GroupTaskStatusRequest request);
-        Task SoftDeleteGroupTaskStatus(Guid userId, Guid groupId, Guid taskStatusId);
+        Task DeleteGroupTaskStatus(Guid userId, Guid groupId, Guid taskStatusId);
         Task ReorderGroupTaskStatus(Guid userId, Guid groupId, ReorderGroupTaskStatusRequest request);
     }
 }

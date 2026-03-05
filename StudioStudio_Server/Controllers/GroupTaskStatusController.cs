@@ -110,7 +110,7 @@ namespace StudioStudio_Server.Controllers
         public async Task<ActionResult<ApiResponse<object>>> DeleteGroup(Guid statusId, Guid groupId)
         {
             var userId = ValidateAndGetUserId();
-            await _groupTaskStatusService.SoftDeleteGroupTaskStatus(userId, groupId, statusId);
+            await _groupTaskStatusService.DeleteGroupTaskStatus(userId, groupId, statusId);
             var message = _messageService.GetMessage(ErrorCodes.SuccessDeleteTaskStatus);
 
             return Ok(ApiResponse<object>.Success(

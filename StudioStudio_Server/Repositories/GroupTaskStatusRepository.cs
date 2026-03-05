@@ -64,10 +64,9 @@ namespace StudioStudio_Server.Repositories
             await _context.SaveChangesAsync();
         }
 
-        public async Task SoftDeleteAsync(GroupTaskStatus status)
+        public async Task DeleteAsync(GroupTaskStatus status)
         {
-            status.IsDeleted = true;
-            _context.GroupTaskStatuses.Update(status);
+            _context.GroupTaskStatuses.Remove(status);
             await _context.SaveChangesAsync();
         }
 
@@ -192,7 +191,7 @@ namespace StudioStudio_Server.Repositories
                     catch (DbUpdateException)
                     {
                         await transaction.RollbackAsync();
-                        
+
                         if (attempt < MAX_RETRY)
                         {
                             await Task.Delay(50 * attempt);

@@ -97,36 +97,14 @@ namespace StudioStudio_Server.Services
 
             await _taskRepository.AddAsync(taskItem);
 
-            List<TaskAssignment> taskAssignments = new List<TaskAssignment>();
-            if (request.Assignees.Any())
+            var assigneeId = request.Assignees != Guid.Empty ? request.Assignees : userId;
+            var assignee = await _userRepository.GetByIdAsync(assigneeId);
+            var assigneeDetail = new UserDto
             {
-                taskAssignments = request.Assignees.Select(assignedId => new TaskAssignment
-                {
-                    AssignmentId = Guid.NewGuid(),
-                    TaskId = taskItem.TaskId,
-                    AssignedTo = assignedId,
-                    AssignedBy = userId,
-                    AssignedAt = now
-                }).ToList();
-
-                await _taskAssignmentRepository.AddRangeAsync(taskAssignments);
-            }
-
-            List<UserDto> assignerDetail = new List<UserDto>();
-            if (taskAssignments.Any())
-            {
-                foreach (var u in taskAssignments)
-                {
-                    var user = await _userRepository.GetByIdAsync(u.AssignedTo);
-                    assignerDetail.Add(new UserDto
-                    {
-                        Id = user!.UserId,
-                        FirstName = user!.FirstName,
-                        LastName = user!.LastName,
-                        AvatarUrl = user!.AvatarUrl,
-                    });
-                }
-            }
+                Id = assigneeId,
+                FirstName = assignee!.FirstName,
+                LastName = assignee.LastName
+            };
 
             return new TaskItemResponse
             {
@@ -146,7 +124,7 @@ namespace StudioStudio_Server.Services
                     StatusName = groupStatus!.StatusName,
                     Position = groupStatus.Position
                 },
-                Assignee = assignerDetail
+                Assignee = assigneeDetail,
             };
         }
 
