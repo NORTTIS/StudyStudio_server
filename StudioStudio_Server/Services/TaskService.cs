@@ -53,7 +53,7 @@ namespace StudioStudio_Server.Services
                 throw new AppException(ErrorCodes.GroupCreateTaskDeniedMissingStatus, StatusCodes.Status400BadRequest);
             }
 
-            var groupStatus = await _groupTaskStatusRepository.GetDetailAsync(request.GroupId);
+            var groupStatus = await _groupTaskStatusRepository.GetDetailAsync(request.GroupStatusId.Value);
 
             var existingTask = await _taskRepository.GetAllTasksByStatusIdAsync(request.GroupStatusId.Value);
             int newTaskPosition = 0;
@@ -97,11 +97,11 @@ namespace StudioStudio_Server.Services
 
             await _taskRepository.AddAsync(taskItem);
 
-            var assigneeId = request.Assignees != Guid.Empty ? request.Assignees : userId;
-            var assignee = await _userRepository.GetByIdAsync(assigneeId);
+            var assigneeId = request.Assignees.HasValue ? request.Assignees : userId;
+            var assignee = await _userRepository.GetByIdAsync(assigneeId!.Value);
             var assigneeDetail = new UserDto
             {
-                Id = assigneeId,
+                Id = assigneeId.Value,
                 FirstName = assignee!.FirstName,
                 LastName = assignee.LastName
             };
@@ -155,11 +155,11 @@ namespace StudioStudio_Server.Services
                 throw new AppException(ErrorCodes.GroupRestoreTaskDenined, StatusCodes.Status401Unauthorized);
             }
 
-            var task = await _taskRepository.GetByIdAsync(taskId);
+            var task = await _taskRepository.GetDeletedByIdAsync(taskId);
 
             if (task == null)
             {
-                return;
+                throw new AppException(ErrorCodes.TaskNotFound, StatusCodes.Status404NotFound);
             }
 
             var statusList = await _groupTaskStatusRepository.GetByGroupIdAsync(groupId);
@@ -205,6 +205,7 @@ namespace StudioStudio_Server.Services
 
             var result = taskHistory.Select(t => new TaskDeleteResponse
             {
+                DeleteTaskId = t.TaskId,
                 TaskName = taskList.FirstOrDefault(task => task.TaskId == t.TaskId)?.Title ?? "Unknown Task",
                 DeletedOn = t.ChangedAt,
                 DeletedBy = t.ChangedBy

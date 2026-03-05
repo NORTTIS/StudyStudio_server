@@ -30,6 +30,13 @@ namespace StudioStudio_Server.Repositories
                 .FirstOrDefaultAsync(t => t.TaskId == taskId && !t.IsPendingDeleted);
         }
 
+        public async Task<TaskItem?> GetDeletedByIdAsync(Guid taskId)
+        {
+            return await _context.Tasks
+                .AsNoTracking()
+                .FirstOrDefaultAsync(t => t.TaskId == taskId && t.IsPendingDeleted);
+        }
+
         /// <summary>
         /// Count tasks in group
         /// Condition: GroupId = {groupId} AND IsPendingDeleted = false
