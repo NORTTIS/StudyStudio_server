@@ -7,6 +7,7 @@ namespace StudioStudio_Server.Repositories.Interfaces
         Task<Dictionary<Guid, int>> GetTaskCountByGroupIdsAsync(List<Guid> groupIds);
         Task<int> GetTaskCountByGroupIdAsync(Guid groupId);
         Task<TaskItem?> GetByIdAsync(Guid taskId);
+        Task<TaskItem?> GetDeletedByIdAsync(Guid taskId);
         Task<TaskSummaryResponse> GetGroupTaskStatisticsAsync(Guid groupId);
         Task AddAsync(TaskItem task);
         Task UpdateAsync(TaskItem task);

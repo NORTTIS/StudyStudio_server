@@ -16,7 +16,7 @@ namespace StudioStudio_Server.Models.DTOs.Response
         public DateTime DueDate { get; set; }
         public GroupTaskStatusDto? GroupStatus { get; set; }
         public PersonalTaskStatusDto? PersonalStatus { get; set; }
-        public List<UserDto> Assignee { get; set; } = new List<UserDto>();
+        public UserDto Assignee { get; set; } = new UserDto();
 
     }
 

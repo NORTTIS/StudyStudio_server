@@ -13,7 +13,7 @@ namespace StudioStudio_Server.Models.DTOs.Request
         public DateTime DueDate { get; set; }
         public Guid? GroupStatusId { get; set; }
         public Guid? PersonalStatusId { get; set; }
-        public List<Guid> Assignees { get; set; } = new List<Guid>();
+        public Guid? Assignees { get; set; }
     }
 
 }

@@ -1,5 +1,7 @@
-﻿using Microsoft.AspNetCore.Http.HttpResults;
+﻿using iText.Layout.Renderer;
+using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
 using StudioStudio_Server.Data;
 using StudioStudio_Server.Exceptions;
 using StudioStudio_Server.Models.DTOs.Request;
@@ -216,9 +218,27 @@ namespace StudioStudio_Server.Services
             // Get assinees
             var taskIdList = taskList.SelectMany(t => t.Value).Select(id => id.TaskId).ToList();
             var assignees = await _taskAssignmentRepository.GetListAssigneesByListTaskId(taskIdList);
-            var userIdList = assignees.SelectMany(t => t.Value).Select(a => a.AssignedTo).Distinct().ToList();
-            var assigneeUsers = await _userRepository.GetByIdsAsync(userIdList);
-            var assigneeUserDict = assigneeUsers.ToDictionary(u => u.UserId, u => u);
+
+            var userIds = assignees.Select(a => a.AssignedTo).Distinct().ToList();
+            var users = await _userRepository.GetByIdsAsync(userIds);
+            var userDict = users.ToDictionary(u => u.UserId);
+
+            var assigneeDict = new Dictionary<Guid, UserDto>();
+
+            foreach (var assignee in assignees)
+            {
+                if (userDict.TryGetValue(assignee.AssignedTo, out var user))
+                {
+                    assigneeDict[assignee.TaskId] = new UserDto
+                    {
+                        Id = user.UserId,
+                        FirstName = user.FirstName,
+                        LastName = user.LastName,
+                        AvatarUrl = user.AvatarUrl
+                    };
+                }
+            }
+
 
             // Check if group is a template
             var template = await _templateRepository.GetByGroupIdAsync(groupId);
@@ -255,7 +275,7 @@ namespace StudioStudio_Server.Services
                     {
                         TaskId = t.TaskId,
                         TaskTitle = t.Title,
-                        TaskDescription = t.Description,
+                        TaskDescription = t.Description!,
                         TaskPriority = t.Priority,
                         TaskSeverity = t.Severity,
                         Position = t.Position,
@@ -263,19 +283,7 @@ namespace StudioStudio_Server.Services
                         CreatedAt = t.CreatedAt,
                         StartDate = t.StartDate!.Value,
                         DueDate = t.DueDate!.Value,
-                        Assignee = assignees.TryGetValue(t.TaskId, out var taskAssignees)
-                            ? taskAssignees.Select(a =>
-                            {
-                                var user = assigneeUserDict.GetValueOrDefault(a.AssignedTo);
-                                return user != null ? new UserDto
-                                {
-                                    Id = user.UserId,
-                                    FirstName = user.FirstName,
-                                    LastName = user.LastName,
-                                    AvatarUrl = user.AvatarUrl
-                                } : new UserDto();
-                            }).Where(u => u != null).ToList()
-                            : new List<UserDto>()
+                        Assignee = assigneeDict.TryGetValue(t.TaskId, out var user) ? user : null
                     }).ToList()
                 }).ToList()
             };

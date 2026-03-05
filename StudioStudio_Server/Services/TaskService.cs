@@ -53,7 +53,7 @@ namespace StudioStudio_Server.Services
                 throw new AppException(ErrorCodes.GroupCreateTaskDeniedMissingStatus, StatusCodes.Status400BadRequest);
             }
 
-            var groupStatus = await _groupTaskStatusRepository.GetDetailAsync(request.GroupId);
+            var groupStatus = await _groupTaskStatusRepository.GetDetailAsync(request.GroupStatusId.Value);
 
             var existingTask = await _taskRepository.GetAllTasksByStatusIdAsync(request.GroupStatusId.Value);
             int newTaskPosition = 0;
@@ -97,36 +97,14 @@ namespace StudioStudio_Server.Services
 
             await _taskRepository.AddAsync(taskItem);
 
-            List<TaskAssignment> taskAssignments = new List<TaskAssignment>();
-            if (request.Assignees.Any())
+            var assigneeId = request.Assignees.HasValue ? request.Assignees : userId;
+            var assignee = await _userRepository.GetByIdAsync(assigneeId!.Value);
+            var assigneeDetail = new UserDto
             {
-                taskAssignments = request.Assignees.Select(assignedId => new TaskAssignment
-                {
-                    AssignmentId = Guid.NewGuid(),
-                    TaskId = taskItem.TaskId,
-                    AssignedTo = assignedId,
-                    AssignedBy = userId,
-                    AssignedAt = now
-                }).ToList();
-
-                await _taskAssignmentRepository.AddRangeAsync(taskAssignments);
-            }
-
-            List<UserDto> assignerDetail = new List<UserDto>();
-            if (taskAssignments.Any())
-            {
-                foreach (var u in taskAssignments)
-                {
-                    var user = await _userRepository.GetByIdAsync(u.AssignedTo);
-                    assignerDetail.Add(new UserDto
-                    {
-                        Id = user!.UserId,
-                        FirstName = user!.FirstName,
-                        LastName = user!.LastName,
-                        AvatarUrl = user!.AvatarUrl,
-                    });
-                }
-            }
+                Id = assigneeId.Value,
+                FirstName = assignee!.FirstName,
+                LastName = assignee.LastName
+            };
 
             return new TaskItemResponse
             {
@@ -146,7 +124,7 @@ namespace StudioStudio_Server.Services
                     StatusName = groupStatus!.StatusName,
                     Position = groupStatus.Position
                 },
-                Assignee = assignerDetail
+                Assignee = assigneeDetail,
             };
         }
 
@@ -177,11 +155,11 @@ namespace StudioStudio_Server.Services
                 throw new AppException(ErrorCodes.GroupRestoreTaskDenined, StatusCodes.Status401Unauthorized);
             }
 
-            var task = await _taskRepository.GetByIdAsync(taskId);
+            var task = await _taskRepository.GetDeletedByIdAsync(taskId);
 
             if (task == null)
             {
-                return;
+                throw new AppException(ErrorCodes.TaskNotFound, StatusCodes.Status404NotFound);
             }
 
             var statusList = await _groupTaskStatusRepository.GetByGroupIdAsync(groupId);
@@ -227,6 +205,7 @@ namespace StudioStudio_Server.Services
 
             var result = taskHistory.Select(t => new TaskDeleteResponse
             {
+                DeleteTaskId = t.TaskId,
                 TaskName = taskList.FirstOrDefault(task => task.TaskId == t.TaskId)?.Title ?? "Unknown Task",
                 DeletedOn = t.ChangedAt,
                 DeletedBy = t.ChangedBy
