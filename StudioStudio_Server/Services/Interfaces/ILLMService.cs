@@ -19,5 +19,19 @@ namespace StudioStudio_Server.Services.Interfaces
             string userMessage,
             string context,
             CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// G?i LLM API ð? generate câu tr? l?i d?ng streaming
+        /// </summary>
+        /// <param name="systemPrompt">System prompt ð? ð?nh ngh?a behavior c?a AI</param>
+        /// <param name="userMessage">Câu h?i t? user</param>
+        /// <param name="context">Context t? documents và tasks</param>
+        /// <param name="cancellationToken">Cancellation token</param>
+        /// <returns>Stream c?a câu tr? l?i t? LLM</returns>
+        IAsyncEnumerable<string> GenerateAnswerStreamAsync(
+            string systemPrompt,
+            string userMessage,
+            string context,
+            CancellationToken cancellationToken = default);
     }
 }

@@ -11,6 +11,8 @@ namespace StudioStudio_Server.Models.DTOs.Response
         public TaskSummaryResponse? TaskSummary { get; set; }
         public long ProcessingTimeMs { get; set; }
         public DateTime GeneratedAt { get; set; }
+        public int RemainingRequests { get; set; }
+        public int DailyLimit { get; set; }
     }
 
     public class SourceDocument

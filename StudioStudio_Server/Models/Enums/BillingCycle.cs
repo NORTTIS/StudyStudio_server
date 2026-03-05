@@ -1,5 +1,5 @@
 ﻿public enum BillingCycle
 {
-    Monthly,
-    Free
+    Free = 0,
+    Monthly = 1
 }

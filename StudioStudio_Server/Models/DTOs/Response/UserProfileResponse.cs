@@ -16,5 +16,10 @@
         public string? GoogleId { get; set; }
         public DateTime CreatedAt { get; set; }
         public DateTime UpdatedAt { get; set; }
+
+        // AI Request Limit Information
+        public int AiRequestsUsedToday { get; set; }
+        public int AiRequestsRemaining { get; set; }
+        public int AiDailyLimit { get; set; }
     }
 }

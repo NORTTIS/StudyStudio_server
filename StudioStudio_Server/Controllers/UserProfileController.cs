@@ -62,7 +62,7 @@ namespace StudioStudio_Server.Controllers
         /// <summary>
         /// [AUTHORIZED] GET /api/user-profile
         /// Get profile information of current user
-        /// Include: Avatar URL (absolute), settings, Google OAuth status
+        /// Include: Avatar URL (absolute), settings, Google OAuth status, AI request limits
         /// </summary>
         [HttpGet("user-profile")]
         public async Task<ActionResult<ApiResponse<UserProfileResponse>>> GetUserProfile()
@@ -76,6 +76,10 @@ namespace StudioStudio_Server.Controllers
                     ErrorCodes.UserNotFound,
                     StatusCodes.Status404NotFound);
             }
+
+            // Get AI request limit info
+            var (usedToday, dailyLimit) = await _userService.GetAiRequestLimitInfoAsync(userId);
+            int remaining = Math.Max(0, dailyLimit - usedToday);
 
             var response = new UserProfileResponse
             {
@@ -92,7 +96,12 @@ namespace StudioStudio_Server.Controllers
                 EmailNotificationEnabled = user.EmailNotificationEnabled,
                 GoogleId = user.GoogleId,
                 CreatedAt = user.CreatedAt,
-                UpdatedAt = user.UpdatedAt
+                UpdatedAt = user.UpdatedAt,
+
+                // AI Request Limit Info
+                AiRequestsUsedToday = usedToday,
+                AiRequestsRemaining = remaining,
+                AiDailyLimit = dailyLimit
             };
 
             var message = _messageService.GetMessage(ErrorCodes.SuccessGetData);
