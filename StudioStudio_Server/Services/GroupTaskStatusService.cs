@@ -84,15 +84,16 @@ namespace StudioStudio_Server.Services
                 throw new AppException(ErrorCodes.GroupDeleteTaskStatusDenied, StatusCodes.Status401Unauthorized);
             }
             var taskStatus = await _groupTaskStatusRepository.GetDetailAsync(taskStatusId);
-            if (taskStatus != null)
+            if (taskStatus == null || taskStatus.GroupId != groupId)
             {
-                var taskList = await _taskRepository.GetAllTasksByStatusIdAsync(taskStatusId);
-                if (taskList != null)
-                {
-                    throw new AppException(ErrorCodes.GroupDeleteTaskDenined, StatusCodes.Status400BadRequest);
-                }
-                await _groupTaskStatusRepository.DeleteAsync(taskStatus);
+                throw new AppException(ErrorCodes.GroupStatusNotFound, StatusCodes.Status404NotFound);
             }
+            var taskList = await _taskRepository.GetAllTasksByStatusIdAsync(taskStatusId);
+            if (taskList.Any())
+            {
+                throw new AppException(ErrorCodes.GroupDeleteTaskStatusFailed, StatusCodes.Status400BadRequest);
+            }
+            await _groupTaskStatusRepository.DeleteAsync(taskStatus);
         }
 
         public async Task UpdateGroupTaskStatus(Guid userId, Guid groupId, Guid taskStatusId, GroupTaskStatusRequest request)
