@@ -16,6 +16,7 @@ using StudioStudio_Server.Filters;
 using StackExchange.Redis;
 using StudioStudio_Server.Hubs;
 using Microsoft.Extensions.FileProviders;
+using StudioStudio_Server.Middlewares;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -244,6 +245,11 @@ app.UseStaticFiles(new StaticFileOptions
 app.UseCors("WebAppPolicy");
 
 app.UseAuthentication();
+
+// Add custom middlewares after authentication
+app.UseMiddleware<TokenValidationMiddleware>();
+app.UseMiddleware<RateLimitMiddleware>();
+
 app.UseAuthorization();
 
 app.MapControllers();

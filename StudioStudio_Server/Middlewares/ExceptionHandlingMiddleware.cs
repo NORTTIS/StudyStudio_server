@@ -1,8 +1,8 @@
-﻿using System.Globalization;
-using System.Net;
+﻿using System.Net;
 using StudioStudio_Server.Exceptions;
 using StudioStudio_Server.Localization;
 using StudioStudio_Server.Models.DTOs.Response;
+using StudioStudio_Server.Utils;
 
 public class ExceptionHandlingMiddleware
 {
@@ -38,7 +38,7 @@ public class ExceptionHandlingMiddleware
 
     private async Task HandleAppException(HttpContext context, AppException ex)
     {
-        var culture = GetCulture(context);
+        var culture = HttpContextHelper.GetCultureFromHeader(context);
         var localizer = new JsonStringLocalizer(_env, culture);
 
         context.Response.StatusCode = ex.HttpStatus;
@@ -56,7 +56,7 @@ public class ExceptionHandlingMiddleware
     {
         _logger.LogError(ex, "Unhandled exception");
 
-        var culture = GetCulture(context);
+        var culture = HttpContextHelper.GetCultureFromHeader(context);
         var localizer = new JsonStringLocalizer(_env, culture);
 
         context.Response.StatusCode = (int)HttpStatusCode.InternalServerError;
@@ -68,17 +68,5 @@ public class ExceptionHandlingMiddleware
         );
 
         await context.Response.WriteAsJsonAsync(response);
-    }
-
-    private static string GetCulture(HttpContext context)
-    {
-        var lang = context.Request.Headers["Accept-Language"].FirstOrDefault();
-
-        if (string.IsNullOrWhiteSpace(lang))
-            return "vi";
-
-        var culture = lang.Split(',')[0].Split('-')[0];
-
-        return culture;
     }
 }
