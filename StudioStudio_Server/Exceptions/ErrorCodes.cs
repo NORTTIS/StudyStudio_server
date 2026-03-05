@@ -146,6 +146,7 @@
         public const string SuccessCreateTask = "SUCCESS037";
         public const string SuccessDeleteTask = "SUCCESS038";
         public const string SuccessRestoreTask = "SUCCESS039";
+        public const string SuccessUpdateTask = "SUCCESS040";
 
         // ANNOUNCEMENT
         public const string AnnouncementTagTitle = "ANNOUNCEMENTTAGTITLE";

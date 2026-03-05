@@ -16,4 +16,11 @@ namespace StudioStudio_Server.Models.DTOs.Request
         public Guid? Assignees { get; set; }
     }
 
+    public class ReorderTaskRequest
+    {
+        public Guid TaskId { get; set; }
+        public Guid TargetStatusId { get; set; }
+        public Guid? PrevTaskId { get; set; }
+        public Guid? NextTaskId { get; set; }
+    }
 }

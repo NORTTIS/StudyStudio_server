@@ -89,13 +89,7 @@ namespace StudioStudio_Server.Services
                 var taskList = await _taskRepository.GetAllTasksByStatusIdAsync(taskStatusId);
                 if (taskList != null)
                 {
-                    foreach (var task in taskList)
-                    {
-                        task.IsPendingDeleted = true;
-                        task.GroupStatusId = null;
-                        task.UpdatedAt = DateTime.UtcNow;
-                    }
-                    await _taskRepository.SaveChangesAsync();
+                    throw new AppException(ErrorCodes.GroupDeleteTaskDenined, StatusCodes.Status400BadRequest);
                 }
                 await _groupTaskStatusRepository.DeleteAsync(taskStatus);
             }

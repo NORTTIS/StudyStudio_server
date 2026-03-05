@@ -9,5 +9,7 @@ namespace StudioStudio_Server.Services.Interfaces
         Task SoftDeleteTaskAsync(Guid userId, Guid groupId, Guid taskId);
         Task RestoreGroupTaskAsync(Guid userId, Guid groupId, Guid taskId);
         Task<List<TaskDeleteResponse>> GetDeleteTaskListAsync(Guid userId, Guid groupId);
+        Task ReorderTaskAsync(Guid userId, Guid groupId, ReorderTaskRequest request);
+
     }
 }

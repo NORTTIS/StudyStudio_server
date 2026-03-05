@@ -13,7 +13,8 @@ namespace StudioStudio_Server.Repositories
     public class TaskRepository : ITaskRepository
     {
         private readonly StudioDbContext _context;
-
+        private const int STEP = 1000;
+        private const int MAX_TRY = 3;
         public TaskRepository(StudioDbContext context)
         {
             _context = context;
@@ -173,7 +174,7 @@ namespace StudioStudio_Server.Repositories
         {
             return await _context.Tasks
                 .Where(t => t.GroupId == groupId && t.IsPendingDeleted)
-                .OrderByDescending(t => t.UpdatedAt)
+                .OrderBy(t => t.UpdatedAt)
                 .ThenByDescending(t => t.Title)
                 .AsNoTracking()
                 .ToListAsync();
@@ -201,12 +202,167 @@ namespace StudioStudio_Server.Repositories
                 var tasks = await _context.Tasks
                     .Where(t => t.GroupStatusId == statusId && !t.IsPendingDeleted)
                     .AsNoTracking()
+                    .OrderBy(t => t.Position)
                     .ToListAsync();
 
                 result[statusId] = tasks;
             }
 
             return result;
+        }
+
+        /// <summary>
+        /// Reorder (và đổi status nếu cần) cho một task dựa trên vị trí kéo thả.
+        /// Hỗ trợ: kéo trong cùng status, kéo sang status khác.
+        /// </summary>
+        public async Task ReorderTaskAsync(Guid taskId, Guid targetStatusId, Guid? prevTaskId, Guid? nextTaskId)
+        {
+            if (!prevTaskId.HasValue && !nextTaskId.HasValue)
+            {
+                throw new InvalidOperationException("Both prevTaskId and nextTaskId cannot be null");
+            }
+
+            for (int attemp = 1; attemp <= MAX_TRY; attemp++)
+            {
+                using var transaction = await _context.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
+
+                try
+                {
+                    var targetStatus = await _context.GroupTaskStatuses
+                        .FirstOrDefaultAsync(s => s.StatusId == targetStatusId && !s.IsDeleted)
+                    ?? throw new InvalidOperationException($"Status {targetStatusId} not found");
+
+                    // Load prev/next task (phải thuộc đúng targetStatus)
+                    var prev = prevTaskId.HasValue
+                        ? await _context.Tasks
+                            .FirstOrDefaultAsync(t => t.TaskId == prevTaskId.Value
+                                                   && t.GroupStatusId == targetStatusId
+                                                   && !t.IsPendingDeleted)
+                        : null;
+
+                    var next = nextTaskId.HasValue
+                        ? await _context.Tasks
+                            .FirstOrDefaultAsync(t => t.TaskId == nextTaskId.Value
+                                                   && t.GroupStatusId == targetStatusId
+                                                   && !t.IsPendingDeleted)
+                        : null;
+
+                    long newPos;
+
+                    if (prev != null && next != null)
+                    {
+                        long gap = next.Position - prev.Position;
+
+                        if (gap <= 1)
+                        {
+                            await RebalanceTasksInStatusInternalAsync(targetStatusId);
+
+                            // Reload sau rebalance
+                            prev = await _context.Tasks
+                                .FirstOrDefaultAsync(t => t.TaskId == prevTaskId!.Value && !t.IsPendingDeleted);
+                            next = await _context.Tasks
+                                .FirstOrDefaultAsync(t => t.TaskId == nextTaskId!.Value && !t.IsPendingDeleted);
+                        }
+
+                        newPos = Midpoint(prev!.Position, next!.Position);
+                    }
+                    else if (prev != null)
+                    {
+                        newPos = prev.Position + STEP;
+                    }
+                    else if (next != null)
+                    {
+                        newPos = next.Position / 2;
+                    }
+                    else
+                    {
+                        throw new InvalidOperationException("Invalid prev/next task state after rebalance");
+                    }
+
+                    // Load task cần di chuyển
+                    var task = await _context.Tasks
+                        .FirstOrDefaultAsync(t => t.TaskId == taskId && !t.IsPendingDeleted)
+                        ?? throw new InvalidOperationException($"Task {taskId} not found");
+
+                    // Cập nhật vị trí + status (cho phép đổi cột)
+                    task.Position = (int)newPos;
+                    task.GroupStatusId = targetStatusId;
+
+                    await _context.SaveChangesAsync();
+                    await transaction.CommitAsync();
+                    return;
+                }
+                catch (DbUpdateException)
+                {
+                    await transaction.RollbackAsync();
+
+                    if (attemp < MAX_TRY)
+                    {
+                        await Task.Delay(50 * attemp);
+                        continue;
+                    }
+                    throw;
+                }
+                catch
+                {
+                    await transaction.RollbackAsync();
+                    throw;
+                }
+            }
+            throw new InvalidOperationException("Failed to reorder task after maximum retries");
+        }
+
+        /// <summary>
+        /// Rebalance public (có transaction riêng)
+        /// </summary>
+        public async Task RebalanceTasksInStatusAsync(Guid statusId)
+        {
+            using var transaction = await _context.Database
+                .BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
+            try
+            {
+                await RebalanceTasksInStatusInternalAsync(statusId);
+                await transaction.CommitAsync();
+            }
+            catch
+            {
+                await transaction.RollbackAsync();
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// Tìm task kế tiếp sau position trong cùng status
+        /// </summary>
+        public async Task<TaskItem?> FindNextAfterAsync(Guid statusId, long position)
+        {
+            return await _context.Tasks
+                .Where(t => t.GroupStatusId == statusId && t.Position > position && !t.IsPendingDeleted)
+                .OrderBy(t => t.Position)
+                .AsNoTracking()
+                .FirstOrDefaultAsync();
+        }
+
+        private async Task RebalanceTasksInStatusInternalAsync(Guid statusId)
+        {
+            var tasks = await _context.Tasks
+                .Where(t => t.GroupStatusId == statusId && !t.IsPendingDeleted)
+                .OrderBy(t => t.Position)
+                .ToListAsync();
+
+            long pos = STEP;
+            foreach (var task in tasks)
+            {
+                task.Position = (int)pos;
+                pos += STEP;
+            }
+
+            await _context.SaveChangesAsync();
+        }
+
+        private static long Midpoint(long a, long b)
+        {
+            return (a + b) / 2;
         }
     }
 }
