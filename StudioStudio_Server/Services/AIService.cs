@@ -5,6 +5,7 @@ using StudioStudio_Server.Models.Entities;
 using StudioStudio_Server.Repositories.Interfaces;
 using StudioStudio_Server.Services.Interfaces;
 using System.Diagnostics;
+using System.Runtime.CompilerServices;
 
 namespace StudioStudio_Server.Services
 {
@@ -12,7 +13,7 @@ namespace StudioStudio_Server.Services
     /// Service for AI Question & Answer with Hybrid RAG
     /// Flow: Question → Embed → Qdrant Search → Task Stats → LLM → Response
     /// Hybrid RAG = Document Context + Task Statistics
-    /// LLM: Gemini 2.5 Flash (primary) with fallback to Gemini 1.5 Flash
+    /// LLM: Gemini 2.5 Flash (primary) with fallback to Gemini 2.5 Pro
     /// </summary>
     public class AIService : IAIService
     {
@@ -134,7 +135,7 @@ namespace StudioStudio_Server.Services
                 string context = BuildContext(searchResults, taskSummary, language);
 
                 // Step 6: Call LLM (Gemini) - Generate answer
-                _logger.LogInformation("Step 6: Calling Gemini LLM (2.5 Flash with 1.5 Flash fallback)...");
+                _logger.LogInformation("Step 6: Calling Gemini LLM (2.5 Flash with 2.5 Pro fallback)...");
                 string systemPrompt = GetSystemPrompt(language);
                 string answer = await _llmService.GenerateAnswerAsync(
                     systemPrompt,
@@ -175,7 +176,9 @@ namespace StudioStudio_Server.Services
                     }).ToList(),
                     TaskSummary = taskSummary,
                     ProcessingTimeMs = sw.ElapsedMilliseconds,
-                    GeneratedAt = DateTime.UtcNow
+                    GeneratedAt = DateTime.UtcNow,
+                    RemainingRequests = dailyLimit - (todayRequests + 1),
+                    DailyLimit = dailyLimit
                 };
 
                 _logger.LogInformation(
@@ -194,6 +197,197 @@ namespace StudioStudio_Server.Services
                 throw new AppException(
                     ErrorCodes.UnexpectedError,
                     StatusCodes.Status500InternalServerError);
+            }
+        }
+
+        /// <summary>
+        /// Process user question with Hybrid RAG approach (Streaming version)
+        /// Returns metadata first, then streams the answer
+        /// Step 0: Check AI rate limiting
+        /// Step 1: Validate permission
+        /// Step 2: Embed question
+        /// Step 3: Search Qdrant (filtered by groupId)
+        /// Step 4: Get task statistics
+        /// Step 5: Build context
+        /// Step 6: Return metadata + Stream answer from LLM
+        /// Step 7: Log AI request (after streaming completes)
+        /// </summary>
+        public async Task<(AIAnswerResponse metadata, IAsyncEnumerable<string> answerStream)> AskQuestionStreamAsync(
+            Guid userId,
+            AIQuestionRequest request,
+            string language = "vi",
+            CancellationToken cancellationToken = default)
+        {
+            Stopwatch sw = Stopwatch.StartNew();
+
+            try
+            {
+                // Step 0: Check AI rate limiting
+                DateTime startOfDay = DateTime.UtcNow.Date;
+                int todayRequests = await _aiRequestLogRepository.CountTodayRequestsAsync(userId, startOfDay);
+
+                // Get user's subscription plan to check rate limit
+                SubscriptionPlan? subscriptionPlan = await _userSubscriptionRepository.GetSubscriptionPlanByUserIdAsync(userId);
+                int dailyLimit = subscriptionPlan?.MaxAiRequestsPerDay ?? 20; // Default: Free Plan = 20
+
+                if (todayRequests >= dailyLimit)
+                {
+                    _logger.LogWarning(
+                        "AI rate limit exceeded: UserId={UserId}, Today={Today}, Limit={Limit}",
+                        userId, todayRequests, dailyLimit);
+
+                    throw new AppException(
+                        ErrorCodes.AIRateLimitExceeded,
+                        StatusCodes.Status429TooManyRequests);
+                }
+
+                _logger.LogInformation(
+                    "AI rate limit check passed: UserId={UserId}, Requests={Today}/{Limit}",
+                    userId, todayRequests, dailyLimit);
+
+                // Step 1: Validate permission - User must be a member of the group
+                bool isMember = await _groupParticipantRepository.IsUserInGroupAsync(
+                    request.GroupId,
+                    userId);
+
+                if (!isMember)
+                {
+                    throw new AppException(
+                        ErrorCodes.GroupPermissionDenied,
+                        StatusCodes.Status403Forbidden);
+                }
+
+                _logger.LogInformation(
+                    "AI Question (Streaming): UserId={UserId}, GroupId={GroupId}, Question={Question}, Language={Language}",
+                    userId, request.GroupId, request.Question, language);
+
+                // Step 2: Embed question - Convert question to 768-dimensional vector
+                _logger.LogInformation("Step 2: Embedding question...");
+                float[] questionEmbedding = await _embeddingService.GenerateEmbeddingAsync(
+                    request.Question,
+                    cancellationToken);
+
+                // Step 3: Search Qdrant - Find top 3 most relevant chunks in the group
+                _logger.LogInformation("Step 3: Searching Qdrant for relevant documents...");
+                List<VectorSearchResponse.SearchResult> searchResults =
+                    await _vectorDbService.SearchVectorsAsync(
+                        questionEmbedding,
+                        topK: 3,
+                        groupId: request.GroupId,
+                        cancellationToken);
+
+                _logger.LogInformation("Found {Count} relevant document chunks", searchResults.Count);
+
+                // Step 4: Task Statistics - Get task statistics for the group
+                _logger.LogInformation("Step 4: Calculating task statistics...");
+                TaskSummaryResponse taskSummary = await GetTaskSummaryAsync(
+                    request.GroupId,
+                    cancellationToken);
+
+                // Step 5: Build Context - Combine document context + task stats
+                _logger.LogInformation("Step 5: Building context...");
+                string context = BuildContext(searchResults, taskSummary, language);
+
+                // Step 6: Prepare metadata and start streaming
+                _logger.LogInformation("Step 6: Starting Gemini LLM streaming (2.5 Flash with 2.5 Pro fallback)...");
+                string systemPrompt = GetSystemPrompt(language);
+
+                // Prepare metadata response
+                AIAnswerResponse metadata = new AIAnswerResponse
+                {
+                    Answer = string.Empty, // Will be filled by streaming
+                    SourceDocuments = searchResults.Select(r => new SourceDocument
+                    {
+                        DocumentId = r.Payload.GetValueOrDefault("documentId")?.ToString(),
+                        ChunkIndex = int.TryParse(
+                            r.Payload.GetValueOrDefault("chunkIndex")?.ToString(),
+                            out int idx) ? idx : 0,
+                        RelevanceScore = r.Score,
+                        Preview = TruncateText(
+                            r.Payload.GetValueOrDefault("content")?.ToString() ?? "",
+                            150)
+                    }).ToList(),
+                    TaskSummary = taskSummary,
+                    ProcessingTimeMs = 0, // Will be updated after streaming
+                    GeneratedAt = DateTime.UtcNow,
+                    RemainingRequests = dailyLimit - (todayRequests + 1),
+                    DailyLimit = dailyLimit
+                };
+
+                // Create answer stream with logging wrapper
+                var answerStream = StreamAnswerWithLoggingAsync(
+                    userId,
+                    request.Question,
+                    context,
+                    systemPrompt,
+                    todayRequests,
+                    dailyLimit,
+                    sw,
+                    cancellationToken);
+
+                return (metadata, answerStream);
+            }
+            catch (AppException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error processing AI question (streaming)");
+                throw new AppException(
+                    ErrorCodes.UnexpectedError,
+                    StatusCodes.Status500InternalServerError);
+            }
+        }
+
+        /// <summary>
+        /// Stream answer from LLM and log after completion
+        /// </summary>
+        private async IAsyncEnumerable<string> StreamAnswerWithLoggingAsync(
+            Guid userId,
+            string question,
+            string context,
+            string systemPrompt,
+            int todayRequests,
+            int dailyLimit,
+            Stopwatch sw,
+            [EnumeratorCancellation] CancellationToken cancellationToken)
+        {
+            System.Text.StringBuilder fullAnswer = new System.Text.StringBuilder();
+
+            await foreach (var chunk in _llmService.GenerateAnswerStreamAsync(
+                systemPrompt,
+                question,
+                context,
+                cancellationToken))
+            {
+                fullAnswer.Append(chunk);
+                yield return chunk;
+            }
+
+            sw.Stop();
+
+            // Log AI request after streaming completes
+            string answer = fullAnswer.ToString();
+            int estimatedTokens = EstimateTokenUsage(question, answer, context);
+            
+            try
+            {
+                await _aiRequestLogRepository.AddAsync(new AIRequestLog
+                {
+                    RequestId = Guid.NewGuid(),
+                    UserId = userId,
+                    TokenUsed = estimatedTokens,
+                    CreatedAt = DateTime.UtcNow
+                });
+
+                _logger.LogInformation(
+                    "AI streaming request logged: UserId={UserId}, Tokens={Tokens}, Requests today={Today}/{Limit}, Time={Ms}ms",
+                    userId, estimatedTokens, todayRequests + 1, dailyLimit, sw.ElapsedMilliseconds);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to log AI streaming request for UserId={UserId}", userId);
             }
         }
 
