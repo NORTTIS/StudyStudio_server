@@ -128,6 +128,16 @@ namespace StudioStudio_Server.Services
             {
                 throw new AppException(ErrorCodes.AuthForbidden, StatusCodes.Status403Forbidden);
             }
+
+            var groupInStud = await _groupRepository.GetStudioGroupsAsync(studioId);
+            if (groupInStud.Any())
+            {
+                foreach (var group in groupInStud)
+                {
+                    group.IsActive = false;
+                }
+                await _groupRepository.SaveChangesAsync();
+            }
             await _studioRepository.DeleteStudioAsync(deleteStudio);
         }
 

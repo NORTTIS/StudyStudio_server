@@ -282,6 +282,7 @@ namespace StudioStudio_Server.Services
                             TaskPriority = t.Priority,
                             TaskSeverity = t.Severity,
                             Position = t.Position,
+                            Progress = t.Progress,
                             CreatedById = t.OwnerId,
                             CreatedAt = t.CreatedAt,
                             StartDate = t.StartDate,
