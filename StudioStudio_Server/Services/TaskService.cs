@@ -70,12 +70,12 @@ namespace StudioStudio_Server.Services
             var now = DateTime.UtcNow;
 
             // Convert dates to UTC if provided
-            DateTime? startDateUtc = request.StartDate.HasValue 
-                ? DateTime.SpecifyKind(request.StartDate.Value, DateTimeKind.Utc) 
+            DateTime? startDateUtc = request.StartDate.HasValue
+                ? DateTime.SpecifyKind(request.StartDate.Value, DateTimeKind.Utc)
                 : null;
-            
-            DateTime? dueDateUtc = request.DueDate.HasValue 
-                ? DateTime.SpecifyKind(request.DueDate.Value, DateTimeKind.Utc) 
+
+            DateTime? dueDateUtc = request.DueDate.HasValue
+                ? DateTime.SpecifyKind(request.DueDate.Value, DateTimeKind.Utc)
                 : null;
 
             // Validate dates
@@ -100,6 +100,7 @@ namespace StudioStudio_Server.Services
                 DueDate = dueDateUtc,
                 Priority = request.TaskPriority,
                 Severity = request.TaskSeverity,
+                Progress = 0,
                 IsPendingDeleted = false,
                 CreatedAt = now,
                 UpdatedAt = now,
@@ -141,6 +142,7 @@ namespace StudioStudio_Server.Services
                 TaskPriority = taskItem.Priority,
                 TaskSeverity = taskItem.Severity,
                 Position = taskItem.Position,
+                Progress = taskItem.Progress,
                 CreatedById = taskItem.OwnerId,
                 CreatedAt = now,
                 StartDate = taskItem.StartDate,
@@ -185,12 +187,12 @@ namespace StudioStudio_Server.Services
             }
 
             // Convert dates to UTC if provided
-            DateTime? startDateUtc = request.StartDate.HasValue 
-                ? DateTime.SpecifyKind(request.StartDate.Value, DateTimeKind.Utc) 
+            DateTime? startDateUtc = request.StartDate.HasValue
+                ? DateTime.SpecifyKind(request.StartDate.Value, DateTimeKind.Utc)
                 : null;
-            
-            DateTime? dueDateUtc = request.DueDate.HasValue 
-                ? DateTime.SpecifyKind(request.DueDate.Value, DateTimeKind.Utc) 
+
+            DateTime? dueDateUtc = request.DueDate.HasValue
+                ? DateTime.SpecifyKind(request.DueDate.Value, DateTimeKind.Utc)
                 : null;
 
             // Validate dates
@@ -231,6 +233,11 @@ namespace StudioStudio_Server.Services
             if (dueDateUtc.HasValue)
             {
                 task.DueDate = dueDateUtc.Value;
+            }
+
+            if (request.Progress.HasValue)
+            {
+                task.Progress = request.Progress.Value;
             }
 
             // Update GroupStatusId if provided
@@ -289,8 +296,8 @@ namespace StudioStudio_Server.Services
             }
 
             // Prepare response
-            var groupStatus = task.GroupStatusId.HasValue 
-                ? await _groupTaskStatusRepository.GetDetailAsync(task.GroupStatusId.Value) 
+            var groupStatus = task.GroupStatusId.HasValue
+                ? await _groupTaskStatusRepository.GetDetailAsync(task.GroupStatusId.Value)
                 : null;
 
             var assignmentList = await _taskAssignmentRepository.GetAssigneesByTaskId(taskId);
@@ -319,6 +326,7 @@ namespace StudioStudio_Server.Services
                 TaskPriority = task.Priority,
                 TaskSeverity = task.Severity,
                 Position = task.Position,
+                Progress = task.Progress,
                 CreatedById = task.OwnerId,
                 CreatedAt = task.CreatedAt,
                 StartDate = task.StartDate,

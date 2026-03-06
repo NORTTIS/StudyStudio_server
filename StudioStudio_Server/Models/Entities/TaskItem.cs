@@ -20,6 +20,7 @@ public class TaskItem
     public TaskSeverity Severity { get; set; }
 
     public int Position { get; set; }
+    public int Progress { get; set; } = 0;
 
     public bool IsPendingDeleted { get; set; }
 

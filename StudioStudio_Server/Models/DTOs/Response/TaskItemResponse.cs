@@ -11,6 +11,7 @@ namespace StudioStudio_Server.Models.DTOs.Response
         public TaskPriority TaskPriority { get; set; }
         public TaskSeverity TaskSeverity { get; set; }
         public int Position { get; set; }
+        public int Progress { get; set; }
         public Guid CreatedById { get; set; }
         public DateTime CreatedAt { get; set; }
         public DateTime? StartDate { get; set; }
