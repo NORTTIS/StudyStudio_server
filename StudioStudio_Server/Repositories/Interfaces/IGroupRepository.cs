@@ -18,5 +18,6 @@ namespace StudioStudio_Server.Repositories.Interfaces
         Task<bool> GroupNameExistsInStudioExcludingGroupAsync(Guid? studioId, string groupName, Guid excludeGroupId);
         Task<List<Group>> GetStudioGroupsAsync(Guid studioId);
         Task<Guid> GetGroupOwnerIdAsync(Guid groupId);
+        Task<List<string>> GetGroupNamesInStudioAsync(Guid? studioId);
     }
 }

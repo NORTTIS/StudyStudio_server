@@ -590,45 +590,52 @@ namespace StudioStudio_Server.Services
 
         public async Task<CreateStudioGroupsResponse> CreateStudioGroupAsync(Guid userId, CreateStudioGroupsRequest request)
         {
-            // Verify studio exists
-            var studio = await _studioRepository.GetByIdAsync(request.StudioId.Value);
-            if (studio == null)
+            int currentGroupCount = 0;
+
+            if (request.StudioId.HasValue)
             {
-                throw new AppException(ErrorCodes.StudioNotFound, StatusCodes.Status404NotFound);
+                var studioId = request.StudioId.Value;
+
+                var studio = await _studioRepository.GetByIdAsync(studioId);
+                if (studio == null)
+                {
+                    throw new AppException(ErrorCodes.StudioNotFound, StatusCodes.Status404NotFound);
+                }
+
+                var isOwner = await _studioRepository.IsUserStudioOwnerAsync(studioId, userId);
+                if (!isOwner)
+                {
+                    throw new AppException(ErrorCodes.StudioPermissionDenied, StatusCodes.Status403Forbidden);
+                }
+                currentGroupCount = await _groupRepository.GetGroupCountByStudioIdAsync(request.StudioId.Value);
+
             }
 
-            // Verify user is studio owner
-            var isOwner = await _studioRepository.IsUserStudioOwnerAsync(request.StudioId.Value, userId);
-            if (!isOwner)
-            {
-                throw new AppException(ErrorCodes.StudioPermissionDenied, StatusCodes.Status403Forbidden);
-            }
-
-            // Check subscription limit
             var subscriptionPlan = await _userSubscriptionRepository.GetSubscriptionPlanByUserIdAsync(userId);
             var groupLimit = subscriptionPlan?.MaxGroups ?? 5;
 
-            var currentGroupCount = await _groupRepository.GetGroupCountByStudioIdAsync(request.StudioId.Value);
             var createGroupCount = request.GroupCount;
-
             var totalGroupCount = currentGroupCount + createGroupCount;
-            if (totalGroupCount >= groupLimit)
+
+            if (totalGroupCount > groupLimit)
             {
                 throw new AppException(ErrorCodes.GroupLimitReached, StatusCodes.Status403Forbidden);
             }
 
-            // Check if group name already exists in this studio
-            for (int i = 1; i <= totalGroupCount; i++)
+            var existingNames = new HashSet<string>(
+                await _groupRepository.GetGroupNamesInStudioAsync(request.StudioId),
+                StringComparer.OrdinalIgnoreCase);
+
+            for (int i = currentGroupCount + 1; i <= totalGroupCount; i++)
             {
                 var groupName = request.GroupPrefix + i;
-                var nameExists = await _groupRepository.GroupNameExistsInStudioAsync(request.StudioId, groupName);
-                if (nameExists)
+
+                if (existingNames.Contains(groupName))
                 {
                     throw new AppException(ErrorCodes.GroupNameAlreadyExists, StatusCodes.Status400BadRequest);
                 }
             }
 
-            // Validate template if provided
             List<GroupTaskStatus>? templateTaskStatuses = null;
             if (request.TemplateId.HasValue)
             {
@@ -638,24 +645,21 @@ namespace StudioStudio_Server.Services
                     throw new AppException(ErrorCodes.TemplateNotFound, StatusCodes.Status404NotFound);
                 }
 
-                // Check if user has access to this template
                 if (!template.IsSystemTemplate && template.UserId != userId)
                 {
                     throw new AppException(ErrorCodes.TemplatePermissionDenied, StatusCodes.Status403Forbidden);
                 }
 
-                // Get template's task statuses
                 templateTaskStatuses = await _groupTaskStatusRepository.GetByGroupIdAsync(template.GroupId);
             }
 
-
             var now = DateTime.UtcNow;
-            List<Group> groupList = new List<Group>();
+            var groupList = new List<Group>();
 
-            for (int i = 1; i <= totalGroupCount; i++)
+            for (int i = currentGroupCount + 1; i <= totalGroupCount; i++)
             {
-                // Create new group
                 var groupName = request.GroupPrefix + i;
+
                 var newGroup = new Group
                 {
                     GroupId = Guid.NewGuid(),
@@ -671,7 +675,6 @@ namespace StudioStudio_Server.Services
 
                 await _groupRepository.AddAsync(newGroup);
 
-                // Add creator as Owner participant
                 var ownerParticipant = new GroupParticipant
                 {
                     ParticipantId = Guid.NewGuid(),
@@ -683,8 +686,7 @@ namespace StudioStudio_Server.Services
 
                 await _groupParticipantRepository.AddAsync(ownerParticipant);
 
-                // Copy task statuses from template if provided
-                if (templateTaskStatuses != null && templateTaskStatuses.Any())
+                if (templateTaskStatuses?.Count > 0)
                 {
                     var newTaskStatuses = templateTaskStatuses.Select(ts => new GroupTaskStatus
                     {

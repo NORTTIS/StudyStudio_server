@@ -33,6 +33,8 @@
 
   <ItemGroup>
     <Folder Include="Configurations\" />
+    <Folder Include="Docs\" />
+    <Folder Include="Helpers\" />
   </ItemGroup>
 
   <ItemGroup>

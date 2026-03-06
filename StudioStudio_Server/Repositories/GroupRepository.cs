@@ -183,5 +183,18 @@ namespace StudioStudio_Server.Repositories
             
             return owner;
         }
+
+        /// <summary>
+        /// Get list of group names in studio
+        /// Condition: StudioId = {studioId} AND IsActive = true
+        /// Returns: List of group names
+        /// </summary>
+        public async Task<List<string>> GetGroupNamesInStudioAsync(Guid? studioId)
+        {
+            return await _db.Groups
+                .Where(g => g.StudioId == studioId && g.IsActive)
+                .Select(g => g.GroupName)
+                .ToListAsync();
+        }
     }
 }
