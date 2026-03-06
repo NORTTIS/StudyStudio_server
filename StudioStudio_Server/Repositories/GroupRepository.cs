@@ -180,7 +180,7 @@ namespace StudioStudio_Server.Repositories
                 .Where(p => p.GroupId == groupId && p.Role == GroupRole.Owner)
                 .Select(p => p.UserId)
                 .FirstOrDefaultAsync();
-            
+
             return owner;
         }
 
@@ -195,6 +195,11 @@ namespace StudioStudio_Server.Repositories
                 .Where(g => g.StudioId == studioId && g.IsActive)
                 .Select(g => g.GroupName)
                 .ToListAsync();
+        }
+
+        public async Task SaveChangesAsync()
+        {
+            await _db.SaveChangesAsync();
         }
     }
 }

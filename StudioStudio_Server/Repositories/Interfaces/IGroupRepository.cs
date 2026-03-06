@@ -19,5 +19,6 @@ namespace StudioStudio_Server.Repositories.Interfaces
         Task<List<Group>> GetStudioGroupsAsync(Guid studioId);
         Task<Guid> GetGroupOwnerIdAsync(Guid groupId);
         Task<List<string>> GetGroupNamesInStudioAsync(Guid? studioId);
+        Task SaveChangesAsync();
     }
 }
