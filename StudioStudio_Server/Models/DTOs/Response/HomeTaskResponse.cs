@@ -32,6 +32,7 @@
         public int Page { get; set; }
         public int PageSize { get; set; }
         public int TotalPages { get; set; }
+        public List<UserGroupDto> UserGroups { get; set; } = new();
     }
 
     public class HomeTaskListItemResponse
@@ -46,5 +47,12 @@
         public Models.Enums.TaskPriority TaskPriority { get; set; }
         public int Progress { get; set; }
         public DateTime? DueDate { get; set; }
+        public string GroupName { get; set; } = string.Empty;
+    }
+
+    public class UserGroupDto
+    {
+        public Guid GroupId { get; set; }
+        public string GroupName { get; set; } = string.Empty;
     }
 }

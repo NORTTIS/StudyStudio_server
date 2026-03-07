@@ -16,9 +16,15 @@ namespace StudioStudio_Server.Services.Interfaces
         Task<HomeSummaryResponse> GetHomeSummaryAsync(Guid userId);
 
         /// <summary>
-        /// Get merged Home task list with pagination.
+        /// Get merged Home task list with pagination, search, filter, and sort.
         /// </summary>
-        Task<HomeTaskListResponse> GetHomeTaskListAsync(Guid userId, int page, int pageSize);
+        Task<HomeTaskListResponse> GetHomeTaskListAsync(
+            Guid userId, 
+            int page, 
+            int pageSize, 
+            string? search = null, 
+            Guid? groupId = null, 
+            string? sortBy = "duedate_asc");
 
         /// <summary>
         /// Create a new personal task status column.

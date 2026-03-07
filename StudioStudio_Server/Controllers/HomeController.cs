@@ -79,10 +79,13 @@ namespace StudioStudio_Server.Controllers
         [HttpGet("TaskList")]
         public async Task<ActionResult<ApiResponse<HomeTaskListResponse>>> GetTaskList(
             [FromQuery] int page = 1,
-            [FromQuery] int pageSize = 10)
+            [FromQuery] int pageSize = 10,
+            [FromQuery] string? search = null,
+            [FromQuery] Guid? groupId = null,
+            [FromQuery] string? sortBy = "duedate_asc")
         {
             var userId = ValidateAndGetUserId();
-            var result = await _homeService.GetHomeTaskListAsync(userId, page, pageSize);
+            var result = await _homeService.GetHomeTaskListAsync(userId, page, pageSize, search, groupId, sortBy);
             var message = _messageService.GetMessage(ErrorCodes.SuccessGetData);
 
             return Ok(ApiResponse<HomeTaskListResponse>.Success(

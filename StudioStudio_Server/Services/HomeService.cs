@@ -112,59 +112,35 @@ namespace StudioStudio_Server.Services
         }
 
         /// <summary>
-        /// Get merged task list (personal + assigned group tasks) with pagination.
+        /// Get assigned group task list with pagination, search, filter, and sort.
+        /// Only returns group tasks assigned to the user (excludes personal tasks).
         /// </summary>
-        public async Task<HomeTaskListResponse> GetHomeTaskListAsync(Guid userId, int page, int pageSize)
+        public async Task<HomeTaskListResponse> GetHomeTaskListAsync(
+            Guid userId,
+            int page,
+            int pageSize,
+            string? search = null,
+            Guid? groupId = null,
+            string? sortBy = "asc")
         {
             await EnsureUserExistsAsync(userId);
 
             page = page <= 0 ? 1 : page;
             pageSize = pageSize <= 0 ? 10 : pageSize;
 
-            var mergedTasks = await GetMergedTaskListAsync(userId, includeGroupTasks: true);
-            var totalCount = mergedTasks.Count;
-            var totalPages = totalCount == 0 ? 0 : (int)Math.Ceiling((double)totalCount / pageSize);
+            // Get only assigned group tasks (exclude personal tasks)
+            var groupTasks = await _taskRepository.GetAssignedGroupTasksByUserAsync(userId);
 
-            var pagedItems = mergedTasks
-                .Skip((page - 1) * pageSize)
-                .Take(pageSize)
-                .ToList();
-
-            return new HomeTaskListResponse
+            // Get user groups for the response
+            var userGroups = await _groupRepository.GetUserGroupsAsync(userId);
+            var userGroupDtos = userGroups.Select(g => new UserGroupDto
             {
-                Items = pagedItems,
-                TotalCount = totalCount,
-                Page = page,
-                PageSize = pageSize,
-                TotalPages = totalPages
-            };
-        }
+                GroupId = g.GroupId,
+                GroupName = g.GroupName
+            }).ToList();
 
-        /// <summary>
-        /// Build merged home task list from personal tasks and optionally assigned group tasks.
-        /// </summary>
-        private async Task<List<HomeTaskListItemResponse>> GetMergedTaskListAsync(Guid userId, bool includeGroupTasks)
-        {
-            var personalTasks = await _taskRepository.GetPersonalTasksByOwnerAsync(userId);
-            var groupTasks = includeGroupTasks
-                ? await _taskRepository.GetAssignedGroupTasksByUserAsync(userId)
-                : new List<TaskItem>();
-
-            var personalItems = personalTasks.Select(t => new HomeTaskListItemResponse
-            {
-                TaskId = t.TaskId,
-                TaskTitle = t.Title,
-                SourceType = "Personal",
-                SourceName = "Personal",
-                GroupId = null,
-                StatusName = t.PersonalStatus?.StatusName ?? string.Empty,
-                TaskSeverity = t.Severity,
-                TaskPriority = t.Priority,
-                Progress = t.Progress,
-                DueDate = t.DueDate
-            });
-
-            var groupItems = groupTasks.Select(t => new HomeTaskListItemResponse
+            // Convert to response items
+            var taskItems = groupTasks.Select(t => new HomeTaskListItemResponse
             {
                 TaskId = t.TaskId,
                 TaskTitle = t.Title,
@@ -176,14 +152,54 @@ namespace StudioStudio_Server.Services
                 TaskPriority = t.Priority,
                 Progress = t.Progress,
                 DueDate = t.DueDate
-            });
+            }).ToList();
 
-            return personalItems
-                .Concat(groupItems)
-                .OrderBy(t => t.DueDate.HasValue ? 0 : 1)
-                .ThenBy(t => t.DueDate)
-                .ThenByDescending(t => t.TaskId)
+            // Apply search filter
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                taskItems = taskItems.Where(t =>
+                    t.TaskTitle.Contains(search, StringComparison.OrdinalIgnoreCase) ||
+                    t.SourceName.Contains(search, StringComparison.OrdinalIgnoreCase) ||
+                    t.StatusName.Contains(search, StringComparison.OrdinalIgnoreCase)
+                ).ToList();
+            }
+
+            // Apply group filter
+            if (groupId.HasValue)
+            {
+                taskItems = taskItems.Where(t => t.GroupId == groupId.Value).ToList();
+            }
+
+            // Apply sorting
+            taskItems = sortBy?.ToLower() switch
+            {
+                "desc" => taskItems.OrderByDescending(t => t.DueDate.HasValue ? 0 : 1)
+                                          .ThenByDescending(t => t.DueDate)
+                                          .ToList(),
+                "asc" or _ => taskItems.OrderBy(t => t.DueDate.HasValue ? 0 : 1)
+                                               .ThenBy(t => t.DueDate)
+                                               .ToList()
+            };
+
+            // Calculate pagination
+            var totalCount = taskItems.Count;
+            var totalPages = totalCount == 0 ? 0 : (int)Math.Ceiling((double)totalCount / pageSize);
+
+            // Apply pagination
+            var pagedItems = taskItems
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
                 .ToList();
+
+            return new HomeTaskListResponse
+            {
+                Items = pagedItems,
+                TotalCount = totalCount,
+                Page = page,
+                PageSize = pageSize,
+                TotalPages = totalPages,
+                UserGroups = userGroupDtos
+            };
         }
 
         /// <summary>
@@ -203,15 +219,8 @@ namespace StudioStudio_Server.Services
         /// </summary>
         private static bool IsTaskCompleted(TaskItem task)
         {
-            if (task.Progress >= 100)
-            {
-                return true;
-            }
+            return task.Progress >= 100;
 
-            var statusName = task.PersonalStatus?.StatusName ?? task.GroupStatus?.StatusName ?? string.Empty;
-            return statusName.Contains("done", StringComparison.OrdinalIgnoreCase)
-                   || statusName.Contains("complete", StringComparison.OrdinalIgnoreCase)
-                   || statusName.Contains("hoàn thành", StringComparison.OrdinalIgnoreCase);
         }
 
         public async Task<PersonalTaskStatusResponse> CreateNewPersonalTaskStatus(Guid userId, PersonalTaskStatusRequest request)
