@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using StudioStudio_Server.Exceptions;
 using StudioStudio_Server.Models.DTOs.Request;
 using StudioStudio_Server.Models.DTOs.Response;
+using StudioStudio_Server.Models.Enums;
 using StudioStudio_Server.Services.Interfaces;
 using System.Security.Claims;
 
@@ -91,6 +92,66 @@ namespace StudioStudio_Server.Controllers
             var message = _messageService.GetMessage(ErrorCodes.SuccessGetData);
 
             return Ok(ApiResponse<GroupDetailResponse>.Success(
+                ErrorCodes.SuccessGetData,
+                message,
+                result));
+        }
+
+        /// <summary>
+        /// [AUTHORIZED] GET /api/group/{groupId}/tasks
+        /// Get paginated list of tasks in group with advanced filters
+        /// Validate: User must be member of group
+        /// Query Parameters:
+        /// - page, pageSize: Pagination
+        /// - search: Search in title and description
+        /// - assigneeId: Filter by assignee
+        /// - statusId: Filter by task status
+        /// - priority: Filter by priority (Low=0, Medium=1, High=2)
+        /// - severity: Filter by severity (Low=0, Medium=1, High=2)
+        /// - startDateFrom, startDateTo: Filter by start date range
+        /// - dueDateFrom, dueDateTo: Filter by due date range
+        /// - sortBy: Sort field (createdAt, dueDate, startDate, priority, severity, progress)
+        /// - sortAscending: Sort direction (true=ASC, false=DESC)
+        /// Response includes: Task list + Group statuses for filter dropdown
+        /// </summary>
+        [HttpGet("{groupId}/tasks")]
+        public async Task<ActionResult<ApiResponse<GroupTaskListResponse>>> GetGroupTasks(
+            Guid groupId,
+            [FromQuery] int page = 1,
+            [FromQuery] int pageSize = 10,
+            [FromQuery] string? search = null,
+            [FromQuery] Guid? assigneeId = null,
+            [FromQuery] Guid? statusId = null,
+            [FromQuery] TaskPriority? priority = null,
+            [FromQuery] TaskSeverity? severity = null,
+            [FromQuery] DateTime? startDateFrom = null,
+            [FromQuery] DateTime? startDateTo = null,
+            [FromQuery] DateTime? dueDateFrom = null,
+            [FromQuery] DateTime? dueDateTo = null,
+            [FromQuery] string? sortBy = "createdAt",
+            [FromQuery] bool sortAscending = true)
+        {
+            var userId = ValidateAndGetUserId();
+            var result = await _groupService.GetGroupTasksAsync(
+                userId,
+                groupId,
+                page,
+                pageSize,
+                search,
+                assigneeId,
+                statusId,
+                priority,
+                severity,
+                startDateFrom,
+                startDateTo,
+                dueDateFrom,
+                dueDateTo,
+                sortBy,
+                sortAscending);
+            
+            var message = _messageService.GetMessage(ErrorCodes.SuccessGetData);
+
+            return Ok(ApiResponse<GroupTaskListResponse>.Success(
                 ErrorCodes.SuccessGetData,
                 message,
                 result));

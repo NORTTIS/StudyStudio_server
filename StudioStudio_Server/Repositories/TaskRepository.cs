@@ -2,6 +2,7 @@
 using StudioStudio_Server.Data;
 using StudioStudio_Server.Models.DTOs.Response;
 using StudioStudio_Server.Models.Entities;
+using StudioStudio_Server.Models.Enums;
 using StudioStudio_Server.Repositories.Interfaces;
 using System.Collections.Generic;
 
@@ -350,6 +351,148 @@ namespace StudioStudio_Server.Repositories
                 query = query.OrderByDescending(t => t.DueDate.HasValue ? 0 : 1)
                             .ThenByDescending(t => t.DueDate);
             }
+
+            // Apply pagination
+            var tasks = await query
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .AsNoTracking()
+                .ToListAsync();
+
+            return (tasks, totalCount);
+        }
+
+        /// <summary>
+        /// Get group tasks with advanced filters, search, sort, and pagination at database level
+        /// Supports filtering by: assignee, status, priority, severity, date ranges
+        /// Supports search in: task title, description
+        /// Supports sorting by: createdAt, dueDate, startDate, priority, severity, progress
+        /// Applies all filters and pagination at database level for optimal performance
+        /// </summary>
+        public async Task<(List<TaskItem> Tasks, int TotalCount)> GetGroupTasksWithFiltersAsync(
+            Guid groupId,
+            int page,
+            int pageSize,
+            string? search = null,
+            Guid? assigneeId = null,
+            Guid? statusId = null,
+            TaskPriority? priority = null,
+            TaskSeverity? severity = null,
+            DateTime? startDateFrom = null,
+            DateTime? startDateTo = null,
+            DateTime? dueDateFrom = null,
+            DateTime? dueDateTo = null,
+            string? sortBy = "createdAt",
+            bool sortAscending = true)
+        {
+            // Convert DateTime parameters to UTC to avoid PostgreSQL timezone issues
+            if (startDateFrom.HasValue && startDateFrom.Value.Kind == DateTimeKind.Unspecified)
+            {
+                startDateFrom = DateTime.SpecifyKind(startDateFrom.Value, DateTimeKind.Utc);
+            }
+            if (startDateTo.HasValue && startDateTo.Value.Kind == DateTimeKind.Unspecified)
+            {
+                startDateTo = DateTime.SpecifyKind(startDateTo.Value, DateTimeKind.Utc);
+            }
+            if (dueDateFrom.HasValue && dueDateFrom.Value.Kind == DateTimeKind.Unspecified)
+            {
+                dueDateFrom = DateTime.SpecifyKind(dueDateFrom.Value, DateTimeKind.Utc);
+            }
+            if (dueDateTo.HasValue && dueDateTo.Value.Kind == DateTimeKind.Unspecified)
+            {
+                dueDateTo = DateTime.SpecifyKind(dueDateTo.Value, DateTimeKind.Utc);
+            }
+
+            // Build base query
+            var query = _context.Tasks
+                .Where(t => t.GroupId == groupId && !t.IsPendingDeleted)
+                .Include(t => t.GroupStatus)
+                .Include(t => t.Owner)
+                .AsQueryable();
+
+            // Apply search filter
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                query = query.Where(t =>
+                    t.Title.Contains(search) ||
+                    (t.Description != null && t.Description.Contains(search))
+                );
+            }
+
+            // Apply assignee filter
+            if (assigneeId.HasValue)
+            {
+                var assignedTaskIds = await _context.TaskAssignments
+                    .Where(a => a.AssignedTo == assigneeId.Value)
+                    .Select(a => a.TaskId)
+                    .ToListAsync();
+
+                query = query.Where(t => assignedTaskIds.Contains(t.TaskId));
+            }
+
+            // Apply status filter
+            if (statusId.HasValue)
+            {
+                query = query.Where(t => t.GroupStatusId == statusId.Value);
+            }
+
+            // Apply priority filter
+            if (priority.HasValue)
+            {
+                query = query.Where(t => t.Priority == priority.Value);
+            }
+
+            // Apply severity filter
+            if (severity.HasValue)
+            {
+                query = query.Where(t => t.Severity == severity.Value);
+            }
+
+            // Apply start date range filter
+            if (startDateFrom.HasValue)
+            {
+                query = query.Where(t => t.StartDate.HasValue && t.StartDate.Value >= startDateFrom.Value);
+            }
+            if (startDateTo.HasValue)
+            {
+                query = query.Where(t => t.StartDate.HasValue && t.StartDate.Value <= startDateTo.Value);
+            }
+
+            // Apply due date range filter
+            if (dueDateFrom.HasValue)
+            {
+                query = query.Where(t => t.DueDate.HasValue && t.DueDate.Value >= dueDateFrom.Value);
+            }
+            if (dueDateTo.HasValue)
+            {
+                query = query.Where(t => t.DueDate.HasValue && t.DueDate.Value <= dueDateTo.Value);
+            }
+
+            // Get total count before pagination
+            var totalCount = await query.CountAsync();
+
+            // Apply sorting
+            query = sortBy?.ToLower() switch
+            {
+                "duedate" => sortAscending
+                    ? query.OrderBy(t => t.DueDate.HasValue ? 0 : 1).ThenBy(t => t.DueDate)
+                    : query.OrderByDescending(t => t.DueDate.HasValue ? 0 : 1).ThenByDescending(t => t.DueDate),
+                "startdate" => sortAscending
+                    ? query.OrderBy(t => t.StartDate.HasValue ? 0 : 1).ThenBy(t => t.StartDate)
+                    : query.OrderByDescending(t => t.StartDate.HasValue ? 0 : 1).ThenByDescending(t => t.StartDate),
+                "priority" => sortAscending
+                    ? query.OrderBy(t => t.Priority)
+                    : query.OrderByDescending(t => t.Priority),
+                "severity" => sortAscending
+                    ? query.OrderBy(t => t.Severity)
+                    : query.OrderByDescending(t => t.Severity),
+                "progress" => sortAscending
+                    ? query.OrderBy(t => t.Progress)
+                    : query.OrderByDescending(t => t.Progress),
+                "createdat" or _ => sortAscending
+                    ? query.OrderBy(t => t.CreatedAt)
+                    : query.OrderByDescending(t => t.CreatedAt)
+            };
 
             // Apply pagination
             var tasks = await query

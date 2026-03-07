@@ -7,6 +7,7 @@ using StudioStudio_Server.Exceptions;
 using StudioStudio_Server.Models.DTOs.Request;
 using StudioStudio_Server.Models.DTOs.Response;
 using StudioStudio_Server.Models.Entities;
+using StudioStudio_Server.Models.Enums;
 using StudioStudio_Server.Repositories.Interfaces;
 using StudioStudio_Server.Services.Interfaces;
 
@@ -799,6 +800,150 @@ namespace StudioStudio_Server.Services
             };
 
             return response;
+        }
+
+        /// <summary>
+        /// Get paginated list of tasks in group with advanced filters
+        /// Validate: User must be member of group
+        /// Supports:
+        /// - Search: Title, Description
+        /// - Filter: Assignee, Status, Priority, Severity, StartDate range, DueDate range
+        /// - Sort: createdAt, dueDate, startDate, priority, severity, progress (asc/desc)
+        /// - Pagination: Database-level for optimal performance
+        /// Returns: Task list + Group status list for filter dropdown
+        /// </summary>
+        public async Task<GroupTaskListResponse> GetGroupTasksAsync(
+            Guid userId,
+            Guid groupId,
+            int page,
+            int pageSize,
+            string? search = null,
+            Guid? assigneeId = null,
+            Guid? statusId = null,
+            TaskPriority? priority = null,
+            TaskSeverity? severity = null,
+            DateTime? startDateFrom = null,
+            DateTime? startDateTo = null,
+            DateTime? dueDateFrom = null,
+            DateTime? dueDateTo = null,
+            string? sortBy = "createdAt",
+            bool sortAscending = true)
+        {
+            // Validate group exists
+            var group = await _groupRepository.GetByIdAsync(groupId);
+            if (group == null)
+            {
+                throw new AppException(ErrorCodes.GroupNotFound, StatusCodes.Status404NotFound);
+            }
+
+            // Validate user is member of group
+            var isUserInGroup = await _groupParticipantRepository.IsUserInGroupAsync(groupId, userId);
+            if (!isUserInGroup)
+            {
+                throw new AppException(ErrorCodes.GroupPermissionDenied, StatusCodes.Status403Forbidden);
+            }
+
+            // Validate page and pageSize
+            page = page <= 0 ? 1 : page;
+            pageSize = pageSize <= 0 ? 10 : pageSize;
+
+            // Get group statuses for filter dropdown
+            var groupStatuses = await _groupTaskStatusRepository.GetByGroupIdAsync(groupId);
+            var statusDtos = groupStatuses.Select(s => new TaskStatusInfoDto
+            {
+                StatusId = s.StatusId,
+                StatusName = s.StatusName
+            }).ToList();
+
+            // Get tasks with filters and pagination from repository
+            var (tasks, totalCount) = await _taskRepository.GetGroupTasksWithFiltersAsync(
+                groupId,
+                page,
+                pageSize,
+                search,
+                assigneeId,
+                statusId,
+                priority,
+                severity,
+                startDateFrom,
+                startDateTo,
+                dueDateFrom,
+                dueDateTo,
+                sortBy,
+                sortAscending);
+
+            // Get task IDs for loading assignees
+            var taskIds = tasks.Select(t => t.TaskId).ToList();
+
+            // Load assignees for all tasks
+            Dictionary<Guid, List<UserDto>> taskAssigneesDict = new();
+            if (taskIds.Any())
+            {
+                var assignments = await _taskAssignmentRepository.GetListAssigneesByListTaskId(taskIds);
+                var assigneeUserIds = assignments.Select(a => a.AssignedTo).Distinct().ToList();
+                var assigneeUsers = await _userRepository.GetByIdsAsync(assigneeUserIds);
+                var userDict = assigneeUsers.ToDictionary(u => u.UserId);
+
+                foreach (var assignment in assignments)
+                {
+                    if (userDict.TryGetValue(assignment.AssignedTo, out var user))
+                    {
+                        if (!taskAssigneesDict.ContainsKey(assignment.TaskId))
+                        {
+                            taskAssigneesDict[assignment.TaskId] = new List<UserDto>();
+                        }
+
+                        taskAssigneesDict[assignment.TaskId].Add(new UserDto
+                        {
+                            Id = user.UserId,
+                            FirstName = user.FirstName,
+                            LastName = user.LastName,
+                            AvatarUrl = user.AvatarUrl
+                        });
+                    }
+                }
+            }
+
+            // Map to response DTOs
+            var taskItems = tasks.Select(t => new GroupTaskItemResponse
+            {
+                TaskId = t.TaskId,
+                TaskTitle = t.Title,
+                TaskDescription = t.Description,
+                StatusName = t.GroupStatus?.StatusName ?? string.Empty,
+                StatusId = t.GroupStatusId ?? Guid.Empty,
+                TaskPriority = t.Priority,
+                TaskSeverity = t.Severity,
+                Progress = t.Progress,
+                StartDate = t.StartDate,
+                DueDate = t.DueDate,
+                CreatedAt = t.CreatedAt,
+                Assignees = taskAssigneesDict.TryGetValue(t.TaskId, out var assignees) 
+                    ? assignees 
+                    : new List<UserDto>(),
+                CreatedBy = new UserDto
+                {
+                    Id = t.Owner.UserId,
+                    FirstName = t.Owner.FirstName,
+                    LastName = t.Owner.LastName,
+                    AvatarUrl = t.Owner.AvatarUrl
+                }
+            }).ToList();
+
+            // Calculate total pages
+            var totalPages = totalCount == 0 ? 0 : (int)Math.Ceiling((double)totalCount / pageSize);
+
+            return new GroupTaskListResponse
+            {
+                GroupId = groupId,
+                GroupName = group.GroupName,
+                Items = taskItems,
+                TotalCount = totalCount,
+                Page = page,
+                PageSize = pageSize,
+                TotalPages = totalPages,
+                GroupStatuses = statusDtos
+            };
         }
     }
 }

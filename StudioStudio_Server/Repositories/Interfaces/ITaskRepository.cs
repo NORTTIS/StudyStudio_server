@@ -1,5 +1,6 @@
 using StudioStudio_Server.Models.DTOs.Response;
 using StudioStudio_Server.Models.Entities;
+using StudioStudio_Server.Models.Enums;
 
 namespace StudioStudio_Server.Repositories.Interfaces
 {
@@ -29,11 +30,26 @@ namespace StudioStudio_Server.Repositories.Interfaces
         Task<List<TaskItem>> GetPersonalTasksByOwnerAsync(Guid userId);
         Task<List<TaskItem>> GetAssignedGroupTasksByUserAsync(Guid userId);
         Task<(List<TaskItem> Tasks, int TotalCount)> GetAssignedGroupTasksWithPaginationAsync(
-            Guid userId, 
-            int page, 
-            int pageSize, 
-            string? search = null, 
-            Guid? groupId = null, 
+            Guid userId,
+            int page,
+            int pageSize,
+            string? search = null,
+            Guid? groupId = null,
+            bool sortAscending = true);
+        Task<(List<TaskItem> Tasks, int TotalCount)> GetGroupTasksWithFiltersAsync(
+            Guid groupId,
+            int page,
+            int pageSize,
+            string? search = null,
+            Guid? assigneeId = null,
+            Guid? statusId = null,
+            TaskPriority? priority = null,
+            TaskSeverity? severity = null,
+            DateTime? startDateFrom = null,
+            DateTime? startDateTo = null,
+            DateTime? dueDateFrom = null,
+            DateTime? dueDateTo = null,
+            string? sortBy = "createdAt",
             bool sortAscending = true);
         Task PermanentDeleteAsync(Guid taskId);
     }
