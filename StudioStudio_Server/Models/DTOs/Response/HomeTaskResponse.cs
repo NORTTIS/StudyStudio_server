@@ -8,18 +8,13 @@
 
     public class AssignedGroupResponse
     {
+        public Guid TaskId { get; set; }
+        public string TaskName { get; set; } = string.Empty;
         public Guid GroupId { get; set; }
         public string GroupName { get; set; } = string.Empty;
-        public string? Description { get; set; }
-        public Guid? StudioId { get; set; }
-        public string? StudioName { get; set; }
-        public string GroupType { get; set; } = string.Empty;
-        public bool IsTemplate { get; set; }
-        public Guid? TemplateId { get; set; }
-        public UserDto CreatedBy { get; set; } = null!;
-        public DateTime CreatedAt { get; set; }
-        public DateTime UpdatedAt { get; set; }
-        public string UserRole { get; set; } = string.Empty;
-        public List<TaskStatusDto> GroupTaskStatuses { get; set; } = new();
+        public string StatusName { get; set; } = string.Empty;
+        public int Priority { get; set; }
+        public int Severity { get; set; }
+        public DateTime? DueDate { get; set; }
     }
 }
