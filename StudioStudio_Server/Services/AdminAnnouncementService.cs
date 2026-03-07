@@ -8,7 +8,9 @@ using StudioStudio_Server.Services.Interfaces;
 namespace StudioStudio_Server.Services
 {
     /// <summary>
-    /// Service x? l? business logic cho Announcements (admin side)
+    /// Service handling business logic for Announcements (admin side)
+    /// Manages CRUD operations for system-wide announcements
+    /// Only admins can create, update, and delete announcements
     /// </summary>
     public class AdminAnnouncementService : IAdminAnnouncementService
     {
@@ -24,7 +26,9 @@ namespace StudioStudio_Server.Services
         }
 
         /// <summary>
-        /// L?y t?t c? announcements (bao g?m c? inactive)
+        /// Get all announcements (including inactive ones)
+        /// Returns: List of all announcements regardless of IsActive status
+        /// Use case: Admin dashboard to manage all announcements
         /// </summary>
         public async Task<List<AnnouncementResponse>> GetAllAnnouncementsAsync()
         {
@@ -36,8 +40,9 @@ namespace StudioStudio_Server.Services
         }
 
         /// <summary>
-        /// L?y chi ti?t m?t announcement
-        /// Validate: Announcement ph?i t?n t?i
+        /// Get announcement details by ID
+        /// Validate: Announcement must exist
+        /// Returns: Complete announcement information
         /// </summary>
         public async Task<AnnouncementResponse> GetAnnouncementByIdAsync(Guid announcementId)
         {
@@ -46,8 +51,9 @@ namespace StudioStudio_Server.Services
         }
 
         /// <summary>
-        /// T?o m?i announcement
-        /// Logic: N?u IsActive = true và không có PublishedAt ? set PublishedAt = UtcNow
+        /// Create new announcement
+        /// Logic: If IsActive = true and PublishedAt not provided, set PublishedAt = UtcNow
+        /// CreatedBy: Admin user ID
         /// </summary>
         public async Task<AnnouncementResponse> CreateAnnouncementAsync(
             Guid adminUserId, 
@@ -78,9 +84,10 @@ namespace StudioStudio_Server.Services
         }
 
         /// <summary>
-        /// C?p nh?t announcement
-        /// Validate: Announcement ph?i t?n t?i
-        /// Logic: X? l? PublishedAt d?a trên IsActive
+        /// Update announcement
+        /// Validate: Announcement must exist
+        /// Logic: Handle PublishedAt based on IsActive status
+        /// UpdatedAt: Auto-set to UtcNow
         /// </summary>
         public async Task<AnnouncementResponse> UpdateAnnouncementAsync(
             Guid adminUserId, 
@@ -108,8 +115,9 @@ namespace StudioStudio_Server.Services
         }
 
         /// <summary>
-        /// Xóa announcement
-        /// Validate: Announcement ph?i t?n t?i
+        /// Delete announcement (hard delete)
+        /// Validate: Announcement must exist
+        /// Note: This is a permanent deletion, not soft delete
         /// </summary>
         public async Task DeleteAnnouncementAsync(Guid adminUserId, Guid announcementId)
         {
@@ -123,8 +131,8 @@ namespace StudioStudio_Server.Services
         }
 
         /// <summary>
-        /// Validate announcement có t?n t?i không
-        /// Throw AppException n?u không t?m th?y
+        /// Validate announcement exists
+        /// Throws AppException if not found
         /// </summary>
         private async Task<Announcement> ValidateAnnouncementExistsAsync(Guid announcementId)
         {
@@ -141,11 +149,11 @@ namespace StudioStudio_Server.Services
         }
 
         /// <summary>
-        /// Xác ð?nh giá tr? PublishedAt
+        /// Determine PublishedAt value based on IsActive status
         /// Logic:
-        /// - N?u có requestPublishedAt ? dùng giá tr? ðó
-        /// - N?u IsActive = true và chýa có PublishedAt ? set = UtcNow
-        /// - Ngý?c l?i gi? nguyên giá tr? hi?n t?i
+        /// - If requestPublishedAt is provided, use it
+        /// - If IsActive = true and no existing PublishedAt, set to UtcNow
+        /// - Otherwise, keep current value
         /// </summary>
         private DateTime? DeterminePublishedAt(
             bool isActive, 
@@ -166,7 +174,7 @@ namespace StudioStudio_Server.Services
         }
 
         /// <summary>
-        /// Map Announcement entity ? AnnouncementResponse DTO
+        /// Map Announcement entity to AnnouncementResponse DTO
         /// </summary>
         private AnnouncementResponse MapToAnnouncementResponse(Announcement announcement)
         {

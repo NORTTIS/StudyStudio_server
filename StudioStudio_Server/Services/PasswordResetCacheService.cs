@@ -8,6 +8,13 @@ using System.Text.Json.Serialization;
 
 namespace StudioStudio_Server.Services
 {
+    /// <summary>
+    /// Service handling password reset token management using Redis cache
+    /// Manages temporary reset tokens with expiration and rate limiting
+    /// Token lifetime: 15 minutes
+    /// Rate limit: 5 reset emails per 15 minutes per email address
+    /// Storage: Redis with key prefixes for token data and rate limiting
+    /// </summary>
     public class PasswordResetCacheService : IPasswordResetCacheService
     {
         private readonly IConnectionMultiplexer _redis;
@@ -32,6 +39,11 @@ namespace StudioStudio_Server.Services
             _logger = logger;
         }
 
+        /// <summary>
+        /// Retrieve password reset data by token from Redis
+        /// Returns: PasswordResetDataRedis if found and not expired, null otherwise
+        /// Use case: Validate reset token when user clicks reset link or submits new password
+        /// </summary>
         public async Task<PasswordResetDataRedis?> GetResetDataByTokenAsync(string token)
         {
             try
@@ -55,6 +67,12 @@ namespace StudioStudio_Server.Services
             }
         }
 
+        /// <summary>
+        /// Check if user can send password reset email (rate limit check)
+        /// Limit: 5 emails per 15 minutes per email address
+        /// Returns: true if under limit, false if limit exceeded
+        /// Fail-open: Returns true if Redis is unavailable
+        /// </summary>
         public async Task<bool> CanSendResetEmailAsync(string email)
         {
             try
@@ -85,6 +103,11 @@ namespace StudioStudio_Server.Services
             }
         }
 
+        /// <summary>
+        /// Invalidate (delete) existing reset token for email
+        /// Deletes both token-by-email and token-data keys
+        /// Use case: Called before creating new token or after successful password reset
+        /// </summary>
         public async Task InvalidateResetTokenAsync(string email)
         {
             try
@@ -113,6 +136,15 @@ namespace StudioStudio_Server.Services
             }
         }
 
+        /// <summary>
+        /// Store password reset token in Redis
+        /// Invalidates old token first (one active token per email)
+        /// Keys:
+        /// - "reset_password:token_by_email:{email}" → token
+        /// - "reset_password:token_data:{token}" → JSON of PasswordResetDataRedis
+        /// TTL: Specified expiry time (typically 15 minutes)
+        /// Uses batch operation for atomicity
+        /// </summary>
         public async Task StoreResetTokenAsync(string email, string token, Guid userId, TimeSpan expiry)
         {
             try
@@ -149,6 +181,12 @@ namespace StudioStudio_Server.Services
             }
         }
 
+        /// <summary>
+        /// Increment rate limit counter for password reset emails
+        /// Key: "reset_password:rate_limit:{email}"
+        /// First request: Sets counter to 1 with 15-minute expiry
+        /// Subsequent requests: Increments counter (expiry remains unchanged)
+        /// </summary>
         public async Task IncrementSendCountAsync(string email)
         {
             try

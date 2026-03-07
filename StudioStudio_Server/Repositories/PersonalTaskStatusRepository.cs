@@ -6,22 +6,36 @@ using System.Threading.Tasks;
 
 namespace StudioStudio_Server.Repositories
 {
+    /// <summary>
+    /// Repository handling operations with PersonalTaskStatus entity
+    /// Manages personal Kanban columns for individual users
+    /// Uses index-based position with midpoint ranking strategy
+    /// </summary>
     public class PersonalTaskStatusRepository : IPersonalTaskStatusRepository
     {
         private readonly StudioDbContext _db;
         private const int MAX_RETRY = 3;
         private const long STEP = 1000;
+        
         public PersonalTaskStatusRepository(StudioDbContext db)
         {
             _db = db;
         }
 
+        /// <summary>
+        /// Add new personal task status to database
+        /// </summary>
         public async Task AddAsync(PersonalTaskStatus personalTaskStatus)
         {
             _db.PersonalTaskStatuses.Add(personalTaskStatus);
             await _db.SaveChangesAsync();
         }
 
+        /// <summary>
+        /// Get all personal task statuses for a user
+        /// Condition: UserId = {userId}
+        /// Order by: Position ASC (according to Kanban columns order)
+        /// </summary>
         public async Task<List<PersonalTaskStatus>> GetAllByUserIdAsync(Guid userId)
         {
             return await _db.PersonalTaskStatuses
@@ -31,28 +45,46 @@ namespace StudioStudio_Server.Repositories
                 .ToListAsync();
         }
 
+        /// <summary>
+        /// Delete personal task status from database (hard delete)
+        /// </summary>
         public async Task DeletePersonalStatusAsync(PersonalTaskStatus status)
         {
             _db.PersonalTaskStatuses.Remove(status);
             await _db.SaveChangesAsync();
         }
 
+        /// <summary>
+        /// Update personal task status information
+        /// </summary>
         public async Task UpdatePersonalStatusAsync(PersonalTaskStatus status)
         {
             _db.PersonalTaskStatuses.Update(status);
             await _db.SaveChangesAsync();
         }
+        
+        /// <summary>
+        /// Add personal task status to database (alias of AddAsync)
+        /// </summary>
         public async Task AddPersonalStatusAsync(PersonalTaskStatus status)
         {
             _db.PersonalTaskStatuses.Add(status);
             await _db.SaveChangesAsync();
         }
 
+        /// <summary>
+        /// Save changes to database
+        /// </summary>
         public async Task SaveChangesAsync()
         {
             await _db.SaveChangesAsync();
         }
 
+        /// <summary>
+        /// Check if status name already exists for user
+        /// Condition: StatusName = {name} AND UserId = {userId} AND StatusId != {currentStatusId}
+        /// Use case: Validate status name uniqueness per user
+        /// </summary>
         public async Task<bool> IsNameExist(PersonalTaskStatus status)
         {
             return await _db.PersonalTaskStatuses.AnyAsync(t =>
@@ -62,8 +94,9 @@ namespace StudioStudio_Server.Repositories
         }
 
         /// <summary>
-        /// Reorder status using midpoint ranking with retry and rebalance
+        /// Reorder personal status using midpoint ranking with retry and rebalance
         /// Handles concurrent updates with Serializable transaction isolation
+        /// Supports: dragging status to different position
         /// </summary>
         public async Task ReorderStatusAsync(Guid statusId, Guid? prevStatusId, Guid? nextStatusId, Guid userId)
         {
@@ -78,6 +111,7 @@ namespace StudioStudio_Server.Repositories
                 {
                     try
                     {
+                        // Load previous and next statuses
                         var prev = prevStatusId.HasValue
                             ? await _db.PersonalTaskStatuses
                                 .FirstOrDefaultAsync(s => s.StatusId == prevStatusId.Value)
@@ -90,14 +124,17 @@ namespace StudioStudio_Server.Repositories
 
                         long newPos;
 
+                        // Calculate new position based on neighbors
                         if (prev != null && next != null)
                         {
                             long gap = next.Position - prev.Position;
 
+                            // If gap is too small, rebalance first
                             if (gap <= 1)
                             {
                                 await RebalanceColumnInternalAsync(userId);
 
+                                // Reload after rebalance
                                 prev = prevStatusId.HasValue
                                     ? await _db.PersonalTaskStatuses
                                         .FirstOrDefaultAsync(s => s.StatusId == prevStatusId.Value)
@@ -112,10 +149,12 @@ namespace StudioStudio_Server.Repositories
                         }
                         else if (prev != null)
                         {
+                            // Place after prev (at the end)
                             newPos = prev.Position + STEP;
                         }
                         else if (next != null)
                         {
+                            // Place before next (at the beginning)
                             newPos = next.Position / 2;
                         }
                         else
@@ -123,6 +162,7 @@ namespace StudioStudio_Server.Repositories
                             throw new InvalidOperationException("Invalid prev/next status");
                         }
 
+                        // Update status position
                         var status = await _db.PersonalTaskStatuses
                             .FirstOrDefaultAsync(s => s.StatusId == statusId);
 
@@ -159,7 +199,9 @@ namespace StudioStudio_Server.Repositories
         }
 
         /// <summary>
-        /// Find next status after given position in the same personal
+        /// Find next status after given position for user
+        /// Condition: UserId = {userId} AND Position > {position}
+        /// Order by: Position ASC (get the immediate next)
         /// </summary>
         public async Task<PersonalTaskStatus?> FindNextAfterAsync(Guid userId, long position)
         {
@@ -171,8 +213,9 @@ namespace StudioStudio_Server.Repositories
         }
 
         /// <summary>
-        /// Rebalance all statuses in a personal with proper spacing
+        /// Rebalance all statuses for a user with proper spacing
         /// Public method with transaction
+        /// Use case: When positions are too close together
         /// </summary>
         public async Task RebalanceColumnAsync(Guid userId)
         {
@@ -193,6 +236,7 @@ namespace StudioStudio_Server.Repositories
 
         /// <summary>
         /// Internal rebalance method (used within existing transactions)
+        /// Redistributes position values with STEP spacing (1000, 2000, 3000, ...)
         /// </summary>
         private async Task RebalanceColumnInternalAsync(Guid userId)
         {
@@ -213,12 +257,17 @@ namespace StudioStudio_Server.Repositories
 
         /// <summary>
         /// Calculate midpoint between two positions
+        /// Used for inserting status between two existing statuses
         /// </summary>
         private long Midpoint(long a, long b)
         {
             return (a + b) / 2;
         }
 
+        /// <summary>
+        /// Get personal task status by ID
+        /// Condition: StatusId = {statusId}
+        /// </summary>
         public async Task<PersonalTaskStatus?> GetDetailAsync(Guid statusId)
         {
             return await _db.PersonalTaskStatuses

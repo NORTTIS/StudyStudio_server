@@ -8,7 +8,9 @@ using StudioStudio_Server.Services.Interfaces;
 namespace StudioStudio_Server.Services
 {
     /// <summary>
-    /// Service x? l? business logic cho Favourites
+    /// Service handling business logic for Favourites (user's favourite groups)
+    /// Allows users to mark groups as favourites for quick access
+    /// Only group members can add group to favourites
     /// </summary>
     public class FavouriteService : IFavouriteService
     {
@@ -30,11 +32,11 @@ namespace StudioStudio_Server.Services
         }
 
         /// <summary>
-        /// Thêm group vào danh sách yêu thích
+        /// Add group to user's favourites
         /// Validate:
-        /// - Group ph?i t?n t?i
-        /// - User ph?i là member c?a group
-        /// - Chýa có trong favourites
+        /// - Group must exist
+        /// - User must be a member of the group
+        /// - Group not already in favourites
         /// </summary>
         public async Task<FavouriteResponse> AddFavouriteAsync(
             Guid userId,
@@ -68,8 +70,9 @@ namespace StudioStudio_Server.Services
         }
 
         /// <summary>
-        /// Xóa group kh?i danh sách yêu thích
-        /// Validate: Favourite ph?i t?n t?i
+        /// Remove group from user's favourites
+        /// Validate: Favourite record must exist
+        /// Action: Hard delete from database
         /// </summary>
         public async Task RemoveFavouriteAsync(
             Guid userId,
@@ -85,7 +88,8 @@ namespace StudioStudio_Server.Services
         }
 
         /// <summary>
-        /// Validate group t?n t?i
+        /// Validate group exists
+        /// Throws AppException if group not found
         /// </summary>
         private async Task<Group> ValidateGroupExistsAsync(Guid groupId)
         {
@@ -102,7 +106,8 @@ namespace StudioStudio_Server.Services
         }
 
         /// <summary>
-        /// Validate user là member c?a group
+        /// Validate user is a member of the group
+        /// Throws AppException if user is not a member
         /// </summary>
         private async Task ValidateUserIsMemberAsync(Guid groupId, Guid userId)
         {
@@ -118,7 +123,8 @@ namespace StudioStudio_Server.Services
         }
 
         /// <summary>
-        /// Validate group chýa có trong favourites
+        /// Validate group is not already in user's favourites
+        /// Throws AppException if favourite already exists
         /// </summary>
         private async Task ValidateFavouriteNotExistsAsync(Guid userId, Guid groupId)
         {
@@ -133,7 +139,8 @@ namespace StudioStudio_Server.Services
         }
 
         /// <summary>
-        /// Validate favourite t?n t?i và thu?c v? user
+        /// Validate favourite exists and belongs to user
+        /// Throws AppException if favourite not found
         /// </summary>
         private async Task<Favourite> ValidateFavouriteExistsAsync(Guid userId, Guid groupId)
         {

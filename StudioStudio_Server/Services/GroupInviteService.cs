@@ -7,6 +7,12 @@ using System.Text.Json;
 
 namespace StudioStudio_Server.Services
 {
+    /// <summary>
+    /// Service handling group invitation token management using Redis cache
+    /// Manages temporary invite links with expiration and rate limiting
+    /// Token lifetime: 15 minutes
+    /// Rate limit: 5 invite links per 15 minutes per user per group
+    /// </summary>
     public class GroupInviteService : IGroupInviteService
     {
         private readonly IConnectionMultiplexer _redis;
@@ -23,6 +29,11 @@ namespace StudioStudio_Server.Services
             _logger = logger;
         }
 
+        /// <summary>
+        /// Generate cryptographically secure random invite token
+        /// Returns: URL-safe base64 string (32 random bytes)
+        /// Format: Replaces + with -, / with _, removes padding =
+        /// </summary>
         public async Task<string> GenerateInviteTokenAsync()
         {
             byte[] randomBytes = new byte[32];
@@ -39,6 +50,13 @@ namespace StudioStudio_Server.Services
             return await Task.FromResult(token);
         }
 
+        /// <summary>
+        /// Store invite token data in Redis
+        /// Key: "group:invite:{token}"
+        /// Value: JSON serialized GroupInviteToken
+        /// TTL: 15 minutes
+        /// Returns: true if stored successfully
+        /// </summary>
         public async Task<bool> StoreInviteTokenAsync(string token, GroupInviteToken inviteData)
         {
             IDatabase db = _redis.GetDatabase();
@@ -59,6 +77,11 @@ namespace StudioStudio_Server.Services
             return result;
         }
 
+        /// <summary>
+        /// Retrieve invite token data from Redis
+        /// Returns: GroupInviteToken if found and not expired, null otherwise
+        /// Use case: Validate invite link when user clicks on it
+        /// </summary>
         public async Task<GroupInviteToken?> GetInviteTokenDataAsync(string token)
         {
             IDatabase db = _redis.GetDatabase();
@@ -77,6 +100,13 @@ namespace StudioStudio_Server.Services
             return inviteData;
         }
 
+        /// <summary>
+        /// Check rate limit for invite link creation
+        /// Key: "invite:ratelimit:{groupId}:{userId}"
+        /// Limit: 5 invites per 15 minutes per user per group
+        /// Returns: true if user can create invite link, false if rate limit exceeded
+        /// Auto-increments counter and sets expiry on first request
+        /// </summary>
         public async Task<bool> CheckInviteCreationRateLimitAsync(Guid groupId, Guid userId)
         {
             IDatabase db = _redis.GetDatabase();

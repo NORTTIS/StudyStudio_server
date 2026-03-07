@@ -5,6 +5,13 @@ using System.Text.Json;
 
 namespace StudioStudio_Server.Services
 {
+    /// <summary>
+    /// Service handling email verification token management using Redis cache
+    /// Manages temporary verification tokens for user registration and email changes
+    /// Token lifetime: 15 minutes
+    /// Rate limit: 5 verification emails per 15 minutes per email address
+    /// Storage: Redis with key prefixes for token data and rate limiting
+    /// </summary>
     public class EmailVerificationCacheService : IEmailVerificationCacheService
     {
         private readonly IConnectionMultiplexer _redis;
@@ -29,6 +36,11 @@ namespace StudioStudio_Server.Services
             _logger = logger;
         }
 
+        /// <summary>
+        /// Retrieve email verification data by token from Redis
+        /// Returns: EmailVerificationDataRedis if found and not expired, null otherwise
+        /// Use case: Validate verification token when user clicks verification link
+        /// </summary>
         public async Task<EmailVerificationDataRedis?> GetVerificationDataByTokenAsync(string token)
         {
             try
@@ -52,6 +64,12 @@ namespace StudioStudio_Server.Services
             }
         }
 
+        /// <summary>
+        /// Check if user can send verification email (rate limit check)
+        /// Limit: 5 emails per 15 minutes per email address
+        /// Returns: true if under limit, false if limit exceeded
+        /// Fail-open: Returns true if Redis is unavailable (allows request)
+        /// </summary>
         public async Task<bool> CanSendVerificationEmailAsync(string email)
         {
             try
@@ -82,6 +100,15 @@ namespace StudioStudio_Server.Services
             }
         }
 
+        /// <summary>
+        /// Store email verification token in Redis
+        /// Invalidates old token first (one active token per email)
+        /// Keys:
+        /// - "email_verification:token_by_email:{email}" ? token
+        /// - "email_verification:token_data:{token}" ? JSON of EmailVerificationDataRedis
+        /// TTL: Specified expiry time (typically 15 minutes)
+        /// Uses batch operation for atomicity
+        /// </summary>
         public async Task StoreVerificationTokenAsync(string email, string token, Guid userId, TimeSpan expiry)
         {
             try
@@ -120,6 +147,11 @@ namespace StudioStudio_Server.Services
             }
         }
 
+        /// <summary>
+        /// Invalidate (delete) existing verification token for email
+        /// Deletes both token-by-email and token-data keys
+        /// Use case: Called before creating new token or after successful verification
+        /// </summary>
         public async Task InvalidateVerificationTokenAsync(string email)
         {
             try
@@ -148,6 +180,12 @@ namespace StudioStudio_Server.Services
             }
         }
 
+        /// <summary>
+        /// Increment rate limit counter for verification emails
+        /// Key: "email_verification:rate_limit:{email}"
+        /// First request: Sets counter to 1 with 15-minute expiry
+        /// Subsequent requests: Increments counter (expiry remains unchanged)
+        /// </summary>
         public async Task IncrementSendCountAsync(string email)
         {
             try

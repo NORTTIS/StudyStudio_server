@@ -20,6 +20,11 @@ using System.Text.RegularExpressions;
 
 namespace StudioStudio_Server.Services
 {
+    /// <summary>
+    /// Service handling authentication and authorization logic
+    /// Supports: Register, Login, Logout, Google OAuth, Password Reset, Email Verification
+    /// Security: JWT (Access Token) + Refresh Token with HttpOnly Cookies
+    /// </summary>
     public class AuthService : IAuthService
     {
         private readonly Regex EmailRegex = new(@"^[^@\s]+@[^@\s]+\.[^@\s]+$", RegexOptions.Compiled);
@@ -52,6 +57,18 @@ namespace StudioStudio_Server.Services
             _emailVerificationCache = emailVerificationCache;
             _resetCache = resetCache;
         }
+        
+        /// <summary>
+        /// Register new user account
+        /// Validate:
+        /// - Email format and uniqueness
+        /// - Password strength (10-20 chars, uppercase, lowercase, digit)
+        /// - Rate limit (5 emails per 15 minutes)
+        /// Flow:
+        /// 1. Create user with Status = Inactive
+        /// 2. Generate verification token (stored in Redis)
+        /// 3. Send verification email
+        /// </summary>
         public async Task RegisterAsync(RegisterRequests registerRequest)
         {
             if (!IsValidEmail(registerRequest.Email))
@@ -122,6 +139,14 @@ namespace StudioStudio_Server.Services
             );
         }
 
+        /// <summary>
+        /// Verify email using token from verification link
+        /// Validate:
+        /// - Token exists and not expired (from Redis)
+        /// - User exists and not deleted
+        /// - Email not already verified
+        /// Action: Set user Status = Active
+        /// </summary>
         public async Task VerifyEmailLinkAsync(string token)
         {
             var verifyData = await _emailVerificationCache.GetVerificationDataByTokenAsync(token);
@@ -157,6 +182,15 @@ namespace StudioStudio_Server.Services
             await _emailVerificationCache.InvalidateVerificationTokenAsync(verifyData.Email);
         }
 
+        /// <summary>
+        /// Login with email and password
+        /// Validate:
+        /// - Email format
+        /// - User exists and not deleted
+        /// - Password matches
+        /// - Account is active (email verified)
+        /// Returns: JWT Access Token + Refresh Token (in HttpOnly cookie)
+        /// </summary>
         public async Task<LoginResponse> LoginAsync(LoginRequests loginRequest, HttpResponse response)
         {
             if (!IsValidEmail(loginRequest.Email))
@@ -217,7 +251,17 @@ namespace StudioStudio_Server.Services
             };
         }
 
-
+        /// <summary>
+        /// Refresh access token using refresh token
+        /// Validate:
+        /// - Refresh token exists, not revoked, and not expired
+        /// - User exists and not deleted
+        /// Flow:
+        /// 1. Revoke old refresh token
+        /// 2. Generate new access token + new refresh token
+        /// 3. Return new tokens
+        /// Security: Token rotation - old refresh token cannot be reused
+        /// </summary>
         public async Task<LoginResponse> RefreshTokenAsync(string refreshToken, HttpResponse response)
         {
             var token = await _refreshTokenRepository.GetValidAsync(refreshToken);
@@ -260,6 +304,12 @@ namespace StudioStudio_Server.Services
             };
         }
 
+        /// <summary>
+        /// Logout user
+        /// Action:
+        /// 1. Revoke refresh token in database
+        /// 2. Delete refresh token cookie
+        /// </summary>
         public async Task LogoutAsync(string refreshToken, HttpResponse response)
         {
             var token = await _refreshTokenRepository.GetValidAsync(refreshToken);
@@ -276,6 +326,16 @@ namespace StudioStudio_Server.Services
             });
         }
 
+        /// <summary>
+        /// Login with Google OAuth
+        /// Validate: Google ID token
+        /// Flow:
+        /// 1. Verify Google ID token
+        /// 2. If user doesn't exist → create new user with Status = Active (no email verification needed)
+        /// 3. If user exists → update Google info if missing
+        /// 4. Generate JWT tokens
+        /// Returns: JWT Access Token + Refresh Token (in HttpOnly cookie)
+        /// </summary>
         public async Task<LoginResponse> GoogleLoginAsync(GoogleLoginRequest request, HttpResponse response)
         {
             try
@@ -361,6 +421,16 @@ namespace StudioStudio_Server.Services
             }
         }
 
+        /// <summary>
+        /// Send password reset link to user email
+        /// Validate:
+        /// - Email format and exists
+        /// - User not deleted
+        /// - Rate limit (5 emails per 15 minutes)
+        /// Flow:
+        /// 1. Generate reset token (stored in Redis with 15-min expiry)
+        /// 2. Send reset password email with link
+        /// </summary>
         public async Task SendResetPasswordLinkAsync(string email)
         {
             if (!IsValidEmail(email))
@@ -403,6 +473,17 @@ namespace StudioStudio_Server.Services
             );
         }
 
+        /// <summary>
+        /// Reset user password using token from reset link
+        /// Validate:
+        /// - Token exists and not expired (from Redis)
+        /// - Password strength
+        /// - User exists and not deleted
+        /// Action:
+        /// 1. Update password hash
+        /// 2. Invalidate reset token
+        /// 3. Revoke all existing refresh tokens (force re-login on all devices)
+        /// </summary>
         public async Task ResetPasswordAsync(string token, string newPassword)
         {
             if (!IsValidPass(newPassword))
@@ -442,6 +523,12 @@ namespace StudioStudio_Server.Services
                 }
             }
         }
+        
+        /// <summary>
+        /// Verify if reset token is valid
+        /// Used to check token validity before showing reset password form
+        /// Returns: true if token is valid and user exists
+        /// </summary>
         public async Task<bool> VerifyResetTokenAsync(string token)
         {
             var resetData = await _resetCache.GetResetDataByTokenAsync(token);
@@ -460,6 +547,15 @@ namespace StudioStudio_Server.Services
             return false;
         }
 
+        /// <summary>
+        /// Resend email verification link
+        /// Validate:
+        /// - Email format and exists
+        /// - User not deleted
+        /// - Email not already verified
+        /// - Rate limit (5 emails per 15 minutes)
+        /// Flow: Same as Register (generate new token + send email)
+        /// </summary>
         public async Task ResendVerifyEmailAsync(ResendVerifyEmailRequest request)
         {
             if (!IsValidEmail(request.Email))
@@ -518,15 +614,29 @@ namespace StudioStudio_Server.Services
                 html
             );
         }
+        
+        /// <summary>
+        /// Validate email format using regex
+        /// </summary>
         private bool IsValidEmail(string email)
         {
             return EmailRegex.IsMatch(email);
         }
 
+        /// <summary>
+        /// Validate password strength
+        /// Requirements: 10-20 chars, at least one uppercase, one lowercase, one digit
+        /// </summary>
         private bool IsValidPass(string pass)
         {
             return PasswordRegex.IsMatch(pass);
         }
+        
+        /// <summary>
+        /// Generate JWT access token
+        /// Claims: UserId (Sub), Email, IsAdmin
+        /// Algorithm: HMAC SHA256
+        /// </summary>
         private string GenerateJWTToken(User user, DateTime expireAt)
         {
             var claims = new[]
@@ -549,6 +659,11 @@ namespace StudioStudio_Server.Services
 
             return new JwtSecurityTokenHandler().WriteToken(token);
         }
+        
+        /// <summary>
+        /// Create new refresh token entity
+        /// Token: Random 64-byte base64 string
+        /// </summary>
         private RefreshToken CreateRefreshToken(User user, DateTime expireAt)
         {
             return new RefreshToken
@@ -559,6 +674,11 @@ namespace StudioStudio_Server.Services
                 UserId = user.UserId
             };
         }
+        
+        /// <summary>
+        /// Set refresh token in HttpOnly cookie
+        /// Security: HttpOnly prevents XSS, Secure requires HTTPS, SameSite=None for cross-origin
+        /// </summary>
         private void SetRefreshTokenCookie(HttpResponse response, string token, DateTime expireAt)
         {
             response.Cookies.Append("refreshToken", token, new CookieOptions

@@ -73,8 +73,8 @@ namespace StudioStudio_Server.Controllers
         }
 
         /// <summary>
-        /// Get merged task list for Home screen with pagination.
-        /// Includes personal tasks and assigned group tasks.
+        /// Get task list for Home screen with pagination, search, filter, and sort.
+        /// Only includes group tasks assigned to the user (excludes personal tasks).
         /// </summary>
         [HttpGet("TaskList")]
         public async Task<ActionResult<ApiResponse<HomeTaskListResponse>>> GetTaskList(
@@ -82,7 +82,7 @@ namespace StudioStudio_Server.Controllers
             [FromQuery] int pageSize = 10,
             [FromQuery] string? search = null,
             [FromQuery] Guid? groupId = null,
-            [FromQuery] string? sortBy = "duedate_asc")
+            [FromQuery] string? sortBy = "asc")
         {
             var userId = ValidateAndGetUserId();
             var result = await _homeService.GetHomeTaskListAsync(userId, page, pageSize, search, groupId, sortBy);

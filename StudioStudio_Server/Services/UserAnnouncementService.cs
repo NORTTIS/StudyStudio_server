@@ -6,13 +6,25 @@ using System.Diagnostics;
 
 namespace StudioStudio_Server.Services
 {
+    /// <summary>
+    /// Service handling business logic for User Announcements (personalized announcements)
+    /// Manages announcements targeted to specific users (mentions/notifications)
+    /// Note: This is different from general Announcements - these are user-specific
+    /// </summary>
     public class UserAnnouncementService : IUserAnnouncementService
     {
         private readonly IUserAnnouccementRepository _userAnnouccementRepository;
+        
         public UserAnnouncementService(IUserAnnouccementRepository userAnnouccementRepository)
         {
             _userAnnouccementRepository = userAnnouccementRepository;
         }
+        
+        /// <summary>
+        /// Add new user announcement (mention/notification)
+        /// Creates a personalized announcement record for specific user
+        /// Initial state: IsRead = false, IsDelete = false
+        /// </summary>
         public async Task AddAnnouncementAsync(UserAnnouncementRequest request)
         {
             var newAnnouce = new UserAnnouncement
@@ -28,6 +40,11 @@ namespace StudioStudio_Server.Services
             await _userAnnouccementRepository.AddAsync(newAnnouce);
         }
 
+        /// <summary>
+        /// Remove user announcement (soft delete)
+        /// Sets IsDelete = true in repository
+        /// Use case: User dismisses notification
+        /// </summary>
         public async Task RemoveAnnouncementAsync(Guid announceId)
         {
             await _userAnnouccementRepository.DeleteAsync(announceId);

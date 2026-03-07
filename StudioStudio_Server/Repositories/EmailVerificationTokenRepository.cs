@@ -5,19 +5,34 @@ using StudioStudio_Server.Repositories.Interfaces;
 
 namespace StudioStudio_Server.Repositories
 {
+    /// <summary>
+    /// Repository handling operations with EmailVerificationToken entity
+    /// Manages email verification tokens for user registration and email changes
+    /// </summary>
     public class EmailVerificationTokenRepository : IEmailVerificationTokenRepository
     {
         private readonly StudioDbContext _context;
+        
         public EmailVerificationTokenRepository(StudioDbContext context)
         {
             _context = context;
         }
+        
+        /// <summary>
+        /// Add new email verification token to database
+        /// </summary>
         public async Task AddAsync(EmailVerificationToken token)
         {
             _context.EmailVerificationTokens.Add(token);
             await _context.SaveChangesAsync();
         }
 
+        /// <summary>
+        /// Get valid email verification token
+        /// Condition: Token = {token} AND IsUsed = false AND ExpiresAt > UtcNow AND User.DeletedFlag = false
+        /// Include: User info
+        /// Use case: Verify email during registration or email change
+        /// </summary>
         public async Task<EmailVerificationToken?> GetValidAsync(string token)
         {
             return await _context.EmailVerificationTokens
@@ -27,6 +42,10 @@ namespace StudioStudio_Server.Repositories
                     x.ExpiresAt > DateTime.UtcNow && !x.User.DeletedFlag);
         }
 
+        /// <summary>
+        /// Mark token as used after successful verification
+        /// Set IsUsed = true
+        /// </summary>
         public async Task MaskAsUsed(EmailVerificationToken token)
         {
             token.IsUsed = true;
@@ -34,6 +53,11 @@ namespace StudioStudio_Server.Repositories
             await _context.SaveChangesAsync();
         }
 
+        /// <summary>
+        /// Invalidate all unused tokens for a user
+        /// Set IsUsed = true for all unused tokens of the user
+        /// Use case: When user requests new verification token or changes email
+        /// </summary>
         public async Task InvalidateTokensAsync(Guid userId)
         {
             var tokens = await _context.EmailVerificationTokens

@@ -7,7 +7,8 @@ using StudioStudio_Server.Services.Interfaces;
 namespace StudioStudio_Server.Services
 {
     /// <summary>
-    /// Service x? l? business logic cho Announcements (user side)
+    /// Service handling business logic for Announcements (user side)
+    /// Users can view active announcements and manage their personal announcement notifications
     /// </summary>
     public class AnnouncementService : IAnnouncementService
     {
@@ -23,7 +24,9 @@ namespace StudioStudio_Server.Services
         }
 
         /// <summary>
-        /// L?y danh sách t?t c? announcements công khai (active)
+        /// Get list of all active public announcements
+        /// Condition: IsActive = true
+        /// Order by: PublishedAt DESC
         /// </summary>
         public async Task<List<AnnouncementResponse>> GetAllActiveAnnouncementsAsync()
         {
@@ -35,8 +38,8 @@ namespace StudioStudio_Server.Services
         }
 
         /// <summary>
-        /// L?y chi ti?t m?t announcement công khai
-        /// Validate: Announcement ph?i t?n t?i và IsActive = true
+        /// Get details of a specific public announcement
+        /// Validate: Announcement must exist and be active (IsActive = true)
         /// </summary>
         public async Task<AnnouncementResponse> GetAnnouncementByIdAsync(Guid announcementId)
         {
@@ -53,7 +56,9 @@ namespace StudioStudio_Server.Services
         }
 
         /// <summary>
-        /// L?y danh sách announcements cá nhân c?a user (nh?ng announcement user ðý?c tag)
+        /// Get list of personalized announcements for user (tagged/mentioned announcements)
+        /// Includes full announcement details joined with user announcement records
+        /// Returns: User's personal announcement notifications
         /// </summary>
         public async Task<List<UserAnnouncementResponse>> GetUserAnnouncementsAsync(Guid userId)
         {
@@ -74,8 +79,9 @@ namespace StudioStudio_Server.Services
         }
 
         /// <summary>
-        /// Ðánh d?u announcement cá nhân là ð? ð?c
-        /// Validate: UserAnnouncement ph?i t?n t?i và thu?c v? user
+        /// Mark user announcement as read
+        /// Validate: UserAnnouncement must exist and belong to the user
+        /// Action: Set IsRead = true
         /// </summary>
         public async Task MarkAnnouncementAsReadAsync(Guid userAnnouncementId, Guid userId)
         {
@@ -95,8 +101,9 @@ namespace StudioStudio_Server.Services
         }
 
         /// <summary>
-        /// Xóa (soft delete) announcement cá nhân
-        /// Validate: UserAnnouncement ph?i t?n t?i và thu?c v? user
+        /// Delete (soft delete) user announcement
+        /// Validate: UserAnnouncement must exist and belong to the user
+        /// Action: Set IsDelete = true in repository
         /// </summary>
         public async Task DeleteUserAnnouncementAsync(Guid userAnnouncementId, Guid userId)
         {
@@ -115,7 +122,8 @@ namespace StudioStudio_Server.Services
         }
 
         /// <summary>
-        /// Validate user có quy?n s? h?u UserAnnouncement không
+        /// Validate user owns the user announcement
+        /// Checks if MetionedId matches userId
         /// </summary>
         private void ValidateUserAnnouncementOwnership(UserAnnouncement userAnnouncement, Guid userId)
         {
@@ -128,8 +136,9 @@ namespace StudioStudio_Server.Services
         }
 
         /// <summary>
-        /// L?y danh sách announcements theo list IDs
-        /// Return: Dictionary v?i key = AnnouncementId
+        /// Get announcements by list of IDs
+        /// Returns: Dictionary with AnnouncementId as key
+        /// Helper method for joining user announcements with announcement details
         /// </summary>
         private async Task<Dictionary<Guid, Announcement>> GetAnnouncementsByIdsAsync(List<Guid> announcementIds)
         {
@@ -148,7 +157,7 @@ namespace StudioStudio_Server.Services
         }
 
         /// <summary>
-        /// Map Announcement entity ? AnnouncementResponse DTO
+        /// Map Announcement entity to AnnouncementResponse DTO
         /// </summary>
         private AnnouncementResponse MapToAnnouncementResponse(Announcement announcement)
         {
@@ -165,7 +174,7 @@ namespace StudioStudio_Server.Services
         }
 
         /// <summary>
-        /// Map UserAnnouncement + Announcement ? UserAnnouncementResponse DTO
+        /// Map UserAnnouncement + Announcement to UserAnnouncementResponse DTO
         /// </summary>
         private UserAnnouncementResponse MapToUserAnnouncementResponse(
             UserAnnouncement userAnnouncement,

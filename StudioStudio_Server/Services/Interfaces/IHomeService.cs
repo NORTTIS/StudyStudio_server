@@ -24,7 +24,7 @@ namespace StudioStudio_Server.Services.Interfaces
             int pageSize, 
             string? search = null, 
             Guid? groupId = null, 
-            string? sortBy = "duedate_asc");
+            string? sortBy = "asc");
 
         /// <summary>
         /// Create a new personal task status column.

@@ -114,6 +114,7 @@ namespace StudioStudio_Server.Services
         /// <summary>
         /// Get assigned group task list with pagination, search, filter, and sort.
         /// Only returns group tasks assigned to the user (excludes personal tasks).
+        /// Uses database-level pagination for better performance.
         /// </summary>
         public async Task<HomeTaskListResponse> GetHomeTaskListAsync(
             Guid userId,
@@ -128,8 +129,12 @@ namespace StudioStudio_Server.Services
             page = page <= 0 ? 1 : page;
             pageSize = pageSize <= 0 ? 10 : pageSize;
 
-            // Get only assigned group tasks (exclude personal tasks)
-            var groupTasks = await _taskRepository.GetAssignedGroupTasksByUserAsync(userId);
+            // Determine sort order
+            bool sortAscending = sortBy?.ToLower() != "desc";
+
+            // Get tasks with database-level pagination
+            var (groupTasks, totalCount) = await _taskRepository.GetAssignedGroupTasksWithPaginationAsync(
+                userId, page, pageSize, search, groupId, sortAscending);
 
             // Get user groups for the response
             var userGroups = await _groupRepository.GetUserGroupsAsync(userId);
@@ -154,46 +159,12 @@ namespace StudioStudio_Server.Services
                 DueDate = t.DueDate
             }).ToList();
 
-            // Apply search filter
-            if (!string.IsNullOrWhiteSpace(search))
-            {
-                taskItems = taskItems.Where(t =>
-                    t.TaskTitle.Contains(search, StringComparison.OrdinalIgnoreCase) ||
-                    t.SourceName.Contains(search, StringComparison.OrdinalIgnoreCase) ||
-                    t.StatusName.Contains(search, StringComparison.OrdinalIgnoreCase)
-                ).ToList();
-            }
-
-            // Apply group filter
-            if (groupId.HasValue)
-            {
-                taskItems = taskItems.Where(t => t.GroupId == groupId.Value).ToList();
-            }
-
-            // Apply sorting
-            taskItems = sortBy?.ToLower() switch
-            {
-                "desc" => taskItems.OrderByDescending(t => t.DueDate.HasValue ? 0 : 1)
-                                          .ThenByDescending(t => t.DueDate)
-                                          .ToList(),
-                "asc" or _ => taskItems.OrderBy(t => t.DueDate.HasValue ? 0 : 1)
-                                               .ThenBy(t => t.DueDate)
-                                               .ToList()
-            };
-
-            // Calculate pagination
-            var totalCount = taskItems.Count;
+            // Calculate total pages
             var totalPages = totalCount == 0 ? 0 : (int)Math.Ceiling((double)totalCount / pageSize);
-
-            // Apply pagination
-            var pagedItems = taskItems
-                .Skip((page - 1) * pageSize)
-                .Take(pageSize)
-                .ToList();
 
             return new HomeTaskListResponse
             {
-                Items = pagedItems,
+                Items = taskItems,
                 TotalCount = totalCount,
                 Page = page,
                 PageSize = pageSize,

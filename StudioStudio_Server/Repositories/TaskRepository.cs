@@ -291,6 +291,77 @@ namespace StudioStudio_Server.Repositories
         }
 
         /// <summary>
+        /// Get group tasks assigned to the user with pagination, search, filter, and sort.
+        /// Applies filters and pagination at database level for better performance.
+        /// </summary>
+        public async Task<(List<TaskItem> Tasks, int TotalCount)> GetAssignedGroupTasksWithPaginationAsync(
+            Guid userId,
+            int page,
+            int pageSize,
+            string? search = null,
+            Guid? groupId = null,
+            bool sortAscending = true)
+        {
+            // Get task IDs assigned to user
+            var taskIds = await _context.TaskAssignments
+                .Where(a => a.AssignedTo == userId)
+                .Select(a => a.TaskId)
+                .ToListAsync();
+
+            if (!taskIds.Any())
+            {
+                return (new List<TaskItem>(), 0);
+            }
+
+            // Build base query
+            var query = _context.Tasks
+                .Where(t => taskIds.Contains(t.TaskId) && t.GroupId.HasValue && !t.IsPendingDeleted)
+                .Include(t => t.Group)
+                .Include(t => t.GroupStatus)
+                .AsQueryable();
+
+            // Apply search filter
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                query = query.Where(t =>
+                    t.Title.Contains(search) ||
+                    (t.Group != null && t.Group.GroupName.Contains(search)) ||
+                    (t.GroupStatus != null && t.GroupStatus.StatusName.Contains(search))
+                );
+            }
+
+            // Apply group filter
+            if (groupId.HasValue)
+            {
+                query = query.Where(t => t.GroupId == groupId.Value);
+            }
+
+            // Get total count before pagination
+            var totalCount = await query.CountAsync();
+
+            // Apply sorting
+            if (sortAscending)
+            {
+                query = query.OrderBy(t => t.DueDate.HasValue ? 0 : 1)
+                            .ThenBy(t => t.DueDate);
+            }
+            else
+            {
+                query = query.OrderByDescending(t => t.DueDate.HasValue ? 0 : 1)
+                            .ThenByDescending(t => t.DueDate);
+            }
+
+            // Apply pagination
+            var tasks = await query
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .AsNoTracking()
+                .ToListAsync();
+
+            return (tasks, totalCount);
+        }
+
+        /// <summary>
         /// Reorder (and change status if needed) for a task based on drag-and-drop position.
         /// Supports: dragging within same status, dragging to different status (including empty columns).
         /// </summary>

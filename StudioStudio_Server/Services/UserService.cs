@@ -8,6 +8,11 @@ using System.Text.RegularExpressions;
 
 namespace StudioStudio_Server.Services
 {
+    /// <summary>
+    /// Service handling user profile and account management
+    /// Manages: Profile updates, password changes, account deletion, avatar uploads
+    /// Also provides AI request usage information for rate limiting display
+    /// </summary>
     public class UserService : IUserService
     {
         private readonly IUserRepository _userRepository;
@@ -39,22 +44,40 @@ namespace StudioStudio_Server.Services
             _aiRequestLogRepository = aiRequestLogRepository;
         }
 
+        /// <summary>
+        /// Get user by ID
+        /// Returns: User entity or null if not found
+        /// </summary>
         public async Task<User?> GetByIdAsync(Guid userId)
         {
             return await _userRepository.GetByIdAsync(userId);
         }
 
+        /// <summary>
+        /// Get user by email
+        /// Returns: User entity or null if not found
+        /// </summary>
         public async Task<User?> GetByEmailAsync(string email)
         {
             return await _userRepository.GetByEmailAsync(email);
         }
 
+        /// <summary>
+        /// Update user information
+        /// Auto-sets UpdatedAt = UtcNow
+        /// </summary>
         public async Task UpdateAsync(User user)
         {
             user.UpdatedAt = DateTime.UtcNow;
             await _userRepository.UpdateAsync(user);
         }
 
+        /// <summary>
+        /// Delete user account (soft delete)
+        /// Validate: User exists and not already deleted
+        /// Action: Set DeletedFlag = true, UpdatedAt = UtcNow
+        /// Note: User data remains in database for referential integrity
+        /// </summary>
         public async Task DeleteAsync(Guid userId)
         {
             var user = await _userRepository.GetByIdAsync(userId);
@@ -73,6 +96,14 @@ namespace StudioStudio_Server.Services
             await _userRepository.UpdateAsync(user);
         }
 
+        /// <summary>
+        /// Change user password
+        /// Validate:
+        /// - Current password is correct
+        /// - New password meets strength requirements
+        /// - New password matches confirmation
+        /// - New password is different from current password
+        /// </summary>
         public async Task ChangePasswordAsync(Guid userId, ChangePasswordRequest request)
         {
             // Get user
@@ -116,6 +147,14 @@ namespace StudioStudio_Server.Services
             await _userRepository.UpdateAsync(user);
         }
 
+        /// <summary>
+        /// Update user profile information
+        /// Updates: FirstName, LastName, PhoneNumber, Bio, Language, EmailNotificationEnabled, Avatar
+        /// Validation:
+        /// - Avatar: Max 5MB, only .jpg/.jpeg/.png allowed
+        /// - Old avatar file is automatically deleted when new one is uploaded
+        /// Avatar storage: wwwroot/uploads/avatars/{userId}_avt.{ext}
+        /// </summary>
         public async Task UpdateProfileAsync(Guid userId, UpdateUserProfileRequest request)
         {
             var user = await _userRepository.GetByIdAsync(userId);
@@ -151,11 +190,26 @@ namespace StudioStudio_Server.Services
             await _userRepository.UpdateAsync(user);
         }
 
+        /// <summary>
+        /// Validate password strength
+        /// Requirements: 10-20 chars, at least one uppercase, one lowercase, one digit
+        /// </summary>
         private bool IsValidPassword(string password)
         {
             return PasswordRegex.IsMatch(password);
         }
 
+        /// <summary>
+        /// Save user avatar to local file system
+        /// Validation:
+        /// - File size max 5MB
+        /// - Only .jpg, .jpeg, .png allowed
+        /// Storage:
+        /// - Path: wwwroot/uploads/avatars/
+        /// - Filename: {userId}_avt.{ext}
+        /// - Deletes old avatar files before saving new one
+        /// Returns: Relative URL path to avatar (/uploads/avatars/{filename})
+        /// </summary>
         private async Task<string> SaveAvatarAsync(Guid userId, IFormFile file, string? existingAvatarUrl)
         {
             if (file.Length > 5 * 1024 * 1024) // 5MB limit
@@ -208,7 +262,12 @@ namespace StudioStudio_Server.Services
             return $"/uploads/avatars/{fileName}";
         }
 
-        // Implement new method
+        /// <summary>
+        /// Get AI request usage information for user
+        /// Returns: (usedToday, dailyLimit) tuple
+        /// Used to display AI usage quota in frontend
+        /// Daily limit depends on subscription plan (Free: 20, Premium: 100)
+        /// </summary>
         public async Task<(int usedToday, int dailyLimit)> GetAiRequestLimitInfoAsync(Guid userId)
         {
             // Get today's start time

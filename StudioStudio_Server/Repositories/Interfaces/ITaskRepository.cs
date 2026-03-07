@@ -28,6 +28,13 @@ namespace StudioStudio_Server.Repositories.Interfaces
         Task<TaskItem?> PersonalFindNextAfterAsync(Guid statusId, long position);
         Task<List<TaskItem>> GetPersonalTasksByOwnerAsync(Guid userId);
         Task<List<TaskItem>> GetAssignedGroupTasksByUserAsync(Guid userId);
+        Task<(List<TaskItem> Tasks, int TotalCount)> GetAssignedGroupTasksWithPaginationAsync(
+            Guid userId, 
+            int page, 
+            int pageSize, 
+            string? search = null, 
+            Guid? groupId = null, 
+            bool sortAscending = true);
         Task PermanentDeleteAsync(Guid taskId);
     }
 }

@@ -10,6 +10,12 @@ namespace StudioStudio_Server.Services.Interfaces
         SupportedLanguage GetCurrentLanguage();
     }
 
+    /// <summary>
+    /// Service handling localized message retrieval
+    /// Loads messages from JSON localization files based on language
+    /// Supported languages: Vietnamese (default), English
+    /// Language detection: Uses Accept-Language header from HTTP request
+    /// </summary>
     public class MessageService : IMessageService
     {
         private readonly IWebHostEnvironment _env;
@@ -21,12 +27,20 @@ namespace StudioStudio_Server.Services.Interfaces
             _httpContextAccessor = httpContextAccessor;
         }
 
+        /// <summary>
+        /// Get localized message by code
+        /// Language is automatically detected from Accept-Language header
+        /// </summary>
         public string GetMessage(string code)
         {
             var language = GetCurrentLanguage();
             return GetMessage(code, language);
         }
 
+        /// <summary>
+        /// Get localized message by code with specific language
+        /// Loads message from JSON file in Resources/Localization folder
+        /// </summary>
         public string GetMessage(string code, SupportedLanguage language)
         {
             var cultureCode = language.ToCultureCode();
@@ -34,6 +48,11 @@ namespace StudioStudio_Server.Services.Interfaces
             return localizer.Get(code);
         }
 
+        /// <summary>
+        /// Get current language from HTTP request header
+        /// Uses Accept-Language header
+        /// Default: Vietnamese if header not present or invalid
+        /// </summary>
         public SupportedLanguage GetCurrentLanguage()
         {
             var context = _httpContextAccessor.HttpContext;
@@ -46,6 +65,10 @@ namespace StudioStudio_Server.Services.Interfaces
             return SupportedLanguageExtensions.FromCultureCode(acceptLanguage);
         }
 
+        /// <summary>
+        /// Get culture code from current language
+        /// Helper method for localization
+        /// </summary>
         private string GetCulture()
         {
             var language = GetCurrentLanguage();
