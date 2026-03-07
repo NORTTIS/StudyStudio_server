@@ -32,7 +32,11 @@ namespace StudioStudio_Server.Services
             _userRepository = userRepository;
         }
 
-        public async Task<HomeTaskResponse> GetGroupAssignedTaskAsync(Guid userId)
+        /// <summary>
+        /// Get personal task board data for the current user.
+        /// Returns: PersonalTaskStatuses with tasks grouped by status.
+        /// </summary>
+        public async Task<PersonalTaskBoardResponse> GetPersonalTaskBoardAsync(Guid userId)
         {
             var userDetail = await _userRepository.GetByIdAsync(userId);
             if (userDetail == null)
@@ -47,11 +51,7 @@ namespace StudioStudio_Server.Services
             // Get user task list
             var personalTaskList = await _taskRepository.GetPersonalListTasksByListStatusId(personalStatusIdList);
 
-            // Get assigned task list
-            var taskAssignList = await _assignmentRepository.GetListTaskIdByUserIdAsync(userId);
-            var taskIdList = taskAssignList.Select(x => x.TaskId);
-
-            return new HomeTaskResponse
+            return new PersonalTaskBoardResponse
             {
                 PersonalTaskStatuses = personalTaskStatus.Select(pt => new TaskStatusDto
                 {
@@ -81,12 +81,140 @@ namespace StudioStudio_Server.Services
                              }
                          }).ToList()
                          : new List<TaskItemResponse>()
-                }).ToList(),
-                GroupTaskAssigned = new List<AssignedGroupResponse>()
+                }).ToList()
             };
         }
 
-        public async Task<PersonalTaskStatusResponse> CreateNewGroupTaskStatus(Guid userId, PersonalTaskStatusRequest request)
+        /// <summary>
+        /// Get home summary metrics including remaining, overdue, completed tasks and joined groups.
+        /// </summary>
+        public async Task<HomeSummaryResponse> GetHomeSummaryAsync(Guid userId)
+        {
+            await EnsureUserExistsAsync(userId);
+
+            var personalTasks = await _taskRepository.GetPersonalTasksByOwnerAsync(userId);
+            var groupTasks = await _taskRepository.GetAssignedGroupTasksByUserAsync(userId);
+            var allTasks = personalTasks.Concat(groupTasks).ToList();
+
+            var completedTaskCount = allTasks.Count(IsTaskCompleted);
+            var overdueTaskCount = allTasks.Count(t => t.DueDate.HasValue && t.DueDate.Value < DateTime.UtcNow && !IsTaskCompleted(t));
+            var remainingTaskCount = allTasks.Count - completedTaskCount;
+
+            var userGroups = await _groupRepository.GetUserGroupsAsync(userId);
+
+            return new HomeSummaryResponse
+            {
+                RemainingTaskCount = remainingTaskCount,
+                OverdueTaskCount = overdueTaskCount,
+                CompletedTaskCount = completedTaskCount,
+                TotalJoinedGroupCount = userGroups.Count
+            };
+        }
+
+        /// <summary>
+        /// Get merged task list (personal + assigned group tasks) with pagination.
+        /// </summary>
+        public async Task<HomeTaskListResponse> GetHomeTaskListAsync(Guid userId, int page, int pageSize)
+        {
+            await EnsureUserExistsAsync(userId);
+
+            page = page <= 0 ? 1 : page;
+            pageSize = pageSize <= 0 ? 10 : pageSize;
+
+            var mergedTasks = await GetMergedTaskListAsync(userId, includeGroupTasks: true);
+            var totalCount = mergedTasks.Count;
+            var totalPages = totalCount == 0 ? 0 : (int)Math.Ceiling((double)totalCount / pageSize);
+
+            var pagedItems = mergedTasks
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .ToList();
+
+            return new HomeTaskListResponse
+            {
+                Items = pagedItems,
+                TotalCount = totalCount,
+                Page = page,
+                PageSize = pageSize,
+                TotalPages = totalPages
+            };
+        }
+
+        /// <summary>
+        /// Build merged home task list from personal tasks and optionally assigned group tasks.
+        /// </summary>
+        private async Task<List<HomeTaskListItemResponse>> GetMergedTaskListAsync(Guid userId, bool includeGroupTasks)
+        {
+            var personalTasks = await _taskRepository.GetPersonalTasksByOwnerAsync(userId);
+            var groupTasks = includeGroupTasks
+                ? await _taskRepository.GetAssignedGroupTasksByUserAsync(userId)
+                : new List<TaskItem>();
+
+            var personalItems = personalTasks.Select(t => new HomeTaskListItemResponse
+            {
+                TaskId = t.TaskId,
+                TaskTitle = t.Title,
+                SourceType = "Personal",
+                SourceName = "Personal",
+                GroupId = null,
+                StatusName = t.PersonalStatus?.StatusName ?? string.Empty,
+                TaskSeverity = t.Severity,
+                TaskPriority = t.Priority,
+                Progress = t.Progress,
+                DueDate = t.DueDate
+            });
+
+            var groupItems = groupTasks.Select(t => new HomeTaskListItemResponse
+            {
+                TaskId = t.TaskId,
+                TaskTitle = t.Title,
+                SourceType = "Group",
+                SourceName = t.Group?.GroupName ?? "Group",
+                GroupId = t.GroupId,
+                StatusName = t.GroupStatus?.StatusName ?? string.Empty,
+                TaskSeverity = t.Severity,
+                TaskPriority = t.Priority,
+                Progress = t.Progress,
+                DueDate = t.DueDate
+            });
+
+            return personalItems
+                .Concat(groupItems)
+                .OrderBy(t => t.DueDate.HasValue ? 0 : 1)
+                .ThenBy(t => t.DueDate)
+                .ThenByDescending(t => t.TaskId)
+                .ToList();
+        }
+
+        /// <summary>
+        /// Validate that the user exists.
+        /// </summary>
+        private async Task EnsureUserExistsAsync(Guid userId)
+        {
+            var userDetail = await _userRepository.GetByIdAsync(userId);
+            if (userDetail == null)
+            {
+                throw new AppException(ErrorCodes.UserNotFound, StatusCodes.Status404NotFound);
+            }
+        }
+
+        /// <summary>
+        /// Determine whether a task is completed based on progress or status name.
+        /// </summary>
+        private static bool IsTaskCompleted(TaskItem task)
+        {
+            if (task.Progress >= 100)
+            {
+                return true;
+            }
+
+            var statusName = task.PersonalStatus?.StatusName ?? task.GroupStatus?.StatusName ?? string.Empty;
+            return statusName.Contains("done", StringComparison.OrdinalIgnoreCase)
+                   || statusName.Contains("complete", StringComparison.OrdinalIgnoreCase)
+                   || statusName.Contains("hoàn thành", StringComparison.OrdinalIgnoreCase);
+        }
+
+        public async Task<PersonalTaskStatusResponse> CreateNewPersonalTaskStatus(Guid userId, PersonalTaskStatusRequest request)
         {
             var userDetail = await _userRepository.GetByIdAsync(userId);
             if (userDetail == null)
@@ -139,9 +267,9 @@ namespace StudioStudio_Server.Services
             var taskStatus = await _personalTaskStatusRepository.GetDetailAsync(taskStatusId);
             if (taskStatus == null || taskStatus.UserId != userId)
             {
-                throw new AppException(ErrorCodes.GroupStatusNotFound, StatusCodes.Status404NotFound);
+                throw new AppException(ErrorCodes.StatusNotFound, StatusCodes.Status404NotFound);
             }
-            var taskList = await _taskRepository.GetAllTasksByStatusIdAsync(taskStatusId);
+            var taskList = await _taskRepository.GetAllPersonalTasksByStatusIdAsync(taskStatusId);
             if (taskList.Any())
             {
                 throw new AppException(ErrorCodes.GroupDeleteTaskStatusFailed, StatusCodes.Status400BadRequest);

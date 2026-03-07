@@ -23,6 +23,9 @@
         public const string TaskNotFound = "TASK001";
         public const string TaskPermissionDenied = "TASK002";
         public const string TaskDateTimeError = "TASK003";
+        public const string TaskInvalidPriority = "TASK004";
+        public const string TaskInvalidSeverity = "TASK005";
+        public const string TaskNotPendingDeleted = "TASK006";
 
         // GROUP
         public const string GroupNotFound = "GROUP001";

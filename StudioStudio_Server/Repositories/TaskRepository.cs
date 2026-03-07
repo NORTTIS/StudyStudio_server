@@ -189,6 +189,18 @@ namespace StudioStudio_Server.Repositories
                 .OrderBy(t => t.Position)
                 .ToListAsync();
         }
+        /// <summary>
+        /// Get all personal tasks by personal status ID.
+        /// Condition: PersonalStatusId = {statusId} AND GroupId IS NULL AND IsPendingDeleted = false.
+        /// </summary>
+        public async Task<List<TaskItem>> GetAllPersonalTasksByStatusIdAsync(Guid statusId)
+        {
+            return await _context.Tasks
+                .Where(t => t.PersonalStatusId == statusId && !t.GroupId.HasValue && !t.IsPendingDeleted)
+                .AsNoTracking()
+                .OrderBy(t => t.Position)
+                .ToListAsync();
+        }
         public async Task SaveChangesAsync()
         {
             await _context.SaveChangesAsync();
@@ -219,7 +231,9 @@ namespace StudioStudio_Server.Repositories
             foreach (var statusId in listStatusIds)
             {
                 var tasks = await _context.Tasks
-                    .Where(t => t.PersonalStatusId == statusId && !t.IsPendingDeleted)
+                    .Where(t => t.PersonalStatusId == statusId
+                             && !t.GroupId.HasValue
+                             && !t.IsPendingDeleted)
                     .AsNoTracking()
                     .OrderBy(t => t.Position)
                     .ToListAsync();
@@ -228,6 +242,52 @@ namespace StudioStudio_Server.Repositories
             }
 
             return result;
+        }
+
+        /// <summary>
+        /// Get personal tasks created by the user.
+        /// Condition: OwnerId = {userId} AND GroupId IS NULL AND IsPendingDeleted = false.
+        /// </summary>
+        public async Task<List<TaskItem>> GetPersonalTasksByOwnerAsync(Guid userId)
+        {
+            return await _context.Tasks
+                .Where(t => t.OwnerId == userId
+                         && !t.GroupId.HasValue
+                         && t.PersonalStatusId.HasValue
+                         && !t.IsPendingDeleted)
+                .Include(t => t.PersonalStatus)
+                .AsNoTracking()
+                .OrderBy(t => t.DueDate.HasValue ? 0 : 1)
+                .ThenBy(t => t.DueDate)
+                .ThenByDescending(t => t.CreatedAt)
+                .ToListAsync();
+        }
+
+        /// <summary>
+        /// Get group tasks assigned to the user.
+        /// Condition: Assignment.AssignedTo = {userId} AND GroupId IS NOT NULL AND IsPendingDeleted = false.
+        /// </summary>
+        public async Task<List<TaskItem>> GetAssignedGroupTasksByUserAsync(Guid userId)
+        {
+            var taskIds = await _context.TaskAssignments
+                .Where(a => a.AssignedTo == userId)
+                .Select(a => a.TaskId)
+                .ToListAsync();
+
+            if (!taskIds.Any())
+            {
+                return new List<TaskItem>();
+            }
+
+            return await _context.Tasks
+                .Where(t => taskIds.Contains(t.TaskId) && t.GroupId.HasValue && !t.IsPendingDeleted)
+                .Include(t => t.Group)
+                .Include(t => t.GroupStatus)
+                .AsNoTracking()
+                .OrderBy(t => t.DueDate.HasValue ? 0 : 1)
+                .ThenBy(t => t.DueDate)
+                .ThenByDescending(t => t.CreatedAt)
+                .ToListAsync();
         }
 
         /// <summary>
@@ -601,6 +661,48 @@ namespace StudioStudio_Server.Repositories
         private static long Midpoint(long a, long b)
         {
             return (a + b) / 2;
+        }
+
+        /// <summary>
+        /// Permanent delete task from database (hard delete)
+        /// Also deletes related TaskHistory and TaskAssignment records
+        /// </summary>
+        public async Task PermanentDeleteAsync(Guid taskId)
+        {
+            using var transaction = await _context.Database.BeginTransactionAsync();
+            try
+            {
+                var taskHistories = await _context.TaskHistories
+                    .Where(h => h.TaskId == taskId)
+                    .ToListAsync();
+                if (taskHistories.Any())
+                {
+                    _context.TaskHistories.RemoveRange(taskHistories);
+                }
+
+                var taskAssignments = await _context.TaskAssignments
+                    .Where(a => a.TaskId == taskId)
+                    .ToListAsync();
+                if (taskAssignments.Any())
+                {
+                    _context.TaskAssignments.RemoveRange(taskAssignments);
+                }
+
+                var task = await _context.Tasks
+                    .FirstOrDefaultAsync(t => t.TaskId == taskId);
+                if (task != null)
+                {
+                    _context.Tasks.Remove(task);
+                }
+
+                await _context.SaveChangesAsync();
+                await transaction.CommitAsync();
+            }
+            catch
+            {
+                await transaction.RollbackAsync();
+                throw;
+            }
         }
     }
 }

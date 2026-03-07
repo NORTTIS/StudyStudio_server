@@ -14,6 +14,7 @@ namespace StudioStudio_Server.Services.Interfaces
         Task<TaskItemResponse> AddPersonalTaskAsync(Guid userId, TaskItemPersonalRequest request);
         Task<TaskItemResponse> UpdatePersonalTaskAsync(Guid userId, Guid taskId, UpdatePersonalTaskRequest request);
         Task ReorderPersonalTaskAsync(Guid userId, ReorderTaskRequest request);
-        Task SoftDeletePersonalTaskAsync(Guid userId, Guid taskId);
+        Task DeletePersonalTaskAsync(Guid userId, Guid taskId);
+        Task PermanentDeleteGroupTaskAsync(Guid userId, Guid groupId, Guid taskId);
     }
 }

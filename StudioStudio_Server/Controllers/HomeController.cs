@@ -56,25 +56,67 @@ namespace StudioStudio_Server.Controllers
             return userId;
         }
 
-        [HttpGet("/personal-status")]
-        public async Task<ActionResult<ApiResponse<HomeTaskResponse>>> GetHome()
+        /// <summary>
+        /// Get summary metrics for Home screen.
+        /// </summary>
+        [HttpGet("summary")]
+        public async Task<ActionResult<ApiResponse<HomeSummaryResponse>>> GetSummary()
         {
             var userId = ValidateAndGetUserId();
-            var result = await _homeService.GetGroupAssignedTaskAsync(userId);
+            var result = await _homeService.GetHomeSummaryAsync(userId);
             var message = _messageService.GetMessage(ErrorCodes.SuccessGetData);
 
-            return Ok(ApiResponse<HomeTaskResponse>.Success(
-                ErrorCodes.SuccessGetGroup,
+            return Ok(ApiResponse<HomeSummaryResponse>.Success(
+                ErrorCodes.SuccessGetData,
                 message,
                 result));
         }
 
-        [HttpPost("/personal-status")]
+        /// <summary>
+        /// Get merged task list for Home screen with pagination.
+        /// Includes personal tasks and assigned group tasks.
+        /// </summary>
+        [HttpGet("TaskList")]
+        public async Task<ActionResult<ApiResponse<HomeTaskListResponse>>> GetTaskList(
+            [FromQuery] int page = 1,
+            [FromQuery] int pageSize = 10)
+        {
+            var userId = ValidateAndGetUserId();
+            var result = await _homeService.GetHomeTaskListAsync(userId, page, pageSize);
+            var message = _messageService.GetMessage(ErrorCodes.SuccessGetData);
+
+            return Ok(ApiResponse<HomeTaskListResponse>.Success(
+                ErrorCodes.SuccessGetData,
+                message,
+                result));
+        }
+
+        /// <summary>
+        /// Get personal task board with statuses and tasks.
+        /// Returns: List of PersonalTaskStatus, each containing its tasks.
+        /// </summary>
+        [HttpGet("personal-task")]
+        public async Task<ActionResult<ApiResponse<PersonalTaskBoardResponse>>> GetPersonalTaskBoard()
+        {
+            var userId = ValidateAndGetUserId();
+            var result = await _homeService.GetPersonalTaskBoardAsync(userId);
+            var message = _messageService.GetMessage(ErrorCodes.SuccessGetData);
+
+            return Ok(ApiResponse<PersonalTaskBoardResponse>.Success(
+                ErrorCodes.SuccessGetData,
+                message,
+                result));
+        }
+
+        /// <summary>
+        /// Create a new personal task status.
+        /// </summary>
+        [HttpPost("personal-status")]
         public async Task<ActionResult<ApiResponse<PersonalTaskStatusResponse>>> CreatePersonalTaskStatus(
             [FromBody] PersonalTaskStatusRequest request)
         {
             var userId = ValidateAndGetUserId();
-            var result = await _homeService.CreateNewGroupTaskStatus(userId, request);
+            var result = await _homeService.CreateNewPersonalTaskStatus(userId, request);
             var message = _messageService.GetMessage(ErrorCodes.SuccessCreateTaskStatus);
 
             return Ok(ApiResponse<PersonalTaskStatusResponse>.Success(
@@ -83,7 +125,10 @@ namespace StudioStudio_Server.Controllers
                 result));
         }
 
-        [HttpPut("/personal-status/reorder")]
+        /// <summary>
+        /// Reorder personal task status columns.
+        /// </summary>
+        [HttpPut("personal-status/reorder")]
         public async Task<ActionResult<ApiResponse<object>>> ReorderTaskStatus(
             [FromBody] ReorderPersonalTaskStatusRequest request)
         {
@@ -97,7 +142,10 @@ namespace StudioStudio_Server.Controllers
                 null));
         }
 
-        [HttpPut("/personal-status/{statusId}/update-detail")]
+        /// <summary>
+        /// Update personal task status details.
+        /// </summary>
+        [HttpPut("personal-status/{statusId}/update-detail")]
         public async Task<ActionResult<ApiResponse<object>>> UpdateTaskStatusDetail(
             [FromBody] PersonalTaskStatusRequest request, Guid statusId)
         {
@@ -111,8 +159,11 @@ namespace StudioStudio_Server.Controllers
                 null));
         }
 
-        [HttpDelete("/personal-status/{statusId}")]
-        public async Task<ActionResult<ApiResponse<object>>> DeleteGroup(Guid statusId)
+        /// <summary>
+        /// Delete a personal task status.
+        /// </summary>
+        [HttpDelete("personal-status/{statusId}")]
+        public async Task<ActionResult<ApiResponse<object>>> DeletePersonalTaskStatus(Guid statusId)
         {
             var userId = ValidateAndGetUserId();
             await _homeService.DeletePersonalTaskStatus(userId, statusId);

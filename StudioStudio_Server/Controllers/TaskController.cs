@@ -97,7 +97,7 @@ namespace StudioStudio_Server.Controllers
         public async Task<ActionResult<ApiResponse<object>>> DeletePersonalTask(Guid taskId)
         {
             var userId = ValidateAndGetUserId();
-            await _taskService.SoftDeletePersonalTaskAsync(userId, taskId);
+            await _taskService.DeletePersonalTaskAsync(userId, taskId);
             var message = _messageService.GetMessage(ErrorCodes.SuccessDeleteTask);
             return Ok(ApiResponse<object>.Success(
                 ErrorCodes.SuccessDeleteTask,
@@ -139,7 +139,7 @@ namespace StudioStudio_Server.Controllers
                 message,
                 null));
         }
-        [HttpPut("/reorder-personal-task")]
+        [HttpPut("reorder-personal-task")]
         public async Task<ActionResult<ApiResponse<object>>> ReorderPersonalTask(
             [FromBody] ReorderTaskRequest request)
         {
@@ -152,6 +152,19 @@ namespace StudioStudio_Server.Controllers
                 message,
                 null));
         }
+
+        [HttpDelete("{groupId}/{taskId}/permanent")]
+        public async Task<ActionResult<ApiResponse<object>>> PermanentDeleteGroupTask(Guid groupId, Guid taskId)
+        {
+            var userId = ValidateAndGetUserId();
+            await _taskService.PermanentDeleteGroupTaskAsync(userId, groupId, taskId);
+            var message = _messageService.GetMessage(ErrorCodes.SuccessDeleteTask);
+            return Ok(ApiResponse<object>.Success(
+                ErrorCodes.SuccessDeleteTask,
+                message,
+                null));
+        }
+
         private Guid ValidateAndGetUserId()
         {
             var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;

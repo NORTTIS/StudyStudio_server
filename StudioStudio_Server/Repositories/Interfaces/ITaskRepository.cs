@@ -16,6 +16,7 @@ namespace StudioStudio_Server.Repositories.Interfaces
         Task RestoreAsync(TaskItem task);
         Task<List<TaskItem>> GetSoftDeleteTaskByGroup(Guid groupId);
         Task<List<TaskItem>> GetAllTasksByStatusIdAsync(Guid statusId);
+        Task<List<TaskItem>> GetAllPersonalTasksByStatusIdAsync(Guid statusId);
         Task<Dictionary<Guid, List<TaskItem>>> GetListTasksByListStatusId(List<Guid> listStatusIds);
         Task SaveChangesAsync();
         Task ReorderTaskAsync(Guid taskId, Guid targetStatusId, Guid? prevTaskId, Guid? nextTaskId);
@@ -25,5 +26,8 @@ namespace StudioStudio_Server.Repositories.Interfaces
         Task RebalancePersonalTasksInStatusAsync(Guid statusId);
         Task<Dictionary<Guid, List<TaskItem>>> GetPersonalListTasksByListStatusId(List<Guid> listStatusIds);
         Task<TaskItem?> PersonalFindNextAfterAsync(Guid statusId, long position);
+        Task<List<TaskItem>> GetPersonalTasksByOwnerAsync(Guid userId);
+        Task<List<TaskItem>> GetAssignedGroupTasksByUserAsync(Guid userId);
+        Task PermanentDeleteAsync(Guid taskId);
     }
 }

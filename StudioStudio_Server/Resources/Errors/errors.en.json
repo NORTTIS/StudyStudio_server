@@ -16,6 +16,9 @@
   "TASK001": "Task not found",
   "TASK002": "You are not allowed to access this task",
   "TASK003": "Due date must later than start date",
+  "TASK004": "Invalid task priority.",
+  "TASK005": "Invalid task severity.",
+  "TASK006": "Task is not marked for deletion. Please soft delete before permanent deletion",
 
   "GROUP001": "Group not found",
   "GROUP002": "Group name already exists in this studio",

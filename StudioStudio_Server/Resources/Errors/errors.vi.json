@@ -16,6 +16,9 @@
   "TASK001": "Không tìm thấy công việc",
   "TASK002": "Bạn không có quyền truy cập công việc này",
   "TASK003": "Hạn phải lớn hơn thời gian bắt đầu",
+  "TASK004": "Mức độ ưu tiên không hợp lệ",
+  "TASK005": "Mức độ nghiêm trọng không hợp lệ",
+  "TASK006": "Công việc chưa được đánh dấu xóa. Vui lòng xóa tạm thời trước khi xóa vĩnh viễn",
 
   "GROUP001": "Không tìm thấy nhóm",
   "GROUP002": "Tên nhóm đã tồn tại trong studio này",
