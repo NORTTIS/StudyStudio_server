@@ -21,5 +21,9 @@ namespace StudioStudio_Server.Repositories.Interfaces
         Task ReorderTaskAsync(Guid taskId, Guid targetStatusId, Guid? prevTaskId, Guid? nextTaskId);
         Task RebalanceTasksInStatusAsync(Guid statusId);
         Task<TaskItem?> FindNextAfterAsync(Guid statusId, long position);
+        Task ReorderPersonalTaskAsync(Guid taskId, Guid targetStatusId, Guid? prevTaskId, Guid? nextTaskId);
+        Task RebalancePersonalTasksInStatusAsync(Guid statusId);
+        Task<Dictionary<Guid, List<TaskItem>>> GetPersonalListTasksByListStatusId(List<Guid> listStatusIds);
+        Task<TaskItem?> PersonalFindNextAfterAsync(Guid statusId, long position);
     }
 }

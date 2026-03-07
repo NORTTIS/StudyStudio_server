@@ -212,6 +212,24 @@ namespace StudioStudio_Server.Repositories
             return result;
         }
 
+        public async Task<Dictionary<Guid, List<TaskItem>>> GetPersonalListTasksByListStatusId(List<Guid> listStatusIds)
+        {
+            Dictionary<Guid, List<TaskItem>> result = new Dictionary<Guid, List<TaskItem>>();
+
+            foreach (var statusId in listStatusIds)
+            {
+                var tasks = await _context.Tasks
+                    .Where(t => t.PersonalStatusId == statusId && !t.IsPendingDeleted)
+                    .AsNoTracking()
+                    .OrderBy(t => t.Position)
+                    .ToListAsync();
+
+                result[statusId] = tasks;
+            }
+
+            return result;
+        }
+
         /// <summary>
         /// Reorder (and change status if needed) for a task based on drag-and-drop position.
         /// Supports: dragging within same status, dragging to different status (including empty columns).
@@ -257,8 +275,8 @@ namespace StudioStudio_Server.Repositories
                     {
                         // Check if there are other tasks in the target status (excluding the moving task)
                         var existingTasks = await _context.Tasks
-                            .Where(t => t.GroupStatusId == targetStatusId 
-                                     && t.TaskId != taskId 
+                            .Where(t => t.GroupStatusId == targetStatusId
+                                     && t.TaskId != taskId
                                      && !t.IsPendingDeleted)
                             .OrderBy(t => t.Position)
                             .ToListAsync();
@@ -301,15 +319,15 @@ namespace StudioStudio_Server.Repositories
                     else if (next != null)
                     {
                         newPos = next.Position / 2;
-                        
+
                         // If calculated position is too small, rebalance and recalculate
                         if (newPos < 1)
                         {
                             await RebalanceTasksInStatusInternalAsync(targetStatusId);
-                            
+
                             next = await _context.Tasks
                                 .FirstOrDefaultAsync(t => t.TaskId == nextTaskId!.Value && !t.IsPendingDeleted);
-                            
+
 
                             newPos = next!.Position / 2;
                         }
@@ -396,6 +414,190 @@ namespace StudioStudio_Server.Repositories
             await _context.SaveChangesAsync();
         }
 
+
+        /// <summary>
+        /// Reorder (and change status if needed) for a task based on drag-and-drop position.
+        /// Supports: dragging within same status, dragging to different status (including empty columns).
+        /// </summary>
+        public async Task ReorderPersonalTaskAsync(Guid taskId, Guid targetStatusId, Guid? prevTaskId, Guid? nextTaskId)
+        {
+            for (int attemp = 1; attemp <= MAX_TRY; attemp++)
+            {
+                using var transaction = await _context.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
+
+                try
+                {
+                    var targetStatus = await _context.PersonalTaskStatuses
+                        .FirstOrDefaultAsync(s => s.StatusId == targetStatusId)
+                    ?? throw new InvalidOperationException($"Status {targetStatusId} not found");
+
+                    // Load task to be moved first
+                    var task = await _context.Tasks
+                        .FirstOrDefaultAsync(t => t.TaskId == taskId && !t.IsPendingDeleted)
+                        ?? throw new InvalidOperationException($"Task {taskId} not found");
+
+                    // Load prev/next task (must belong to targetStatus and exclude the moving task)
+                    var prev = prevTaskId.HasValue
+                        ? await _context.Tasks
+                            .FirstOrDefaultAsync(t => t.TaskId == prevTaskId.Value
+                                                   && t.PersonalStatusId == targetStatusId
+                                                   && t.TaskId != taskId
+                                                   && !t.IsPendingDeleted)
+                        : null;
+
+                    var next = nextTaskId.HasValue
+                        ? await _context.Tasks
+                            .FirstOrDefaultAsync(t => t.TaskId == nextTaskId.Value
+                                                   && t.PersonalStatusId == targetStatusId
+                                                   && t.TaskId != taskId
+                                                   && !t.IsPendingDeleted)
+                        : null;
+
+                    long newPos;
+
+                    // Case 1: Moving to empty column (both prev and next are null)
+                    if (prev == null && next == null)
+                    {
+                        // Check if there are other tasks in the target status (excluding the moving task)
+                        var existingTasks = await _context.Tasks
+                            .Where(t => t.PersonalStatusId == targetStatusId
+                                     && t.TaskId != taskId
+                                     && !t.IsPendingDeleted)
+                            .OrderBy(t => t.Position)
+                            .ToListAsync();
+
+                        if (existingTasks.Any())
+                        {
+                            // Place at the end
+                            newPos = existingTasks.Max(t => t.Position) + STEP;
+                        }
+                        else
+                        {
+                            // Truly empty column
+                            newPos = STEP;
+                        }
+                    }
+                    // Case 2: Between two tasks
+                    else if (prev != null && next != null)
+                    {
+                        long gap = next.Position - prev.Position;
+
+                        if (gap <= 1)
+                        {
+                            await RebalancePersonalTasksInStatusInternalAsync(targetStatusId);
+
+                            // Reload after rebalance
+                            prev = await _context.Tasks
+                                .FirstOrDefaultAsync(t => t.TaskId == prevTaskId!.Value && !t.IsPendingDeleted);
+                            next = await _context.Tasks
+                                .FirstOrDefaultAsync(t => t.TaskId == nextTaskId!.Value && !t.IsPendingDeleted);
+                        }
+
+                        newPos = Midpoint(prev!.Position, next!.Position);
+                    }
+                    // Case 3: After last task (only prev exists)
+                    else if (prev != null)
+                    {
+                        newPos = prev.Position + STEP;
+                    }
+                    // Case 4: Before first task (only next exists)
+                    else if (next != null)
+                    {
+                        newPos = next.Position / 2;
+
+                        // If calculated position is too small, rebalance and recalculate
+                        if (newPos < 1)
+                        {
+                            await RebalancePersonalTasksInStatusInternalAsync(targetStatusId);
+
+                            next = await _context.Tasks
+                                .FirstOrDefaultAsync(t => t.TaskId == nextTaskId!.Value && !t.IsPendingDeleted);
+
+
+                            newPos = next!.Position / 2;
+                        }
+                    }
+                    else
+                    {
+                        throw new InvalidOperationException("Invalid prev/next task state after rebalance");
+                    }
+
+                    // Update position + status (allows changing column)
+                    task.Position = (int)newPos;
+                    task.PersonalStatusId = targetStatusId;
+                    task.UpdatedAt = DateTime.UtcNow;
+
+                    await _context.SaveChangesAsync();
+                    await transaction.CommitAsync();
+                    return;
+                }
+                catch (DbUpdateException)
+                {
+                    await transaction.RollbackAsync();
+
+                    if (attemp < MAX_TRY)
+                    {
+                        await Task.Delay(50 * attemp);
+                        continue;
+                    }
+                    throw;
+                }
+                catch
+                {
+                    await transaction.RollbackAsync();
+                    throw;
+                }
+            }
+            throw new InvalidOperationException("Failed to reorder task after maximum retries");
+        }
+
+        /// <summary>
+        /// Rebalance all tasks in status (public method with separate transaction)
+        /// </summary>
+        public async Task RebalancePersonalTasksInStatusAsync(Guid statusId)
+        {
+            using var transaction = await _context.Database
+                .BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
+            try
+            {
+                await RebalancePersonalTasksInStatusInternalAsync(statusId);
+                await transaction.CommitAsync();
+            }
+            catch
+            {
+                await transaction.RollbackAsync();
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// Find next task after position in same status
+        /// </summary>
+        public async Task<TaskItem?> PersonalFindNextAfterAsync(Guid statusId, long position)
+        {
+            return await _context.Tasks
+                .Where(t => t.PersonalStatusId == statusId && t.Position > position && !t.IsPendingDeleted)
+                .OrderBy(t => t.Position)
+                .AsNoTracking()
+                .FirstOrDefaultAsync();
+        }
+
+        private async Task RebalancePersonalTasksInStatusInternalAsync(Guid statusId)
+        {
+            var tasks = await _context.Tasks
+                .Where(t => t.PersonalStatusId == statusId && !t.IsPendingDeleted)
+                .OrderBy(t => t.Position)
+                .ToListAsync();
+
+            long pos = STEP;
+            foreach (var task in tasks)
+            {
+                task.Position = (int)pos;
+                pos += STEP;
+            }
+
+            await _context.SaveChangesAsync();
+        }
         private static long Midpoint(long a, long b)
         {
             return (a + b) / 2;

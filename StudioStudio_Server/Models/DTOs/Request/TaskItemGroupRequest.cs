@@ -17,6 +17,17 @@ namespace StudioStudio_Server.Models.DTOs.Request
         public Guid? Assignees { get; set; }
     }
 
+    public class TaskItemPersonalRequest
+    {
+        public string TaskName { get; set; } = string.Empty;
+        public string TaskDescription { get; set; } = string.Empty;
+        public TaskPriority TaskPriority { get; set; }
+        public TaskSeverity TaskSeverity { get; set; }
+        public DateTime? StartDate { get; set; }
+        public DateTime? DueDate { get; set; }
+        public Guid? PersonalStatusId { get; set; }
+    }
+
     public class ReorderTaskRequest
     {
         public Guid TaskId { get; set; }

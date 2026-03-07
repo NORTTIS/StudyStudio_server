@@ -52,7 +52,7 @@ namespace StudioStudio_Server.Services
 
             if (await _groupTaskStatusRepository.NameExistsInGroupAsync(newStatus))
             {
-                throw new AppException(ErrorCodes.GroupTaskStatusNameExist, StatusCodes.Status400BadRequest);
+                throw new AppException(ErrorCodes.StatusNameExist, StatusCodes.Status400BadRequest);
             }
 
             await _groupTaskStatusRepository.AddAsync(newStatus);
@@ -107,14 +107,14 @@ namespace StudioStudio_Server.Services
             var taskStatus = await _groupTaskStatusRepository.GetDetailAsync(taskStatusId);
             if (taskStatus == null || taskStatus.GroupId != groupId)
             {
-                throw new AppException(ErrorCodes.TaskNotFound, StatusCodes.Status404NotFound);
+                throw new AppException(ErrorCodes.StatusNotFound, StatusCodes.Status404NotFound);
             }
 
             taskStatus.StatusName = request.StatusName;
 
             if (await _groupTaskStatusRepository.NameExistsInGroupAsync(taskStatus))
             {
-                throw new AppException(ErrorCodes.GroupTaskStatusNameExist, StatusCodes.Status400BadRequest);
+                throw new AppException(ErrorCodes.StatusNameExist, StatusCodes.Status400BadRequest);
             }
 
             await _groupTaskStatusRepository.UpdateAsync(taskStatus);
@@ -131,7 +131,7 @@ namespace StudioStudio_Server.Services
             var status = await _groupTaskStatusRepository.GetDetailAsync(request.StatusId);
             if (status == null || status.GroupId != groupId)
             {
-                throw new AppException(ErrorCodes.TaskNotFound, StatusCodes.Status404NotFound);
+                throw new AppException(ErrorCodes.StatusNotFound, StatusCodes.Status404NotFound);
             }
 
             await _groupTaskStatusRepository.ReorderStatusAsync(

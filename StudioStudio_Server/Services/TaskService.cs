@@ -20,6 +20,7 @@ namespace StudioStudio_Server.Services
         private readonly ITaskAssignmentRepository _taskAssignmentRepository;
         private readonly IUserRepository _userRepository;
         private readonly ITaskHistoryRepository _taskHistoryRepository;
+        private readonly IPersonalTaskStatusRepository _personalTaskStatusRepository;
 
         public TaskService(
             ITaskRepository taskRepository,
@@ -29,7 +30,8 @@ namespace StudioStudio_Server.Services
             IGroupTaskStatusRepository groupTaskStatusRepository,
             ITaskAssignmentRepository taskAssignmentRepository,
             IUserRepository userRepository,
-            ITaskHistoryRepository taskHistoryRepository)
+            ITaskHistoryRepository taskHistoryRepository,
+            IPersonalTaskStatusRepository personalTaskStatusRepository)
         {
             _taskRepository = taskRepository;
             _logger = logger;
@@ -39,6 +41,7 @@ namespace StudioStudio_Server.Services
             _taskAssignmentRepository = taskAssignmentRepository;
             _userRepository = userRepository;
             _taskHistoryRepository = taskHistoryRepository;
+            _personalTaskStatusRepository = personalTaskStatusRepository;
         }
 
         public async Task<TaskItemResponse> AddGroupTaskAsync(Guid userId, TaskItemGroupRequest request)
@@ -360,6 +363,25 @@ namespace StudioStudio_Server.Services
             });
         }
 
+        public async Task SoftDeletePersonalTaskAsync(Guid userId, Guid taskId)
+        {
+            var user = await _userRepository.GetByIdAsync(userId);
+            if (user == null || user.UserId != userId)
+            {
+                throw new AppException(ErrorCodes.UserNotFound, StatusCodes.Status403Forbidden);
+            }
+
+            await _taskRepository.SoftDeleteAsync(taskId);
+            await _taskHistoryRepository.AddAsync(new TaskHistory
+            {
+                HistoryId = Guid.NewGuid(),
+                TaskId = taskId,
+                ChangedBy = userId,
+                ChangedAt = DateTime.UtcNow,
+                ChangedContent = "DELETE"
+            });
+        }
+
         public async Task RestoreGroupTaskAsync(Guid userId, Guid groupId, Guid taskId)
         {
             var userRole = await _participantRepository.GetGroupRoleByUserIdAsync(userId, groupId);
@@ -463,5 +485,218 @@ namespace StudioStudio_Server.Services
             request.NextTaskId);
         }
 
+        public async Task<TaskItemResponse> AddPersonalTaskAsync(Guid userId, TaskItemPersonalRequest request)
+        {
+            var user = await _userRepository.GetByIdAsync(userId);
+            if (user == null || user.UserId != userId)
+            {
+                throw new AppException(ErrorCodes.UserNotFound, StatusCodes.Status404NotFound);
+            }
+
+            if (!request.PersonalStatusId.HasValue)
+            {
+                throw new AppException(ErrorCodes.PersonalCreateTaskDeniedMissingStatus, StatusCodes.Status400BadRequest);
+            }
+
+            var personalTaskStatus = await _personalTaskStatusRepository.GetDetailAsync(request.PersonalStatusId.Value);
+
+            var existingTask = await _taskRepository.GetAllTasksByStatusIdAsync(request.PersonalStatusId.Value);
+            int newTaskPosition = 0;
+            if (existingTask.Any())
+            {
+                newTaskPosition = existingTask.Max(s => s.Position) + 1000;
+            }
+            else
+            {
+                newTaskPosition = 1000;
+            }
+
+            var now = DateTime.UtcNow;
+
+            // Convert dates to UTC if provided
+            DateTime? startDateUtc = request.StartDate.HasValue
+                ? DateTime.SpecifyKind(request.StartDate.Value, DateTimeKind.Utc)
+                : null;
+
+            DateTime? dueDateUtc = request.DueDate.HasValue
+                ? DateTime.SpecifyKind(request.DueDate.Value, DateTimeKind.Utc)
+                : null;
+
+            // Validate dates
+            if (startDateUtc.HasValue && dueDateUtc.HasValue)
+            {
+                if (startDateUtc.Value > dueDateUtc.Value)
+                {
+                    throw new AppException(ErrorCodes.TaskDateTimeError, StatusCodes.Status400BadRequest);
+                }
+            }
+
+            var taskItem = new TaskItem
+            {
+                TaskId = Guid.NewGuid(),
+                OwnerId = userId,
+                PersonalStatusId = request.PersonalStatusId,
+                Title = request.TaskName,
+                Position = newTaskPosition,
+                Description = request.TaskDescription,
+                StartDate = startDateUtc,
+                DueDate = dueDateUtc,
+                Priority = request.TaskPriority,
+                Severity = request.TaskSeverity,
+                Progress = 0,
+                IsPendingDeleted = false,
+                CreatedAt = now,
+                UpdatedAt = now,
+            };
+
+            await _taskRepository.AddAsync(taskItem);
+
+            return new TaskItemResponse
+            {
+                TaskId = taskItem.TaskId,
+                TaskTitle = taskItem.Title,
+                TaskDescription = taskItem.Description,
+                TaskPriority = taskItem.Priority,
+                TaskSeverity = taskItem.Severity,
+                Position = taskItem.Position,
+                Progress = taskItem.Progress,
+                CreatedById = taskItem.OwnerId,
+                CreatedAt = now,
+                StartDate = taskItem.StartDate,
+                DueDate = taskItem.DueDate,
+                PersonalStatus = new PersonalTaskStatusDto
+                {
+                    UserId = userId,
+                    StatusName = personalTaskStatus!.StatusName,
+                    Position = personalTaskStatus.Position
+                }
+            };
+        }
+        public async Task<TaskItemResponse> UpdatePersonalTaskAsync(Guid userId, Guid taskId, UpdatePersonalTaskRequest request)
+        {
+            var user = await _userRepository.GetByIdAsync(userId);
+            if (user == null || user.UserId != userId)
+            {
+                throw new AppException(ErrorCodes.UserNotFound, StatusCodes.Status404NotFound);
+            }
+
+            var task = await _taskRepository.GetByIdAsync(taskId);
+            if (task == null)
+            {
+                throw new AppException(ErrorCodes.TaskNotFound, StatusCodes.Status404NotFound);
+            }
+
+            // Validate PersonalStatusId if provided
+            if (request.PersonalStatusId.HasValue)
+            {
+                var statusExists = await _personalTaskStatusRepository.GetDetailAsync(request.PersonalStatusId.Value);
+                if (statusExists == null || statusExists.UserId != userId)
+                {
+                    throw new AppException(ErrorCodes.StatusNotFound, StatusCodes.Status404NotFound);
+                }
+            }
+
+            // Convert dates to UTC if provided
+            DateTime? startDateUtc = request.StartDate.HasValue
+                ? DateTime.SpecifyKind(request.StartDate.Value, DateTimeKind.Utc)
+                : null;
+
+            DateTime? dueDateUtc = request.DueDate.HasValue
+                ? DateTime.SpecifyKind(request.DueDate.Value, DateTimeKind.Utc)
+                : null;
+
+            // Validate dates
+            if (startDateUtc.HasValue && dueDateUtc.HasValue)
+            {
+                if (startDateUtc.Value > dueDateUtc.Value)
+                {
+                    throw new AppException(ErrorCodes.TaskDateTimeError, StatusCodes.Status400BadRequest);
+                }
+            }
+
+            // Update basic fields
+            if (!string.IsNullOrWhiteSpace(request.TaskName))
+            {
+                task.Title = request.TaskName;
+            }
+
+            if (request.TaskDescription != null)
+            {
+                task.Description = request.TaskDescription;
+            }
+
+            if (request.TaskPriority.HasValue)
+            {
+                task.Priority = request.TaskPriority.Value;
+            }
+
+            if (request.TaskSeverity.HasValue)
+            {
+                task.Severity = request.TaskSeverity.Value;
+            }
+
+            if (startDateUtc.HasValue)
+            {
+                task.StartDate = startDateUtc.Value;
+            }
+
+            if (dueDateUtc.HasValue)
+            {
+                task.DueDate = dueDateUtc.Value;
+            }
+
+            if (request.Progress.HasValue)
+            {
+                task.Progress = request.Progress.Value;
+            }
+
+            // Update personal if provided
+            if (request.PersonalStatusId.HasValue)
+            {
+                task.PersonalStatusId = request.PersonalStatusId.Value;
+            }
+
+            await _taskRepository.UpdateAsync(task);
+
+            // Prepare response
+            var personalStatus = task.PersonalStatusId.HasValue
+                ? await _personalTaskStatusRepository.GetDetailAsync(task.PersonalStatusId.Value)
+                : null;
+
+            return new TaskItemResponse
+            {
+                TaskId = task.TaskId,
+                TaskTitle = task.Title,
+                TaskDescription = task.Description ?? string.Empty,
+                TaskPriority = task.Priority,
+                TaskSeverity = task.Severity,
+                Position = task.Position,
+                Progress = task.Progress,
+                CreatedById = task.OwnerId,
+                CreatedAt = task.CreatedAt,
+                StartDate = task.StartDate,
+                DueDate = task.DueDate,
+                PersonalStatus = personalStatus != null ? new PersonalTaskStatusDto
+                {
+                    UserId = personalStatus.UserId,
+                    StatusName = personalStatus.StatusName,
+                    Position = personalStatus.Position
+                } : null
+            };
+        }
+        public async Task ReorderPersonalTaskAsync(Guid userId, ReorderTaskRequest request)
+        {
+            var user = await _userRepository.GetByIdAsync(userId);
+            if (user == null || user.UserId != userId)
+            {
+                throw new AppException(ErrorCodes.UserNotFound, StatusCodes.Status404NotFound);
+            }
+
+            await _taskRepository.ReorderPersonalTaskAsync(
+            request.TaskId,
+            request.TargetStatusId,
+            request.PrevTaskId,
+            request.NextTaskId);
+        }
     }
 }

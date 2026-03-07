@@ -11,6 +11,9 @@ namespace StudioStudio_Server.Services.Interfaces
         Task RestoreGroupTaskAsync(Guid userId, Guid groupId, Guid taskId);
         Task<List<TaskDeleteResponse>> GetDeleteTaskListAsync(Guid userId, Guid groupId);
         Task ReorderTaskAsync(Guid userId, Guid groupId, ReorderTaskRequest request);
-
+        Task<TaskItemResponse> AddPersonalTaskAsync(Guid userId, TaskItemPersonalRequest request);
+        Task<TaskItemResponse> UpdatePersonalTaskAsync(Guid userId, Guid taskId, UpdatePersonalTaskRequest request);
+        Task ReorderPersonalTaskAsync(Guid userId, ReorderTaskRequest request);
+        Task SoftDeletePersonalTaskAsync(Guid userId, Guid taskId);
     }
 }

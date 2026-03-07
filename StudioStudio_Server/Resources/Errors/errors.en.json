@@ -36,8 +36,8 @@
   "GROUP017": "You do not have permission to create task for this group",
   "GROUP018": "You do not have permission to create task status for this group",
   "GROUP019": "You do not have permission to delete this task status. Only owner and moderator can delete it",
-  "GROUP020": "You can only create a task when a task status is provided",
-  "GROUP021": "This task status name already existed",
+  "GROUP020": "You can only create a task when a task status is available",
+  "Change group021 to Status 002": null,
   "GROUP022": "This position is already taken by another task status",
   "GROUP023": "You do not have permission to delete this task. Only owner and moderator can delete it",
   "GROUP024": "You do not have permission to restore this task. Only owner and moderator can restore it",
@@ -46,6 +46,12 @@
   "GROUP027": "Status not found",
 
   "STUDIO001": "You have reached the limit of studios you can create",
+
+  "STATUS001": "Status not found",
+  "STATUS002": "This status name already exist",
+
+  "PERSONAL001": "You can only create a task when a task status is available",
+  "PERSONAL002": "You have no permission to delete this task",
 
   "FAVOURITE001": "Group is already in your favourites",
   "FAVOURITE002": "Favourite not found",

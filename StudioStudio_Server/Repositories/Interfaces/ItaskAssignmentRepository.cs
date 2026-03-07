@@ -8,5 +8,6 @@ namespace StudioStudio_Server.Repositories.Interfaces
         Task RemoveAsync(List<TaskAssignment> assignees);
         Task<List<TaskAssignment>> GetAssigneesByTaskId(Guid taskId);
         Task<List<TaskAssignment>> GetListAssigneesByListTaskId(List<Guid> taskIds);
+        Task<List<TaskAssignment>> GetListTaskIdByUserIdAsync(Guid userId);
     }
 }
