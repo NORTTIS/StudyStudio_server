@@ -45,5 +45,12 @@ namespace StudioStudio_Server.Repositories
                 .AsNoTracking()
                 .ToListAsync();
         }
+        public async Task<List<TaskAssignment>> GetListTaskIdByUserIdAsync(Guid userId)
+        {
+            return await _db.TaskAssignments
+                .Where(a => a.AssignedTo == userId)
+                .AsNoTracking()
+                .ToListAsync();
+        }
     }
 }

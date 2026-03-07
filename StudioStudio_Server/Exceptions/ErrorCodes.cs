@@ -45,7 +45,7 @@
         public const string GroupCreateTaskStatusDenied = "GROUP018";
         public const string GroupDeleteTaskStatusDenied = "GROUP019";
         public const string GroupCreateTaskDeniedMissingStatus = "GROUP020";
-        public const string GroupTaskStatusNameExist = "GROUP021";
+        //Change group021 to Status 002
         public const string GroupTaskStatusPositionExist = "GROUP022";
         public const string GroupDeleteTaskDenined = "GROUP023";
         public const string GroupRestoreTaskDenined = "GROUP024";
@@ -55,6 +55,10 @@
 
         // STUDIO
         public const string StudioLimitReached = "STUDIO001";
+
+        // STATUS
+        public const string StatusNotFound = "STATUS001";
+        public const string StatusNameExist = "STATUS002";
 
         // FAVOURITE
         public const string FavouriteAlreadyExists = "FAVOURITE001";
