@@ -50,6 +50,9 @@
   "STATUS001": "Không tìm thấy trạng thái",
   "STATUS002": "Trạng thái này đã tồn tại",
 
+  "PERSONAL001": "Bạn chỉ có thể tạo công việc khi có trạng thái",
+  "PERSONAL002": "Bạn không có quyền xóa công việc này",
+
   "FAVOURITE001": "Nhóm đã có trong danh sách yêu thích của bạn",
   "FAVOURITE002": "Không tìm thấy yêu thích",
   "FAVOURITE003": "Bạn phải là thành viên của nhóm để thêm vào yêu thích",

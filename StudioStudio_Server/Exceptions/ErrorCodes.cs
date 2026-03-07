@@ -60,6 +60,10 @@
         public const string StatusNotFound = "STATUS001";
         public const string StatusNameExist = "STATUS002";
 
+        // PERSONAL
+        public const string PersonalCreateTaskDeniedMissingStatus = "PERSONAL001";
+        public const string PersonalDeleteTaskDenined = "PERSONAL002";
+
         // FAVOURITE
         public const string FavouriteAlreadyExists = "FAVOURITE001";
         public const string FavouriteNotFound = "FAVOURITE002";

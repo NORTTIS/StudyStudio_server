@@ -39,6 +39,20 @@ namespace StudioStudio_Server.Controllers
                 result));
         }
 
+        [HttpPost("create-personal-task")]
+        public async Task<ActionResult<ApiResponse<TaskItemResponse>>> CreatePersonalTask(
+            [FromBody] TaskItemPersonalRequest request)
+        {
+            var userId = ValidateAndGetUserId();
+            var result = await _taskService.AddPersonalTaskAsync(userId, request);
+            var message = _messageService.GetMessage(ErrorCodes.SuccessCreateTask);
+
+            return Ok(ApiResponse<TaskItemResponse>.Success(
+                ErrorCodes.SuccessCreateTask,
+                message,
+                result));
+        }
+
         [HttpPut("{groupId}/{taskId}")]
         public async Task<ActionResult<ApiResponse<TaskItemResponse>>> UpdateGroupTask(
             Guid groupId, Guid taskId, [FromBody] UpdateTaskRequest request)
@@ -53,11 +67,37 @@ namespace StudioStudio_Server.Controllers
                 result));
         }
 
+        [HttpPut("update-personal-task/{taskId}")]
+        public async Task<ActionResult<ApiResponse<TaskItemResponse>>> UpdatePersonalTask(
+            Guid taskId, [FromBody] UpdatePersonalTaskRequest request)
+        {
+            var userId = ValidateAndGetUserId();
+            var result = await _taskService.UpdatePersonalTaskAsync(userId, taskId, request);
+            var message = _messageService.GetMessage(ErrorCodes.SuccessUpdateTask);
+
+            return Ok(ApiResponse<TaskItemResponse>.Success(
+                ErrorCodes.SuccessUpdateTask,
+                message,
+                result));
+        }
+
         [HttpDelete("{groupId}/{taskId}")]
         public async Task<ActionResult<ApiResponse<object>>> DeleteTask(Guid groupId, Guid taskId)
         {
             var userId = ValidateAndGetUserId();
             await _taskService.SoftDeleteTaskAsync(userId, groupId, taskId);
+            var message = _messageService.GetMessage(ErrorCodes.SuccessDeleteTask);
+            return Ok(ApiResponse<object>.Success(
+                ErrorCodes.SuccessDeleteTask,
+                message,
+                null));
+        }
+
+        [HttpDelete("delete-personal-task/{taskId}")]
+        public async Task<ActionResult<ApiResponse<object>>> DeletePersonalTask(Guid taskId)
+        {
+            var userId = ValidateAndGetUserId();
+            await _taskService.SoftDeletePersonalTaskAsync(userId, taskId);
             var message = _messageService.GetMessage(ErrorCodes.SuccessDeleteTask);
             return Ok(ApiResponse<object>.Success(
                 ErrorCodes.SuccessDeleteTask,
@@ -92,6 +132,19 @@ namespace StudioStudio_Server.Controllers
         {
             var userId = ValidateAndGetUserId();
             await _taskService.ReorderTaskAsync(userId, groupId, request);
+            var message = _messageService.GetMessage(ErrorCodes.SuccessUpdateTask);
+
+            return Ok(ApiResponse<object>.Success(
+                ErrorCodes.SuccessUpdateTask,
+                message,
+                null));
+        }
+        [HttpPut("/reorder-personal-task")]
+        public async Task<ActionResult<ApiResponse<object>>> ReorderPersonalTask(
+            [FromBody] ReorderTaskRequest request)
+        {
+            var userId = ValidateAndGetUserId();
+            await _taskService.ReorderPersonalTaskAsync(userId, request);
             var message = _messageService.GetMessage(ErrorCodes.SuccessUpdateTask);
 
             return Ok(ApiResponse<object>.Success(

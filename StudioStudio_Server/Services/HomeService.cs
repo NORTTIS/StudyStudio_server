@@ -45,7 +45,7 @@ namespace StudioStudio_Server.Services
             var personalStatusIdList = personalTaskStatus.Select(s => s.StatusId).ToList();
 
             // Get user task list
-            var personalTaskList = await _taskRepository.GetListTasksByListStatusId(personalStatusIdList);
+            var personalTaskList = await _taskRepository.GetPersonalListTasksByListStatusId(personalStatusIdList);
 
             // Get assigned task list
             var taskAssignList = await _assignmentRepository.GetListTaskIdByUserIdAsync(userId);
@@ -58,27 +58,29 @@ namespace StudioStudio_Server.Services
                     StatusId = pt.StatusId,
                     StatusName = pt.StatusName,
                     Position = pt.Position,
-                    TaskList = personalTaskList[pt.StatusId].Select(t => new TaskItemResponse
-                    {
-                        TaskId = t.TaskId,
-                        TaskTitle = t.Title,
-                        TaskDescription = t.Description,
-                        TaskPriority = t.Priority,
-                        TaskSeverity = t.Severity,
-                        Position = t.Position,
-                        Progress = t.Progress,
-                        CreatedById = t.OwnerId,
-                        CreatedAt = t.CreatedAt,
-                        StartDate = t.StartDate,
-                        DueDate = t.DueDate,
-                        Assignee = new UserDto
-                        {
-                            Id = userId,
-                            FirstName = userDetail.FirstName,
-                            LastName = userDetail.LastName,
-                            AvatarUrl = userDetail.AvatarUrl,
-                        }
-                    }).ToList()
+                    TaskList = personalTaskList.TryGetValue(pt.StatusId, out var tasks)
+                         ? tasks.Select(t => new TaskItemResponse
+                         {
+                             TaskId = t.TaskId,
+                             TaskTitle = t.Title,
+                             TaskDescription = t.Description,
+                             TaskPriority = t.Priority,
+                             TaskSeverity = t.Severity,
+                             Position = t.Position,
+                             Progress = t.Progress,
+                             CreatedById = t.OwnerId,
+                             CreatedAt = t.CreatedAt,
+                             StartDate = t.StartDate,
+                             DueDate = t.DueDate,
+                             Assignee = new UserDto
+                             {
+                                 Id = userId,
+                                 FirstName = userDetail.FirstName,
+                                 LastName = userDetail.LastName,
+                                 AvatarUrl = userDetail.AvatarUrl,
+                             }
+                         }).ToList()
+                         : new List<TaskItemResponse>()
                 }).ToList(),
                 GroupTaskAssigned = new List<AssignedGroupResponse>()
             };
