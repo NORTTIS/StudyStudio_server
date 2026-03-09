@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Authorization;
+﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using PayOS.Models.Webhooks;
 using StudioStudio_Server.Exceptions;
@@ -20,11 +20,13 @@ namespace StudioStudio_Server.Controllers
     {
         private readonly IPaymentService _paymentService;
         private readonly IMessageService _messageService;
+        private readonly ILogger<PaymentController> _logger;
 
-        public PaymentController(IPaymentService paymentService, IMessageService messageService)
+        public PaymentController(IPaymentService paymentService, IMessageService messageService, ILogger<PaymentController> logger)
         {
             _paymentService = paymentService;
             _messageService = messageService;
+            _logger = logger;
         }
 
         private Guid ValidateAndGetUserId()
@@ -79,7 +81,20 @@ namespace StudioStudio_Server.Controllers
         [AllowAnonymous]
         public async Task<IActionResult> Webhook([FromBody] Webhook webhookBody)
         {
-            await _paymentService.HandleWebhookAsync(webhookBody);
+            try
+            {
+                await _paymentService.HandleWebhookAsync(webhookBody);
+            }
+            catch (AppException ex) when (ex.Code == ErrorCodes.PaymentWebhookInvalid)
+            {
+                // Chữ ký sai — không retry, vẫn trả 200
+                _logger.LogWarning("Invalid webhook signature");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Webhook processing error");
+                return StatusCode(500, new { success = false });
+            }
             return Ok(new { success = true });
         }
 
