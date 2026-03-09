@@ -160,11 +160,21 @@
         public const string SuccessDeleteTask = "SUCCESS038";
         public const string SuccessRestoreTask = "SUCCESS039";
         public const string SuccessUpdateTask = "SUCCESS040";
+        public const string SuccessPaymentCreated = "SUCCESS041";
+        public const string SuccessPaymentCancelled = "SUCCESS042";
 
         // ANNOUNCEMENT
         public const string AnnouncementTagTitle = "ANNOUNCEMENTTAGTITLE";
         public const string AnnouncementTagContent = "ANNOUNCEMENTTAGCONTENT";
         public const string AnnouncementNotFound = "ANNOUNCEMENT001";
+
+        // PAYMENT
+        public const string PaymentPlanNotFound = "PAYMENT001";
+        public const string PaymentCannotPayForFreePlan = "PAYMENT002";
+        public const string PaymentNotFound = "PAYMENT003";
+        public const string PaymentCannotCancel = "PAYMENT004";
+        public const string PaymentWebhookInvalid = "PAYMENT005";
+        public const string PaymentPriceInvalid = "PAYMENT006";
 
         // COMMON
         public const string UnexpectedError = "SYS001";

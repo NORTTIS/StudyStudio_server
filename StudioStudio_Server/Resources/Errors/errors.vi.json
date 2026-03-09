@@ -73,7 +73,7 @@
   "MESSAGE002": "Bạn không có quyền xóa tin nhắn này",
   "MESSAGE003": "Tin nhắn gốc không tồn tại hoặc đã bị xóa",
 
-  "COMMENT001": "Không tìm thấy bình luận",
+  "COMMENT001": "Não tìm thấy bình luận",
   "COMMENT002": "Bạn không có quyền xóa bình luận này",
   "COMMENT003": "Bình luận gốc không tồn tại hoặc đã bị xóa",
 
@@ -137,6 +137,15 @@
   "SUCCESS038": "Xóa công việc thành công",
   "SUCCESS039": "Khôi phục công việc thành công",
   "SUCCESS040": "Cập nhật công việc thành công",
+  "SUCCESS041": "Tạo liên kết thanh toán thành công",
+  "SUCCESS042": "Hủy thanh toán thành công",
+
+  "PAYMENT001": "Không tìm thấy gói đăng ký",
+  "PAYMENT002": "Không thể thanh toán cho gói miễn phí",
+  "PAYMENT003": "Không tìm thấy giao dịch thanh toán",
+  "PAYMENT004": "Chỉ có thể hủy giao dịch đang chờ xử lý",
+  "PAYMENT005": "Dữ liệu webhook không hợp lệ hoặc không thể xác minh",
+  "PAYMENT006": "Giá tiền không hợp lệ",
 
   "SYS001": "Lỗi hệ thống không xác định"
 }
