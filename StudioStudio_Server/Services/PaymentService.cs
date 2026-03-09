@@ -103,16 +103,12 @@ namespace StudioStudio_Server.Services
             };
         }
 
-        public async Task HandleWebhookAsync(object webhookBody)
+        public async Task HandleWebhookAsync(Webhook webhook)
         {
             WebhookData webhookData;
 
             try
             {
-                var webhook = System.Text.Json.JsonSerializer.Deserialize<Webhook>(
-                    webhookBody.ToString()!,
-                    new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-
                 if (webhook == null)
                     throw new AppException(ErrorCodes.PaymentWebhookInvalid);
 

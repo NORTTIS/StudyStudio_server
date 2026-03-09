@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using PayOS.Models.Webhooks;
 using StudioStudio_Server.Exceptions;
 using StudioStudio_Server.Models.DTOs.Request;
 using StudioStudio_Server.Models.DTOs.Response;
@@ -76,7 +77,7 @@ namespace StudioStudio_Server.Controllers
         /// </summary>
         [HttpPost("webhook")]
         [AllowAnonymous]
-        public async Task<IActionResult> Webhook([FromBody] object webhookBody)
+        public async Task<IActionResult> Webhook([FromBody] Webhook webhookBody)
         {
             await _paymentService.HandleWebhookAsync(webhookBody);
             return Ok(new { success = true });
