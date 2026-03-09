@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using PayOS;
 using PayOS.Models.V2.PaymentRequests;
 using PayOS.Models.Webhooks;
+using StudioStudio_Server.Configurations;
 using StudioStudio_Server.Data;
 using StudioStudio_Server.Exceptions;
 using StudioStudio_Server.Models.DTOs.Request;
@@ -17,6 +18,8 @@ namespace StudioStudio_Server.Services
         private readonly PayOSClient _payOSClient;
         private readonly IPaymentRepository _paymentRepository;
         private readonly IUserSubscriptionRepository _subscriptionRepository;
+        private readonly IUserRepository _userRepository;
+        private readonly IEmailService _emailService;
         private readonly StudioDbContext _db;
         private readonly IConfiguration _configuration;
         private readonly ILogger<PaymentService> _logger;
@@ -25,6 +28,8 @@ namespace StudioStudio_Server.Services
             PayOSClient payOSClient,
             IPaymentRepository paymentRepository,
             IUserSubscriptionRepository subscriptionRepository,
+            IUserRepository userRepository,
+            IEmailService emailService,
             StudioDbContext db,
             IConfiguration configuration,
             ILogger<PaymentService> logger)
@@ -32,6 +37,8 @@ namespace StudioStudio_Server.Services
             _payOSClient = payOSClient;
             _paymentRepository = paymentRepository;
             _subscriptionRepository = subscriptionRepository;
+            _userRepository = userRepository;
+            _emailService = emailService;
             _db = db;
             _configuration = configuration;
             _logger = logger;
@@ -130,6 +137,10 @@ namespace StudioStudio_Server.Services
             if (payment.PaymentStatus != "PENDING")
                 return;
 
+            var user = await _userRepository.GetByIdAsync(payment.UserId);
+            var plan = await _db.SubscriptionPlans.FindAsync(payment.PlanId);
+            var language = user?.Language == "vi" ? Language.Vietnamese : Language.English;
+
             if (webhookData.Code == "00")
             {
                 payment.PaymentStatus = "SUCCESS";
@@ -138,11 +149,62 @@ namespace StudioStudio_Server.Services
                 await _paymentRepository.UpdateAsync(payment);
 
                 await ActivateSubscriptionAsync(payment);
+
+                // Send success email
+                if (user != null && plan != null)
+                {
+                    var userDisplayName = !string.IsNullOrEmpty(user.FirstName) || !string.IsNullOrEmpty(user.LastName)
+                        ? $"{user.FirstName} {user.LastName}".Trim()
+                        : user.Email;
+
+                    var emailBody = EmailTemplate.PaymentSuccessEmail(
+                        userDisplayName,
+                        plan.PlanName,
+                        payment.Amount,
+                        payment.PaidAt ?? DateTime.UtcNow,
+                        language);
+
+                    try
+                    {
+                        await _emailService.SendLinkAsync(user.Email, "Payment Successful - Study Studio", emailBody);
+                        _logger.LogInformation("Payment success email sent to {Email}", user.Email);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "Failed to send payment success email to {Email}", user.Email);
+                    }
+                }
             }
             else
             {
                 payment.PaymentStatus = "FAILED";
                 await _paymentRepository.UpdateAsync(payment);
+
+                // Send failed email
+                if (user != null && plan != null)
+                {
+                    var userDisplayName = !string.IsNullOrEmpty(user.FirstName) || !string.IsNullOrEmpty(user.LastName)
+                        ? $"{user.FirstName} {user.LastName}".Trim()
+                        : user.Email;
+
+                    var reason = "Payment was not completed. Please try again or use a different payment method.";
+                    var emailBody = EmailTemplate.PaymentFailedEmail(
+                        userDisplayName,
+                        plan.PlanName,
+                        payment.Amount,
+                        reason,
+                        language);
+
+                    try
+                    {
+                        await _emailService.SendLinkAsync(user.Email, "Payment Failed - Study Studio", emailBody);
+                        _logger.LogInformation("Payment failed email sent to {Email}", user.Email);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "Failed to send payment failed email to {Email}", user.Email);
+                    }
+                }
             }
         }
 
