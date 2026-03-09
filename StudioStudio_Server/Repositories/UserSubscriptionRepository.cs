@@ -55,5 +55,30 @@ namespace StudioStudio_Server.Repositories
 
             return freePlan;
         }
+
+        public async Task<UserSubscription?> GetActiveSubscriptionAsync(Guid userId)
+        {
+            DateTime now = DateTime.UtcNow;
+            return await _db.UserSubscriptions
+                .FirstOrDefaultAsync(us => us.UserId == userId && us.IsActive && us.EndDate > now);
+        }
+
+        public async Task DeactivateActiveSubscriptionsAsync(Guid userId)
+        {
+            var activeSubscriptions = await _db.UserSubscriptions
+                .Where(us => us.UserId == userId && us.IsActive)
+                .ToListAsync();
+
+            foreach (var sub in activeSubscriptions)
+                sub.IsActive = false;
+
+            await _db.SaveChangesAsync();
+        }
+
+        public async Task AddAsync(UserSubscription subscription)
+        {
+            await _db.UserSubscriptions.AddAsync(subscription);
+            await _db.SaveChangesAsync();
+        }
     }
 }

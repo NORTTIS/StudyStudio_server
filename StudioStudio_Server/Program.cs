@@ -1,22 +1,23 @@
+using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.FileProviders;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
+using PayOS;
+using StackExchange.Redis;
 using StudioStudio_Server.Configurations;
 using StudioStudio_Server.Data;
+using StudioStudio_Server.Filters;
+using StudioStudio_Server.Hubs;
+using StudioStudio_Server.Middlewares;
 using StudioStudio_Server.Models.Entities;
 using StudioStudio_Server.Repositories;
 using StudioStudio_Server.Repositories.Interfaces;
 using StudioStudio_Server.Services;
 using StudioStudio_Server.Services.Interfaces;
 using System.Text;
-using Microsoft.AspNetCore.Http.Features;
-using Microsoft.AspNetCore.Mvc;
-using StudioStudio_Server.Filters;
-using StackExchange.Redis;
-using StudioStudio_Server.Hubs;
-using Microsoft.Extensions.FileProviders;
-using StudioStudio_Server.Middlewares;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -37,6 +38,17 @@ builder.Services.AddSingleton<IConnectionMultiplexer>(r =>
     return ConnectionMultiplexer.Connect(configuration);
 });
 
+//payos registration
+builder.Services.AddSingleton(sp =>
+{
+    var config = sp.GetRequiredService<IConfiguration>();
+    return new PayOSClient(
+       config["PayOS:ClientId"],
+       config["PayOS:ApiKey"],
+       config["PayOS:ChecksumKey"]
+   );
+});
+
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddHttpClient();
 builder.Services.AddScoped<IMessageService, MessageService>();
@@ -51,6 +63,8 @@ builder.Services.AddScoped<IEmailVerificationCacheService, EmailVerificationCach
 builder.Services.AddScoped<IGroupRepository, GroupRepository>();
 builder.Services.AddScoped<IGroupService, GroupService>();
 builder.Services.AddScoped<IUserSubscriptionRepository, UserSubscriptionRepository>();
+builder.Services.AddScoped<IPaymentRepository, PaymentRepository>();
+builder.Services.AddScoped<IPaymentService, PaymentService>();
 builder.Services.AddScoped<IFavouriteRepository, FavouriteRepository>();
 builder.Services.AddScoped<IStudioRepository, StudioRepository>();
 builder.Services.AddScoped<IStudioService, StudioService>();

@@ -138,6 +138,15 @@
   "SUCCESS038": "Successfully deleted task",
   "SUCCESS039": "Successfully restore task",
   "SUCCESS040": "Successfully update task",
+  "SUCCESS041": "Payment link created successfully",
+  "SUCCESS042": "Payment cancelled successfully",
+
+  "PAYMENT001": "Subscription plan not found",
+  "PAYMENT002": "Cannot create payment for a free plan",
+  "PAYMENT003": "Payment not found",
+  "PAYMENT004": "Only pending payments can be cancelled",
+  "PAYMENT005": "Invalid or unverifiable webhook payload",
+  "PAYMENT006": "Invalid price",
 
   "SYS001": "Unexpected system error"
 }

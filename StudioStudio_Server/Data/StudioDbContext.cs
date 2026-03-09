@@ -247,6 +247,18 @@ namespace StudioStudio_Server.Data
             modelBuilder.Entity<Payment>(e =>
             {
                 e.HasKey(x => x.PaymentId);
+
+                e.HasIndex(x => x.OrderCode).IsUnique();
+
+                e.HasOne(x => x.User)
+                    .WithMany()
+                    .HasForeignKey(x => x.UserId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+                e.HasOne(x => x.Plan)
+                    .WithMany()
+                    .HasForeignKey(x => x.PlanId)
+                    .OnDelete(DeleteBehavior.Restrict);
             });
 
             // AI REQUEST LOG
