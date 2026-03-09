@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using StudioStudio_Server.Exceptions;
 using StudioStudio_Server.Models.DTOs.Request;
 using StudioStudio_Server.Models.DTOs.Response;
+using StudioStudio_Server.Repositories.Interfaces;
 using StudioStudio_Server.Services.Interfaces;
 using System.Security.Claims;
 
@@ -81,6 +82,9 @@ namespace StudioStudio_Server.Controllers
             var (usedToday, dailyLimit) = await _userService.GetAiRequestLimitInfoAsync(userId);
             int remaining = Math.Max(0, dailyLimit - usedToday);
 
+            // Get user subscription plan
+            var plan = await _userService.GetUserSubscriptionPlan(userId);
+
             var response = new UserProfileResponse
             {
                 UserId = user.UserId,
@@ -97,6 +101,7 @@ namespace StudioStudio_Server.Controllers
                 GoogleId = user.GoogleId,
                 CreatedAt = user.CreatedAt,
                 UpdatedAt = user.UpdatedAt,
+                SubscriptionPlan = plan,
 
                 // AI Request Limit Info
                 AiRequestsUsedToday = usedToday,

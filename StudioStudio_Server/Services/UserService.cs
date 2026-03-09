@@ -5,6 +5,7 @@ using StudioStudio_Server.Services.Interfaces;
 using Microsoft.AspNetCore.Identity;
 using StudioStudio_Server.Exceptions;
 using System.Text.RegularExpressions;
+using StudioStudio_Server.Models.DTOs.Response;
 
 namespace StudioStudio_Server.Services
 {
@@ -283,6 +284,16 @@ namespace StudioStudio_Server.Services
             Console.WriteLine($"Subscription Plan: {subscriptionPlan?.PlanName ?? "Free Plan"}, Max AI Requests/Day: {dailyLimit}");
 
             return (usedToday, dailyLimit);
+        }
+
+        public async Task<UserSubscriptionPlanResponse> GetUserSubscriptionPlan(Guid userId)
+        {
+            SubscriptionPlan? subscriptionPlan = await _userSubscriptionRepository.GetSubscriptionPlanByUserIdAsync(userId);
+            return new UserSubscriptionPlanResponse
+            {
+                PlanId = subscriptionPlan!.PlanId,
+                PlanName = subscriptionPlan!.PlanName
+            };
         }
     }
 }
