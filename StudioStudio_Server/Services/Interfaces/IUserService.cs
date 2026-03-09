@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.Data;
 using StudioStudio_Server.Models.DTOs.Request;
+using StudioStudio_Server.Models.DTOs.Response;
 using StudioStudio_Server.Models.Entities;
 
 namespace StudioStudio_Server.Services.Interfaces
@@ -14,5 +15,6 @@ namespace StudioStudio_Server.Services.Interfaces
         Task ChangePasswordAsync(Guid userId, ChangePasswordRequest request);
         Task UpdateProfileAsync(Guid userId, UpdateUserProfileRequest request);
         Task<(int usedToday, int dailyLimit)> GetAiRequestLimitInfoAsync(Guid userId);
+        Task<UserSubscriptionPlanResponse> GetUserSubscriptionPlan(Guid userId);
     }
 }

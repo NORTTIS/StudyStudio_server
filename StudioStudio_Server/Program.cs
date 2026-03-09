@@ -94,6 +94,8 @@ builder.Services.AddScoped<IReportService, ReportService>();
 builder.Services.AddScoped<ITaskService, TaskService>();
 builder.Services.AddScoped<IGroupTaskStatusService, GroupTaskStatusService>();
 builder.Services.AddScoped<IHomeService, HomeService>();
+builder.Services.AddScoped<ISubscriptionPlanService, SubscriptionPlanService>();
+builder.Services.AddScoped<ISubscriptionPlanRepository, SubscriptionPlanRepository>();
 
 // AI & Document Services
 builder.Services.AddScoped<IFileStorageService, BackblazeStorageService>();

@@ -4,5 +4,6 @@ namespace StudioStudio_Server.Repositories.Interfaces
 {
     public interface ISubscriptionPlanRepository
     {
+        Task<List<SubscriptionPlan>> GetAllAsync();
     }
 }
