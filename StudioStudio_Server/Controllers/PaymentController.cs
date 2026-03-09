@@ -77,7 +77,7 @@ namespace StudioStudio_Server.Controllers
         /// </summary>
         [HttpPost("webhook")]
         [AllowAnonymous]
-        public async Task<IActionResult> Webhook([FromBody] WebhookData webhookBody)
+        public async Task<IActionResult> Webhook([FromBody] Webhook webhookBody)
         {
             await _paymentService.HandleWebhookAsync(webhookBody);
             return Ok(new { success = true });
