@@ -105,7 +105,7 @@ namespace StudioStudio_Server.Services
 
         public async Task HandleWebhookAsync(Webhook webhook)
         {
-            WebhookData webhookData;
+            WebhookData webhookData = null;
 
             try
             {
