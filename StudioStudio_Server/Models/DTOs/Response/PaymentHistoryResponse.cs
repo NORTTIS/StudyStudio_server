@@ -1,4 +1,4 @@
-﻿namespace StudioStudio_Server.Models.DTOs.Response
+namespace StudioStudio_Server.Models.DTOs.Response
 {
     public class PaymentHistoryResponse
     {
@@ -9,7 +9,7 @@
     {
         public Guid PaymentId { get; set; }
         public Guid PlanId { get; set; }
-        public string Status { get; set; } = string.Empty;
+        public Enums.PaymentStatus Status { get; set; }
         public DateTime? PaidAt { get; set; }
     }
 }

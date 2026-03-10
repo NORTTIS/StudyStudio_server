@@ -10,6 +10,7 @@ using StudioStudio_Server.Models.DTOs.Response;
 using StudioStudio_Server.Models.Entities;
 using StudioStudio_Server.Repositories.Interfaces;
 using StudioStudio_Server.Services.Interfaces;
+using PaymentStatusEnum = StudioStudio_Server.Models.Enums.PaymentStatus;
 
 namespace StudioStudio_Server.Services
 {
@@ -69,7 +70,7 @@ namespace StudioStudio_Server.Services
                 PlanId = plan.PlanId,
                 OrderCode = orderCode,
                 Amount = plan.Price,
-                PaymentStatus = "PENDING",
+                PaymentStatus = PaymentStatusEnum.PENDING,
                 CreatedAt = DateTime.UtcNow
             };
 
@@ -134,7 +135,7 @@ namespace StudioStudio_Server.Services
                 return;
             }
 
-            if (payment.PaymentStatus != "PENDING")
+            if (payment.PaymentStatus != PaymentStatusEnum.PENDING)
                 return;
 
             var user = await _userRepository.GetByIdAsync(payment.UserId);
@@ -143,7 +144,7 @@ namespace StudioStudio_Server.Services
 
             if (webhookData.Code == "00")
             {
-                payment.PaymentStatus = "SUCCESS";
+                payment.PaymentStatus = PaymentStatusEnum.SUCCESS;
                 payment.TransactionId = webhookData.Reference;
                 payment.PaidAt = DateTime.UtcNow;
                 await _paymentRepository.UpdateAsync(payment);
@@ -177,7 +178,7 @@ namespace StudioStudio_Server.Services
             }
             else
             {
-                payment.PaymentStatus = "FAILED";
+                payment.PaymentStatus = PaymentStatusEnum.FAILED;
                 await _paymentRepository.UpdateAsync(payment);
 
                 // Send failed email
@@ -225,12 +226,12 @@ namespace StudioStudio_Server.Services
             if (payment == null || payment.UserId != userId)
                 throw new AppException(ErrorCodes.PaymentNotFound, StatusCodes.Status404NotFound);
 
-            if (payment.PaymentStatus != "PENDING")
+            if (payment.PaymentStatus != PaymentStatusEnum.PENDING)
                 throw new AppException(ErrorCodes.PaymentCannotCancel, StatusCodes.Status400BadRequest);
 
             await _payOSClient.PaymentRequests.CancelAsync(payment.OrderCode);
 
-            payment.PaymentStatus = "CANCELLED";
+            payment.PaymentStatus = PaymentStatusEnum.CANCELLED;
             await _paymentRepository.UpdateAsync(payment);
 
             return MapToStatusResponse(payment);
@@ -287,6 +288,41 @@ namespace StudioStudio_Server.Services
             return new PaymentHistoryResponse
             {
                 PaymentHistories = histories
+            };
+        }
+
+        public async Task<BillingHistoryResponse> GetBillingHistoryAsync(GetBillingHistoryRequest request)
+        {
+            var (items, totalCount) = await _paymentRepository.GetBillingHistoryAsync(
+                request.SearchTerm,
+                request.PaymentStatus,
+                request.PageNumber,
+                request.PageSize);
+
+            var billingItems = items.Select(p => new BillingHistoryItem
+            {
+                PaymentId = p.PaymentId,
+                OrderCode = p.OrderCode,
+                PaymentStatus = p.PaymentStatus,
+                Amount = p.Amount,
+                PaymentMethod = p.PaymentMethod,
+                CreatedAt = p.CreatedAt,
+                PaidAt = p.PaidAt,
+                UserId = p.UserId,
+                UserEmail = p.User?.Email ?? string.Empty,
+                UserName = !string.IsNullOrEmpty(p.User?.FirstName) || !string.IsNullOrEmpty(p.User?.LastName)
+                    ? $"{p.User.FirstName} {p.User.LastName}".Trim()
+                    : p.User?.Email ?? string.Empty,
+                PlanId = p.PlanId,
+                PlanName = p.Plan?.PlanName ?? string.Empty
+            }).ToList();
+
+            return new BillingHistoryResponse
+            {
+                Items = billingItems,
+                PageNumber = request.PageNumber,
+                PageSize = request.PageSize,
+                TotalCount = totalCount
             };
         }
     }

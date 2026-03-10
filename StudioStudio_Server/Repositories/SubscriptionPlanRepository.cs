@@ -8,7 +8,6 @@ namespace StudioStudio_Server.Repositories
     /// <summary>
     /// Repository handling operations with SubscriptionPlan entity
     /// Manages subscription tiers (Free, Premium)
-    /// Note: This repository is currently minimal as plan management is handled elsewhere
     /// </summary>
     public class SubscriptionPlanRepository : ISubscriptionPlanRepository
     {
@@ -25,6 +24,25 @@ namespace StudioStudio_Server.Repositories
                 .Where(s => s.IsActive)
                 .AsNoTracking()
                 .ToListAsync();
+        }
+
+        public async Task<List<SubscriptionPlan>> GetAllIncludingInactiveAsync()
+        {
+            return await _db.SubscriptionPlans
+                .AsNoTracking()
+                .ToListAsync();
+        }
+
+        public async Task<SubscriptionPlan?> GetByIdAsync(Guid planId)
+        {
+            return await _db.SubscriptionPlans
+                .FirstOrDefaultAsync(p => p.PlanId == planId);
+        }
+
+        public async Task UpdateAsync(SubscriptionPlan plan)
+        {
+            _db.SubscriptionPlans.Update(plan);
+            await _db.SaveChangesAsync();
         }
     }
 }

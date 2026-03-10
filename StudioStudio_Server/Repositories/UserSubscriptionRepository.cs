@@ -80,5 +80,37 @@ namespace StudioStudio_Server.Repositories
             await _db.UserSubscriptions.AddAsync(subscription);
             await _db.SaveChangesAsync();
         }
+
+        /// <summary>
+        /// Get subscriber count for each plan
+        /// Returns dictionary of PlanId -> SubscriberCount
+        /// Only counts active subscriptions (IsActive = true AND EndDate > Now)
+        /// </summary>
+        public async Task<Dictionary<Guid, int>> GetSubscriberCountsByPlanAsync()
+        {
+            DateTime now = DateTime.UtcNow;
+
+            return await _db.UserSubscriptions
+                .Where(us => us.IsActive && us.EndDate > now)
+                .GroupBy(us => us.PlanId)
+                .Select(g => new { PlanId = g.Key, Count = g.Count() })
+                .ToDictionaryAsync(x => x.PlanId, x => x.Count);
+        }
+
+        /// <summary>
+        /// Count total premium users (users who have ever subscribed to a paid plan)
+        /// Includes: Current premium users + Expired premium users
+        /// Excludes: Free Plan users (BillingCycle = Free)
+        /// Each user is counted only once (Distinct by UserId)
+        /// </summary>
+        public async Task<int> CountPremiumUsersAsync()
+        {
+            return await _db.UserSubscriptions
+                .Include(us => us.Plan)
+                .Where(us => us.Plan.BillingCycle != BillingCycle.Free)
+                .Select(us => us.UserId)
+                .Distinct()
+                .CountAsync();
+        }
     }
 }

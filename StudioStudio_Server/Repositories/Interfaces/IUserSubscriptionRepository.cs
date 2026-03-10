@@ -8,5 +8,7 @@ namespace StudioStudio_Server.Repositories.Interfaces
         Task<UserSubscription?> GetActiveSubscriptionAsync(Guid userId);
         Task DeactivateActiveSubscriptionsAsync(Guid userId);
         Task AddAsync(UserSubscription subscription);
+        Task<Dictionary<Guid, int>> GetSubscriberCountsByPlanAsync();
+        Task<int> CountPremiumUsersAsync();
     }
 }

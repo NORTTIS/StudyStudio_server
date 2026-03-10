@@ -11,5 +11,12 @@ namespace StudioStudio_Server.Services.Interfaces
         Task<PaymentStatusResponse> GetPaymentStatusAsync(Guid userId, Guid paymentId);
         Task<PaymentStatusResponse> CancelPaymentAsync(Guid userId, Guid paymentId);
         Task<PaymentHistoryResponse> GetPaymentHistoryAsync(Guid userId);
+
+        /// <summary>
+        /// [ADMIN] Get paginated billing history with filters
+        /// Search by: userName, userEmail, invoiceId (orderCode)
+        /// Filter by: paymentStatus
+        /// </summary>
+        Task<BillingHistoryResponse> GetBillingHistoryAsync(GetBillingHistoryRequest request);
     }
 }

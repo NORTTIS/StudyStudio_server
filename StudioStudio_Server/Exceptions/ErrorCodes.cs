@@ -164,6 +164,7 @@
         public const string SuccessPaymentCreated = "SUCCESS041";
         public const string SuccessPaymentCancelled = "SUCCESS042";
         public const string SuccessUpdateReport = "SUCCESS043";
+        public const string SuccessUpdateSubscriptionPlan = "SUCCESS044";
 
         // ANNOUNCEMENT
         public const string AnnouncementTagTitle = "ANNOUNCEMENTTAGTITLE";
@@ -177,6 +178,9 @@
         public const string PaymentCannotCancel = "PAYMENT004";
         public const string PaymentWebhookInvalid = "PAYMENT005";
         public const string PaymentPriceInvalid = "PAYMENT006";
+
+        // SUBSCRIPTION PLAN
+        public const string SubscriptionPlanNotFound = "SUBSCRIPTION001";
 
         // COMMON
         public const string UnexpectedError = "SYS001";

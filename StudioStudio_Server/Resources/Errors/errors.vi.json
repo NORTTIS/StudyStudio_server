@@ -141,6 +141,7 @@
   "SUCCESS041": "Tạo liên kết thanh toán thành công",
   "SUCCESS042": "Hủy thanh toán thành công",
   "SUCCESS043": "Cập nhật báo cáo thành công",
+  "SUCCESS044": "Cập nhật gói đăng ký thành công",
 
   "PAYMENT001": "Không tìm thấy gói đăng ký",
   "PAYMENT002": "Không thể thanh toán cho gói miễn phí",
@@ -148,6 +149,8 @@
   "PAYMENT004": "Chỉ có thể hủy giao dịch đang chờ xử lý",
   "PAYMENT005": "Dữ liệu webhook không hợp lệ hoặc không thể xác minh",
   "PAYMENT006": "Giá tiền không hợp lệ",
+
+  "SUBSCRIPTION001": "Không tìm thấy gói đăng ký",
 
   "SYS001": "Lỗi hệ thống không xác định"
 }
