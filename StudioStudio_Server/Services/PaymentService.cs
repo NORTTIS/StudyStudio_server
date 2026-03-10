@@ -16,7 +16,7 @@ namespace StudioStudio_Server.Services
 {
     public class PaymentService : IPaymentService
     {
-        private const int PAYOS_CANCEL_TIME = 1;
+        private const int PAYOS_CANCEL_TIME = 15;
 
         private readonly PayOSClient _payOSClient;
         private readonly IPaymentRepository _paymentRepository;
@@ -119,7 +119,10 @@ namespace StudioStudio_Server.Services
                 OrderCode = orderCode,
                 PaymentUrl = paymentLink.CheckoutUrl,
                 Amount = plan.Price,
-                PlanName = plan.PlanName
+                PlanName = plan.PlanName,
+                ExpiredAt = paymentLink.ExpiredAt.HasValue
+                    ? DateTimeOffset.FromUnixTimeSeconds(paymentLink.ExpiredAt.Value)
+                    : DateTimeOffset.MinValue
             };
         }
 
@@ -231,9 +234,9 @@ namespace StudioStudio_Server.Services
             return MapToStatusResponse(payment);
         }
 
-        public async Task<PaymentStatusResponse> CancelPaymentAsync(Guid userId, Guid paymentId)
+        public async Task<PaymentStatusResponse> CancelPaymentAsync(Guid userId, long orderCode)
         {
-            var payment = await _paymentRepository.GetByPaymentIdAsync(paymentId);
+            var payment = await _paymentRepository.GetByOrderCodeAsync(orderCode);
 
             if (payment == null || payment.UserId != userId)
                 throw new AppException(ErrorCodes.PaymentNotFound, StatusCodes.Status404NotFound);
@@ -241,7 +244,7 @@ namespace StudioStudio_Server.Services
             if (payment.PaymentStatus != PaymentStatusEnum.PENDING)
                 throw new AppException(ErrorCodes.PaymentCannotCancel, StatusCodes.Status400BadRequest);
 
-            await _payOSClient.PaymentRequests.CancelAsync(payment.OrderCode);
+            await _payOSClient.PaymentRequests.CancelAsync(orderCode);
 
             payment.PaymentStatus = PaymentStatusEnum.CANCELLED;
             await _paymentRepository.UpdateAsync(payment);
@@ -324,7 +327,7 @@ namespace StudioStudio_Server.Services
                         "Could not cancel PayOS payment link for order {OrderCode}",
                         payment.OrderCode);
                 }
-                payment.PaymentStatus = "CANCELLED";
+                payment.PaymentStatus = PaymentStatusEnum.CANCELLED;
                 await _paymentRepository.UpdateAsync(payment);
             }
         }

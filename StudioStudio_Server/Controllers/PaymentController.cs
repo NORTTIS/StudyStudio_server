@@ -117,15 +117,15 @@ namespace StudioStudio_Server.Controllers
         }
 
         /// <summary>
-        /// [AUTHORIZED] POST /api/payment/{paymentId}/cancel
+        /// [AUTHORIZED] POST /api/payment/{orderCode}/cancel
         /// Cancel a pending payment
         /// </summary>
-        [HttpPost("{paymentId:guid}/cancel")]
+        [HttpPost("{orderCode:long}/cancel")]
         [Authorize]
-        public async Task<ActionResult<ApiResponse<PaymentStatusResponse>>> CancelPayment([FromRoute] Guid paymentId)
+        public async Task<ActionResult<ApiResponse<PaymentStatusResponse>>> CancelPayment([FromRoute] long orderCode)
         {
             var userId = ValidateAndGetUserId();
-            var result = await _paymentService.CancelPaymentAsync(userId, paymentId);
+            var result = await _paymentService.CancelPaymentAsync(userId, orderCode);
             var message = _messageService.GetMessage(ErrorCodes.SuccessPaymentCancelled);
 
             return Ok(ApiResponse<PaymentStatusResponse>.Success(

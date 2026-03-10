@@ -9,7 +9,7 @@ namespace StudioStudio_Server.Services.Interfaces
         Task<CreatePaymentResponse> CreatePaymentLinkAsync(Guid userId, CreatePaymentRequest request);
         Task HandleWebhookAsync(Webhook webhook);
         Task<PaymentStatusResponse> GetPaymentStatusAsync(Guid userId, Guid paymentId);
-        Task<PaymentStatusResponse> CancelPaymentAsync(Guid userId, Guid paymentId);
+        Task<PaymentStatusResponse> CancelPaymentAsync(Guid userId, long orderCode);
         Task<PaymentHistoryResponse> GetPaymentHistoryAsync(Guid userId);
 
         /// <summary>
