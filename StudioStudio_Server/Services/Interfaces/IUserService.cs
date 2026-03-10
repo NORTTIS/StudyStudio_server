@@ -15,6 +15,6 @@ namespace StudioStudio_Server.Services.Interfaces
         Task ChangePasswordAsync(Guid userId, ChangePasswordRequest request);
         Task UpdateProfileAsync(Guid userId, UpdateUserProfileRequest request);
         Task<(int usedToday, int dailyLimit)> GetAiRequestLimitInfoAsync(Guid userId);
-        Task<UserSubscriptionPlanResponse> GetUserSubscriptionPlan(Guid userId);
+        Task<SubscriptionPlanItem> GetUserSubscriptionPlan(Guid userId);
     }
 }
