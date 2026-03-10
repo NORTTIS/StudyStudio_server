@@ -178,6 +178,7 @@
         public const string PaymentCannotCancel = "PAYMENT004";
         public const string PaymentWebhookInvalid = "PAYMENT005";
         public const string PaymentPriceInvalid = "PAYMENT006";
+        public const string PaymentCantProceed = "PAYMENT007";
 
         // SUBSCRIPTION PLAN
         public const string SubscriptionPlanNotFound = "SUBSCRIPTION001";

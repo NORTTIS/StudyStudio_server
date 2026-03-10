@@ -150,6 +150,7 @@
   "PAYMENT004": "Only pending payments can be cancelled",
   "PAYMENT005": "Invalid or unverifiable webhook payload",
   "PAYMENT006": "Invalid price",
+  "PAYMENT007": "You already at premium plan",
 
   "SUBSCRIPTION001": "Subscription plan not found",
 

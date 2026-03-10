@@ -88,5 +88,12 @@ namespace StudioStudio_Server.Repositories
 
             return (items, totalCount);
         }
+
+        public async Task<List<Payment>> GetAllPendingByUserIdAsync(Guid userId)
+        {
+            return await _db.Payments
+                .Where(p => p.UserId == userId && p.PaymentStatus == "PENDING")
+                .ToListAsync();
+        }
     }
 }
