@@ -17,9 +17,9 @@
         public string PaymentMethod { get; set; } = "payos";
 
         /// <summary>
-        /// PENDING | SUCCESS | CANCELLED | FAILED
+        /// Payment status: PENDING | SUCCESS | CANCELLED | FAILED
         /// </summary>
-        public string PaymentStatus { get; set; } = "PENDING";
+        public Enums.PaymentStatus PaymentStatus { get; set; } = Enums.PaymentStatus.PENDING;
 
         /// <summary>
         /// PayOS transaction reference

@@ -142,6 +142,7 @@
   "SUCCESS041": "Payment link created successfully",
   "SUCCESS042": "Payment cancelled successfully",
   "SUCCESS043": "Report updated successfully",
+  "SUCCESS044": "Subscription plan updated successfully",
 
   "PAYMENT001": "Subscription plan not found",
   "PAYMENT002": "Cannot create payment for a free plan",
@@ -149,6 +150,8 @@
   "PAYMENT004": "Only pending payments can be cancelled",
   "PAYMENT005": "Invalid or unverifiable webhook payload",
   "PAYMENT006": "Invalid price",
+
+  "SUBSCRIPTION001": "Subscription plan not found",
 
   "SYS001": "Unexpected system error"
 }

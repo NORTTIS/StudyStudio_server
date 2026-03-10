@@ -73,5 +73,17 @@ namespace StudioStudio_Server.Repositories
                 .AsNoTracking()
                 .ToListAsync();
         }
+
+        /// <summary>
+        /// Count total active users
+        /// Condition: DeletedFlag = false AND Status = Active
+        /// Use case: Admin statistics
+        /// </summary>
+        public async Task<int> CountActiveUsersAsync()
+        {
+            return await _context.Users
+                .Where(u => !u.DeletedFlag && u.Status == UserStatus.Active)
+                .CountAsync();
+        }
     }
 }
