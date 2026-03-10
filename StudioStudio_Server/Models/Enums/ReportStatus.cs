@@ -1,5 +1,10 @@
-﻿public enum ReportStatus
+﻿namespace StudioStudio_Server.Models.Enums
 {
-    Pending,
-    Resolved
+    public enum ReportStatus
+    {
+        Open = 0,
+        InProgress = 1,
+        Resolved = 2,
+        Closed = 3
+    }
 }

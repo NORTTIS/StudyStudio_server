@@ -12,6 +12,7 @@
 
   "REPORT001": "Dữ liệu báo cáo không hợp lệ",
   "REPORT002": "Chưa cấu hình email nhận báo cáo",
+  "REPORT003": "Không tìm thấy báo cáo",
 
   "TASK001": "Không tìm thấy công việc",
   "TASK002": "Bạn không có quyền truy cập công việc này",
@@ -139,6 +140,7 @@
   "SUCCESS040": "Cập nhật công việc thành công",
   "SUCCESS041": "Tạo liên kết thanh toán thành công",
   "SUCCESS042": "Hủy thanh toán thành công",
+  "SUCCESS043": "Cập nhật báo cáo thành công",
 
   "PAYMENT001": "Không tìm thấy gói đăng ký",
   "PAYMENT002": "Không thể thanh toán cho gói miễn phí",

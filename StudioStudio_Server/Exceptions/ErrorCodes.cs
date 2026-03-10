@@ -18,6 +18,7 @@
         // REPORT
         public const string ReportInvalidRequest = "REPORT001";
         public const string ReportEmailNotConfigured = "REPORT002";
+        public const string ReportNotFound = "REPORT003";
 
         // TASK
         public const string TaskNotFound = "TASK001";
@@ -162,6 +163,7 @@
         public const string SuccessUpdateTask = "SUCCESS040";
         public const string SuccessPaymentCreated = "SUCCESS041";
         public const string SuccessPaymentCancelled = "SUCCESS042";
+        public const string SuccessUpdateReport = "SUCCESS043";
 
         // ANNOUNCEMENT
         public const string AnnouncementTagTitle = "ANNOUNCEMENTTAGTITLE";
