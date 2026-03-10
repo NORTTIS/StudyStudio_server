@@ -1031,5 +1031,459 @@
         }
 
         #endregion
+
+        #region Payment Success
+
+        public static string PaymentSuccessEmail(
+            string userName,
+            string planName,
+            decimal amount,
+            DateTime paidAt,
+            Language language = Language.English)
+        {
+            return language == Language.Vietnamese
+                ? PaymentSuccessEmailVietnamese(userName, planName, amount, paidAt)
+                : PaymentSuccessEmailEnglish(userName, planName, amount, paidAt);
+        }
+
+        private static string PaymentSuccessEmailEnglish(
+            string userName,
+            string planName,
+            decimal amount,
+            DateTime paidAt)
+        {
+            return $@"
+<!DOCTYPE html>
+<html lang=""en"">
+<head>
+    <meta charset=""UTF-8"" />
+    <meta name=""viewport"" content=""width=device-width, initial-scale=1.0"" />
+    <title>Payment Successful</title>
+</head>
+
+<body style=""margin:0;padding:0;background:#f5f7fa;font-family:Arial,Helvetica,sans-serif;"">
+
+<table align=""center"" width=""100%"" cellpadding=""0"" cellspacing=""0""
+style=""max-width:620px;margin:40px auto;background:#ffffff;border-radius:20px;overflow:hidden;box-shadow:0 10px 30px rgba(0,0,0,0.08);"">
+
+  <!-- HEADER -->
+  <tr>
+    <td style=""background:linear-gradient(135deg,#4CAF50,#2E7D32);padding:45px 30px;text-align:center;color:white;"">
+      <h1 style=""margin:0;font-size:24px;font-weight:700;"">
+        Payment Successful
+      </h1>
+      <p style=""margin-top:10px;font-size:14px;opacity:0.95;"">
+        Thank you for your subscription
+      </p>
+    </td>
+  </tr>
+
+  <!-- BODY -->
+  <tr>
+    <td style=""padding:40px 35px;color:#333;font-size:15px;line-height:1.7;"">
+
+      <p>Hello <strong>{userName}</strong>,</p>
+
+      <p>
+        Thank you for your payment! Your subscription has been successfully activated.
+      </p>
+
+      <!-- PAYMENT DETAILS -->
+      <div style=""margin-top:25px;
+                  padding:20px;
+                  background:#f8fdf4;
+                  border:1px solid #c8e6c9;
+                  border-radius:12px;"">
+
+        <div style=""margin-bottom:12px;"">
+          <div style=""font-size:12px;font-weight:700;color:#2E7D32;text-transform:uppercase;"">
+            Plan
+          </div>
+          <div style=""margin-top:4px;font-size:16px;font-weight:600;"">
+            {planName}
+          </div>
+        </div>
+
+        <div style=""margin-bottom:12px;"">
+          <div style=""font-size:12px;font-weight:700;color:#2E7D32;text-transform:uppercase;"">
+            Amount Paid
+          </div>
+          <div style=""margin-top:4px;font-size:16px;font-weight:600;"">
+            {amount:N0} VND
+          </div>
+        </div>
+
+        <div>
+          <div style=""font-size:12px;font-weight:700;color:#2E7D32;text-transform:uppercase;"">
+            Payment Date
+          </div>
+          <div style=""margin-top:4px;font-size:14px;color:#555;"">
+            {paidAt:MMMM dd, yyyy HH:mm} (UTC)
+          </div>
+        </div>
+
+      </div>
+
+      <p style=""margin-top:25px;"">
+        You can now enjoy all the premium features of Study Studio.
+        If you have any questions, please don't hesitate to contact our support team.
+      </p>
+
+      <hr style=""margin:35px 0;border:none;border-top:1px solid #eee;"">
+
+      <p style=""font-size:12px;color:#999;"">
+        This is an automated message. Please do not reply to this email.
+      </p>
+
+    </td>
+  </tr>
+
+  <!-- FOOTER -->
+  <tr>
+    <td style=""background:#fafafa;padding:25px;text-align:center;font-size:12px;color:#999;"">
+      © 2026 Study Studio <br/>
+      Made with care for Students
+    </td>
+  </tr>
+
+</table>
+
+</body>
+</html>";
+        }
+
+        private static string PaymentSuccessEmailVietnamese(
+            string userName,
+            string planName,
+            decimal amount,
+            DateTime paidAt)
+        {
+            return $@"
+<!DOCTYPE html>
+<html lang=""vi"">
+<head>
+    <meta charset=""UTF-8"" />
+    <meta name=""viewport"" content=""width=device-width, initial-scale=1.0"" />
+    <title>Thanh toán thành công</title>
+</head>
+
+<body style=""margin:0;padding:0;background:#f5f7fa;font-family:Arial,Helvetica,sans-serif;"">
+
+<table align=""center"" width=""100%"" cellpadding=""0"" cellspacing=""0""
+style=""max-width:620px;margin:40px auto;background:#ffffff;border-radius:20px;overflow:hidden;box-shadow:0 10px 30px rgba(0,0,0,0.08);"">
+
+  <!-- HEADER -->
+  <tr>
+    <td style=""background:linear-gradient(135deg,#4CAF50,#2E7D32);padding:45px 30px;text-align:center;color:white;"">
+      <h1 style=""margin:0;font-size:24px;font-weight:700;"">
+        Thanh toán thành công
+      </h1>
+      <p style=""margin-top:10px;font-size:14px;opacity:0.95;"">
+        Cảm ơn bạn đã đăng ký dịch vụ
+      </p>
+    </td>
+  </tr>
+
+  <!-- BODY -->
+  <tr>
+    <td style=""padding:40px 35px;color:#333;font-size:15px;line-height:1.7;"">
+
+      <p>Xin chào <strong>{userName}</strong>,</p>
+
+      <p>
+        Cảm ơn bạn đã thanh toán! Gói dịch vụ của bạn đã được kích hoạt thành công.
+      </p>
+
+      <!-- PAYMENT DETAILS -->
+      <div style=""margin-top:25px;
+                  padding:20px;
+                  background:#f8fdf4;
+                  border:1px solid #c8e6c9;
+                  border-radius:12px;"">
+
+        <div style=""margin-bottom:12px;"">
+          <div style=""font-size:12px;font-weight:700;color:#2E7D32;text-transform:uppercase;"">
+            Gói dịch vụ
+          </div>
+          <div style=""margin-top:4px;font-size:16px;font-weight:600;"">
+            {planName}
+          </div>
+        </div>
+
+        <div style=""margin-bottom:12px;"">
+          <div style=""font-size:12px;font-weight:700;color:#2E7D32;text-transform:uppercase;"">
+            Số tiền đã thanh toán
+          </div>
+          <div style=""margin-top:4px;font-size:16px;font-weight:600;"">
+            {amount:N0} VND
+          </div>
+        </div>
+
+        <div>
+          <div style=""font-size:12px;font-weight:700;color:#2E7D32;text-transform:uppercase;"">
+            Ngày thanh toán
+          </div>
+          <div style=""margin-top:4px;font-size:14px;color:#555;"">
+            {paidAt:dd MMMM yyyy, HH:mm} (UTC)
+          </div>
+        </div>
+
+      </div>
+
+      <p style=""margin-top:25px;"">
+        Bây giờ bạn có thể tận hưởng tất cả các tính năng cao cấp của Study Studio.
+        Nếu có bất kỳ câu hỏi nào, vui lòng liên hệ với đội ngũ hỗ trợ của chúng tôi.
+      </p>
+
+      <hr style=""margin:35px 0;border:none;border-top:1px solid #eee;"">
+
+      <p style=""font-size:12px;color:#999;"">
+        Đây là email tự động. Vui lòng không trả lời email này.
+      </p>
+
+    </td>
+  </tr>
+
+  <!-- FOOTER -->
+  <tr>
+    <td style=""background:#fafafa;padding:25px;text-align:center;font-size:12px;color:#999;"">
+      © 2026 Study Studio <br/>
+      Made with care for Students
+    </td>
+  </tr>
+
+</table>
+
+</body>
+</html>";
+        }
+
+        #endregion
+
+        #region Payment Failed
+
+        public static string PaymentFailedEmail(
+            string userName,
+            string planName,
+            decimal amount,
+            string reason,
+            Language language = Language.English)
+        {
+            return language == Language.Vietnamese
+                ? PaymentFailedEmailVietnamese(userName, planName, amount, reason)
+                : PaymentFailedEmailEnglish(userName, planName, amount, reason);
+        }
+
+        private static string PaymentFailedEmailEnglish(
+            string userName,
+            string planName,
+            decimal amount,
+            string reason)
+        {
+            return $@"
+<!DOCTYPE html>
+<html lang=""en"">
+<head>
+    <meta charset=""UTF-8"" />
+    <meta name=""viewport"" content=""width=device-width, initial-scale=1.0"" />
+    <title>Payment Failed</title>
+</head>
+
+<body style=""margin:0;padding:0;background:#f5f7fa;font-family:Arial,Helvetica,sans-serif;"">
+
+<table align=""center"" width=""100%"" cellpadding=""0"" cellspacing=""0""
+style=""max-width:620px;margin:40px auto;background:#ffffff;border-radius:20px;overflow:hidden;box-shadow:0 10px 30px rgba(0,0,0,0.08);"">
+
+  <!-- HEADER -->
+  <tr>
+    <td style=""background:linear-gradient(135deg,#f44336,#c62828);padding:45px 30px;text-align:center;color:white;"">
+      <h1 style=""margin:0;font-size:24px;font-weight:700;"">
+        Payment Failed
+      </h1>
+      <p style=""margin-top:10px;font-size:14px;opacity:0.95;"">
+        Something went wrong with your payment
+      </p>
+    </td>
+  </tr>
+
+  <!-- BODY -->
+  <tr>
+    <td style=""padding:40px 35px;color:#333;font-size:15px;line-height:1.7;"">
+
+      <p>Hello <strong>{userName}</strong>,</p>
+
+      <p>
+        We're sorry, but your payment could not be completed. Please try again or use a different payment method.
+      </p>
+
+      <!-- PAYMENT DETAILS -->
+      <div style=""margin-top:25px;
+                  padding:20px;
+                  background:#fff5f5;
+                  border:1px solid #ffcdd2;
+                  border-radius:12px;"">
+
+        <div style=""margin-bottom:12px;"">
+          <div style=""font-size:12px;font-weight:700;color:#c62828;text-transform:uppercase;"">
+            Plan
+          </div>
+          <div style=""margin-top:4px;font-size:16px;font-weight:600;"">
+            {planName}
+          </div>
+        </div>
+
+        <div style=""margin-bottom:12px;"">
+          <div style=""font-size:12px;font-weight:700;color:#c62828;text-transform:uppercase;"">
+            Amount
+          </div>
+          <div style=""margin-top:4px;font-size:16px;font-weight:600;"">
+            {amount:N0} VND
+          </div>
+        </div>
+
+        <div>
+          <div style=""font-size:12px;font-weight:700;color:#c62828;text-transform:uppercase;"">
+            Reason
+          </div>
+          <div style=""margin-top:4px;font-size:14px;color:#555;"">
+            {reason}
+          </div>
+        </div>
+
+      </div>
+
+      <p style=""margin-top:25px;"">
+        Please try again or contact our support team if you need assistance.
+      </p>
+
+      <hr style=""margin:35px 0;border:none;border-top:1px solid #eee;"">
+
+      <p style=""font-size:12px;color:#999;"">
+        This is an automated message. Please do not reply to this email.
+      </p>
+
+    </td>
+  </tr>
+
+  <!-- FOOTER -->
+  <tr>
+    <td style=""background:#fafafa;padding:25px;text-align:center;font-size:12px;color:#999;"">
+      © 2026 Study Studio <br/>
+      Made with care for Students
+    </td>
+  </tr>
+
+</table>
+
+</body>
+</html>";
+        }
+
+        private static string PaymentFailedEmailVietnamese(
+            string userName,
+            string planName,
+            decimal amount,
+            string reason)
+        {
+            return $@"
+<!DOCTYPE html>
+<html lang=""vi"">
+<head>
+    <meta charset=""UTF-8"" />
+    <meta name=""viewport"" content=""width=device-width, initial-scale=1.0"" />
+    <title>Thanh toán thất bại</title>
+</head>
+
+<body style=""margin:0;padding:0;background:#f5f7fa;font-family:Arial,Helvetica,sans-serif;"">
+
+<table align=""center"" width=""100%"" cellpadding=""0"" cellspacing=""0""
+style=""max-width:620px;margin:40px auto;background:#ffffff;border-radius:20px;overflow:hidden;box-shadow:0 10px 30px rgba(0,0,0,0.08);"">
+
+  <!-- HEADER -->
+  <tr>
+    <td style=""background:linear-gradient(135deg,#f44336,#c62828);padding:45px 30px;text-align:center;color:white;"">
+      <h1 style=""margin:0;font-size:24px;font-weight:700;"">
+        Thanh toán thất bại
+      </h1>
+      <p style=""margin-top:10px;font-size:14px;opacity:0.95;"">
+        Đã xảy ra lỗi với thanh toán của bạn
+      </p>
+    </td>
+  </tr>
+
+  <!-- BODY -->
+  <tr>
+    <td style=""padding:40px 35px;color:#333;font-size:15px;line-height:1.7;"">
+
+      <p>Xin chào <strong>{userName}</strong>,</p>
+
+      <p>
+        Rất tiếc, thanh toán của bạn không thể hoàn tất. Vui lòng thử lại hoặc sử dụng phương thức thanh toán khác.
+      </p>
+
+      <!-- PAYMENT DETAILS -->
+      <div style=""margin-top:25px;
+                  padding:20px;
+                  background:#fff5f5;
+                  border:1px solid #ffcdd2;
+                  border-radius:12px;"">
+
+        <div style=""margin-bottom:12px;"">
+          <div style=""font-size:12px;font-weight:700;color:#c62828;text-transform:uppercase;"">
+            Gói dịch vụ
+          </div>
+          <div style=""margin-top:4px;font-size:16px;font-weight:600;"">
+            {planName}
+          </div>
+        </div>
+
+        <div style=""margin-bottom:12px;"">
+          <div style=""font-size:12px;font-weight:700;color:#c62828;text-transform:uppercase;"">
+            Số tiền
+          </div>
+          <div style=""margin-top:4px;font-size:16px;font-weight:600;"">
+            {amount:N0} VND
+          </div>
+        </div>
+
+        <div>
+          <div style=""font-size:12px;font-weight:700;color:#c62828;text-transform:uppercase;"">
+            Lý do
+          </div>
+          <div style=""margin-top:4px;font-size:14px;color:#555;"">
+            {reason}
+          </div>
+        </div>
+
+      </div>
+
+      <p style=""margin-top:25px;"">
+        Vui lòng thử lại hoặc liên hệ đội ngũ hỗ trợ nếu bạn cần giúp đỡ.
+      </p>
+
+      <hr style=""margin:35px 0;border:none;border-top:1px solid #eee;"">
+
+      <p style=""font-size:12px;color:#999;"">
+        Đây là email tự động. Vui lòng không trả lời email này.
+      </p>
+
+    </td>
+  </tr>
+
+  <!-- FOOTER -->
+  <tr>
+    <td style=""background:#fafafa;padding:25px;text-align:center;font-size:12px;color:#999;"">
+      © 2026 Study Studio <br/>
+      Made with care for Students
+    </td>
+  </tr>
+
+</table>
+
+</body>
+</html>";
+        }
+
+        #endregion
     }
 }
