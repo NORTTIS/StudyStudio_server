@@ -7,5 +7,6 @@ namespace StudioStudio_Server.Models.DTOs.Response
         public string PaymentUrl { get; set; } = null!;
         public decimal Amount { get; set; }
         public string PlanName { get; set; } = null!;
+        public DateTimeOffset ExpiredAt { get; set; }
     }
 }

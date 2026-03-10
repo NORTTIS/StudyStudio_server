@@ -149,6 +149,7 @@
   "PAYMENT004": "Chỉ có thể hủy giao dịch đang chờ xử lý",
   "PAYMENT005": "Dữ liệu webhook không hợp lệ hoặc không thể xác minh",
   "PAYMENT006": "Giá tiền không hợp lệ",
+  "PAYMENT007": "Bạn đã đăng ký gói nâng cấp",
 
   "SUBSCRIPTION001": "Không tìm thấy gói đăng ký",
 

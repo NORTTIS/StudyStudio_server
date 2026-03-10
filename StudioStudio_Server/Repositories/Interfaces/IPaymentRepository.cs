@@ -10,6 +10,7 @@ namespace StudioStudio_Server.Repositories.Interfaces
         Task AddAsync(Payment payment);
         Task UpdateAsync(Payment payment);
         Task<List<Payment>> GetByUserIdAsync(Guid userId);
+        Task<List<Payment>> GetAllPendingByUserIdAsync(Guid userId);
 
         /// <summary>
         /// Get paginated billing history with filters (admin)

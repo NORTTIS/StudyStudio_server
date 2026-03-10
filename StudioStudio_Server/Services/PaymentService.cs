@@ -1,4 +1,4 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using PayOS;
 using PayOS.Models.V2.PaymentRequests;
 using PayOS.Models.Webhooks;
@@ -16,6 +16,8 @@ namespace StudioStudio_Server.Services
 {
     public class PaymentService : IPaymentService
     {
+        private const int PAYOS_CANCEL_TIME = 15;
+
         private readonly PayOSClient _payOSClient;
         private readonly IPaymentRepository _paymentRepository;
         private readonly IUserSubscriptionRepository _subscriptionRepository;
@@ -60,6 +62,15 @@ namespace StudioStudio_Server.Services
             {
                 throw new AppException(ErrorCodes.PaymentPriceInvalid, StatusCodes.Status400BadRequest);
             }
+
+            var currentPlan = await _subscriptionRepository.GetSubscriptionPlanByUserIdAsync(userId);
+            if (currentPlan != null && currentPlan.BillingCycle == BillingCycle.Monthly)
+            {
+                throw new AppException(ErrorCodes.PaymentCantProceed, StatusCodes.Status400BadRequest);
+            }
+
+            await CancelAllPendingPaymentAsync(userId);
+
             // Generate unique order code using timestamp (max 9999999999999)
             long orderCode = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() % 9999999999999;
 
@@ -85,6 +96,7 @@ namespace StudioStudio_Server.Services
                 Description = $"Premium - {plan.PlanName}",
                 ReturnUrl = returnUrl,
                 CancelUrl = cancelUrl,
+                ExpiredAt = (int)DateTimeOffset.UtcNow.AddMinutes(PAYOS_CANCEL_TIME).ToUnixTimeSeconds(),
                 Items =
                 [
                     new PaymentLinkItem
@@ -107,7 +119,10 @@ namespace StudioStudio_Server.Services
                 OrderCode = orderCode,
                 PaymentUrl = paymentLink.CheckoutUrl,
                 Amount = plan.Price,
-                PlanName = plan.PlanName
+                PlanName = plan.PlanName,
+                ExpiredAt = paymentLink.ExpiredAt.HasValue
+                    ? DateTimeOffset.FromUnixTimeSeconds(paymentLink.ExpiredAt.Value)
+                    : DateTimeOffset.MinValue
             };
         }
 
@@ -219,9 +234,9 @@ namespace StudioStudio_Server.Services
             return MapToStatusResponse(payment);
         }
 
-        public async Task<PaymentStatusResponse> CancelPaymentAsync(Guid userId, Guid paymentId)
+        public async Task<PaymentStatusResponse> CancelPaymentAsync(Guid userId, long orderCode)
         {
-            var payment = await _paymentRepository.GetByPaymentIdAsync(paymentId);
+            var payment = await _paymentRepository.GetByOrderCodeAsync(orderCode);
 
             if (payment == null || payment.UserId != userId)
                 throw new AppException(ErrorCodes.PaymentNotFound, StatusCodes.Status404NotFound);
@@ -229,7 +244,7 @@ namespace StudioStudio_Server.Services
             if (payment.PaymentStatus != PaymentStatusEnum.PENDING)
                 throw new AppException(ErrorCodes.PaymentCannotCancel, StatusCodes.Status400BadRequest);
 
-            await _payOSClient.PaymentRequests.CancelAsync(payment.OrderCode);
+            await _payOSClient.PaymentRequests.CancelAsync(orderCode);
 
             payment.PaymentStatus = PaymentStatusEnum.CANCELLED;
             await _paymentRepository.UpdateAsync(payment);
@@ -289,6 +304,32 @@ namespace StudioStudio_Server.Services
             {
                 PaymentHistories = histories
             };
+        }
+
+        private async Task CancelAllPendingPaymentAsync(Guid userId)
+        {
+            var pendingPayments = await _paymentRepository.GetAllPendingByUserIdAsync(userId);
+
+            if (!pendingPayments.Any()) return;
+
+            foreach (var payment in pendingPayments)
+            {
+                try
+                {
+                    await _payOSClient.PaymentRequests.CancelAsync(
+                        payment.OrderCode,
+                        "Người dùng tạo đơn thanh toán mới"
+                    );
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex,
+                        "Could not cancel PayOS payment link for order {OrderCode}",
+                        payment.OrderCode);
+                }
+                payment.PaymentStatus = PaymentStatusEnum.CANCELLED;
+                await _paymentRepository.UpdateAsync(payment);
+            }
         }
 
         public async Task<BillingHistoryResponse> GetBillingHistoryAsync(GetBillingHistoryRequest request)
