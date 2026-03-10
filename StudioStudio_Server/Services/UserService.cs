@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Identity;
 using StudioStudio_Server.Exceptions;
 using System.Text.RegularExpressions;
 using StudioStudio_Server.Models.DTOs.Response;
+using EnumsNET;
 
 namespace StudioStudio_Server.Services
 {
@@ -286,13 +287,21 @@ namespace StudioStudio_Server.Services
             return (usedToday, dailyLimit);
         }
 
-        public async Task<UserSubscriptionPlanResponse> GetUserSubscriptionPlan(Guid userId)
+        public async Task<SubscriptionPlanItem> GetUserSubscriptionPlan(Guid userId)
         {
             SubscriptionPlan? subscriptionPlan = await _userSubscriptionRepository.GetSubscriptionPlanByUserIdAsync(userId);
-            return new UserSubscriptionPlanResponse
+            return new SubscriptionPlanItem
             {
                 PlanId = subscriptionPlan!.PlanId,
-                PlanName = subscriptionPlan!.PlanName
+                PlanName = subscriptionPlan!.PlanName,
+                Price = subscriptionPlan.Price,
+                BillingCycle = subscriptionPlan.BillingCycle,
+                Description = subscriptionPlan.Description,
+                MaxStudios = subscriptionPlan.MaxStudios,
+                MaxStorageMb = subscriptionPlan.MaxStorageMb,
+                MaxAiRequestsPerDay = subscriptionPlan.MaxAiRequestsPerDay,
+                MaxGroups = subscriptionPlan.MaxGroups,
+                MaxMembersPerGroup = subscriptionPlan.MaxMembersPerGroup
             };
         }
     }

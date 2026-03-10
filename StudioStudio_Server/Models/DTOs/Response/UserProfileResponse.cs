@@ -17,17 +17,11 @@
         public DateTime CreatedAt { get; set; }
         public DateTime UpdatedAt { get; set; }
 
-        public UserSubscriptionPlanResponse? SubscriptionPlan { get; set; }
+        public SubscriptionPlanItem? SubscriptionPlan { get; set; }
 
         // AI Request Limit Information
         public int AiRequestsUsedToday { get; set; }
         public int AiRequestsRemaining { get; set; }
         public int AiDailyLimit { get; set; }
-    }
-
-    public class UserSubscriptionPlanResponse
-    {
-        public Guid PlanId { get; set; }
-        public string PlanName { get; set; } = string.Empty;
     }
 }
