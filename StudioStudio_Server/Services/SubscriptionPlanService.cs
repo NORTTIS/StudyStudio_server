@@ -11,15 +11,18 @@ namespace StudioStudio_Server.Services
         private readonly ISubscriptionPlanRepository _subscriptionPlanRepository;
         private readonly IUserRepository _userRepository;
         private readonly IUserSubscriptionRepository _userSubscriptionRepository;
+        private readonly ICacheService _cacheService;
 
         public SubscriptionPlanService(
             ISubscriptionPlanRepository subscriptionPlanRepository,
             IUserRepository userRepository,
-            IUserSubscriptionRepository userSubscriptionRepository)
+            IUserSubscriptionRepository userSubscriptionRepository,
+            ICacheService cacheService)
         {
             _subscriptionPlanRepository = subscriptionPlanRepository;
             _userRepository = userRepository;
             _userSubscriptionRepository = userSubscriptionRepository;
+            _cacheService = cacheService;
         }
 
         public async Task<SubscriptionPlanResponse> GetAllAsync()
@@ -114,6 +117,7 @@ namespace StudioStudio_Server.Services
         /// Update subscription plan information
         /// Only admin can update plans
         /// Validates plan exists before updating
+        /// CACHE: Invalidates subscription caches after update
         /// </summary>
         public async Task<SubscriptionPlanDetail> UpdatePlanAsync(UpdateSubscriptionPlanRequest request)
         {
@@ -139,6 +143,9 @@ namespace StudioStudio_Server.Services
 
             // Save changes
             await _subscriptionPlanRepository.UpdateAsync(plan);
+
+            // ✅ INVALIDATE SUBSCRIPTION CACHES - Admin updated subscription plans
+            await _cacheService.InvalidateSubscriptionCachesAsync();
 
             // Calculate subscriber count based on plan type
             int subscriberCount;

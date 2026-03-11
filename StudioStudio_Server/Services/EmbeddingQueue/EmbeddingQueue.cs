@@ -80,7 +80,7 @@ namespace StudioStudio_Server.Services.EmbeddingQueue
     /// - Pauses processing when approaching limit
     /// - Automatically resets window after 1 minute
     /// </summary>
-    public class EmbeddingQueue : IEmbeddingQueue
+    public class EmbeddingQueue : IEmbeddingQueue, IDisposable
     {
         private readonly Channel<EmbeddingJob> _queue;
         private readonly Dictionary<Guid, EmbeddingJobStatusInfo> _jobStatuses = new();
@@ -88,24 +88,67 @@ namespace StudioStudio_Server.Services.EmbeddingQueue
         private readonly SemaphoreSlim _tokenLock = new(1, 1);
         private readonly ILogger<EmbeddingQueue> _logger;
         private int _queueDepth = 0;
-        
+        private readonly Timer _cleanupTimer;
+        private const int MAX_TOKENS_PER_MINUTE = 800_000; // 80% of 1M (safety margin)
+        private const int JOB_STATUS_RETENTION_HOURS = 24;
+
         // Token tracking for rate limiting
         private DateTime _tokenWindowStart = DateTime.UtcNow;
         private int _tokensUsedThisWindow = 0;
-        private const int MAX_TOKENS_PER_MINUTE = 800_000; // 80% of 1M (safety margin)
 
         public EmbeddingQueue(ILogger<EmbeddingQueue> logger)
         {
             _logger = logger;
-            
+
             // Unbounded channel - queues all jobs
             var options = new UnboundedChannelOptions
             {
                 SingleReader = true,  // Only one background service reading
                 SingleWriter = false  // Multiple controllers can enqueue
             };
-            
+
             _queue = Channel.CreateUnbounded<EmbeddingJob>(options);
+
+            // Periodic cleanup of old job statuses (every 30 minutes)
+            _cleanupTimer = new Timer(CleanupOldJobStatuses, null, TimeSpan.FromMinutes(30), TimeSpan.FromMinutes(30));
+        }
+
+        private void CleanupOldJobStatuses(object? state)
+        {
+            _statusLock.Wait();
+            try
+            {
+                var cutoff = DateTime.UtcNow.AddHours(-JOB_STATUS_RETENTION_HOURS);
+                var keysToRemove = _jobStatuses
+                    .Where(kvp => kvp.Value.CompletedAt.HasValue && kvp.Value.CompletedAt.Value < cutoff)
+                    .Select(kvp => kvp.Key)
+                    .ToList();
+
+                foreach (var key in keysToRemove)
+                {
+                    _jobStatuses.Remove(key);
+                }
+
+                if (keysToRemove.Count > 0)
+                {
+                    _logger.LogInformation("Cleaned up {Count} old embedding job statuses", keysToRemove.Count);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error cleaning up old embedding job statuses");
+            }
+            finally
+            {
+                _statusLock.Release();
+            }
+        }
+
+        public void Dispose()
+        {
+            _cleanupTimer?.Dispose();
+            _statusLock?.Dispose();
+            _tokenLock?.Dispose();
         }
 
         public async ValueTask EnqueueAsync(EmbeddingJob job, CancellationToken cancellationToken = default)

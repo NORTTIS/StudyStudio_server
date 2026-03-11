@@ -49,13 +49,15 @@ namespace StudioStudio_Server.Services.DeleteQueue
     /// 3. Update status throughout processing
     /// 4. Handle partial failures gracefully
     /// </summary>
-    public class DeleteQueue : IDeleteQueue
+    public class DeleteQueue : IDeleteQueue, IDisposable
     {
         private readonly Channel<DeleteJob> _queue;
         private readonly Dictionary<Guid, DeleteJobStatusInfo> _jobStatuses = new();
         private readonly SemaphoreSlim _statusLock = new(1, 1);
         private readonly ILogger<DeleteQueue> _logger;
         private int _queueDepth = 0;
+        private readonly Timer _cleanupTimer;
+        private const int JOB_STATUS_RETENTION_HOURS = 24;
 
         public DeleteQueue(ILogger<DeleteQueue> logger)
         {
@@ -69,6 +71,46 @@ namespace StudioStudio_Server.Services.DeleteQueue
             };
 
             _queue = Channel.CreateUnbounded<DeleteJob>(options);
+
+            // Periodic cleanup of old job statuses (every 30 minutes)
+            _cleanupTimer = new Timer(CleanupOldJobStatuses, null, TimeSpan.FromMinutes(30), TimeSpan.FromMinutes(30));
+        }
+
+        private void CleanupOldJobStatuses(object? state)
+        {
+            _statusLock.Wait();
+            try
+            {
+                var cutoff = DateTime.UtcNow.AddHours(-JOB_STATUS_RETENTION_HOURS);
+                var keysToRemove = _jobStatuses
+                    .Where(kvp => kvp.Value.CompletedAt.HasValue && kvp.Value.CompletedAt.Value < cutoff)
+                    .Select(kvp => kvp.Key)
+                    .ToList();
+
+                foreach (var key in keysToRemove)
+                {
+                    _jobStatuses.Remove(key);
+                }
+
+                if (keysToRemove.Count > 0)
+                {
+                    _logger.LogInformation("Cleaned up {Count} old delete job statuses", keysToRemove.Count);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error cleaning up old delete job statuses");
+            }
+            finally
+            {
+                _statusLock.Release();
+            }
+        }
+
+        public void Dispose()
+        {
+            _cleanupTimer?.Dispose();
+            _statusLock?.Dispose();
         }
 
         public async ValueTask EnqueueAsync(DeleteJob job, CancellationToken cancellationToken = default)

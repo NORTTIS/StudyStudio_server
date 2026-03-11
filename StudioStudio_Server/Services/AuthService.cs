@@ -258,9 +258,11 @@ namespace StudioStudio_Server.Services
         /// - User exists and not deleted
         /// Flow:
         /// 1. Revoke old refresh token
-        /// 2. Generate new access token + new refresh token
-        /// 3. Return new tokens
+        /// 2. Cleanup expired/revoked tokens for this user
+        /// 3. Generate new access token + new refresh token
+        /// 4. Return new tokens
         /// Security: Token rotation - old refresh token cannot be reused
+        /// OPTIMIZATION: Auto-cleanup prevents token accumulation
         /// </summary>
         public async Task<LoginResponse> RefreshTokenAsync(string refreshToken, HttpResponse response)
         {
@@ -270,6 +272,13 @@ namespace StudioStudio_Server.Services
                 throw new AppException(ErrorCodes.AuthTokenExpired, StatusCodes.Status401Unauthorized);
 
             await _refreshTokenRepository.RevokeAsync(token);
+            
+            // ✅ CLEANUP: Delete all expired/revoked tokens for this user
+            var deletedCount = await _refreshTokenRepository.CleanupUserTokensAsync(token.UserId);
+            if (deletedCount > 0)
+            {
+                Console.WriteLine($"Cleaned up {deletedCount} expired/revoked refresh tokens for user {token.UserId}");
+            }
 
             var user = await _userRepository.GetByIdAsync(token.UserId);
             if (user == null)
@@ -308,7 +317,9 @@ namespace StudioStudio_Server.Services
         /// Logout user
         /// Action:
         /// 1. Revoke refresh token in database
-        /// 2. Delete refresh token cookie
+        /// 2. Cleanup expired/revoked tokens for this user
+        /// 3. Delete refresh token cookie
+        /// OPTIMIZATION: Auto-cleanup prevents token accumulation
         /// </summary>
         public async Task LogoutAsync(string refreshToken, HttpResponse response)
         {
@@ -316,6 +327,13 @@ namespace StudioStudio_Server.Services
             if (token != null)
             {
                 await _refreshTokenRepository.RevokeAsync(token);
+                
+                // ✅ CLEANUP: Delete all expired/revoked tokens for this user
+                var deletedCount = await _refreshTokenRepository.CleanupUserTokensAsync(token.UserId);
+                if (deletedCount > 0)
+                {
+                    Console.WriteLine($"Cleaned up {deletedCount} expired/revoked refresh tokens for user {token.UserId}");
+                }
             }
 
             response.Cookies.Delete("refreshToken", new CookieOptions
@@ -515,12 +533,10 @@ namespace StudioStudio_Server.Services
             await _userRepository.UpdateAsync(user);
             await _resetCache.InvalidateResetTokenAsync(resetData.Email);
 
-            if (user.RefreshTokens != null && user.RefreshTokens.Any())
+            var revokedCount = await _refreshTokenRepository.RevokeAllUserTokensAsync(user.UserId);
+            if (revokedCount > 0)
             {
-                foreach (var refreshToken in user.RefreshTokens.Where(t => !t.IsRevoked))
-                {
-                    await _refreshTokenRepository.RevokeAsync(refreshToken);
-                }
+                Console.WriteLine($"Revoked {revokedCount} active refresh tokens for user {user.UserId} after password reset");
             }
         }
         
