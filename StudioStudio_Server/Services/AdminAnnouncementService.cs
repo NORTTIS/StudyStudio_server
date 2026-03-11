@@ -11,18 +11,22 @@ namespace StudioStudio_Server.Services
     /// Service handling business logic for Announcements (admin side)
     /// Manages CRUD operations for system-wide announcements
     /// Only admins can create, update, and delete announcements
+    /// CACHE INVALIDATION: Automatically invalidates announcement caches when data changes
     /// </summary>
     public class AdminAnnouncementService : IAdminAnnouncementService
     {
         private readonly IAnnouncementRepository _announcementRepository;
         private readonly ILogger<AdminAnnouncementService> _logger;
+        private readonly ICacheService _cacheService;
 
         public AdminAnnouncementService(
             IAnnouncementRepository announcementRepository,
-            ILogger<AdminAnnouncementService> logger)
+            ILogger<AdminAnnouncementService> logger,
+            ICacheService cacheService)
         {
             _announcementRepository = announcementRepository;
             _logger = logger;
+            _cacheService = cacheService;
         }
 
         /// <summary>
@@ -54,6 +58,7 @@ namespace StudioStudio_Server.Services
         /// Create new announcement
         /// Logic: If IsActive = true and PublishedAt not provided, set PublishedAt = UtcNow
         /// CreatedBy: Admin user ID
+        /// CACHE: Invalidates announcement cache after creation
         /// </summary>
         public async Task<AnnouncementResponse> CreateAnnouncementAsync(
             Guid adminUserId, 
@@ -76,6 +81,9 @@ namespace StudioStudio_Server.Services
 
             await _announcementRepository.AddAsync(announcement);
 
+            // Invalidate announcement cache
+            await _cacheService.InvalidateAnnouncementCachesAsync();
+
             _logger.LogInformation(
                 "Announcement created by admin {UserId}. AnnouncementId: {AnnouncementId}, Title: {Title}",
                 adminUserId, announcement.AnnouncementId, announcement.Title);
@@ -88,6 +96,7 @@ namespace StudioStudio_Server.Services
         /// Validate: Announcement must exist
         /// Logic: Handle PublishedAt based on IsActive status
         /// UpdatedAt: Auto-set to UtcNow
+        /// CACHE: Invalidates announcement cache after update
         /// </summary>
         public async Task<AnnouncementResponse> UpdateAnnouncementAsync(
             Guid adminUserId, 
@@ -107,6 +116,9 @@ namespace StudioStudio_Server.Services
 
             await _announcementRepository.UpdateAsync(announcement);
 
+            // Invalidate announcement cache
+            await _cacheService.InvalidateAnnouncementCachesAsync();
+
             _logger.LogInformation(
                 "Announcement {AnnouncementId} updated by admin {UserId}. Title: {Title}",
                 announcement.AnnouncementId, adminUserId, announcement.Title);
@@ -118,12 +130,16 @@ namespace StudioStudio_Server.Services
         /// Delete announcement (hard delete)
         /// Validate: Announcement must exist
         /// Note: This is a permanent deletion, not soft delete
+        /// CACHE: Invalidates announcement cache after deletion
         /// </summary>
         public async Task DeleteAnnouncementAsync(Guid adminUserId, Guid announcementId)
         {
             var announcement = await ValidateAnnouncementExistsAsync(announcementId);
 
             await _announcementRepository.DeleteAsync(announcement);
+
+            // Invalidate announcement cache
+            await _cacheService.InvalidateAnnouncementCachesAsync();
 
             _logger.LogInformation(
                 "Announcement {AnnouncementId} deleted by admin {UserId}. Title: {Title}",

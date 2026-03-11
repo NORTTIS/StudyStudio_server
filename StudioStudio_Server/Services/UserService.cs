@@ -14,6 +14,7 @@ namespace StudioStudio_Server.Services
     /// Service handling user profile and account management
     /// Manages: Profile updates, password changes, account deletion, avatar uploads
     /// Also provides AI request usage information for rate limiting display
+    /// OPTIMIZED: Uses caching and automatic cache invalidation
     /// </summary>
     public class UserService : IUserService
     {
@@ -24,6 +25,7 @@ namespace StudioStudio_Server.Services
         private readonly IWebHostEnvironment _environment;
         private readonly IUserSubscriptionRepository _userSubscriptionRepository;
         private readonly IAIRequestLogRepository _aiRequestLogRepository;
+        private readonly ICacheService _cacheService;
 
         // Password must be 10-20 characters long, contain at least one uppercase letter, one lowercase letter, and one digit
         private readonly Regex PasswordRegex = new(@"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)[A-Za-z\d@$!%*?&]{10,20}$", RegexOptions.Compiled);
@@ -35,7 +37,8 @@ namespace StudioStudio_Server.Services
             IHttpContextAccessor httpContextAccessor,
             IWebHostEnvironment environment,
             IUserSubscriptionRepository userSubscriptionRepository,
-            IAIRequestLogRepository aiRequestLogRepository)
+            IAIRequestLogRepository aiRequestLogRepository,
+            ICacheService cacheService)
         {
             _userRepository = userRepository;
             _passwordHasher = passwordHasher;
@@ -44,15 +47,23 @@ namespace StudioStudio_Server.Services
             _environment = environment;
             _userSubscriptionRepository = userSubscriptionRepository;
             _aiRequestLogRepository = aiRequestLogRepository;
+            _cacheService = cacheService;
         }
 
         /// <summary>
         /// Get user by ID
         /// Returns: User entity or null if not found
+        /// CACHED: Uses UserProfileExpiration (15 minutes)
         /// </summary>
         public async Task<User?> GetByIdAsync(Guid userId)
         {
-            return await _userRepository.GetByIdAsync(userId);
+            var cacheKey = _cacheService.GetUserProfileKey(userId);
+            
+            return await _cacheService.GetOrSetAsync(
+                cacheKey,
+                async () => await _userRepository.GetByIdAsync(userId),
+                _cacheService.GetExpirationForKey(cacheKey)
+            );
         }
 
         /// <summary>
@@ -67,11 +78,15 @@ namespace StudioStudio_Server.Services
         /// <summary>
         /// Update user information
         /// Auto-sets UpdatedAt = UtcNow
+        /// CACHE: Invalidates user cache after update
         /// </summary>
         public async Task UpdateAsync(User user)
         {
             user.UpdatedAt = DateTime.UtcNow;
             await _userRepository.UpdateAsync(user);
+            
+            // Invalidate user cache
+            await _cacheService.InvalidateUserCacheAsync(user.UserId);
         }
 
         /// <summary>
@@ -79,6 +94,7 @@ namespace StudioStudio_Server.Services
         /// Validate: User exists and not already deleted
         /// Action: Set DeletedFlag = true, UpdatedAt = UtcNow
         /// Note: User data remains in database for referential integrity
+        /// CACHE: Invalidates user cache after deletion
         /// </summary>
         public async Task DeleteAsync(Guid userId)
         {
@@ -96,6 +112,9 @@ namespace StudioStudio_Server.Services
             user.DeletedFlag = true;
             user.UpdatedAt = DateTime.UtcNow;
             await _userRepository.UpdateAsync(user);
+            
+            // Invalidate all user-related cache
+            await _cacheService.InvalidateUserCacheAsync(userId);
         }
 
         /// <summary>
@@ -105,6 +124,7 @@ namespace StudioStudio_Server.Services
         /// - New password meets strength requirements
         /// - New password matches confirmation
         /// - New password is different from current password
+        /// CACHE: Invalidates user cache after password change
         /// </summary>
         public async Task ChangePasswordAsync(Guid userId, ChangePasswordRequest request)
         {
@@ -147,6 +167,9 @@ namespace StudioStudio_Server.Services
             user.PasswordHash = _passwordHasher.HashPassword(user, request.NewPassword);
             user.UpdatedAt = DateTime.UtcNow;
             await _userRepository.UpdateAsync(user);
+            
+            // Invalidate user cache
+            await _cacheService.InvalidateUserCacheAsync(userId);
         }
 
         /// <summary>
@@ -156,6 +179,7 @@ namespace StudioStudio_Server.Services
         /// - Avatar: Max 5MB, only .jpg/.jpeg/.png allowed
         /// - Old avatar file is automatically deleted when new one is uploaded
         /// Avatar storage: wwwroot/uploads/avatars/{userId}_avt.{ext}
+        /// CACHE: Invalidates user cache after profile update
         /// </summary>
         public async Task UpdateProfileAsync(Guid userId, UpdateUserProfileRequest request)
         {
@@ -190,6 +214,9 @@ namespace StudioStudio_Server.Services
 
             user.UpdatedAt = DateTime.UtcNow;
             await _userRepository.UpdateAsync(user);
+            
+            // Invalidate all user-related cache after profile update
+            await _cacheService.InvalidateUserCacheAsync(userId);
         }
 
         /// <summary>
@@ -269,17 +296,25 @@ namespace StudioStudio_Server.Services
         /// Returns: (usedToday, dailyLimit) tuple
         /// Used to display AI usage quota in frontend
         /// Daily limit depends on subscription plan (Free: 20, Premium: 100)
+        /// CACHED: Subscription plan uses SubscriptionExpiration (5 minutes)
         /// </summary>
         public async Task<(int usedToday, int dailyLimit)> GetAiRequestLimitInfoAsync(Guid userId)
         {
             // Get today's start time
             DateTime startOfDay = DateTime.UtcNow.Date;
 
-            // Count today's requests
+            // Always query AI request count fresh for accurate rate limiting
+            // (int cannot be cached with current ICacheService constraint)
             int usedToday = await _aiRequestLogRepository.CountTodayRequestsAsync(userId, startOfDay);
 
-            // Get user's subscription plan
-            SubscriptionPlan? subscriptionPlan = await _userSubscriptionRepository.GetSubscriptionPlanByUserIdAsync(userId);
+            // Cache subscription plan with proper expiration
+            var subscriptionKey = _cacheService.GetUserSubscriptionKey(userId);
+            SubscriptionPlan? subscriptionPlan = await _cacheService.GetOrSetAsync(
+                subscriptionKey,
+                async () => await _userSubscriptionRepository.GetSubscriptionPlanByUserIdAsync(userId),
+                _cacheService.GetExpirationForKey(subscriptionKey)
+            );
+
             int dailyLimit = subscriptionPlan?.MaxAiRequestsPerDay ?? 20; // Default: Free Plan = 20
             Console.WriteLine($"User {userId} has used {usedToday}/{dailyLimit} AI requests today.");
             Console.WriteLine($"Subscription Plan: {subscriptionPlan?.PlanName ?? "Free Plan"}, Max AI Requests/Day: {dailyLimit}");
@@ -289,7 +324,14 @@ namespace StudioStudio_Server.Services
 
         public async Task<SubscriptionPlanItem> GetUserSubscriptionPlan(Guid userId)
         {
-            SubscriptionPlan? subscriptionPlan = await _userSubscriptionRepository.GetSubscriptionPlanByUserIdAsync(userId);
+            // Cache subscription plan with proper expiration
+            var subscriptionKey = _cacheService.GetUserSubscriptionKey(userId);
+            SubscriptionPlan? subscriptionPlan = await _cacheService.GetOrSetAsync(
+                subscriptionKey,
+                async () => await _userSubscriptionRepository.GetSubscriptionPlanByUserIdAsync(userId),
+                _cacheService.GetExpirationForKey(subscriptionKey)
+            );
+
             return new SubscriptionPlanItem
             {
                 PlanId = subscriptionPlan!.PlanId,

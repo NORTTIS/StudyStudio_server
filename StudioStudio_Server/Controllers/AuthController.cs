@@ -103,10 +103,9 @@ namespace StudioStudio_Server.Controllers
         /// Return: New JWT AccessToken + new RefreshToken
         /// </summary>
         [HttpPost("refresh")]
-        public async Task<ActionResult<ApiResponse<LoginResponse>>> Refresh()
+        public async Task<ActionResult<ApiResponse<LoginResponse>>> Refresh([FromBody] RefreshTokenRequest request)
         {
-            string refreshToken = GetRefreshTokenFromCookie();
-            var refreshResponse = await _authService.RefreshTokenAsync(refreshToken, Response);
+            var refreshResponse = await _authService.RefreshTokenAsync(request.RefreshToken, Response);
             var message = _messageService.GetMessage(ErrorCodes.SuccessRefreshToken);
 
             return Ok(ApiResponse<LoginResponse>.Success(

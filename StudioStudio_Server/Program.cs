@@ -51,6 +51,25 @@ builder.Services.AddSingleton(sp =>
 
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddHttpClient();
+
+// ========== CACHE CONFIGURATION ==========
+// Choose cache provider: "Memory" (development) or "Redis" (production)
+var cacheProvider = builder.Configuration.GetValue<string>("Cache:Provider") ?? "Memory";
+
+if (cacheProvider.Equals("Redis", StringComparison.OrdinalIgnoreCase))
+{
+    // Redis Cache for Production (using existing IConnectionMultiplexer)
+    builder.Services.AddScoped<ICacheService, RedisCacheService>();
+    Console.WriteLine("? Using Redis Distributed Cache (StackExchange.Redis)");
+}
+else
+{
+    // Memory Cache for Development
+    builder.Services.AddMemoryCache();
+    builder.Services.AddScoped<ICacheService, CacheService>();
+    Console.WriteLine("? Using In-Memory Cache");
+}
+
 builder.Services.AddScoped<IMessageService, MessageService>();
 builder.Services.AddScoped<IEmailService, SMTPEmailService>();
 builder.Services.AddScoped<IUserRepository, UserRepository>();
@@ -115,6 +134,8 @@ builder.Services.AddHostedService<StudioStudio_Server.Services.EmbeddingQueue.Em
 builder.Services.AddSingleton<StudioStudio_Server.Services.DeleteQueue.IDeleteQueue, StudioStudio_Server.Services.DeleteQueue.DeleteQueue>();
 builder.Services.AddHostedService<StudioStudio_Server.Services.DeleteQueue.DeleteBackgroundService>();
 
+// Refresh Token Cleanup Background Service (runs every 24 hours)
+builder.Services.AddHostedService<StudioStudio_Server.Services.BackgroundServices.RefreshTokenCleanupService>();
 
 builder.Services.AddControllers(options =>
     {

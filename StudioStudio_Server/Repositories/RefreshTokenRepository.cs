@@ -45,11 +45,59 @@ namespace StudioStudio_Server.Repositories
         /// <summary>
         /// Revoke refresh token (set IsRevoked = true)
         /// Use case: Logout, token rotation
+        /// Uses ExecuteUpdateAsync for better concurrency handling
         /// </summary>
         public async Task RevokeAsync(RefreshToken token)
         {
-            token.IsRevoked = true;
-            await _context.SaveChangesAsync();
+            await _context.RefreshToken
+                .Where(t => t.Id == token.Id)
+                .ExecuteUpdateAsync(setters => setters.SetProperty(t => t.IsRevoked, true));
+        }
+
+        /// <summary>
+        /// Revoke all active refresh tokens for a specific user
+        /// Use case: Password reset, account security
+        /// Uses ExecuteUpdateAsync for better concurrency handling
+        /// </summary>
+        public async Task<int> RevokeAllUserTokensAsync(Guid userId)
+        {
+            var revokedCount = await _context.RefreshToken
+                .Where(t => t.UserId == userId && !t.IsRevoked)
+                .ExecuteUpdateAsync(setters => setters.SetProperty(t => t.IsRevoked, true));
+
+            return revokedCount;
+        }
+
+        /// <summary>
+        /// Delete all expired or revoked refresh tokens for a specific user
+        /// Removes: IsRevoked = true OR ExpiresAt < UtcNow
+        /// Uses ExecuteDeleteAsync for better concurrency handling
+        /// </summary>
+        public async Task<int> CleanupUserTokensAsync(Guid userId)
+        {
+            var now = DateTime.UtcNow;
+            
+            var deletedCount = await _context.RefreshToken
+                .Where(t => t.UserId == userId && (t.IsRevoked || t.ExpiresAt < now))
+                .ExecuteDeleteAsync();
+
+            return deletedCount;
+        }
+
+        /// <summary>
+        /// Delete all expired or revoked refresh tokens globally
+        /// Removes: IsRevoked = true OR ExpiresAt < UtcNow
+        /// Uses ExecuteDeleteAsync for better concurrency handling
+        /// </summary>
+        public async Task<int> CleanupExpiredTokensAsync()
+        {
+            var now = DateTime.UtcNow;
+            
+            var deletedCount = await _context.RefreshToken
+                .Where(t => t.IsRevoked || t.ExpiresAt < now)
+                .ExecuteDeleteAsync();
+
+            return deletedCount;
         }
     }
 }

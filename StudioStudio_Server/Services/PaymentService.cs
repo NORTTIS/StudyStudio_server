@@ -26,6 +26,7 @@ namespace StudioStudio_Server.Services
         private readonly StudioDbContext _db;
         private readonly IConfiguration _configuration;
         private readonly ILogger<PaymentService> _logger;
+        private readonly ICacheService _cacheService;
 
         public PaymentService(
             PayOSClient payOSClient,
@@ -35,7 +36,8 @@ namespace StudioStudio_Server.Services
             IEmailService emailService,
             StudioDbContext db,
             IConfiguration configuration,
-            ILogger<PaymentService> logger)
+            ILogger<PaymentService> logger,
+            ICacheService cacheService)
         {
             _payOSClient = payOSClient;
             _paymentRepository = paymentRepository;
@@ -45,6 +47,7 @@ namespace StudioStudio_Server.Services
             _db = db;
             _configuration = configuration;
             _logger = logger;
+            _cacheService = cacheService;
         }
 
         public async Task<CreatePaymentResponse> CreatePaymentLinkAsync(Guid userId, CreatePaymentRequest request)
@@ -275,7 +278,11 @@ namespace StudioStudio_Server.Services
             };
 
             await _subscriptionRepository.AddAsync(subscription);
-            _logger.LogInformation("Subscription activated for user {UserId}, plan {PlanId}", payment.UserId, payment.PlanId);
+            
+            // ? INVALIDATE USER SUBSCRIPTION CACHE - User purchased new subscription
+            await _cacheService.InvalidateUserCacheAsync(payment.UserId);
+            
+            _logger.LogInformation("Subscription activated for user {UserId}, plan {PlanId}. Cache invalidated.", payment.UserId, payment.PlanId);
         }
 
         private static PaymentStatusResponse MapToStatusResponse(Payment payment) => new()

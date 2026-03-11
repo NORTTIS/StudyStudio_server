@@ -62,6 +62,23 @@ namespace StudioStudio_Server.Repositories
         }
 
         /// <summary>
+        /// Get announcements by list of IDs (bulk load to prevent N+1 queries)
+        /// Returns only announcements that exist in the database
+        /// </summary>
+        public async Task<List<Announcement>> GetByIdsAsync(List<Guid> announcementIds)
+        {
+            if (announcementIds == null || !announcementIds.Any())
+            {
+                return new List<Announcement>();
+            }
+
+            return await _context.Announcements
+                .Where(a => announcementIds.Contains(a.AnnouncementId))
+                .AsNoTracking()
+                .ToListAsync();
+        }
+
+        /// <summary>
         /// Update announcement information
         /// </summary>
         public async Task UpdateAsync(Announcement announcement)
