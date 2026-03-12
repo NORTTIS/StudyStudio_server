@@ -36,7 +36,7 @@ namespace StudioStudio_Server.Services
         public async Task<List<AnnouncementResponse>> GetAllActiveAnnouncementsAsync()
         {
             var cacheKey = _cacheService.GetAnnouncementsKey();
-            
+
             var announcements = await _cacheService.GetOrSetAsync(
                 cacheKey,
                 async () => await _announcementRepository.GetAllActiveAsync(),
@@ -145,7 +145,8 @@ namespace StudioStudio_Server.Services
                 {
                     UserAnnouncementId = Guid.NewGuid(),
                     AnnouncementId = userAnnouncementId,
-                    MetionedId = userId,
+                    MentionedId = userId,
+                    CreatedBy = userId,
                     IsRead = true,
                     IsDelete = false,
                     CreatedAt = DateTime.UtcNow,
@@ -179,11 +180,11 @@ namespace StudioStudio_Server.Services
 
         /// <summary>
         /// Validate user owns the user announcement
-        /// Checks if MetionedId matches userId
+        /// Checks if MentionedId matches userId
         /// </summary>
         private void ValidateUserAnnouncementOwnership(UserAnnouncement userAnnouncement, Guid userId)
         {
-            if (userAnnouncement.MetionedId != userId)
+            if (userAnnouncement.MentionedId != userId)
             {
                 throw new AppException(
                     ErrorCodes.AuthForbidden,
@@ -243,7 +244,9 @@ namespace StudioStudio_Server.Services
                 Type = announcement?.Type.ToString() ?? "",
                 IsRead = userAnnouncement.IsRead,
                 CreatedAt = userAnnouncement.CreatedAt,
-                PublishedAt = announcement?.PublishedAt
+                PublishedAt = announcement?.PublishedAt,
+                MentionedId = userAnnouncement.MentionedId,
+                CreatedBy = userAnnouncement.CreatedBy
             };
         }
     }

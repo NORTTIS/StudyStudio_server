@@ -6,10 +6,12 @@ using Microsoft.Extensions.FileProviders;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using PayOS;
+using Prometheus;
 using StackExchange.Redis;
 using StudioStudio_Server.Configurations;
 using StudioStudio_Server.Data;
 using StudioStudio_Server.Filters;
+using StudioStudio_Server.HealthChecks;
 using StudioStudio_Server.Hubs;
 using StudioStudio_Server.Middlewares;
 using StudioStudio_Server.Models.Entities;
@@ -35,6 +37,7 @@ builder.Services.Configure<GeminiConfig>(
 builder.Services.AddSingleton<IConnectionMultiplexer>(r =>
 {
     var configuration = ConfigurationOptions.Parse(builder.Configuration.GetConnectionString("Redis") ?? "localhost:6379");
+    configuration.AllowAdmin = true; // Enable admin commands for health checks
     return ConnectionMultiplexer.Connect(configuration);
 });
 
@@ -51,6 +54,12 @@ builder.Services.AddSingleton(sp =>
 
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddHttpClient();
+
+// ========== HEALTH CHECKS ==========
+builder.Services.AddHealthChecks()
+    .AddCheck<DatabaseHealthCheck>("database")
+    .AddCheck<RedisHealthCheck>("redis")
+    .AddCheck<ExternalServicesHealthCheck>("external_services");
 
 // ========== CACHE CONFIGURATION ==========
 // Choose cache provider: "Memory" (development) or "Redis" (production)
@@ -290,10 +299,34 @@ app.UseMiddleware<RateLimitMiddleware>();
 
 app.UseAuthorization();
 
+// Health check endpoints - return JSON response
+app.MapHealthChecks("/health", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
+{
+    ResponseWriter = async (context, report) =>
+    {
+        context.Response.ContentType = "application/json";
+        var response = new
+        {
+            status = report.Status.ToString(),
+            results = report.Entries.Select(e => new
+            {
+                key = e.Key,
+                status = e.Value.Status.ToString(),
+                description = e.Value.Description,
+                data = e.Value.Data
+            })
+        };
+        await context.Response.WriteAsync(System.Text.Json.JsonSerializer.Serialize(response));
+    }
+});
+
 app.MapControllers();
 
 // Map SignalR Hubs
 app.MapHub<GroupDiscussHub>("/hubs/group-discuss");
 app.MapHub<TaskCommentHub>("/hubs/task-comment");
+
+// Prometheus metrics endpoint
+app.MapMetrics();
 
 app.Run();

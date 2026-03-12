@@ -6,6 +6,7 @@ using Microsoft.IdentityModel.Tokens;
 using Newtonsoft.Json.Linq;
 using StudioStudio_Server.Configurations;
 using StudioStudio_Server.Exceptions;
+using StudioStudio_Server.Metrics;
 using StudioStudio_Server.Models.DTOs.Request;
 using StudioStudio_Server.Models.DTOs.Response;
 using StudioStudio_Server.Models.Entities;
@@ -113,6 +114,9 @@ namespace StudioStudio_Server.Services
 
             await _userRepository.AddAsync(registedUser);
 
+            // Record registration metric
+            AppMetrics.UserRegistrationsTotal.Inc();
+
             // Generate verification token and store in Redis
             var token = Convert.ToBase64String(RandomNumberGenerator.GetBytes(64));
             var expiry = TimeSpan.FromMinutes(15);
@@ -203,11 +207,13 @@ namespace StudioStudio_Server.Services
 
             if (user == null)
             {
+                AppMetrics.UserLoginAttemptsTotal.WithLabels("failed").Inc();
                 throw new AppException(ErrorCodes.AuthInvalidCredential, StatusCodes.Status401Unauthorized);
             }
 
             if (user.DeletedFlag)
             {
+                AppMetrics.UserLoginAttemptsTotal.WithLabels("failed").Inc();
                 throw new AppException(ErrorCodes.UserAccountAlreadyDeleted, StatusCodes.Status400BadRequest);
             }
 
@@ -216,6 +222,7 @@ namespace StudioStudio_Server.Services
 
             if (result != PasswordVerificationResult.Success)
             {
+                AppMetrics.UserLoginAttemptsTotal.WithLabels("failed").Inc();
                 throw new AppException(ErrorCodes.AuthInvalidCredential, StatusCodes.Status401Unauthorized);
             }
 
@@ -237,6 +244,10 @@ namespace StudioStudio_Server.Services
             await _refreshTokenRepository.AddAsync(refreshToken);
 
             SetRefreshTokenCookie(response, refreshToken.Token, refreshExpireAt);
+
+            // Record login metrics
+            AppMetrics.UserLoginAttemptsTotal.WithLabels("success").Inc();
+            AppMetrics.ActiveJwtTokens.Inc();
 
             return new LoginResponse
             {

@@ -30,13 +30,13 @@ namespace StudioStudio_Server.Services
         }
 
         /// <summary>
-        /// Get all announcements (including inactive ones)
-        /// Returns: List of all announcements regardless of IsActive status
-        /// Use case: Admin dashboard to manage all announcements
+        /// Get system-wide announcements (not @mentions)
+        /// Returns: List of announcements that are NOT user-specific @mentions
+        /// Use case: Admin dashboard to manage system announcements
         /// </summary>
         public async Task<List<AnnouncementResponse>> GetAllAnnouncementsAsync()
         {
-            var announcements = await _announcementRepository.GetAllAsync();
+            var announcements = await _announcementRepository.GetSystemAnnouncementsAsync();
 
             return announcements
                 .Select(MapToAnnouncementResponse)

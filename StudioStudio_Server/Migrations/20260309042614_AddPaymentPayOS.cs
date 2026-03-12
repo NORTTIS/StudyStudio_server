@@ -41,6 +41,27 @@ namespace StudioStudio_Server.Migrations
                 type: "text",
                 nullable: true);
 
+            migrationBuilder.Sql(@"
+                WITH numbered_payments AS (
+                    SELECT ""PaymentId"", 1000000000000 + ROW_NUMBER() OVER (ORDER BY ""CreatedAt"", ""PaymentId"") AS new_order_code
+                    FROM ""Payments""
+                    WHERE ""OrderCode"" = 0
+                )
+                UPDATE ""Payments"" p
+                SET ""OrderCode"" = np.new_order_code
+                FROM numbered_payments np
+                WHERE p.""PaymentId"" = np.""PaymentId"";
+            ");
+
+            migrationBuilder.AlterColumn<long>(
+                name: "OrderCode",
+                table: "Payments",
+                type: "bigint",
+                nullable: false,
+                oldClrType: typeof(long),
+                oldType: "bigint",
+                oldDefaultValue: 0L);
+
             migrationBuilder.CreateIndex(
                 name: "IX_Payments_OrderCode",
                 table: "Payments",

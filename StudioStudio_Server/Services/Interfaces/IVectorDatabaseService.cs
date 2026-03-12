@@ -89,6 +89,11 @@ namespace StudioStudio_Server.Services.Interfaces
         /// <param name="id">ID of vector</param>
         /// <returns>Vector data or null if not found</returns>
         Task<VectorSearchResult?> GetVectorByIdAsync(string id);
+
+        /// <summary>
+        /// Test connection to vector database (for health checks)
+        /// </summary>
+        Task TestConnectionAsync();
     }
 
     /// <summary>

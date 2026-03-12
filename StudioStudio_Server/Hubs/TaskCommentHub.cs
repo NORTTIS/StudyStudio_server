@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
 using StudioStudio_Server.Exceptions;
+using StudioStudio_Server.Metrics;
 using StudioStudio_Server.Models.DTOs.Request;
 using StudioStudio_Server.Models.DTOs.Response;
 using StudioStudio_Server.Models.Entities;
@@ -445,7 +446,22 @@ namespace StudioStudio_Server.Hubs
         public override async Task OnDisconnectedAsync(Exception? exception)
         {
             _logger.LogInformation("Client disconnected: {ConnectionId}", Context.ConnectionId);
+
+            // Update SignalR connection metrics
+            AppMetrics.SignalRConnections.WithLabels("task-comment").Dec();
+
             await base.OnDisconnectedAsync(exception);
+        }
+
+        /// <summary>
+        /// Handle client connection
+        /// </summary>
+        public override async Task OnConnectedAsync()
+        {
+            // Update SignalR connection metrics
+            AppMetrics.SignalRConnections.WithLabels("task-comment").Inc();
+
+            await base.OnConnectedAsync();
         }
     }
 }

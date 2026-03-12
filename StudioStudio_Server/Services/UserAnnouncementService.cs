@@ -31,8 +31,9 @@ namespace StudioStudio_Server.Services
             {
                 UserAnnouncementId = Guid.NewGuid(),
                 AnnouncementId = request.AnnouncementId,
+                MentionedId = request.MentionedId,
+                CreatedBy = request.CreatedBy,  // Người tạo thông báo
                 CreatedAt = request.CreatedAt,
-                MetionedId = request.MentionedId,
                 IsRead = request.IsRead,
                 IsDelete = false,
                 UpdatedAt = request.CreatedAt

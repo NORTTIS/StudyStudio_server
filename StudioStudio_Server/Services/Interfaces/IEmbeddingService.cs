@@ -37,5 +37,10 @@ namespace StudioStudio_Server.Services.Interfaces
         /// <param name="cancellationToken">Cancellation token</param>
         /// <returns>List of corresponding vectors</returns>
         Task<List<float[]>> GenerateBatchEmbeddingsAsync(List<string> texts, CancellationToken cancellationToken);
+
+        /// <summary>
+        /// Test connection to embedding service (for health checks)
+        /// </summary>
+        Task TestConnectionAsync();
     }
 }

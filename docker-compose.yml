@@ -1,4 +1,5 @@
 services:
+
   api:
     image: norttis/studiostudio-server:latest
     container_name: studiostudio_api
@@ -41,9 +42,57 @@ services:
     networks:
       - studiostudio_net
 
+
+# -----------------------------
+# Monitoring stack
+# -----------------------------
+
+  prometheus:
+    image: prom/prometheus
+    container_name: studiostudio_prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus
+    networks:
+      - studiostudio_net
+
+  grafana:
+    image: grafana/grafana
+    container_name: studiostudio_grafana
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+    networks:
+      - studiostudio_net
+
+  node-exporter:
+    image: prom/node-exporter
+    container_name: studiostudio_node_exporter
+    ports:
+      - "9100:9100"
+    networks:
+      - studiostudio_net
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor
+    container_name: studiostudio_cadvisor
+    ports:
+      - "8081:8080"
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+    networks:
+      - studiostudio_net
+
+
 volumes:
   postgres_data:
   redis_data:
+  grafana_data:
 
 networks:
   studiostudio_net:

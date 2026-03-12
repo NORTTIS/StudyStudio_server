@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.IdentityModel.Tokens;
 using StudioStudio_Server.Exceptions;
+using StudioStudio_Server.Metrics;
 using StudioStudio_Server.Models.DTOs.Request;
 using StudioStudio_Server.Models.DTOs.Response;
 using StudioStudio_Server.Models.Entities;
@@ -167,6 +168,7 @@ namespace StudioStudio_Server.Hubs
                 {
                     AnnouncementId = announcement.AnnouncementId,
                     MentionedId = taggedUserId,
+                    CreatedBy = senderId,
                     IsRead = false,
                     CreatedAt = now
                 };
@@ -301,6 +303,9 @@ namespace StudioStudio_Server.Hubs
                 };
 
                 await Clients.Group(request.GroupId.ToString()).SendAsync("ReceiveMessage", messageDto);
+
+                // Record SignalR message metric
+                AppMetrics.SignalRMessagesTotal.WithLabels("group-discuss").Inc();
 
                 _logger.LogInformation(
                     "Message sent to group {GroupId} by user {UserId}",
@@ -495,7 +500,22 @@ namespace StudioStudio_Server.Hubs
         public override async Task OnDisconnectedAsync(Exception? exception)
         {
             _logger.LogInformation("Client disconnected: {ConnectionId}", Context.ConnectionId);
+
+            // Update SignalR connection metrics
+            AppMetrics.SignalRConnections.WithLabels("group-discuss").Dec();
+
             await base.OnDisconnectedAsync(exception);
+        }
+
+        /// <summary>
+        /// Handle client connection
+        /// </summary>
+        public override async Task OnConnectedAsync()
+        {
+            // Update SignalR connection metrics
+            AppMetrics.SignalRConnections.WithLabels("group-discuss").Inc();
+
+            await base.OnConnectedAsync();
         }
     }
 }

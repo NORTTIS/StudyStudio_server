@@ -378,8 +378,13 @@ namespace StudioStudio_Server.Data
 
                 e.HasOne<User>()
                     .WithMany()
-                    .HasForeignKey(x => x.MetionedId)
+                    .HasForeignKey(x => x.MentionedId)
                     .OnDelete(DeleteBehavior.Cascade);
+
+                e.HasOne<User>()
+                    .WithMany()
+                    .HasForeignKey(x => x.CreatedBy)
+                    .OnDelete(DeleteBehavior.SetNull);  // Set null instead of cascade
 
                 e.Property(x => x.IsRead).IsRequired();
                 e.Property(x => x.CreatedAt).IsRequired();

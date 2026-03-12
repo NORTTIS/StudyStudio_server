@@ -442,5 +442,32 @@ namespace StudioStudio_Server.Services
             return vector.Select(x => (float)(x / norm)).ToArray();
         }
 
+        /// <summary>
+        /// Test connection to Gemini API
+        /// </summary>
+        public async Task TestConnectionAsync()
+        {
+            if (string.IsNullOrEmpty(_config.ApiKey))
+            {
+                throw new Exception("Gemini API key not configured");
+            }
+
+            // Test with a simple embedding request
+            try
+            {
+                await GenerateEmbeddingAsync("test");
+            }
+            catch (Exception ex)
+            {
+                // If it's a configuration error, rethrow
+                if (ex.Message.Contains("not configured"))
+                {
+                    throw;
+                }
+                // For other errors (like API quota), we consider it a connection issue
+                throw new Exception($"Gemini API connection failed: {ex.Message}");
+            }
+        }
+
     }
 }
