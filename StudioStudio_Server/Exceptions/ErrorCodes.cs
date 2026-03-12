@@ -183,6 +183,12 @@
         // SUBSCRIPTION PLAN
         public const string SubscriptionPlanNotFound = "SUBSCRIPTION001";
 
+        // REVENUE
+        public const string RevenueInvalidDateRange = "REVENUE001";
+        public const string RevenueInvalidPeriod = "REVENUE002";
+        public const string RevenueInvalidCustomPeriod = "REVENUE003";
+        public const string RevenueInvalidLimit = "REVENUE004";
+
         // COMMON
         public const string UnexpectedError = "SYS001";
     }

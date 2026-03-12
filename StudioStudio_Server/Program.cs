@@ -124,6 +124,7 @@ builder.Services.AddScoped<IGroupTaskStatusService, GroupTaskStatusService>();
 builder.Services.AddScoped<IHomeService, HomeService>();
 builder.Services.AddScoped<ISubscriptionPlanService, SubscriptionPlanService>();
 builder.Services.AddScoped<ISubscriptionPlanRepository, SubscriptionPlanRepository>();
+builder.Services.AddScoped<IRevenueService, RevenueService>();
 
 // AI & Document Services
 builder.Services.AddScoped<IFileStorageService, BackblazeStorageService>();
