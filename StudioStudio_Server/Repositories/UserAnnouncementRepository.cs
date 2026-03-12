@@ -46,13 +46,13 @@ namespace StudioStudio_Server.Repositories
 
         /// <summary>
         /// Lấy danh sách UserAnnouncements của user theo userId
-        /// Điều kiện: MetionedId = userId AND IsDelete = false
+        /// Điều kiện: MentionedId = userId AND IsDelete = false
         /// Sắp xếp: CreatedAt DESC (mới nhất trước)
         /// </summary>
         public async Task<List<UserAnnouncement>> GetByUserIdAsync(Guid userId)
         {
             return await _context.UserAnnouncements
-                .Where(ua => ua.MetionedId == userId && !ua.IsDelete)
+                .Where(ua => ua.MentionedId == userId && !ua.IsDelete)
                 .OrderByDescending(ua => ua.CreatedAt)
                 .AsNoTracking()
                 .ToListAsync();

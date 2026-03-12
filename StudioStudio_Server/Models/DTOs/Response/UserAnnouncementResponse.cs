@@ -10,5 +10,7 @@ namespace StudioStudio_Server.Models.DTOs.Response
         public bool IsRead { get; set; }
         public DateTime CreatedAt { get; set; }
         public DateTime? PublishedAt { get; set; }
+        public Guid MentionedId { get; set; }   // Người được nhắc đến
+        public Guid? CreatedBy { get; set; }   // Người tạo thông báo (có thể null)
     }
 }

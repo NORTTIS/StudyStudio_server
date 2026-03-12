@@ -552,5 +552,25 @@ namespace StudioStudio_Server.Services
                 Vector = vector
             };
         }
+
+        /// <summary>
+        /// Test connection to Qdrant
+        /// </summary>
+        public async Task TestConnectionAsync()
+        {
+            if (_httpClient == null)
+            {
+                throw new Exception("Qdrant Cloud not configured");
+            }
+
+            // Test by getting cluster info
+            string url = "/cluster";
+            HttpResponseMessage response = await _httpClient.GetAsync(url);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                throw new Exception($"Qdrant connection test failed: {response.StatusCode}");
+            }
+        }
     }
 }

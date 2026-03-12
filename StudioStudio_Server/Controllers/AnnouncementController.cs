@@ -37,19 +37,19 @@ namespace StudioStudio_Server.Controllers
             if (string.IsNullOrEmpty(userIdClaim) || !Guid.TryParse(userIdClaim, out Guid userId))
             {
                 throw new AppException(
-                    ErrorCodes.AuthInvalidCredential, 
+                    ErrorCodes.AuthInvalidCredential,
                     StatusCodes.Status401Unauthorized);
             }
 
             var isAdminClaim = User.FindFirst("IsAdmin")?.Value;
-            var isAdmin = isAdminClaim != null && 
-                          bool.TryParse(isAdminClaim, out var adminResult) && 
+            var isAdmin = isAdminClaim != null &&
+                          bool.TryParse(isAdminClaim, out var adminResult) &&
                           adminResult;
 
             if (isAdmin)
             {
                 throw new AppException(
-                    ErrorCodes.AuthForbidden, 
+                    ErrorCodes.AuthForbidden,
                     StatusCodes.Status403Forbidden);
             }
 

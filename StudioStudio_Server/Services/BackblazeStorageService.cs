@@ -18,7 +18,7 @@ namespace StudioStudio_Server.Services
 
         /// <summary>
         /// Kh?i t?o Backblaze Storage Service
-        /// Note: N?u config không ð?y ð?, service ho?t ð?ng ? degraded mode (ch? log warning)
+        /// Note: N?u config khï¿½ng ï¿½?y ï¿½?, service ho?t ï¿½?ng ? degraded mode (ch? log warning)
         /// </summary>
         public BackblazeStorageService(
             IOptions<BackblazeConfig> config,
@@ -31,7 +31,7 @@ namespace StudioStudio_Server.Services
                 string.IsNullOrEmpty(_config.KeyId) ||
                 string.IsNullOrEmpty(_config.AppKey))
             {
-                _logger.LogWarning("Backblaze B2 storage chýa ðý?c c?u h?nh. Các thao tác lýu tr? file s? b? b? qua.");
+                _logger.LogWarning("Backblaze B2 storage chï¿½a ï¿½ï¿½?c c?u h?nh. Cï¿½c thao tï¿½c lï¿½u tr? file s? b? b? qua.");
                 _s3Client = null!;
                 return;
             }
@@ -47,16 +47,16 @@ namespace StudioStudio_Server.Services
 
         /// <summary>
         /// T?o presigned URL cho upload file
-        /// Flow: Backend t?o URL ? Frontend PUT file tr?c ti?p lên B2
+        /// Flow: Backend t?o URL ? Frontend PUT file tr?c ti?p lï¿½n B2
         /// </summary>
         /// <param name="key">File path (format: group/{groupId}/{docId}.pdf)</param>
-        /// <param name="expirationMinutes">Th?i gian h?t h?n (m?c ð?nh: 10 phút)</param>
-        /// <returns>Presigned URL ho?c empty string n?u chýa config</returns>
+        /// <param name="expirationMinutes">Th?i gian h?t h?n (m?c ï¿½?nh: 10 phï¿½t)</param>
+        /// <returns>Presigned URL ho?c empty string n?u chï¿½a config</returns>
         public async Task<string> GeneratePresignedUploadUrlAsync(string key, int expirationMinutes = 10)
         {
             if (_s3Client == null)
             {
-                _logger.LogWarning("Backblaze B2 storage chýa ðý?c c?u h?nh. Không th? t?o presigned upload URL cho key: {Key}", key);
+                _logger.LogWarning("Backblaze B2 storage chï¿½a ï¿½ï¿½?c c?u h?nh. Khï¿½ng th? t?o presigned upload URL cho key: {Key}", key);
                 return string.Empty;
             }
 
@@ -69,7 +69,7 @@ namespace StudioStudio_Server.Services
             };
 
             string url = _s3Client.GetPreSignedURL(request);
-            _logger.LogInformation("Ð? t?o presigned upload URL cho key: {Key}", key);
+            _logger.LogInformation("ï¿½? t?o presigned upload URL cho key: {Key}", key);
 
             return url;
         }
@@ -79,13 +79,13 @@ namespace StudioStudio_Server.Services
         /// Flow: Backend t?o URL ? Frontend GET file tr?c ti?p t? B2
         /// </summary>
         /// <param name="key">File path</param>
-        /// <param name="expirationMinutes">Th?i gian h?t h?n (m?c ð?nh: 60 phút)</param>
-        /// <returns>Presigned URL ho?c empty string n?u chýa config</returns>
+        /// <param name="expirationMinutes">Th?i gian h?t h?n (m?c ï¿½?nh: 60 phï¿½t)</param>
+        /// <returns>Presigned URL ho?c empty string n?u chï¿½a config</returns>
         public async Task<string> GeneratePresignedDownloadUrlAsync(string key, int expirationMinutes = 60)
         {
             if (_s3Client == null)
             {
-                _logger.LogWarning("Backblaze B2 storage chýa ðý?c c?u h?nh. Không th? t?o presigned download URL cho key: {Key}", key);
+                _logger.LogWarning("Backblaze B2 storage chï¿½a ï¿½ï¿½?c c?u h?nh. Khï¿½ng th? t?o presigned download URL cho key: {Key}", key);
                 return string.Empty;
             }
 
@@ -98,22 +98,22 @@ namespace StudioStudio_Server.Services
             };
 
             string url = _s3Client.GetPreSignedURL(request);
-            _logger.LogInformation("Ð? t?o presigned download URL cho key: {Key}", key);
+            _logger.LogInformation("ï¿½? t?o presigned download URL cho key: {Key}", key);
 
             return url;
         }
 
         /// <summary>
-        /// Xóa file v?nh vi?n kh?i Backblaze B2
-        /// Note: Luôn ki?m tra quy?n trý?c khi g?i. Xóa không th? hoàn tác.
+        /// Xï¿½a file v?nh vi?n kh?i Backblaze B2
+        /// Note: Luï¿½n ki?m tra quy?n trï¿½?c khi g?i. Xï¿½a khï¿½ng th? hoï¿½n tï¿½c.
         /// </summary>
-        /// <param name="key">File path c?n xóa</param>
-        /// <returns>True n?u thành công, false n?u th?t b?i</returns>
+        /// <param name="key">File path c?n xï¿½a</param>
+        /// <returns>True n?u thï¿½nh cï¿½ng, false n?u th?t b?i</returns>
         public async Task<bool> DeleteFileAsync(string key)
         {
             if (_s3Client == null)
             {
-                _logger.LogWarning("Backblaze B2 storage chýa ðý?c c?u h?nh. Không th? xóa file v?i key: {Key}", key);
+                _logger.LogWarning("Backblaze B2 storage chï¿½a ï¿½ï¿½?c c?u h?nh. Khï¿½ng th? xï¿½a file v?i key: {Key}", key);
                 return false;
             }
 
@@ -124,13 +124,13 @@ namespace StudioStudio_Server.Services
             };
 
             DeleteObjectResponse response = await _s3Client.DeleteObjectAsync(request);
-            _logger.LogInformation("Ð? xóa file v?i key: {Key}", key);
+            _logger.LogInformation("ï¿½? xï¿½a file v?i key: {Key}", key);
 
             return response.HttpStatusCode == System.Net.HttpStatusCode.NoContent;
         }
 
         /// <summary>
-        /// Ki?m tra file có t?n t?i trong B2 không
+        /// Ki?m tra file cï¿½ t?n t?i trong B2 khï¿½ng
         /// </summary>
         /// <param name="key">File path c?n ki?m tra</param>
         /// <returns>True n?u file t?n t?i</returns>
@@ -138,7 +138,7 @@ namespace StudioStudio_Server.Services
         {
             if (_s3Client == null)
             {
-                _logger.LogWarning("Backblaze B2 storage chýa ðý?c c?u h?nh. Không th? ki?m tra file v?i key: {Key}", key);
+                _logger.LogWarning("Backblaze B2 storage chï¿½a ï¿½ï¿½?c c?u h?nh. Khï¿½ng th? ki?m tra file v?i key: {Key}", key);
                 return false;
             }
 
@@ -166,7 +166,7 @@ namespace StudioStudio_Server.Services
 
         /// <summary>
         /// Download file t? B2 Storage
-        /// Tr? v? Stream ð? ð?c file content
+        /// Tr? v? Stream ï¿½? ï¿½?c file content
         /// </summary>
         /// <param name="key">File path c?n download</param>
         /// <returns>Stream c?a file</returns>
@@ -174,8 +174,8 @@ namespace StudioStudio_Server.Services
         {
             if (_s3Client == null)
             {
-                _logger.LogWarning("Backblaze B2 storage chýa ðý?c c?u h?nh. Không th? download file v?i key: {Key}", key);
-                throw new Exception("Backblaze B2 storage chýa ðý?c c?u h?nh");
+                _logger.LogWarning("Backblaze B2 storage chï¿½a ï¿½ï¿½?c c?u h?nh. Khï¿½ng th? download file v?i key: {Key}", key);
+                throw new Exception("Backblaze B2 storage chï¿½a ï¿½ï¿½?c c?u h?nh");
             }
 
             try
@@ -196,12 +196,32 @@ namespace StudioStudio_Server.Services
             {
                 _logger.LogError(ex, "L?i khi download file t? B2. Key: {Key}, Status: {Status}", 
                     key, ex.StatusCode);
-                throw new Exception($"Không th? download file: {ex.Message}", ex);
+                throw new Exception($"Khï¿½ng th? download file: {ex.Message}", ex);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "L?i không xác ð?nh khi download file. Key: {Key}", key);
+                _logger.LogError(ex, "L?i khï¿½ng xï¿½c ï¿½?nh khi download file. Key: {Key}", key);
                 throw;
+            }
+        }
+
+        /// <summary>
+        /// Test connection to Backblaze B2 storage
+        /// </summary>
+        public async Task TestConnectionAsync()
+        {
+            if (_s3Client == null)
+            {
+                throw new Exception("Backblaze B2 storage chï¿½a ï¿½ï¿½?c c?u h?nh");
+            }
+
+            // Test by listing buckets or checking bucket access
+            var request = new ListBucketsRequest();
+            var response = await _s3Client.ListBucketsAsync(request);
+
+            if (response.Buckets == null)
+            {
+                throw new Exception("Failed to connect to Backblaze B2");
             }
         }
     }

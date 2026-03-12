@@ -1,6 +1,7 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using StudioStudio_Server.Data;
 using StudioStudio_Server.Models.Entities;
+using StudioStudio_Server.Models.Enums;
 using StudioStudio_Server.Repositories.Interfaces;
 
 namespace StudioStudio_Server.Repositories
@@ -43,19 +44,24 @@ namespace StudioStudio_Server.Repositories
         public async Task<List<Announcement>> GetAllActiveAsync()
         {
             return await _context.Announcements
-                .Where(a => a.IsActive)
+                .Where(a => a.IsActive && a.Type != AnnouncementType.Mention)
                 .OrderByDescending(a => a.PublishedAt ?? a.CreatedAt)
                 .AsNoTracking()
                 .ToListAsync();
         }
 
         /// <summary>
-        /// Get all announcements (including inactive)
+        /// Get system-wide announcements (not @mentions)
+        /// Returns announcements where:
+        /// - Either NOT in UserAnnouncement table (never read)
+        /// - OR in UserAnnouncement with MentionedId == null (system-wide announcement)
+        /// (i.e., global announcements, not user-specific @mentions)
         /// Order by: CreatedAt DESC (newest first)
         /// </summary>
-        public async Task<List<Announcement>> GetAllAsync()
+        public async Task<List<Announcement>> GetSystemAnnouncementsAsync()
         {
             return await _context.Announcements
+                .Where(a => a.Type != AnnouncementType.Mention)
                 .OrderByDescending(a => a.CreatedAt)
                 .AsNoTracking()
                 .ToListAsync();
@@ -94,6 +100,20 @@ namespace StudioStudio_Server.Repositories
         {
             _context.Announcements.Remove(announcement);
             await _context.SaveChangesAsync();
+        }
+
+        public async Task<List<Announcement>> GetByUserIdAsync(Guid userId)
+        {
+            var userAnnouncementIds = await _context.UserAnnouncements
+                .Where(ua => ua.MentionedId == userId)
+                .Select(ua => ua.AnnouncementId)
+                .ToListAsync();
+
+            return await _context.Announcements
+                .Where(a => userAnnouncementIds.Contains(a.AnnouncementId) || a.Type != AnnouncementType.Mention)
+                .OrderByDescending(a => a.CreatedAt)
+                .AsNoTracking()
+                .ToListAsync();
         }
     }
 }
