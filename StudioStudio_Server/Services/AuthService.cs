@@ -10,6 +10,7 @@ using StudioStudio_Server.Metrics;
 using StudioStudio_Server.Models.DTOs.Request;
 using StudioStudio_Server.Models.DTOs.Response;
 using StudioStudio_Server.Models.Entities;
+using StudioStudio_Server.Models.Enums;
 using StudioStudio_Server.Repositories.Interfaces;
 using StudioStudio_Server.Services.Interfaces;
 using System.IdentityModel.Tokens.Jwt;
@@ -105,7 +106,7 @@ namespace StudioStudio_Server.Services
                 FirstName = registerRequest.FirstName,
                 LastName = registerRequest.LastName,
                 Status = UserStatus.Inactive,
-                DeletedFlag = false
+                IsVerify = false
             };
 
             //hashpassword using .net PasswordHasher
@@ -167,7 +168,7 @@ namespace StudioStudio_Server.Services
                 throw new AppException(ErrorCodes.UserNotFound, StatusCodes.Status404NotFound);
             }
 
-            if (user.DeletedFlag)
+            if (user.Status == UserStatus.Deleted)
             {
                 throw new AppException(ErrorCodes.UserAccountAlreadyDeleted, StatusCodes.Status400BadRequest);
             }
@@ -211,7 +212,7 @@ namespace StudioStudio_Server.Services
                 throw new AppException(ErrorCodes.AuthInvalidCredential, StatusCodes.Status401Unauthorized);
             }
 
-            if (user.DeletedFlag)
+            if (user.Status == UserStatus.Deleted)
             {
                 AppMetrics.UserLoginAttemptsTotal.WithLabels("failed").Inc();
                 throw new AppException(ErrorCodes.UserAccountAlreadyDeleted, StatusCodes.Status400BadRequest);
@@ -295,7 +296,7 @@ namespace StudioStudio_Server.Services
             if (user == null)
                 throw new AppException(ErrorCodes.UserNotFound, StatusCodes.Status404NotFound);
 
-            if (user.DeletedFlag)
+            if (user.Status == UserStatus.Deleted)
                 throw new AppException(ErrorCodes.UserAccountAlreadyDeleted, StatusCodes.Status400BadRequest);
 
             var accessTokenExpireMs = _configuration.GetValue<long>("JWT:AccessTokenExpireMs", 3600000);
@@ -397,14 +398,14 @@ namespace StudioStudio_Server.Services
                         LastName = lastName,
                         AvatarUrl = imgURL,
                         Status = UserStatus.Active,
-                        DeletedFlag = false
+                        IsVerify = false
                     };
 
                     await _userRepository.AddAsync(user);
                 }
                 else
                 {
-                    if (user.DeletedFlag)
+                    if (user.Status == UserStatus.Deleted)
                     {
                         throw new AppException(ErrorCodes.UserAccountAlreadyDeleted, StatusCodes.Status400BadRequest);
                     }
@@ -479,7 +480,7 @@ namespace StudioStudio_Server.Services
                 throw new AppException(ErrorCodes.UserNotFound, StatusCodes.Status404NotFound);
             }
 
-            if (user.DeletedFlag)
+            if (user.Status == UserStatus.Deleted)
             {
                 throw new AppException(ErrorCodes.UserAccountAlreadyDeleted, StatusCodes.Status400BadRequest);
             }
@@ -533,7 +534,7 @@ namespace StudioStudio_Server.Services
                 throw new AppException(ErrorCodes.UserNotFound, StatusCodes.Status404NotFound);
             }
 
-            if (user.DeletedFlag)
+            if (user.Status == UserStatus.Deleted)
             {
                 throw new AppException(ErrorCodes.UserAccountAlreadyDeleted, StatusCodes.Status400BadRequest);
             }
@@ -563,7 +564,7 @@ namespace StudioStudio_Server.Services
             if (resetData != null)
             {
                 var user = await _userRepository.GetByIdAsync(resetData.UserId);
-                if (user == null || user.DeletedFlag)
+                if (user == null || user.Status == UserStatus.Deleted)
                 {
                     return false;
                 }
@@ -606,7 +607,7 @@ namespace StudioStudio_Server.Services
                 throw new AppException(ErrorCodes.UserNotFound, StatusCodes.Status404NotFound);
             }
 
-            if (user.DeletedFlag)
+            if (user.Status == UserStatus.Deleted)
             {
                 throw new AppException(ErrorCodes.UserAccountAlreadyDeleted, StatusCodes.Status400BadRequest);
             }

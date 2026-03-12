@@ -9,6 +9,8 @@
   "USER001": "Không tìm thấy người dùng",
   "USER002": "Email đã được sử dụng",
   "USER003": "Tài khoản đã bị xóa",
+  "USER004": "Trạng thái không hợp lệ",
+  "USER005": "Không thể thay đổi trạng thái của người dùng quản trị",
 
   "REPORT001": "Dữ liệu báo cáo không hợp lệ",
   "REPORT002": "Chưa cấu hình email nhận báo cáo",
@@ -90,6 +92,8 @@
   "VALIDATION010": "Mật khẩu mới không được trùng với mật khẩu hiện tại",
   "VALIDATION011": "Cần ít nhất một nhóm.",
   "VALIDATION012": "Bạn đã vượt quá giới hạn gửi email (5 lần/15 phút). Vui lòng thử lại sau",
+  "VALIDATION013": "Độ dài chuỗi không hợp lệ",
+  "VALIDATION014": "Giá trị nằm ngoài phạm vi cho phép",
 
   "STORAGE001": "Dung lượng lưu trữ của nhóm đã đầy. Vui lòng xóa bớt tài liệu hoặc nâng cấp gói",
   "AI001": "Bạn đã vượt quá giới hạn số lượng câu hỏi AI trong ngày. Vui lòng thử lại vào ngày mai hoặc nâng cấp gói Premium",
@@ -142,6 +146,7 @@
   "SUCCESS042": "Hủy thanh toán thành công",
   "SUCCESS043": "Cập nhật báo cáo thành công",
   "SUCCESS044": "Cập nhật gói đăng ký thành công",
+  "SUCCESS045": "Cập nhật dữ liệu thành công",
 
   "PAYMENT001": "Không tìm thấy gói đăng ký",
   "PAYMENT002": "Không thể thanh toán cho gói miễn phí",

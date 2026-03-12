@@ -14,7 +14,7 @@
         public string? AvatarUrl { get; set; }
         public UserStatus Status { get; set; }
         public bool IsAdmin { get; set; }
-        public bool DeletedFlag { get; set; } = false;
+        public bool IsVerify { get; set; } = false;
 
         public DateTime CreatedAt { get; set; }
         public DateTime UpdatedAt { get; set; }
@@ -26,5 +26,6 @@
         public string? GoogleId { get; set; } = null;
         public ICollection<GroupParticipant> GroupParticipants { get; set; } = new List<GroupParticipant>();
         public ICollection<Favourite> Favourites { get; set; } = new List<Favourite>();
+        public ICollection<UserSubscription> UserSubscriptions { get; set; } = new List<UserSubscription>();
     }
 }

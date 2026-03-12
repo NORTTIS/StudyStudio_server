@@ -4,6 +4,7 @@ using StudioStudio_Server.Exceptions;
 using StudioStudio_Server.Localization;
 using StudioStudio_Server.Models.DTOs.Response;
 using StudioStudio_Server.Models.Entities;
+using StudioStudio_Server.Models.Enums;
 using StudioStudio_Server.Utils;
 using System.Security.Claims;
 
@@ -71,7 +72,7 @@ namespace StudioStudio_Server.Middlewares
                         }
 
                         // Check if user account has been deleted
-                        if (user.DeletedFlag)
+                        if (user.Status == UserStatus.Deleted)
                         {
                             _logger.LogWarning("User {UserId} account is deleted but attempting to access API", userId.Value);
                             await HandleUnauthorized(context, ErrorCodes.UserAccountAlreadyDeleted);

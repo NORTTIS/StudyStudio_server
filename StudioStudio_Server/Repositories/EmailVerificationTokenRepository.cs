@@ -1,6 +1,7 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using StudioStudio_Server.Data;
 using StudioStudio_Server.Models.Entities;
+using StudioStudio_Server.Models.Enums;
 using StudioStudio_Server.Repositories.Interfaces;
 
 namespace StudioStudio_Server.Repositories
@@ -29,7 +30,7 @@ namespace StudioStudio_Server.Repositories
 
         /// <summary>
         /// Get valid email verification token
-        /// Condition: Token = {token} AND IsUsed = false AND ExpiresAt > UtcNow AND User.DeletedFlag = false
+        /// Condition: Token = {token} AND IsUsed = false AND ExpiresAt > UtcNow AND User.Status != Deleted
         /// Include: User info
         /// Use case: Verify email during registration or email change
         /// </summary>
@@ -39,7 +40,7 @@ namespace StudioStudio_Server.Repositories
                 .Include(x => x.User)
                 .FirstOrDefaultAsync(x =>
                     x.Token == token && !x.IsUsed &&
-                    x.ExpiresAt > DateTime.UtcNow && !x.User.DeletedFlag);
+                    x.ExpiresAt > DateTime.UtcNow && x.User.Status != UserStatus.Deleted);
         }
 
         /// <summary>

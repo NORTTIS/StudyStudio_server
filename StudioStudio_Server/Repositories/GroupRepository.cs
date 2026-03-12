@@ -1,5 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using StudioStudio_Server.Data;
+using StudioStudio_Server.Models.DTOs.Response;
 using StudioStudio_Server.Models.Entities;
 using StudioStudio_Server.Repositories.Interfaces;
 
@@ -200,6 +201,205 @@ namespace StudioStudio_Server.Repositories
         public async Task SaveChangesAsync()
         {
             await _db.SaveChangesAsync();
+        }
+
+        /// <summary>
+        /// Get paginated groups with filters for admin
+        /// </summary>
+        public async Task<(List<Group> Groups, int TotalCount)> GetGroupsAsync(
+            string? searchTerm,
+            string? groupType,
+            int pageNumber,
+            int pageSize)
+        {
+            var query = _db.Groups.AsQueryable();
+
+            // Apply search filter
+            if (!string.IsNullOrWhiteSpace(searchTerm))
+            {
+                query = query.Where(g => g.GroupName.Contains(searchTerm));
+            }
+
+            // Apply group type filter
+            if (!string.IsNullOrWhiteSpace(groupType))
+            {
+                if (groupType.Equals("Studio", StringComparison.OrdinalIgnoreCase))
+                {
+                    query = query.Where(g => g.StudioId != null);
+                }
+                else if (groupType.Equals("Independent", StringComparison.OrdinalIgnoreCase))
+                {
+                    query = query.Where(g => g.StudioId == null);
+                }
+            }
+
+            // Get total count before pagination
+            var totalCount = await query.CountAsync();
+
+            // Apply pagination and ordering
+            var groups = await query
+                .OrderByDescending(g => g.CreatedAt)
+                .Skip((pageNumber - 1) * pageSize)
+                .Take(pageSize)
+                .AsNoTracking()
+                .ToListAsync();
+
+            return (groups, totalCount);
+        }
+
+        /// <summary>
+        /// Get member counts for a list of groups
+        /// </summary>
+        public async Task<Dictionary<Guid, int>> GetMemberCountsAsync(List<Guid> groupIds)
+        {
+            if (groupIds == null || groupIds.Count == 0)
+            {
+                return new Dictionary<Guid, int>();
+            }
+
+            var counts = await _db.GroupParticipants
+                .Where(p => groupIds.Contains(p.GroupId))
+                .GroupBy(p => p.GroupId)
+                .Select(g => new { GroupId = g.Key, Count = g.Count() })
+                .ToDictionaryAsync(x => x.GroupId, x => x.Count);
+
+            // Ensure all groupIds have an entry (default to 0 for groups with no members)
+            return groupIds.ToDictionary(g => g, g => counts.ContainsKey(g) ? counts[g] : 0);
+        }
+
+        /// <summary>
+        /// Get task counts for a list of groups
+        /// </summary>
+        public async Task<Dictionary<Guid, int>> GetTaskCountsAsync(List<Guid> groupIds)
+        {
+            if (groupIds == null || groupIds.Count == 0)
+            {
+                return new Dictionary<Guid, int>();
+            }
+
+            var counts = await _db.Tasks
+                .Where(t => groupIds.Contains(t.GroupId!.Value))
+                .GroupBy(t => t.GroupId)
+                .Select(g => new { GroupId = g.Key!.Value, Count = g.Count() })
+                .ToDictionaryAsync(x => x.GroupId, x => x.Count);
+
+            return groupIds.ToDictionary(g => g, g => counts.ContainsKey(g) ? counts[g] : 0);
+        }
+
+        /// <summary>
+        /// Get last activity for a list of groups
+        /// Last activity = MAX(Group.UpdatedAt, MAX(TaskItem.UpdatedAt), MAX(GroupMessage.CreatedAt))
+        /// </summary>
+        public async Task<Dictionary<Guid, DateTime?>> GetLastActivityAsync(List<Guid> groupIds)
+        {
+            if (groupIds == null || groupIds.Count == 0)
+            {
+                return new Dictionary<Guid, DateTime?>();
+            }
+
+            // Get group UpdatedAt
+            var groupUpdatedAt = await _db.Groups
+                .Where(g => groupIds.Contains(g.GroupId))
+                .Select(g => new { g.GroupId, g.UpdatedAt })
+                .ToDictionaryAsync(x => x.GroupId, x => (DateTime?)x.UpdatedAt);
+
+            // Get max task UpdatedAt per group
+            var taskUpdatedAt = await _db.Tasks
+                .Where(t => groupIds.Contains(t.GroupId!.Value))
+                .GroupBy(t => t.GroupId)
+                .Select(g => new { GroupId = g.Key!.Value, LastUpdated = g.Max(t => t.UpdatedAt) })
+                .ToDictionaryAsync(x => x.GroupId, x => (DateTime?)x.LastUpdated);
+
+            // Get max message CreatedAt per group
+            var messageCreatedAt = await _db.GroupMessages
+                .Where(m => groupIds.Contains(m.GroupId))
+                .GroupBy(m => m.GroupId)
+                .Select(g => new { GroupId = g.Key, LastMessage = g.Max(m => m.CreatedAt) })
+                .ToDictionaryAsync(x => x.GroupId, x => (DateTime?)x.LastMessage);
+
+            // Calculate max for each group
+            var result = new Dictionary<Guid, DateTime?>();
+            foreach (var groupId in groupIds)
+            {
+                var groupTime = groupUpdatedAt.GetValueOrDefault(groupId);
+                var taskTime = taskUpdatedAt.GetValueOrDefault(groupId);
+                var messageTime = messageCreatedAt.GetValueOrDefault(groupId);
+
+                var maxTime = groupTime;
+                if (taskTime.HasValue && (!maxTime.HasValue || taskTime > maxTime))
+                {
+                    maxTime = taskTime;
+                }
+                if (messageTime.HasValue && (!maxTime.HasValue || messageTime > maxTime))
+                {
+                    maxTime = messageTime;
+                }
+
+                result[groupId] = maxTime;
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// Get summary statistics for groups
+        /// </summary>
+        public async Task<GroupListSummary> GetGroupSummaryAsync(string? groupType)
+        {
+            var query = _db.Groups.AsQueryable();
+
+            // Apply group type filter
+            if (!string.IsNullOrWhiteSpace(groupType))
+            {
+                if (groupType.Equals("Studio", StringComparison.OrdinalIgnoreCase))
+                {
+                    query = query.Where(g => g.StudioId != null);
+                }
+                else if (groupType.Equals("Independent", StringComparison.OrdinalIgnoreCase))
+                {
+                    query = query.Where(g => g.StudioId == null);
+                }
+            }
+
+            var summary = new GroupListSummary
+            {
+                TotalGroups = await query.CountAsync(),
+                StudioGroups = await query.CountAsync(g => g.StudioId != null),
+                IndependentGroups = await query.CountAsync(g => g.StudioId == null),
+                ActiveGroups = await query.CountAsync(g => g.IsActive),
+                InactiveGroups = await query.CountAsync(g => !g.IsActive)
+            };
+
+            return summary;
+        }
+
+        /// <summary>
+        /// Get group by ID (including inactive groups for admin)
+        /// </summary>
+        public async Task<Group?> GetByIdAdminAsync(Guid groupId)
+        {
+            return await _db.Groups
+                .FirstOrDefaultAsync(g => g.GroupId == groupId);
+        }
+
+        /// <summary>
+        /// Get studio names for a list of studio IDs
+        /// </summary>
+        public async Task<Dictionary<Guid, string>> GetStudioNamesAsync(List<Guid?> studioIds)
+        {
+            var validIds = studioIds.Where(id => id.HasValue).Select(id => id!.Value).ToList();
+
+            if (validIds.Count == 0)
+            {
+                return new Dictionary<Guid, string>();
+            }
+
+            var studios = await _db.Studios
+                .Where(s => validIds.Contains(s.StudioId))
+                .Select(s => new { s.StudioId, s.StudioName })
+                .ToDictionaryAsync(x => x.StudioId, x => x.StudioName);
+
+            return studios;
         }
     }
 }

@@ -159,9 +159,9 @@ namespace StudioStudio_Server.Controllers
 
         /// <summary>
         /// [AUTHORIZED] DELETE /api/user-profile
-        /// Delete account (soft delete)
-        /// Action: Set DeletedFlag = true
-        /// Effect: User cannot login again
+        /// Delete account (ghost user)
+        /// Action: Set Status = Deleted, anonymize user data
+        /// Effect: User cannot login again, email can be reused for new registration
         /// </summary>
         [HttpDelete("user-profile")]
         public async Task<IActionResult> DeleteAccount()

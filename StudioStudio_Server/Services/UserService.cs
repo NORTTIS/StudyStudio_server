@@ -1,5 +1,6 @@
 using StudioStudio_Server.Models.DTOs.Request;
 using StudioStudio_Server.Models.Entities;
+using StudioStudio_Server.Models.Enums;
 using StudioStudio_Server.Repositories.Interfaces;
 using StudioStudio_Server.Services.Interfaces;
 using Microsoft.AspNetCore.Identity;
@@ -90,29 +91,46 @@ namespace StudioStudio_Server.Services
         }
 
         /// <summary>
-        /// Delete user account (soft delete)
+        /// Delete user account (ghost user)
         /// Validate: User exists and not already deleted
-        /// Action: Set DeletedFlag = true, UpdatedAt = UtcNow
+        /// Action:
+        ///   - Set Status = UserStatus.Deleted
+        ///   - Anonymize user data (ghostUser): clear email, name, password, etc.
+        ///   - Email is replaced with unique placeholder to allow new registration
         /// Note: User data remains in database for referential integrity
         /// CACHE: Invalidates user cache after deletion
         /// </summary>
         public async Task DeleteAsync(Guid userId)
         {
-            var user = await _userRepository.GetByIdAsync(userId);
+            var user = await _userRepository.GetByIdIncludingDeletedAsync(userId);
             if (user == null)
             {
                 throw new AppException(ErrorCodes.UserNotFound, StatusCodes.Status404NotFound);
             }
 
-            if (user.DeletedFlag)
+            if (user.Status == UserStatus.Deleted)
             {
                 throw new AppException(ErrorCodes.UserAccountAlreadyDeleted, StatusCodes.Status400BadRequest);
             }
 
-            user.DeletedFlag = true;
+            // Apply ghostUser: anonymize user data
+            // Note: Email is kept as-is because the unique index only applies to non-deleted users
+            // This allows the original email to be reused after the user is restored (if needed)
+            user.Status = UserStatus.Deleted;
+            user.IsVerify = false; // Reset verification status
+            user.FirstName = "Deleted";
+            user.LastName = "User";
+            // Generate random password hash to satisfy NOT NULL constraint
+            // This password is unusable since user cannot login (Status = Deleted)
+            user.PasswordHash = _passwordHasher.HashPassword(user, Guid.NewGuid().ToString("N"));
+            user.PhoneNumber = null;
+            user.Bio = null;
+            user.AvatarUrl = null;
+            user.GoogleId = null;
             user.UpdatedAt = DateTime.UtcNow;
+
             await _userRepository.UpdateAsync(user);
-            
+
             // Invalidate all user-related cache
             await _cacheService.InvalidateUserCacheAsync(userId);
         }

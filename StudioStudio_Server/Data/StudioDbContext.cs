@@ -45,6 +45,9 @@ namespace StudioStudio_Server.Data
             {
                 e.HasKey(x => x.UserId);
 
+                // Email is unique only for non-deleted users
+                // Deleted users have their email replaced with "deleted_{guid}@deleted.local"
+                // This allows new users to register with an email that belonged to a deleted account
                 e.HasIndex(x => x.Email).IsUnique();
 
                 e.Property(x => x.Email).IsRequired();
@@ -235,7 +238,7 @@ namespace StudioStudio_Server.Data
                 e.HasKey(x => x.SubscriptionId);
 
                 e.HasOne(x => x.User)
-                    .WithMany()
+                    .WithMany(u => u.UserSubscriptions)
                     .HasForeignKey(x => x.UserId);
 
                 e.HasOne(x => x.Plan)

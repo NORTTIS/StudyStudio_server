@@ -107,6 +107,8 @@
         public const string ValidationNewPasswordSameAsCurrent = "VALIDATION010";
         public const string ValidationGroupCreationNumber = "VALIDATION011";
         public const string ValidationRateLimitExceeded = "VALIDATION012";
+        public const string ValidationStringLength = "VALIDATION013";
+        public const string ValidationInvalidRange = "VALIDATION014";
 
         // STORAGE
         public const string StorageQuotaExceeded = "STORAGE001";
@@ -188,6 +190,13 @@
         public const string RevenueInvalidPeriod = "REVENUE002";
         public const string RevenueInvalidCustomPeriod = "REVENUE003";
         public const string RevenueInvalidLimit = "REVENUE004";
+
+        // USER
+        public const string UserInvalidStatus = "USER004";
+        public const string UserCannotModifyAdmin = "USER005";
+
+        // SUCCESS
+        public const string SuccessUpdateData = "SUCCESS045";
 
         // COMMON
         public const string UnexpectedError = "SYS001";

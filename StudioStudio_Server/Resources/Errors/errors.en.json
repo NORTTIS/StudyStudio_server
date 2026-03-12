@@ -9,6 +9,8 @@
   "USER001": "User not found",
   "USER002": "User already exists",
   "USER003": "Account has already been deleted",
+  "USER004": "Invalid status",
+  "USER005": "Cannot modify admin user status",
 
   "REPORT001": "Report data is invalid",
   "REPORT002": "Report email is not configured",
@@ -90,6 +92,8 @@
   "VALIDATION010": "New password cannot be the same as current password",
   "VALIDATION011": "Required at least one group.",
   "VALIDATION012": "You have exceeded the rate limit (5 times/15 minutes). Please try again later",
+  "VALIDATION013": "String length is invalid",
+  "VALIDATION014": "Value is out of valid range",
 
   "STORAGE001": "Group storage quota exceeded. Please delete some documents or upgrade your plan",
 
@@ -143,6 +147,7 @@
   "SUCCESS042": "Payment cancelled successfully",
   "SUCCESS043": "Report updated successfully",
   "SUCCESS044": "Subscription plan updated successfully",
+  "SUCCESS045": "Data updated successfully",
 
   "PAYMENT001": "Subscription plan not found",
   "PAYMENT002": "Cannot create payment for a free plan",
