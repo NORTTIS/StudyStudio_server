@@ -53,7 +53,7 @@ services:
     ports:
       - "9090:9090"
     volumes:
-      - ./prometheus.yml:/etc/prometheus
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
     networks:
       - studiostudio_net
 
