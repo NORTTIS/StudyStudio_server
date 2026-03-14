@@ -46,7 +46,7 @@ namespace StudioStudio_Server.Migrations
                     b.HasIndex("UserId", "Position")
                         .IsUnique();
 
-                    b.ToTable("PersonalTaskStatuses");
+                    b.ToTable("PersonalTaskStatuses", (string)null);
                 });
 
             modelBuilder.Entity("StudioStudio_Server.Models.Entities.AIRequestLog", b =>
@@ -66,7 +66,7 @@ namespace StudioStudio_Server.Migrations
 
                     b.HasKey("RequestId");
 
-                    b.ToTable("AIRequestLogs");
+                    b.ToTable("AIRequestLogs", (string)null);
                 });
 
             modelBuilder.Entity("StudioStudio_Server.Models.Entities.ActivityLog", b =>
@@ -91,7 +91,7 @@ namespace StudioStudio_Server.Migrations
 
                     b.HasKey("LogId");
 
-                    b.ToTable("ActivityLogs");
+                    b.ToTable("ActivityLogs", (string)null);
                 });
 
             modelBuilder.Entity("StudioStudio_Server.Models.Entities.Announcement", b =>
@@ -132,7 +132,7 @@ namespace StudioStudio_Server.Migrations
 
                     b.HasIndex("PublishedAt");
 
-                    b.ToTable("Announcements");
+                    b.ToTable("Announcements", (string)null);
                 });
 
             modelBuilder.Entity("StudioStudio_Server.Models.Entities.EmailVerificationToken", b =>
@@ -161,7 +161,7 @@ namespace StudioStudio_Server.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("EmailVerificationTokens");
+                    b.ToTable("EmailVerificationTokens", (string)null);
                 });
 
             modelBuilder.Entity("StudioStudio_Server.Models.Entities.Favourite", b =>
@@ -185,7 +185,7 @@ namespace StudioStudio_Server.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("Favourites");
+                    b.ToTable("Favourites", (string)null);
                 });
 
             modelBuilder.Entity("StudioStudio_Server.Models.Entities.Group", b =>
@@ -223,7 +223,7 @@ namespace StudioStudio_Server.Migrations
 
                     b.HasIndex("StudioId", "GroupName");
 
-                    b.ToTable("Groups");
+                    b.ToTable("Groups", (string)null);
                 });
 
             modelBuilder.Entity("StudioStudio_Server.Models.Entities.GroupAttachment", b =>
@@ -273,7 +273,7 @@ namespace StudioStudio_Server.Migrations
 
                     b.HasKey("GroupAttachmentId");
 
-                    b.ToTable("GroupAttachments");
+                    b.ToTable("GroupAttachments", (string)null);
                 });
 
             modelBuilder.Entity("StudioStudio_Server.Models.Entities.GroupMessage", b =>
@@ -314,7 +314,7 @@ namespace StudioStudio_Server.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("GroupMessages");
+                    b.ToTable("GroupMessages", (string)null);
                 });
 
             modelBuilder.Entity("StudioStudio_Server.Models.Entities.GroupParticipant", b =>
@@ -342,7 +342,7 @@ namespace StudioStudio_Server.Migrations
                     b.HasIndex("GroupId", "UserId")
                         .IsUnique();
 
-                    b.ToTable("GroupParticipants");
+                    b.ToTable("GroupParticipants", (string)null);
                 });
 
             modelBuilder.Entity("StudioStudio_Server.Models.Entities.GroupTaskStatus", b =>
@@ -369,7 +369,7 @@ namespace StudioStudio_Server.Migrations
                     b.HasIndex("GroupId", "Position")
                         .IsUnique();
 
-                    b.ToTable("GroupTaskStatuses");
+                    b.ToTable("GroupTaskStatuses", (string)null);
                 });
 
             modelBuilder.Entity("StudioStudio_Server.Models.Entities.Payment", b =>
@@ -418,7 +418,7 @@ namespace StudioStudio_Server.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("Payments");
+                    b.ToTable("Payments", (string)null);
                 });
 
             modelBuilder.Entity("StudioStudio_Server.Models.Entities.PersonalAttachment", b =>
@@ -450,7 +450,7 @@ namespace StudioStudio_Server.Migrations
 
                     b.HasKey("AttachmentId");
 
-                    b.ToTable("PersonalAttachments");
+                    b.ToTable("PersonalAttachments", (string)null);
                 });
 
             modelBuilder.Entity("StudioStudio_Server.Models.Entities.RefreshToken", b =>
@@ -478,7 +478,7 @@ namespace StudioStudio_Server.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("RefreshToken");
+                    b.ToTable("RefreshToken", (string)null);
                 });
 
             modelBuilder.Entity("StudioStudio_Server.Models.Entities.Report", b =>
@@ -522,7 +522,7 @@ namespace StudioStudio_Server.Migrations
 
                     b.HasKey("ReportId");
 
-                    b.ToTable("Reports");
+                    b.ToTable("Reports", (string)null);
                 });
 
             modelBuilder.Entity("StudioStudio_Server.Models.Entities.Studio", b =>
@@ -554,7 +554,7 @@ namespace StudioStudio_Server.Migrations
 
                     b.HasIndex("OwnerId");
 
-                    b.ToTable("Studios");
+                    b.ToTable("Studios", (string)null);
                 });
 
             modelBuilder.Entity("StudioStudio_Server.Models.Entities.SubscriptionPlan", b =>
@@ -600,7 +600,7 @@ namespace StudioStudio_Server.Migrations
                     b.HasIndex("PlanName")
                         .IsUnique();
 
-                    b.ToTable("SubscriptionPlans");
+                    b.ToTable("SubscriptionPlans", (string)null);
                 });
 
             modelBuilder.Entity("StudioStudio_Server.Models.Entities.TaskAssignment", b =>
@@ -626,7 +626,7 @@ namespace StudioStudio_Server.Migrations
                     b.HasIndex("TaskId", "AssignedTo")
                         .IsUnique();
 
-                    b.ToTable("TaskAssignments");
+                    b.ToTable("TaskAssignments", (string)null);
                 });
 
             modelBuilder.Entity("StudioStudio_Server.Models.Entities.TaskComment", b =>
@@ -667,7 +667,7 @@ namespace StudioStudio_Server.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("TaskComments");
+                    b.ToTable("TaskComments", (string)null);
                 });
 
             modelBuilder.Entity("StudioStudio_Server.Models.Entities.TaskHistory", b =>
@@ -693,7 +693,7 @@ namespace StudioStudio_Server.Migrations
 
                     b.HasKey("HistoryId");
 
-                    b.ToTable("TaskHistories");
+                    b.ToTable("TaskHistories", (string)null);
                 });
 
             modelBuilder.Entity("StudioStudio_Server.Models.Entities.Template", b =>
@@ -729,7 +729,7 @@ namespace StudioStudio_Server.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("Templates");
+                    b.ToTable("Templates", (string)null);
                 });
 
             modelBuilder.Entity("StudioStudio_Server.Models.Entities.User", b =>
@@ -793,7 +793,7 @@ namespace StudioStudio_Server.Migrations
                     b.HasIndex("Email")
                         .IsUnique();
 
-                    b.ToTable("Users");
+                    b.ToTable("Users", (string)null);
                 });
 
             modelBuilder.Entity("StudioStudio_Server.Models.Entities.UserAnnouncement", b =>
@@ -831,7 +831,7 @@ namespace StudioStudio_Server.Migrations
 
                     b.HasIndex("MentionedId");
 
-                    b.ToTable("UserAnnouncements");
+                    b.ToTable("UserAnnouncements", (string)null);
                 });
 
             modelBuilder.Entity("StudioStudio_Server.Models.Entities.UserSubscription", b =>
@@ -861,7 +861,7 @@ namespace StudioStudio_Server.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("UserSubscriptions");
+                    b.ToTable("UserSubscriptions", (string)null);
                 });
 
             modelBuilder.Entity("TaskItem", b =>
@@ -926,7 +926,7 @@ namespace StudioStudio_Server.Migrations
 
                     b.HasIndex("PersonalStatusId");
 
-                    b.ToTable("Tasks");
+                    b.ToTable("Tasks", (string)null);
                 });
 
             modelBuilder.Entity("PersonalTaskStatus", b =>

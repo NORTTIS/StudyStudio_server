@@ -127,6 +127,8 @@ builder.Services.AddScoped<ISubscriptionPlanRepository, SubscriptionPlanReposito
 builder.Services.AddScoped<IRevenueService, RevenueService>();
 builder.Services.AddScoped<IAdminUserService, AdminUserService>();
 builder.Services.AddScoped<IAdminGroupService, AdminGroupService>();
+builder.Services.AddScoped<IAdminStatisticsRepository, AdminStatisticsRepository>();
+builder.Services.AddScoped<IAdminStatisticsService, AdminStatisticsService>();
 
 // AI & Document Services
 builder.Services.AddScoped<IFileStorageService, BackblazeStorageService>();

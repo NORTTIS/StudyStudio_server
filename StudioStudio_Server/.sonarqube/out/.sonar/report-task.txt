@@ -1,0 +1,6 @@
+projectKey=SEP490_G62_NET
+serverUrl=http://localhost
+serverVersion=26.3.0.120487
+dashboardUrl=http://localhost/dashboard?id=SEP490_G62_NET
+ceTaskId=e7475647-d37d-4dad-90c6-f47a48e56284
+ceTaskUrl=http://localhost/api/ce/task?id=e7475647-d37d-4dad-90c6-f47a48e56284

@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ProjectInfo xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns="http://www.sonarsource.com/msbuild/integration/2015/1">
+  <ProjectName>StudioStudio_Server</ProjectName>
+  <ProjectLanguage>C#</ProjectLanguage>
+  <ProjectType>Product</ProjectType>
+  <ProjectGuid>8c9c82c0-f70c-43d3-9cd6-cf0e7211b150</ProjectGuid>
+  <FullPath>D:\Code\StudyStudio\StudyStudio_server\StudioStudio_Server\StudioStudio_Server.csproj</FullPath>
+  <IsExcluded>false</IsExcluded>
+  <AnalysisResultFiles>
+    <AnalysisResultFile Id="FilesToAnalyze" Location="D:\Code\StudyStudio\StudyStudio_server\StudioStudio_Server\.sonarqube\conf\0\FilesToAnalyze.txt" />
+  </AnalysisResultFiles>
+  <AnalysisSettings>
+    <Property Name="sonar.cs.roslyn.reportFilePaths">D:\Code\StudyStudio\StudyStudio_server\StudioStudio_Server\.sonarqube\out\0\Issues.json</Property>
+    <Property Name="sonar.cs.analyzer.projectOutPaths">D:\Code\StudyStudio\StudyStudio_server\StudioStudio_Server\.sonarqube\out\0</Property>
+    <Property Name="sonar.cs.scanner.telemetry">D:\Code\StudyStudio\StudyStudio_server\StudioStudio_Server\.sonarqube\out\0\Telemetry.json</Property>
+  </AnalysisSettings>
+  <Configuration>Debug</Configuration>
+  <Platform>AnyCPU</Platform>
+  <TargetFramework>net8.0</TargetFramework>
+</ProjectInfo>
