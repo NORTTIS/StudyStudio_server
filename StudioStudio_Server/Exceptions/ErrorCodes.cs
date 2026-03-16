@@ -173,6 +173,7 @@
         // ANNOUNCEMENT
         public const string AnnouncementTagTitle = "ANNOUNCEMENTTAGTITLE";
         public const string AnnouncementTagContent = "ANNOUNCEMENTTAGCONTENT";
+        public const string AnnouncementTagTask = "ANNOUNCEMENTTAGTASK";
         public const string AnnouncementNotFound = "ANNOUNCEMENT001";
 
         // PAYMENT

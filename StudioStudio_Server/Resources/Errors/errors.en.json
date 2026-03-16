@@ -103,6 +103,7 @@
 
   "ANNOUNCEMENTTAGTITLE": "You have been mentioned",
   "ANNOUNCEMENTTAGCONTENT": "have mentioned you at group",
+  "ANNOUNCEMENTTAGTASK": "have mentioned you at task",
   "ANNOUNCEMENT001": "Announcement not found",
 
   "SUCCESS001": "Registration successful. Please check your email to verify your account",

@@ -331,7 +331,6 @@ app.MapControllers();
 
 // Map SignalR Hubs
 app.MapHub<GroupDiscussHub>("/hubs/group-discuss");
-app.MapHub<TaskCommentHub>("/hubs/task-comment");
 
 // Prometheus metrics endpoint
 app.MapMetrics();
