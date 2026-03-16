@@ -7,7 +7,7 @@ namespace StudioStudio_Server.Models.DTOs.Request
     {
         public Guid GroupId { get; set; }
         public string TaskName { get; set; } = string.Empty;
-        public string TaskDescription { get; set; } = string.Empty;
+        public string? TaskDescription { get; set; } = string.Empty;
         public TaskPriority TaskPriority { get; set; }
         public TaskSeverity TaskSeverity { get; set; }
         public DateTime? StartDate { get; set; }
@@ -20,7 +20,7 @@ namespace StudioStudio_Server.Models.DTOs.Request
     public class TaskItemPersonalRequest
     {
         public string TaskName { get; set; } = string.Empty;
-        public string TaskDescription { get; set; } = string.Empty;
+        public string? TaskDescription { get; set; } = string.Empty;
         public TaskPriority TaskPriority { get; set; }
         public TaskSeverity TaskSeverity { get; set; }
         public DateTime? StartDate { get; set; }
