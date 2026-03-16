@@ -152,5 +152,24 @@ namespace StudioStudio_Server.Controllers
                 message,
                 null));
         }
+
+        /// <summary>
+        /// [AUTHORIZED] GET /api/studio/{studioId}/members
+        /// Get list of members in studio
+        /// Validate: User must be member or owner of studio
+        /// Include: User info, studio role, and group info within this studio
+        /// </summary>
+        [HttpGet("{studioId}/members")]
+        public async Task<ActionResult<ApiResponse<List<StudioMemberResponse>>>> GetStudioMembers(Guid studioId)
+        {
+            var userId = JwtHelper.ValidateAndGetUserId(User);
+            var result = await _studioService.GetStudioMembersAsync(userId, studioId);
+            var message = _messageService.GetMessage(ErrorCodes.SuccessGetData);
+
+            return Ok(ApiResponse<List<StudioMemberResponse>>.Success(
+                ErrorCodes.SuccessGetData,
+                message,
+                result));
+        }
     }
 }

@@ -1,5 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using StudioStudio_Server.Models.Entities;
+using StudioStudio_Server.Models.Enums;
 
 namespace StudioStudio_Server.Data
 {
@@ -35,6 +36,7 @@ namespace StudioStudio_Server.Data
         public DbSet<GroupMessage> GroupMessages => Set<GroupMessage>();
         public DbSet<TaskComment> TaskComments => Set<TaskComment>();
         public DbSet<UserAnnouncement> UserAnnouncements => Set<UserAnnouncement>();
+        public DbSet<StudioParticipant> StudioParticipants => Set<StudioParticipant>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -91,6 +93,28 @@ namespace StudioStudio_Server.Data
                     .WithMany()
                     .HasForeignKey(x => x.OwnerId)
                     .OnDelete(DeleteBehavior.Restrict);
+
+                e.HasMany(s => s.Participants)
+                    .WithOne(p => p.Studio)
+                    .HasForeignKey(p => p.StudioId)
+                    .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            // STUDIO PARTICIPANT
+            modelBuilder.Entity<StudioParticipant>(e =>
+            {
+                e.HasKey(x => x.ParticipantId);
+
+                e.HasIndex(x => new { x.StudioId, x.UserId })
+                    .IsUnique();
+
+                e.HasOne<User>(x => x.User)
+                    .WithMany(x => x.StudioParticipants)
+                    .HasForeignKey(x => x.UserId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                e.Property(x => x.Role)
+                    .HasConversion<int>();
             });
 
             // GROUP

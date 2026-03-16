@@ -15,5 +15,6 @@
         public DateTime UpdatedAt { get; set; }
 
         public ICollection<Group> Groups { get; set; } = new List<Group>();
+        public ICollection<StudioParticipant> Participants { get; set; } = new List<StudioParticipant>();
     }
 }

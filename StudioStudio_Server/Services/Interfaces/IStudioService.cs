@@ -13,5 +13,6 @@ namespace StudioStudio_Server.Services.Interfaces
         Task<StudioResponse> CreateStudioAsync(Guid ownerId, CreateStudioRequest studio);
         Task DeleteStudioAsync(Guid ownerId, Guid studioId);
         Task<UpdateStudioResponse> UpdateStudioAsync(Guid userId, UpdateStudioRequest studio);
+        Task<List<StudioMemberResponse>> GetStudioMembersAsync(Guid userId, Guid studioId);
     }
 }
