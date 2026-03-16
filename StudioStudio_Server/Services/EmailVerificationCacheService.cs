@@ -128,13 +128,9 @@ namespace StudioStudio_Server.Services
                 var emailKey = TOKEN_BY_EMAIL_PREFIX + email.ToLowerInvariant();
                 var tokenKey = TOKEN_DATA_PREFIX + token;
 
-                // Use batch for atomic operations
-                var batch = _database.CreateBatch();
-                var emailTask = batch.StringSetAsync(emailKey, token, expiry);
-                var tokenTask = batch.StringSetAsync(tokenKey, json, expiry);
-                batch.Execute();
-
-                await Task.WhenAll(emailTask, tokenTask);
+                // Use direct database calls for reliability
+                await _database.StringSetAsync(emailKey, token, expiry);
+                await _database.StringSetAsync(tokenKey, json, expiry);
 
                 _logger.LogInformation(
                     "Stored verification token for email: {Email}, UserId: {UserId}, Expires in: {Expiry}",
@@ -163,12 +159,9 @@ namespace StudioStudio_Server.Services
                 {
                     var tokenKey = TOKEN_DATA_PREFIX + oldToken;
 
-                    var batch = _database.CreateBatch();
-                    var deleteEmailTask = batch.KeyDeleteAsync(emailKey);
-                    var deleteTokenTask = batch.KeyDeleteAsync(tokenKey);
-                    batch.Execute();
-
-                    await Task.WhenAll(deleteEmailTask, deleteTokenTask);
+                    // Use direct database calls for reliability
+                    await _database.KeyDeleteAsync(emailKey);
+                    await _database.KeyDeleteAsync(tokenKey);
 
                     _logger.LogInformation("Invalidated verification token for email: {Email}", email);
                 }

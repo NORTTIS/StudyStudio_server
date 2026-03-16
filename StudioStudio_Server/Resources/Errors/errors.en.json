@@ -3,8 +3,9 @@
   "AUTH002": "Token has expired",
   "AUTH003": "You do not have permission",
   "AUTH004": "Password confirmation does not match",
-  "AUTH005": "Account not verified.",
-  "AUTH006": "Current password is incorrect",
+  "AUTH005": "Account not verified. Please check your email",
+  "AUTH006": "Account has been deactivated. Contact admin for support",
+  "AUTH007": "Current password is incorrect",
 
   "USER001": "User not found",
   "USER002": "User already exists",

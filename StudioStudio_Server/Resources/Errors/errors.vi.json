@@ -4,7 +4,8 @@
   "AUTH003": "Bạn không có quyền truy cập",
   "AUTH004": "Xác nhận mật khẩu không khớp",
   "AUTH005": "Tài khoản chưa được xác thực. Vui lòng kiểm tra email",
-  "AUTH006": "Mật khẩu hiện tại không đúng",
+  "AUTH006": "Tài khoản đã bị vô hiệu hóa. Liên hệ admin để được hỗ trợ",
+  "AUTH007": "Mật khẩu hiện tại không đúng",
 
   "USER001": "Không tìm thấy người dùng",
   "USER002": "Email đã được sử dụng",

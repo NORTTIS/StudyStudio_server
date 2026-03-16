@@ -79,11 +79,11 @@ namespace StudioStudio_Server.Middlewares
                             return;
                         }
 
-                        // Check if user account is inactive (not verified)
+                        // Check if user account is inactive (disabled by admin)
                         if (user.Status == UserStatus.Inactive)
                         {
                             _logger.LogWarning("User {UserId} account is inactive but attempting to access API", userId.Value);
-                            await HandleUnauthorized(context, ErrorCodes.AuthAccountNotVerified);
+                            await HandleUnauthorized(context, ErrorCodes.AuthAccountInactive);
                             return;
                         }
 

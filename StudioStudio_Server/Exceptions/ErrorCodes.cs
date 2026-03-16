@@ -8,7 +8,8 @@
         public const string AuthForbidden = "AUTH003";
         public const string AuthPasswordMismatch = "AUTH004";
         public const string AuthAccountNotVerified = "AUTH005";
-        public const string AuthIncorrectCurrentPassword = "AUTH006";
+        public const string AuthAccountInactive = "AUTH006";
+        public const string AuthIncorrectCurrentPassword = "AUTH007";
 
         // USER
         public const string UserNotFound = "USER001";

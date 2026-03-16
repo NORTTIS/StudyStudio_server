@@ -59,7 +59,7 @@ namespace StudioStudio_Server.Services
             _emailVerificationCache = emailVerificationCache;
             _resetCache = resetCache;
         }
-        
+
         /// <summary>
         /// Register new user account
         /// Validate:
@@ -105,7 +105,7 @@ namespace StudioStudio_Server.Services
                 Email = registerRequest.Email,
                 FirstName = registerRequest.FirstName,
                 LastName = registerRequest.LastName,
-                Status = UserStatus.Inactive,
+                Status = UserStatus.Active,
                 IsVerify = false
             };
 
@@ -178,7 +178,7 @@ namespace StudioStudio_Server.Services
                 throw new AppException(ErrorCodes.ValidationEmailAlreadyVerified, StatusCodes.Status400BadRequest);
             }
 
-            user.Status = UserStatus.Active;
+            user.IsVerify = true;
             user.UpdatedAt = DateTime.UtcNow;
 
             await _userRepository.UpdateAsync(user);
@@ -229,7 +229,7 @@ namespace StudioStudio_Server.Services
 
             if (user.Status == UserStatus.Inactive)
             {
-                throw new AppException(ErrorCodes.AuthAccountNotVerified, StatusCodes.Status403Forbidden);
+                throw new AppException(ErrorCodes.AuthAccountInactive, StatusCodes.Status403Forbidden);
             }
 
 
@@ -284,7 +284,7 @@ namespace StudioStudio_Server.Services
                 throw new AppException(ErrorCodes.AuthTokenExpired, StatusCodes.Status401Unauthorized);
 
             await _refreshTokenRepository.RevokeAsync(token);
-            
+
             // ✅ CLEANUP: Delete all expired/revoked tokens for this user
             var deletedCount = await _refreshTokenRepository.CleanupUserTokensAsync(token.UserId);
             if (deletedCount > 0)
@@ -339,7 +339,7 @@ namespace StudioStudio_Server.Services
             if (token != null)
             {
                 await _refreshTokenRepository.RevokeAsync(token);
-                
+
                 // ✅ CLEANUP: Delete all expired/revoked tokens for this user
                 var deletedCount = await _refreshTokenRepository.CleanupUserTokensAsync(token.UserId);
                 if (deletedCount > 0)
@@ -551,7 +551,7 @@ namespace StudioStudio_Server.Services
                 Console.WriteLine($"Revoked {revokedCount} active refresh tokens for user {user.UserId} after password reset");
             }
         }
-        
+
         /// <summary>
         /// Verify if reset token is valid
         /// Used to check token validity before showing reset password form
@@ -642,7 +642,7 @@ namespace StudioStudio_Server.Services
                 html
             );
         }
-        
+
         /// <summary>
         /// Validate email format using regex
         /// </summary>
@@ -659,7 +659,7 @@ namespace StudioStudio_Server.Services
         {
             return PasswordRegex.IsMatch(pass);
         }
-        
+
         /// <summary>
         /// Generate JWT access token
         /// Claims: UserId (Sub), Email, IsAdmin
@@ -687,7 +687,7 @@ namespace StudioStudio_Server.Services
 
             return new JwtSecurityTokenHandler().WriteToken(token);
         }
-        
+
         /// <summary>
         /// Create new refresh token entity
         /// Token: Random 64-byte base64 string
@@ -702,7 +702,7 @@ namespace StudioStudio_Server.Services
                 UserId = user.UserId
             };
         }
-        
+
         /// <summary>
         /// Set refresh token in HttpOnly cookie
         /// Security: HttpOnly prevents XSS, Secure requires HTTPS, SameSite=None for cross-origin
