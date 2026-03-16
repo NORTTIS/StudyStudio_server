@@ -753,6 +753,295 @@
 
         #endregion
 
+        #region Studio Invite
+
+        public static string StudioInviteEmail(
+            string inviteUrl,
+            string inviterName,
+            string studioName,
+            string role,
+            string? studioDescription = null,
+            Language language = Language.Vietnamese)
+        {
+            return language == Language.Vietnamese
+                ? StudioInviteEmailVietnamese(inviteUrl, inviterName, studioName, role, studioDescription)
+                : StudioInviteEmailEnglish(inviteUrl, inviterName, studioName, role, studioDescription);
+        }
+
+        private static string StudioInviteEmailEnglish(
+            string inviteUrl,
+            string inviterName,
+            string studioName,
+            string role,
+            string? studioDescription = null)
+        {
+            return $@"
+            <!DOCTYPE html>
+            <html lang=""en"">
+            <head>
+            <meta charset=""UTF-8"" />
+            <meta name=""viewport"" content=""width=device-width, initial-scale=1.0"" />
+            <title>Invitation to join Studio</title>
+            </head>
+
+            <body style=""margin:0;padding:0;background:#f5f7fa;font-family:Arial,Helvetica,sans-serif;"">
+
+            <table align=""center"" width=""100%"" cellpadding=""0"" cellspacing=""0""
+            style=""max-width:620px;margin:40px auto;background:#ffffff;border-radius:20px;overflow:hidden;box-shadow:0 10px 30px rgba(0,0,0,0.08);"">
+
+              <!-- HEADER -->
+              <tr>
+                <td style=""background:linear-gradient(135deg,#7E57C2,#5E35B1);padding:45px 30px;text-align:center;color:white;"">
+                  <h1 style=""margin:0;font-size:24px;font-weight:700;"">
+                    Invitation to join Studio
+                  </h1>
+                  <p style=""margin-top:10px;font-size:14px;opacity:0.95;"">
+                    Join your collaborative study space on Study Studio
+                  </p>
+                </td>
+              </tr>
+
+              <!-- BODY -->
+              <tr>
+                <td style=""padding:40px 35px;color:#333;font-size:15px;line-height:1.7;"">
+
+                  <p>Hello,</p>
+
+                  <p>
+                    <strong>{inviterName}</strong> has invited you to join the studio
+                    <strong>{studioName}</strong>
+                  </p>
+
+                  <!-- ROLE BADGE -->
+                  <div style=""margin:15px 0;"">
+                    <span style=""display:inline-block;
+                                 background:#ede7f6;
+                                 color:#5E35B1;
+                                 padding:6px 16px;
+                                 border-radius:30px;
+                                 font-weight:600;
+                                 font-size:13px;"">
+                        Role: {role}
+                    </span>
+                  </div>
+
+                  {(!string.IsNullOrEmpty(studioDescription) ? $@"
+                  <!-- DESCRIPTION -->
+                  <div style=""margin-top:20px;
+                              padding:16px;
+                              background:#f5f3fa;
+                              border-radius:12px;
+                              font-size:14px;
+                              color:#555;"">
+                      {studioDescription}
+                  </div>
+                  " : "")}
+
+                  <p style=""margin-top:25px;"">
+                    Click the button below to accept the invitation and start collaborating:
+                  </p>
+
+                  <!-- CTA -->
+                  <div style=""text-align:center;margin:35px 0;"">
+                    <a href=""{inviteUrl}""
+                       style=""background:#5E35B1;
+                              color:#fff;
+                              padding:15px 34px;
+                              text-decoration:none;
+                              font-weight:600;
+                              border-radius:40px;
+                              display:inline-block;
+                              font-size:16px;
+                              box-shadow:0 8px 20px rgba(94,53,177,0.45);"">
+                       Accept Invitation
+                    </a>
+                  </div>
+
+                  <!-- ALT LINK -->
+                  <p style=""font-size:14px;color:#666;margin-top:20px;"">
+                    Or copy and paste the link below into your browser:
+                  </p>
+
+                  <p style=""word-break:break-all;
+                            background:#ede7f6;
+                            padding:12px 14px;
+                            border-radius:10px;
+                            font-size:13px;
+                            color:#5E35B1;"">
+                    {inviteUrl}
+                  </p>
+
+                  <!-- EXPIRY -->
+                  <div style=""margin-top:25px;
+                              padding:14px 16px;
+                              background:#f5f3fa;
+                              border:1px solid #d1c4e9;
+                              border-radius:12px;
+                              font-size:14px;"">
+                    This invitation will expire in <strong>15 minutes</strong>.
+                  </div>
+
+                  <hr style=""margin:35px 0;border:none;border-top:1px solid #eee;"">
+
+                  <p style=""font-size:12px;color:#999;"">
+                    If you didn't expect this invitation, you can ignore this email.
+                  </p>
+
+                </td>
+              </tr>
+
+              <!-- FOOTER -->
+              <tr>
+                <td style=""background:#fafafa;padding:25px;text-align:center;font-size:12px;color:#999;"">
+                  © 2026 Study Studio <br/>
+                  Made with care for Students
+                </td>
+              </tr>
+
+            </table>
+
+            </body>
+            </html>";
+        }
+
+        private static string StudioInviteEmailVietnamese(
+            string inviteUrl,
+            string inviterName,
+            string studioName,
+            string role,
+            string? studioDescription = null)
+        {
+            return $@"
+            <!DOCTYPE html>
+            <html lang=""vi"">
+            <head>
+            <meta charset=""UTF-8"" />
+            <meta name=""viewport"" content=""width=device-width, initial-scale=1.0"" />
+            <title>Lời mời tham gia Studio</title>
+            </head>
+
+            <body style=""margin:0;padding:0;background:#f5f7fa;font-family:Arial,Helvetica,sans-serif;"">
+
+            <table align=""center"" width=""100%"" cellpadding=""0"" cellspacing=""0""
+            style=""max-width:620px;margin:40px auto;background:#ffffff;border-radius:20px;overflow:hidden;box-shadow:0 10px 30px rgba(0,0,0,0.08);"">
+
+              <!-- HEADER -->
+              <tr>
+                <td style=""background:linear-gradient(135deg,#7E57C2,#5E35B1);padding:45px 30px;text-align:center;color:white;"">
+                  <h1 style=""margin:0;font-size:24px;font-weight:700;"">
+                    Lời mời tham gia Studio
+                  </h1>
+                  <p style=""margin-top:10px;font-size:14px;opacity:0.95;"">
+                    Tham gia không gian học tập cộng tác trên Study Studio
+                  </p>
+                </td>
+              </tr>
+
+              <!-- BODY -->
+              <tr>
+                <td style=""padding:40px 35px;color:#333;font-size:15px;line-height:1.7;"">
+
+                  <p>Xin chào,</p>
+
+                  <p>
+                    <strong>{inviterName}</strong> đã mời bạn tham gia studio
+                    <strong>{studioName}</strong>
+                  </p>
+
+                  <!-- ROLE BADGE -->
+                  <div style=""margin:15px 0;"">
+                    <span style=""display:inline-block;
+                                 background:#ede7f6;
+                                 color:#5E35B1;
+                                 padding:6px 16px;
+                                 border-radius:30px;
+                                 font-weight:600;
+                                 font-size:13px;"">
+                        Vai trò: {role}
+                    </span>
+                  </div>
+
+                  {(!string.IsNullOrEmpty(studioDescription) ? $@"
+                  <!-- DESCRIPTION -->
+                  <div style=""margin-top:20px;
+                              padding:16px;
+                              background:#f5f3fa;
+                              border-radius:12px;
+                              font-size:14px;
+                              color:#555;"">
+                      {studioDescription}
+                  </div>
+                  " : "")}
+
+                  <p style=""margin-top:25px;"">
+                    Nhấn vào nút bên dưới để chấp nhận lời mời và bắt đầu cộng tác:
+                  </p>
+
+                  <!-- CTA -->
+                  <div style=""text-align:center;margin:35px 0;"">
+                    <a href=""{inviteUrl}""
+                       style=""background:#5E35B1;
+                              color:#fff;
+                              padding:15px 34px;
+                              text-decoration:none;
+                              font-weight:600;
+                              border-radius:40px;
+                              display:inline-block;
+                              font-size:16px;
+                              box-shadow:0 8px 20px rgba(94,53,177,0.45);"">
+                       Chấp nhận lời mời
+                    </a>
+                  </div>
+
+                  <!-- ALT LINK -->
+                  <p style=""font-size:14px;color:#666;margin-top:20px;"">
+                    Hoặc sao chép và dán liên kết sau vào trình duyệt:
+                  </p>
+
+                  <p style=""word-break:break-all;
+                            background:#ede7f6;
+                            padding:12px 14px;
+                            border-radius:10px;
+                            font-size:13px;
+                            color:#5E35B1;"">
+                    {inviteUrl}
+                  </p>
+
+                  <!-- EXPIRY -->
+                  <div style=""margin-top:25px;
+                              padding:14px 16px;
+                              background:#f5f3fa;
+                              border:1px solid #d1c4e9;
+                              border-radius:12px;
+                              font-size:14px;"">
+                    Lời mời này sẽ hết hạn sau <strong>15 phút</strong>.
+                  </div>
+
+                  <hr style=""margin:35px 0;border:none;border-top:1px solid #eee;"">
+
+                  <p style=""font-size:12px;color:#999;"">
+                    Nếu bạn không mong đợi lời mời này, bạn có thể bỏ qua email.
+                  </p>
+
+                </td>
+              </tr>
+
+              <!-- FOOTER -->
+              <tr>
+                <td style=""background:#fafafa;padding:25px;text-align:center;font-size:12px;color:#999;"">
+                  © 2026 Study Studio <br/>
+                  Made with care for Students
+                </td>
+              </tr>
+
+            </table>
+
+            </body>
+            </html>";
+        }
+
+        #endregion
+
         #region Report
 
         public static string ReportEmail(

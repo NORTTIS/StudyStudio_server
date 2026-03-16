@@ -173,5 +173,6 @@ namespace StudioStudio_Server.Repositories
                 u.GroupId == groupId);
             return user?.Role ?? GroupRole.Viewer;
         }
+
     }
 }

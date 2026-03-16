@@ -2,6 +2,7 @@ using StudioStudio_Server.Exceptions;
 using StudioStudio_Server.Models.DTOs.Request;
 using StudioStudio_Server.Models.DTOs.Response;
 using StudioStudio_Server.Models.Entities;
+using StudioStudio_Server.Models.Enums;
 using StudioStudio_Server.Repositories;
 using StudioStudio_Server.Repositories.Interfaces;
 using StudioStudio_Server.Services.Interfaces;
@@ -14,15 +15,21 @@ namespace StudioStudio_Server.Services
         private readonly IStudioRepository _studioRepository;
         private readonly IGroupRepository _groupRepository;
         private readonly IUserSubscriptionRepository _userSubscriptionRepository;
+        private readonly IStudioParticipantRepository _studioParticipantRepository;
+        private readonly IGroupParticipantRepository _groupParticipantRepository;
 
         public StudioService(
             IStudioRepository studioRepository,
             IGroupRepository groupRepository,
-            IUserSubscriptionRepository userSubscriptionRepository)
+            IUserSubscriptionRepository userSubscriptionRepository,
+            IStudioParticipantRepository studioParticipantRepository,
+            IGroupParticipantRepository groupParticipantRepository)
         {
             _studioRepository = studioRepository;
             _groupRepository = groupRepository;
             _userSubscriptionRepository = userSubscriptionRepository;
+            _studioParticipantRepository = studioParticipantRepository;
+            _groupParticipantRepository = groupParticipantRepository;
         }
 
         public async Task<List<StudioResponse>> GetUserStudiosAsync(Guid userId)
@@ -76,6 +83,17 @@ namespace StudioStudio_Server.Services
             };
 
             await _studioRepository.CreateStudioAsync(createStudio);
+
+            // Auto-set creator as Owner in StudioParticipant
+            var studioParticipant = new StudioParticipant
+            {
+                ParticipantId = Guid.NewGuid(),
+                StudioId = createStudio.StudioId,
+                UserId = ownerId,
+                Role = StudioRole.Owner,
+                CreatedAt = now
+            };
+            await _studioParticipantRepository.AddAsync(studioParticipant);
 
             return new StudioResponse
             {
@@ -166,6 +184,68 @@ namespace StudioStudio_Server.Services
                 Description = updateStudio.Description,
                 UpdatedAt = updateStudio.UpdatedAt
             };
+        }
+
+        public async Task<List<StudioMemberResponse>> GetStudioMembersAsync(Guid userId, Guid studioId)
+        {
+            // Validate: User must be member or owner of studio
+            var userStudioParticipant = await _studioParticipantRepository.GetByStudioAndUserAsync(studioId, userId);
+            if (userStudioParticipant == null)
+            {
+                throw new AppException(ErrorCodes.AuthForbidden, StatusCodes.Status403Forbidden);
+            }
+
+            // Get all participants in the studio
+            var studioParticipants = await _studioParticipantRepository.GetParticipantsByStudioIdAsync(studioId);
+
+            // Get all group IDs in this studio
+            var studioGroups = await _groupRepository.GetStudioGroupsAsync(studioId);
+            var groupIds = studioGroups.Select(g => g.GroupId).ToList();
+
+            // Get all group participants for users in this studio (only for groups in this studio)
+            var userIds = studioParticipants.Select(sp => sp.UserId).ToList();
+            var allGroupParticipants = new List<GroupParticipant>();
+
+            if (groupIds.Any())
+            {
+                allGroupParticipants = await _groupParticipantRepository.GetByGroupIdsAsync(groupIds);
+            }
+
+            // Build response
+            var result = new List<StudioMemberResponse>();
+
+            foreach (var participant in studioParticipants)
+            {
+                var userGroups = allGroupParticipants
+                    .Where(gp => gp.UserId == participant.UserId)
+                    .ToList();
+
+                var groupInfoList = new List<GroupInfoItem>();
+                foreach (var ug in userGroups)
+                {
+                    var group = studioGroups.FirstOrDefault(g => g.GroupId == ug.GroupId);
+                    if (group != null)
+                    {
+                        groupInfoList.Add(new GroupInfoItem
+                        {
+                            GroupId = ug.GroupId,
+                            GroupName = group.GroupName,
+                            GroupRole = ug.Role
+                        });
+                    }
+                }
+
+                result.Add(new StudioMemberResponse
+                {
+                    UserId = participant.UserId,
+                    UserName = $"{participant.User.FirstName} {participant.User.LastName}",
+                    Email = participant.User.Email,
+                    StudioRole = participant.Role,
+                    GroupInfo = groupInfoList
+                });
+            }
+
+            return result;
         }
     }
 }

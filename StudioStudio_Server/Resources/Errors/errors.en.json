@@ -53,6 +53,7 @@
   "GROUP027": "Status not found",
 
   "STUDIO001": "You have reached the limit of studios you can create",
+  "STUDIO004": "You are already a member of this studio",
 
   "STATUS001": "Status not found",
   "STATUS002": "This status name already exist",

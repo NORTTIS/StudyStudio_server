@@ -60,6 +60,7 @@
 
         // STUDIO
         public const string StudioLimitReached = "STUDIO001";
+        public const string StudioAlreadyMember = "STUDIO004";
 
         // STATUS
         public const string StatusNotFound = "STATUS001";
