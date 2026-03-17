@@ -154,24 +154,21 @@ namespace StudioStudio_Server.Services
                 var startDate = request.StartDate ?? DateTime.MinValue;
                 var endDate = request.EndDate ?? DateTime.UtcNow;
 
-                // Get all subscriptions (excluding subscriptions from admin accounts)
-                var subscriptions = await _repository.GetSubscriptionsAsync(startDate, endDate);
-
+                // Get all ACTIVE users in date range
                 var users = await _repository.GetUsersAsync(startDate, endDate);
                 var activeCount = users.Count(u => u.Status == UserStatus.Active);
 
-                var premiumCount = subscriptions.Count(s => s.BillingCycle == BillingCycle.Monthly.ToString());
+                // Get only PREMIUM subscriptions (filtered by date range) - free accounts have no subscription record
+                var premiumSubscriptions = await _repository.GetSubscriptionsAsync(startDate, endDate);
+                var premiumCount = premiumSubscriptions.Count;
+
+                // Free users = Total active - Premium users
                 var freeCount = activeCount - premiumCount;
                 var totalCount = activeCount;
 
-                // Calculate revenue for each type
-                var freeRevenue = subscriptions
-                    .Where(s => s.BillingCycle == BillingCycle.Free.ToString())
-                    .Sum(s => s.Price);
-
-                var premiumRevenue = subscriptions
-                    .Where(s => s.BillingCycle == BillingCycle.Monthly.ToString())
-                    .Sum(s => s.Price);
+                // Calculate revenue - only premium subscriptions have revenue
+                var premiumRevenue = premiumSubscriptions.Sum(s => s.Price);
+                var freeRevenue = 0m;  // Free accounts generate no revenue
 
                 var distribution = new List<SubscriptionDistributionItem>
                 {
