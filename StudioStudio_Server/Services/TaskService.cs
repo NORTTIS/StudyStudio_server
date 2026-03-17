@@ -1,4 +1,5 @@
 ﻿using DocumentFormat.OpenXml.Spreadsheet;
+using Microsoft.AspNetCore.Http;
 using Microsoft.IdentityModel.Tokens;
 using Org.BouncyCastle.Asn1.Ocsp;
 using StudioStudio_Server.Exceptions;
@@ -8,6 +9,7 @@ using StudioStudio_Server.Models.Entities;
 using StudioStudio_Server.Models.Enums;
 using StudioStudio_Server.Repositories.Interfaces;
 using StudioStudio_Server.Services.Interfaces;
+using StudioStudio_Server.Utils;
 
 namespace StudioStudio_Server.Services
 {
@@ -22,6 +24,7 @@ namespace StudioStudio_Server.Services
         private readonly IUserRepository _userRepository;
         private readonly ITaskHistoryRepository _taskHistoryRepository;
         private readonly IPersonalTaskStatusRepository _personalTaskStatusRepository;
+        private readonly IHttpContextAccessor _httpContextAccessor;
 
         public TaskService(
             ITaskRepository taskRepository,
@@ -32,7 +35,8 @@ namespace StudioStudio_Server.Services
             ITaskAssignmentRepository taskAssignmentRepository,
             IUserRepository userRepository,
             ITaskHistoryRepository taskHistoryRepository,
-            IPersonalTaskStatusRepository personalTaskStatusRepository)
+            IPersonalTaskStatusRepository personalTaskStatusRepository,
+            IHttpContextAccessor httpContextAccessor)
         {
             _taskRepository = taskRepository;
             _logger = logger;
@@ -43,6 +47,7 @@ namespace StudioStudio_Server.Services
             _userRepository = userRepository;
             _taskHistoryRepository = taskHistoryRepository;
             _personalTaskStatusRepository = personalTaskStatusRepository;
+            _httpContextAccessor = httpContextAccessor;
         }
 
         /// <summary>
@@ -612,7 +617,7 @@ namespace StudioStudio_Server.Services
                     Id = user.UserId,
                     FirstName = user.FirstName,
                     LastName = user.LastName,
-                    AvatarUrl = user.AvatarUrl
+                    AvatarUrl = AvatarUrlHelper.BuildAbsoluteAvatarUrl(user.AvatarUrl, _httpContextAccessor.HttpContext)
                 }
             };
         }
@@ -733,7 +738,7 @@ namespace StudioStudio_Server.Services
                     Id = user.UserId,
                     FirstName = user.FirstName,
                     LastName = user.LastName,
-                    AvatarUrl = user.AvatarUrl
+                    AvatarUrl = AvatarUrlHelper.BuildAbsoluteAvatarUrl(user.AvatarUrl, _httpContextAccessor.HttpContext)
                 }
             };
         }

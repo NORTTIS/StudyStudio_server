@@ -1,9 +1,11 @@
-﻿using StudioStudio_Server.Exceptions;
+﻿using Microsoft.AspNetCore.Http;
+using StudioStudio_Server.Exceptions;
 using StudioStudio_Server.Models.DTOs.Request;
 using StudioStudio_Server.Models.DTOs.Response;
 using StudioStudio_Server.Models.Entities;
 using StudioStudio_Server.Repositories.Interfaces;
 using StudioStudio_Server.Services.Interfaces;
+using StudioStudio_Server.Utils;
 
 namespace StudioStudio_Server.Services
 {
@@ -15,6 +17,7 @@ namespace StudioStudio_Server.Services
         private readonly IGroupTaskStatusRepository _groupTaskStatusRepository;
         private readonly IPersonalTaskStatusRepository _personalTaskStatusRepository;
         private readonly IUserRepository _userRepository;
+        private readonly IHttpContextAccessor _httpContextAccessor;
 
         public HomeService(
             ITaskAssignmentRepository assignmentRepository,
@@ -22,7 +25,8 @@ namespace StudioStudio_Server.Services
             IGroupRepository groupRepository,
             IGroupTaskStatusRepository groupTaskStatusRepository,
             IPersonalTaskStatusRepository personalTaskStatusRepository,
-            IUserRepository userRepository)
+            IUserRepository userRepository,
+            IHttpContextAccessor httpContextAccessor)
         {
             _assignmentRepository = assignmentRepository;
             _taskRepository = taskRepository;
@@ -30,6 +34,7 @@ namespace StudioStudio_Server.Services
             _groupTaskStatusRepository = groupTaskStatusRepository;
             _personalTaskStatusRepository = personalTaskStatusRepository;
             _userRepository = userRepository;
+            _httpContextAccessor = httpContextAccessor;
         }
 
         /// <summary>
@@ -77,7 +82,7 @@ namespace StudioStudio_Server.Services
                                  Id = userId,
                                  FirstName = userDetail.FirstName,
                                  LastName = userDetail.LastName,
-                                 AvatarUrl = userDetail.AvatarUrl,
+                                 AvatarUrl = AvatarUrlHelper.BuildAbsoluteAvatarUrl(userDetail.AvatarUrl, _httpContextAccessor.HttpContext),
                              }
                          }).ToList()
                          : new List<TaskItemResponse>()

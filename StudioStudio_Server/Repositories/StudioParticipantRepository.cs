@@ -73,5 +73,18 @@ namespace StudioStudio_Server.Repositories
                 .AsNoTracking()
                 .ToListAsync();
         }
+
+        /// <summary>
+        /// Get all studio participant records for a user
+        /// Condition: UserId = {userId}
+        /// Use case: Get all studios where user is a participant (member)
+        /// </summary>
+        public async Task<List<StudioParticipant>> GetStudiosByUserIdAsync(Guid userId)
+        {
+            return await _context.StudioParticipants
+                .Where(sp => sp.UserId == userId)
+                .AsNoTracking()
+                .ToListAsync();
+        }
     }
 }

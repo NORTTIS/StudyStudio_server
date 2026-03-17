@@ -1,8 +1,10 @@
+using Microsoft.AspNetCore.Http;
 using StudioStudio_Server.Exceptions;
 using StudioStudio_Server.Models.DTOs.Response;
 using StudioStudio_Server.Models.Entities;
 using StudioStudio_Server.Repositories.Interfaces;
 using StudioStudio_Server.Services.Interfaces;
+using StudioStudio_Server.Utils;
 
 namespace StudioStudio_Server.Services
 {
@@ -16,15 +18,18 @@ namespace StudioStudio_Server.Services
         private readonly IGroupMessageRepository _messageRepository;
         private readonly IGroupParticipantRepository _groupParticipantRepository;
         private readonly ILogger<GroupMessageService> _logger;
+        private readonly IHttpContextAccessor _httpContextAccessor;
 
         public GroupMessageService(
             IGroupMessageRepository messageRepository,
             IGroupParticipantRepository groupParticipantRepository,
-            ILogger<GroupMessageService> logger)
+            ILogger<GroupMessageService> logger,
+            IHttpContextAccessor httpContextAccessor)
         {
             _messageRepository = messageRepository;
             _groupParticipantRepository = groupParticipantRepository;
             _logger = logger;
+            _httpContextAccessor = httpContextAccessor;
         }
 
         /// <summary>
@@ -99,7 +104,7 @@ namespace StudioStudio_Server.Services
                     Id = message.User.UserId,
                     FirstName = message.User.FirstName,
                     LastName = message.User.LastName,
-                    AvatarUrl = message.User.AvatarUrl
+                    AvatarUrl = AvatarUrlHelper.BuildAbsoluteAvatarUrl(message.User.AvatarUrl, _httpContextAccessor.HttpContext)
                 },
                 ReplyCount = message.Replies?.Count(r => !r.IsDeleted) ?? 0,
                 Replies = null

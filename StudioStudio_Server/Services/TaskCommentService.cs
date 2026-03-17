@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Http;
 using StudioStudio_Server.Exceptions;
 using StudioStudio_Server.Models.DTOs.Request;
 using StudioStudio_Server.Models.DTOs.Response;
@@ -5,6 +6,7 @@ using StudioStudio_Server.Models.Entities;
 using StudioStudio_Server.Models.Enums;
 using StudioStudio_Server.Repositories.Interfaces;
 using StudioStudio_Server.Services.Interfaces;
+using StudioStudio_Server.Utils;
 using System.Text.RegularExpressions;
 
 namespace StudioStudio_Server.Services
@@ -24,6 +26,7 @@ namespace StudioStudio_Server.Services
         private readonly IGroupRepository _groupRepository;
         private readonly IMessageService _messageService;
         private readonly ILogger<TaskCommentService> _logger;
+        private readonly IHttpContextAccessor _httpContextAccessor;
 
         public TaskCommentService(
             ITaskCommentRepository commentRepository,
@@ -34,7 +37,8 @@ namespace StudioStudio_Server.Services
             IUserAnnouncementService userAnnouncementService,
             IGroupRepository groupRepository,
             IMessageService messageService,
-            ILogger<TaskCommentService> logger)
+            ILogger<TaskCommentService> logger,
+            IHttpContextAccessor httpContextAccessor)
         {
             _commentRepository = commentRepository;
             _taskRepository = taskRepository;
@@ -45,6 +49,7 @@ namespace StudioStudio_Server.Services
             _groupRepository = groupRepository;
             _messageService = messageService;
             _logger = logger;
+            _httpContextAccessor = httpContextAccessor;
         }
 
         /// <summary>
@@ -409,7 +414,7 @@ namespace StudioStudio_Server.Services
                     Id = comment.User.UserId,
                     FirstName = comment.User.FirstName,
                     LastName = comment.User.LastName,
-                    AvatarUrl = comment.User.AvatarUrl
+                    AvatarUrl = AvatarUrlHelper.BuildAbsoluteAvatarUrl(comment.User.AvatarUrl, _httpContextAccessor.HttpContext)
                 },
                 ReplyCount = comment.Replies?.Count(r => !r.IsDeleted) ?? 0,
                 Replies = comment.Replies?
@@ -429,7 +434,7 @@ namespace StudioStudio_Server.Services
                             Id = r.User.UserId,
                             FirstName = r.User.FirstName,
                             LastName = r.User.LastName,
-                            AvatarUrl = r.User.AvatarUrl
+                            AvatarUrl = AvatarUrlHelper.BuildAbsoluteAvatarUrl(r.User.AvatarUrl, _httpContextAccessor.HttpContext)
                         },
                         ReplyCount = 0,
                         Replies = null
@@ -459,7 +464,7 @@ namespace StudioStudio_Server.Services
                     Id = user.UserId,
                     FirstName = user.FirstName,
                     LastName = user.LastName,
-                    AvatarUrl = user.AvatarUrl
+                    AvatarUrl = AvatarUrlHelper.BuildAbsoluteAvatarUrl(user.AvatarUrl, _httpContextAccessor.HttpContext)
                 },
                 ReplyCount = 0,
                 Replies = null

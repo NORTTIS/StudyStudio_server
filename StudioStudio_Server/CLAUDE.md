@@ -90,3 +90,100 @@ Swagger UI is available at `/swagger` in Development mode.
 3. **Error Handling**: Custom `ExceptionHandlingMiddleware` returns standardized `ApiResponse`
 4. **Service Interfaces**: All services follow interface-based DI pattern
 5. **Background Queues**: Embedding and deletion operations use in-memory queues with hosted services
+
+## Error Handling & Exceptions
+
+### Custom Exception Flow
+
+```
+Request → Controller → Service → [throw AppException] → ExceptionHandlingMiddleware → ApiResponse
+```
+
+- **AppException** (`Exceptions/AppException.cs`): Base exception with `Code` and `HttpStatus`
+- **ErrorCodes** (`Exceptions/ErrorCodes.cs`): Centralized error code constants
+
+### Error Code Categories
+
+| Prefix | Category | Examples |
+|--------|----------|----------|
+| `AUTH` | Authentication | `AUTH001` - Invalid credential, `AUTH002` - Token expired, `AUTH003` - Forbidden |
+| `USER` | User | `USER001` - Not found, `USER002` - Already exists |
+| `GROUP` | Group/Studio | `GROUP001` - Not found, `GROUP003` - Limit reached |
+| `TASK` | Task | `TASK001` - Not found, `TASK002` - Permission denied |
+| `VALIDATION` | Input validation | `VALIDATION001` - Invalid email, `VALIDATION002` - Invalid password |
+| `PAYMENT` | Payment | `PAYMENT001` - Plan not found, `PAYMENT003` - Payment not found |
+| `SUCCESS` | Success responses | `SUCCESS001` - Register success, `SUCCESS010` - Get data success |
+| `SYS` | System | `SYS001` - Unexpected error |
+
+### Response Format
+
+All API responses use `ApiResponse<T>`:
+```json
+{
+  "status": "success" | "error",
+  "code": "SUCCESS010",
+  "message": "Data retrieved successfully",
+  "data": { ... }
+}
+```
+
+### Throwing Exceptions in Services
+
+```csharp
+// Simple throw
+throw new AppException(ErrorCodes.UserNotFound, StatusCodes.Status404NotFound);
+
+// With validation
+if (user == null)
+    throw new AppException(ErrorCodes.UserNotFound, StatusCodes.Status404NotFound);
+```
+
+## Code Comments
+
+### Service Comments Pattern
+
+Use XML summary comments for all public methods:
+
+```csharp
+/// <summary>
+/// Get user by ID
+/// Validate: User must exist and not be deleted
+/// Returns: User information if found
+/// </summary>
+/// <param name="userId">User's unique identifier</param>
+public async Task<UserResponse> GetByIdAsync(Guid userId)
+```
+
+### Controller Comments Pattern
+
+```csharp
+/// <summary>
+/// Get user profile
+/// Authenticate and get userId from JWT token
+/// Validate: User must exist and not be admin
+/// </summary>
+/// <param name="cancellationToken">Cancellation token</param>
+[Authorize]
+[HttpGet("profile")]
+public async Task<IActionResult> GetProfile(CancellationToken cancellationToken)
+```
+
+### Key Comment Elements
+
+1. **`<summary>`**: Brief description of what the method does
+2. **Validate**: Preconditions that cause exceptions (e.g., "User must exist")
+3. **Returns**: What the method returns on success
+4. **Use case**: When this method is typically called
+
+## Background Services
+
+- **EmbeddingBackgroundService**: Processes document embeddings asynchronously via `EmbeddingQueue`
+- **DeleteQueue**: Handles async document deletion from vector DB and storage
+
+## Health Checks
+
+- `/health` endpoint with checks for Database, Redis, and External Services
+
+## Cache Configuration
+
+Set `Cache:Provider` in appsettings to `"Memory"` (dev) or `"Redis"` (production)

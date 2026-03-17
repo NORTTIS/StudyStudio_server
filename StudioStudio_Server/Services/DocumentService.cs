@@ -1,4 +1,5 @@
-﻿using StudioStudio_Server.Configurations;
+﻿using Microsoft.AspNetCore.Http;
+using StudioStudio_Server.Configurations;
 using StudioStudio_Server.Exceptions;
 using StudioStudio_Server.Models.DTOs.Request;
 using StudioStudio_Server.Models.DTOs.Response;
@@ -8,6 +9,7 @@ using StudioStudio_Server.Repositories.Interfaces;
 using StudioStudio_Server.Services.Interfaces;
 using StudioStudio_Server.Services.EmbeddingQueue;
 using StudioStudio_Server.Services.DeleteQueue;
+using StudioStudio_Server.Utils;
 using System.Diagnostics;
 using System.Security.Cryptography;
 using System.Text;
@@ -39,6 +41,7 @@ namespace StudioStudio_Server.Services
         private readonly ILogger<DocumentService> _logger;
         private readonly IGroupRepository _groupRepository;
         private readonly IUserSubscriptionRepository _userSubscriptionRepository;
+        private readonly IHttpContextAccessor _httpContextAccessor;
 
         // Allowed file extensions for upload
         private static readonly HashSet<string> AllowedExtensions = new()
@@ -68,7 +71,8 @@ namespace StudioStudio_Server.Services
             IDeleteQueue deleteQueue,
             ILogger<DocumentService> logger,
             IGroupRepository groupRepository,
-            IUserSubscriptionRepository userSubscriptionRepository)
+            IUserSubscriptionRepository userSubscriptionRepository,
+            IHttpContextAccessor httpContextAccessor)
         {
             _attachmentRepository = attachmentRepository;
             _groupParticipantRepository = groupParticipantRepository;
@@ -82,6 +86,7 @@ namespace StudioStudio_Server.Services
             _logger = logger;
             _groupRepository = groupRepository;
             _userSubscriptionRepository = userSubscriptionRepository;
+            _httpContextAccessor = httpContextAccessor;
         }
 
         /// <summary>
@@ -1165,7 +1170,7 @@ namespace StudioStudio_Server.Services
                         Id = uploader.UserId,
                         FirstName = uploader.FirstName,
                         LastName = uploader.LastName,
-                        AvatarUrl = uploader.AvatarUrl
+                        AvatarUrl = AvatarUrlHelper.BuildAbsoluteAvatarUrl(uploader.AvatarUrl, _httpContextAccessor.HttpContext)
                     } : new UserDto(),
                     CreatedAt = a.UploadedAt
                 };
