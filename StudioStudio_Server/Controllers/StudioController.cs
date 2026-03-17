@@ -36,16 +36,16 @@ namespace StudioStudio_Server.Controllers
         /// Get list of studios owned by user
         /// Condition: OwnerId = userId
         /// Order by: CreatedAt DESC
-        /// Include: GroupCount for each studio
+        /// Include: GroupCount for each studio + Subscription info
         /// </summary>
         [HttpGet]
-        public async Task<ActionResult<ApiResponse<List<StudioResponse>>>> GetUserStudios()
+        public async Task<ActionResult<ApiResponse<StudioListResponse>>> GetUserStudios()
         {
             var userId = JwtHelper.ValidateAndGetUserId(User);
             var result = await _studioService.GetUserStudiosAsync(userId);
             var message = _messageService.GetMessage(ErrorCodes.SuccessGetData);
 
-            return Ok(ApiResponse<List<StudioResponse>>.Success(
+            return Ok(ApiResponse<StudioListResponse>.Success(
                 ErrorCodes.SuccessGetData,
                 message,
                 result));

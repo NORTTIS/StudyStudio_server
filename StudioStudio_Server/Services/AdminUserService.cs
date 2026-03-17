@@ -6,16 +6,19 @@ using StudioStudio_Server.Models.Entities;
 using StudioStudio_Server.Models.Enums;
 using StudioStudio_Server.Repositories.Interfaces;
 using StudioStudio_Server.Services.Interfaces;
+using StudioStudio_Server.Utils;
 
 namespace StudioStudio_Server.Services
 {
     public class AdminUserService : IAdminUserService
     {
         private readonly IUserRepository _userRepository;
+        private readonly IHttpContextAccessor _httpContextAccessor;
 
-        public AdminUserService(IUserRepository userRepository)
+        public AdminUserService(IUserRepository userRepository, IHttpContextAccessor httpContextAccessor)
         {
             _userRepository = userRepository;
+            _httpContextAccessor = httpContextAccessor;
         }
 
         /// <summary>
@@ -152,7 +155,7 @@ namespace StudioStudio_Server.Services
                 Status = baseItem.Status,
                 PhoneNumber = user.PhoneNumber,
                 Bio = user.Bio,
-                AvatarUrl = user.AvatarUrl,
+                AvatarUrl = AvatarUrlHelper.BuildAbsoluteAvatarUrl(user.AvatarUrl, _httpContextAccessor.HttpContext),
                 IsVerify = user.IsVerify,
                 UpdatedAt = user.UpdatedAt,
                 IsAdmin = user.IsAdmin,

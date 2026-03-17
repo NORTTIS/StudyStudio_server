@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Http;
 using StudioStudio_Server.Exceptions;
 using StudioStudio_Server.Models.DTOs.Request;
 using StudioStudio_Server.Models.DTOs.Response;
@@ -6,6 +7,7 @@ using StudioStudio_Server.Models.Enums;
 using StudioStudio_Server.Repositories;
 using StudioStudio_Server.Repositories.Interfaces;
 using StudioStudio_Server.Services.Interfaces;
+using StudioStudio_Server.Utils;
 using System.Security.Claims;
 
 namespace StudioStudio_Server.Services
@@ -17,36 +19,78 @@ namespace StudioStudio_Server.Services
         private readonly IUserSubscriptionRepository _userSubscriptionRepository;
         private readonly IStudioParticipantRepository _studioParticipantRepository;
         private readonly IGroupParticipantRepository _groupParticipantRepository;
+        private readonly IHttpContextAccessor _httpContextAccessor;
 
         public StudioService(
             IStudioRepository studioRepository,
             IGroupRepository groupRepository,
             IUserSubscriptionRepository userSubscriptionRepository,
             IStudioParticipantRepository studioParticipantRepository,
-            IGroupParticipantRepository groupParticipantRepository)
+            IGroupParticipantRepository groupParticipantRepository,
+            IHttpContextAccessor httpContextAccessor)
         {
             _studioRepository = studioRepository;
             _groupRepository = groupRepository;
             _userSubscriptionRepository = userSubscriptionRepository;
             _studioParticipantRepository = studioParticipantRepository;
             _groupParticipantRepository = groupParticipantRepository;
+            _httpContextAccessor = httpContextAccessor;
         }
 
-        public async Task<List<StudioResponse>> GetUserStudiosAsync(Guid userId)
+        public async Task<StudioListResponse> GetUserStudiosAsync(Guid userId)
         {
-            var studios = await _studioRepository.GetByOwnerIdAsync(userId);
+            // Get subscription info
+            var subscriptionPlan = await _userSubscriptionRepository.GetSubscriptionPlanByUserIdAsync(userId);
+            var studioLimit = subscriptionPlan?.MaxStudios ?? 3;
+            var studioCreated = await _studioRepository.CountStudioCreatedByUserAsync(userId);
 
-            if (!studios.Any())
+            // Get studios where user is owner
+            var ownedStudios = await _studioRepository.GetByOwnerIdAsync(userId);
+
+            // Get studios where user is a participant (member)
+            var participantRecords = await _studioParticipantRepository.GetStudiosByUserIdAsync(userId);
+            var participantStudioIds = participantRecords
+                .Where(pr => pr.StudioId != null)
+                .Select(pr => pr.StudioId)
+                .ToList();
+
+            var memberStudios = new List<Studio>();
+            if (participantStudioIds.Any())
             {
-                return new List<StudioResponse>();
+                // Get studio details for participant studios
+                memberStudios = await _studioRepository.GetByIdsAsync(participantStudioIds);
+                // Filter out studios where user is already the owner (to avoid duplicates)
+                memberStudios = memberStudios.Where(s => s.OwnerId != userId).ToList();
             }
 
-            var studioResponses = studios.Select(studio => new StudioResponse
+            // Combine owned and member studios (avoid duplicates)
+            var allStudios = ownedStudios
+                .Concat(memberStudios)
+                .GroupBy(s => s.StudioId)
+                .Select(g => g.First())
+                .OrderByDescending(s => s.CreatedAt)
+                .ToList();
+
+            if (!allStudios.Any())
+            {
+                return new StudioListResponse
+                {
+                    Studios = new List<StudioResponse>(),
+                    Subscription = new StudioListSubscriptionResponse
+                    {
+                        StudioLimit = studioLimit,
+                        StudioCreated = studioCreated
+                    }
+                };
+            }
+
+            var studioResponses = allStudios.Select(studio => new StudioResponse
             {
                 StudioId = studio.StudioId,
                 StudioName = studio.StudioName,
                 Description = studio.Description,
                 OwnerId = studio.OwnerId,
+                StudioRole = studio.OwnerId == userId ? StudioRole.Owner : StudioRole.Member,
                 CreatedAt = studio.CreatedAt,
                 UpdatedAt = studio.UpdatedAt,
                 GroupCount = 0
@@ -57,7 +101,15 @@ namespace StudioStudio_Server.Services
                 response.GroupCount = await _groupRepository.GetGroupCountByStudioIdAsync(response.StudioId);
             }
 
-            return studioResponses;
+            return new StudioListResponse
+            {
+                Studios = studioResponses,
+                Subscription = new StudioListSubscriptionResponse
+                {
+                    StudioLimit = studioLimit,
+                    StudioCreated = studioCreated
+                }
+            };
         }
 
         public async Task<StudioResponse> CreateStudioAsync(Guid ownerId, CreateStudioRequest studio)
@@ -115,12 +167,35 @@ namespace StudioStudio_Server.Services
                 throw new AppException(ErrorCodes.StudioNotFound, StatusCodes.Status404NotFound);
             }
 
-            if (studio.OwnerId != userId)
+            // Check if user is owner or member of studio
+            var userStudioParticipant = await _studioParticipantRepository.GetByStudioAndUserAsync(studioId, userId);
+            if (studio.OwnerId != userId && userStudioParticipant == null)
             {
                 throw new AppException(ErrorCodes.AuthForbidden, StatusCodes.Status403Forbidden);
             }
 
-            var groupCount = await _groupRepository.GetGroupCountByStudioIdAsync(studioId);
+            int groupCount;
+            if (studio.OwnerId == userId)
+            {
+                // Owner can see all groups in studio
+                groupCount = await _groupRepository.GetGroupCountByStudioIdAsync(studioId);
+            }
+            else
+            {
+                // Member can only see groups they participate in
+                var studioGroups = await _groupRepository.GetStudioGroupsAsync(studioId);
+                var groupIds = studioGroups.Select(g => g.GroupId).ToList();
+
+                if (!groupIds.Any())
+                {
+                    groupCount = 0;
+                }
+                else
+                {
+                    var userGroupParticipants = await _groupParticipantRepository.GetByGroupIdsAsync(groupIds);
+                    groupCount = userGroupParticipants.Count(gp => gp.UserId == userId);
+                }
+            }
 
             return new StudioResponse
             {
@@ -128,6 +203,7 @@ namespace StudioStudio_Server.Services
                 StudioName = studio.StudioName,
                 Description = studio.Description,
                 OwnerId = studio.OwnerId,
+                StudioRole = studio.OwnerId == userId ? StudioRole.Owner : StudioRole.Member,
                 CreatedAt = studio.CreatedAt,
                 UpdatedAt = studio.UpdatedAt,
                 GroupCount = groupCount
@@ -240,6 +316,7 @@ namespace StudioStudio_Server.Services
                     UserId = participant.UserId,
                     UserName = $"{participant.User.FirstName} {participant.User.LastName}",
                     Email = participant.User.Email,
+                    AvatarUrl = AvatarUrlHelper.BuildAbsoluteAvatarUrl(participant.User.AvatarUrl, _httpContextAccessor.HttpContext),
                     StudioRole = participant.Role,
                     GroupInfo = groupInfoList
                 });

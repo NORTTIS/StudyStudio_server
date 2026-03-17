@@ -10,5 +10,12 @@ namespace StudioStudio_Server.Repositories.Interfaces
         Task<StudioParticipant?> GetByStudioAndUserAsync(Guid studioId, Guid userId);
         Task<int> GetParticipantCountByStudioIdAsync(Guid studioId);
         Task<List<StudioParticipant>> GetParticipantsByStudioIdAsync(Guid studioId);
+
+        /// <summary>
+        /// Get all studio participant records for a user
+        /// Condition: UserId = {userId}
+        /// Use case: Get all studios where user is a participant (member)
+        /// </summary>
+        Task<List<StudioParticipant>> GetStudiosByUserIdAsync(Guid userId);
     }
 }

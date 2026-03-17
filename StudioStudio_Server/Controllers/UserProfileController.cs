@@ -5,6 +5,7 @@ using StudioStudio_Server.Models.DTOs.Request;
 using StudioStudio_Server.Models.DTOs.Response;
 using StudioStudio_Server.Repositories.Interfaces;
 using StudioStudio_Server.Services.Interfaces;
+using StudioStudio_Server.Utils;
 using System.Security.Claims;
 
 namespace StudioStudio_Server.Controllers
@@ -46,21 +47,6 @@ namespace StudioStudio_Server.Controllers
         }
 
         /// <summary>
-        /// Build absolute avatar URL from relative path
-        /// Return: Full URL with domain, or null if no avatar
-        /// </summary>
-        private string? BuildAbsoluteAvatarUrl(string? avatarUrl)
-        {
-            if (!string.IsNullOrEmpty(avatarUrl) && avatarUrl.StartsWith("/"))
-            {
-                var request = HttpContext.Request;
-                return $"{request.Scheme}://{request.Host}{avatarUrl}";
-            }
-
-            return avatarUrl;
-        }
-
-        /// <summary>
         /// [AUTHORIZED] GET /api/user-profile
         /// Get profile information of current user
         /// Include: Avatar URL (absolute), settings, Google OAuth status, AI request limits
@@ -93,7 +79,7 @@ namespace StudioStudio_Server.Controllers
                 LastName = user.LastName,
                 PhoneNumber = user.PhoneNumber,
                 Bio = user.Bio,
-                AvatarUrl = BuildAbsoluteAvatarUrl(user.AvatarUrl),
+                AvatarUrl = AvatarUrlHelper.BuildAbsoluteAvatarUrl(user.AvatarUrl, HttpContext),
                 Status = user.Status.ToString(),
                 IsAdmin = user.IsAdmin,
                 Language = user.Language,

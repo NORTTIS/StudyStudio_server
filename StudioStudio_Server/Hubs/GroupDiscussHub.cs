@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.IdentityModel.Tokens;
 using StudioStudio_Server.Exceptions;
@@ -9,6 +10,7 @@ using StudioStudio_Server.Models.Entities;
 using StudioStudio_Server.Models.Enums;
 using StudioStudio_Server.Repositories.Interfaces;
 using StudioStudio_Server.Services.Interfaces;
+using StudioStudio_Server.Utils;
 using System.Security.Claims;
 using System.Text.RegularExpressions;
 
@@ -30,6 +32,7 @@ namespace StudioStudio_Server.Hubs
         private readonly IUserAnnouncementService _userAnnouncementService;
         private readonly IGroupRepository _groupRepository;
         private readonly ILogger<GroupDiscussHub> _logger;
+        private readonly IHttpContextAccessor _httpContextAccessor;
 
         public GroupDiscussHub(
             IGroupMessageRepository messageRepository,
@@ -39,7 +42,8 @@ namespace StudioStudio_Server.Hubs
             IAnnouncementRepository announcementRepository,
             IUserAnnouncementService userAnnouncementService,
             IGroupRepository groupRepository,
-            ILogger<GroupDiscussHub> logger)
+            ILogger<GroupDiscussHub> logger,
+            IHttpContextAccessor httpContextAccessor)
         {
             _messageRepository = messageRepository;
             _groupParticipantRepository = groupParticipantRepository;
@@ -49,6 +53,7 @@ namespace StudioStudio_Server.Hubs
             _userAnnouncementService = userAnnouncementService;
             _groupRepository = groupRepository;
             _logger = logger;
+            _httpContextAccessor = httpContextAccessor;
         }
 
         /// <summary>
@@ -298,7 +303,7 @@ namespace StudioStudio_Server.Hubs
                         Id = user!.UserId,
                         FirstName = user.FirstName,
                         LastName = user.LastName,
-                        AvatarUrl = user.AvatarUrl
+                        AvatarUrl = AvatarUrlHelper.BuildAbsoluteAvatarUrl(user.AvatarUrl, _httpContextAccessor.HttpContext)
                     }
                 };
 
@@ -410,7 +415,7 @@ namespace StudioStudio_Server.Hubs
                         Id = user!.UserId,
                         FirstName = user.FirstName,
                         LastName = user.LastName,
-                        AvatarUrl = user.AvatarUrl
+                        AvatarUrl = AvatarUrlHelper.BuildAbsoluteAvatarUrl(user.AvatarUrl, _httpContextAccessor.HttpContext)
                     }
                 };
 

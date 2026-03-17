@@ -8,7 +8,7 @@ namespace StudioStudio_Server.Services.Interfaces
     /// </summary>
     public interface IStudioService
     {
-        Task<List<StudioResponse>> GetUserStudiosAsync(Guid userId);
+        Task<StudioListResponse> GetUserStudiosAsync(Guid userId);
         Task<StudioResponse> GetStudioDetailAsync(Guid userId, Guid studioId);
         Task<StudioResponse> CreateStudioAsync(Guid ownerId, CreateStudioRequest studio);
         Task DeleteStudioAsync(Guid ownerId, Guid studioId);

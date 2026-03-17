@@ -14,6 +14,7 @@ namespace StudioStudio_Server.Models.DTOs.Response
         public Guid UserId { get; set; }
         public string UserName { get; set; } = string.Empty;
         public string Email { get; set; } = string.Empty;
+        public string? AvatarUrl { get; set; }
         public StudioRole StudioRole { get; set; }
         public List<GroupInfoItem> GroupInfo { get; set; } = new();
     }

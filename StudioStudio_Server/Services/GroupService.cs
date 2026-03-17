@@ -1,5 +1,6 @@
 ﻿using iText.Layout.Renderer;
 using Microsoft.AspNetCore.Http.HttpResults;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using StudioStudio_Server.Data;
@@ -10,6 +11,7 @@ using StudioStudio_Server.Models.Entities;
 using StudioStudio_Server.Models.Enums;
 using StudioStudio_Server.Repositories.Interfaces;
 using StudioStudio_Server.Services.Interfaces;
+using StudioStudio_Server.Utils;
 
 namespace StudioStudio_Server.Services
 {
@@ -27,6 +29,8 @@ namespace StudioStudio_Server.Services
         private readonly ITemplateRepository _templateRepository;
         private readonly IGroupTaskStatusRepository _groupTaskStatusRepository;
         private readonly ITaskAssignmentRepository _taskAssignmentRepository;
+        private readonly IStudioParticipantRepository _studioParticipantRepository;
+        private readonly IHttpContextAccessor _httpContextAccessor;
 
         public GroupService(
             ILogger<GroupService> logger,
@@ -40,7 +44,9 @@ namespace StudioStudio_Server.Services
             ITaskRepository taskRepository,
             ITemplateRepository templateRepository,
             IGroupTaskStatusRepository groupTaskStatusRepository,
-            ITaskAssignmentRepository taskAssignmentRepository)
+            ITaskAssignmentRepository taskAssignmentRepository,
+            IStudioParticipantRepository studioParticipantRepository,
+            IHttpContextAccessor httpContextAccessor)
         {
             _logger = logger;
             _messageService = messageService;
@@ -54,6 +60,8 @@ namespace StudioStudio_Server.Services
             _templateRepository = templateRepository;
             _groupTaskStatusRepository = groupTaskStatusRepository;
             _taskAssignmentRepository = taskAssignmentRepository;
+            _studioParticipantRepository = studioParticipantRepository;
+            _httpContextAccessor = httpContextAccessor;
         }
 
         public async Task<GroupListResponse> GetGroupsAsync(Guid userId)
@@ -108,7 +116,7 @@ namespace StudioStudio_Server.Services
                             Id = gp.UserId,
                             FirstName = user?.FirstName ?? "",
                             LastName = user?.LastName ?? "",
-                            AvatarUrl = user?.AvatarUrl
+                            AvatarUrl = AvatarUrlHelper.BuildAbsoluteAvatarUrl(user?.AvatarUrl, _httpContextAccessor.HttpContext)
                         };
                     })
                     .ToList();
@@ -130,7 +138,7 @@ namespace StudioStudio_Server.Services
                         Id = createdByUser.UserId,
                         FirstName = createdByUser.FirstName,
                         LastName = createdByUser.LastName,
-                        AvatarUrl = createdByUser.AvatarUrl
+                        AvatarUrl = AvatarUrlHelper.BuildAbsoluteAvatarUrl(createdByUser.AvatarUrl, _httpContextAccessor.HttpContext)
                     } : new UserDto(),
                     MemberCount = groupParticipants.Count,
                     TaskCount = taskCounts.TryGetValue(g.GroupId, out var count) ? count : 0,
@@ -236,7 +244,7 @@ namespace StudioStudio_Server.Services
                             Id = user.UserId,
                             FirstName = user.FirstName,
                             LastName = user.LastName,
-                            AvatarUrl = user.AvatarUrl
+                            AvatarUrl = AvatarUrlHelper.BuildAbsoluteAvatarUrl(user.AvatarUrl, _httpContextAccessor.HttpContext)
                         };
                     }
                 }
@@ -262,7 +270,7 @@ namespace StudioStudio_Server.Services
                     Id = creator.UserId,
                     FirstName = creator.FirstName,
                     LastName = creator.LastName,
-                    AvatarUrl = creator.AvatarUrl
+                    AvatarUrl = AvatarUrlHelper.BuildAbsoluteAvatarUrl(creator.AvatarUrl, _httpContextAccessor.HttpContext)
                 } : new UserDto(),
                 CreatedAt = group.CreatedAt,
                 UpdatedAt = group.UpdatedAt,
@@ -328,7 +336,7 @@ namespace StudioStudio_Server.Services
                     FirstName = user?.FirstName ?? "",
                     LastName = user?.LastName ?? "",
                     Email = user?.Email ?? "",
-                    AvatarUrl = user?.AvatarUrl,
+                    AvatarUrl = AvatarUrlHelper.BuildAbsoluteAvatarUrl(user?.AvatarUrl, _httpContextAccessor.HttpContext),
                     Role = p.Role.ToString(),
                     JoinedAt = p.CreatedAt
                 };
@@ -721,31 +729,75 @@ namespace StudioStudio_Server.Services
 
         public async Task<StudioGroupListResponse> GetStudioGroupsAsync(Guid userId, Guid studioId)
         {
+            // Check if studio exists
+            var studio = await _studioRepository.GetByIdAsync(studioId);
+            if (studio == null)
+            {
+                throw new AppException(ErrorCodes.StudioNotFound, StatusCodes.Status404NotFound);
+            }
+
+            // Check if user is owner or member of studio
+            var userStudioParticipant = await _studioParticipantRepository.GetByStudioAndUserAsync(studioId, userId);
+            if (studio.OwnerId != userId && userStudioParticipant == null)
+            {
+                throw new AppException(ErrorCodes.AuthForbidden, StatusCodes.Status403Forbidden);
+            }
+
             // Get all groups belong to studio
             var groups = await _groupRepository.GetStudioGroupsAsync(studioId);
 
-            // Get all group IDs
-            var groupIds = groups.Select(g => g.GroupId).ToList();
+            // If user is a member (not owner), filter to only groups they participate in
+            List<Guid> allowedGroupIds;
+            if (studio.OwnerId == userId)
+            {
+                // Owner can see all groups
+                allowedGroupIds = groups.Select(g => g.GroupId).ToList();
+            }
+            else
+            {
+                // Member can only see groups they participate in
+                var groupIds = groups.Select(g => g.GroupId).ToList();
+                if (!groupIds.Any())
+                {
+                    allowedGroupIds = new List<Guid>();
+                }
+                else
+                {
+                    var userGroupParticipants = await _groupParticipantRepository.GetByGroupIdsAsync(groupIds);
+                    allowedGroupIds = userGroupParticipants
+                        .Where(gp => gp.UserId == userId)
+                        .Select(gp => gp.GroupId)
+                        .ToList();
+                }
+            }
+
+            // Filter groups based on user's access
+            var filteredGroups = groups.Where(g => allowedGroupIds.Contains(g.GroupId)).ToList();
+
+            // Get all group IDs from filtered groups
+            var groupIdsForQuery = filteredGroups.Select(g => g.GroupId).ToList();
 
             // Get all participants for member previews
-            var allParticipants = await _groupParticipantRepository.GetByGroupIdsAsync(groupIds);
+            var allParticipants = await _groupParticipantRepository.GetByGroupIdsAsync(groupIdsForQuery);
 
             var participantUserIds = allParticipants.Select(gp => gp.UserId).Distinct().ToList();
             var users = await _userRepository.GetByIdsAsync(participantUserIds);
 
             // Get task counts
-            var taskCounts = await _taskRepository.GetTaskCountByGroupIdsAsync(groupIds);
+            var taskCounts = await _taskRepository.GetTaskCountByGroupIdsAsync(groupIdsForQuery);
 
-            // Fix for the CS1061 error: Ensure that the `groupCards` list is awaited properly since it contains tasks.
-            // Modify the code to await the tasks and then access the `Studio` property.
             var createdByUser = await _userRepository.GetByIdAsync(userId);
-            var studio = await _studioRepository.GetByIdAsync(studioId);
 
-            var groupCards = groups.Select(g =>
+            var groupCards = filteredGroups.Select(g =>
             {
                 var groupParticipants = allParticipants
                     .Where(gp => gp.GroupId == g.GroupId)
                     .ToList();
+
+                // Get user's actual role in this group
+                var userParticipant = groupParticipants
+                    .FirstOrDefault(gp => gp.GroupId == g.GroupId && gp.UserId == userId);
+                var userRole = userParticipant?.Role ?? GroupRole.Owner;
 
                 var membersPreview = groupParticipants
                     .Take(5)
@@ -757,7 +809,7 @@ namespace StudioStudio_Server.Services
                             Id = gp.UserId,
                             FirstName = user?.FirstName ?? "",
                             LastName = user?.LastName ?? "",
-                            AvatarUrl = user?.AvatarUrl
+                            AvatarUrl = AvatarUrlHelper.BuildAbsoluteAvatarUrl(user?.AvatarUrl, _httpContextAccessor.HttpContext)
                         };
                     })
                     .ToList();
@@ -768,7 +820,7 @@ namespace StudioStudio_Server.Services
                     Name = g.GroupName,
                     Description = g.Description ?? "",
                     IsFavorite = false,
-                    Role = GroupRole.Owner.ToString(),
+                    Role = userRole.ToString(),
                     Studio = studio != null ? new StudioDto
                     {
                         Id = studioId,
@@ -779,7 +831,7 @@ namespace StudioStudio_Server.Services
                         Id = createdByUser.UserId,
                         FirstName = createdByUser.FirstName,
                         LastName = createdByUser.LastName,
-                        AvatarUrl = createdByUser.AvatarUrl
+                        AvatarUrl = AvatarUrlHelper.BuildAbsoluteAvatarUrl(createdByUser.AvatarUrl, _httpContextAccessor.HttpContext)
                     } : new UserDto(),
                     MemberCount = groupParticipants.Count,
                     TaskCount = taskCounts.TryGetValue(g.GroupId, out var count) ? count : 0,
@@ -790,12 +842,9 @@ namespace StudioStudio_Server.Services
 
             var studioGroups = groupCards.Where(g => g.Studio != null).ToList();
 
-
-            var totalGroup = await _groupRepository.GetGroupCountByStudioIdAsync(studioId);
-
             var response = new StudioGroupListResponse
             {
-                TotalGroup = totalGroup,
+                TotalGroup = filteredGroups.Count,
                 StudioGroups = studioGroups,
             };
 
@@ -898,7 +947,7 @@ namespace StudioStudio_Server.Services
                             Id = user.UserId,
                             FirstName = user.FirstName,
                             LastName = user.LastName,
-                            AvatarUrl = user.AvatarUrl
+                            AvatarUrl = AvatarUrlHelper.BuildAbsoluteAvatarUrl(user.AvatarUrl, _httpContextAccessor.HttpContext)
                         });
                     }
                 }
@@ -926,7 +975,7 @@ namespace StudioStudio_Server.Services
                     Id = t.Owner.UserId,
                     FirstName = t.Owner.FirstName,
                     LastName = t.Owner.LastName,
-                    AvatarUrl = t.Owner.AvatarUrl
+                    AvatarUrl = AvatarUrlHelper.BuildAbsoluteAvatarUrl(t.Owner.AvatarUrl, _httpContextAccessor.HttpContext)
                 }
             }).ToList();
 
