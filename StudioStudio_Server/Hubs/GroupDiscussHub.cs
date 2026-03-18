@@ -33,6 +33,7 @@ namespace StudioStudio_Server.Hubs
         private readonly IGroupRepository _groupRepository;
         private readonly ILogger<GroupDiscussHub> _logger;
         private readonly IHttpContextAccessor _httpContextAccessor;
+        private readonly IActivityLogService _activityLogService;
 
         public GroupDiscussHub(
             IGroupMessageRepository messageRepository,
@@ -43,7 +44,8 @@ namespace StudioStudio_Server.Hubs
             IUserAnnouncementService userAnnouncementService,
             IGroupRepository groupRepository,
             ILogger<GroupDiscussHub> logger,
-            IHttpContextAccessor httpContextAccessor)
+            IHttpContextAccessor httpContextAccessor,
+            IActivityLogService activityLogService)
         {
             _messageRepository = messageRepository;
             _groupParticipantRepository = groupParticipantRepository;
@@ -54,6 +56,7 @@ namespace StudioStudio_Server.Hubs
             _groupRepository = groupRepository;
             _logger = logger;
             _httpContextAccessor = httpContextAccessor;
+            _activityLogService = activityLogService;
         }
 
         /// <summary>
@@ -284,6 +287,10 @@ namespace StudioStudio_Server.Hubs
                 };
 
                 await _messageRepository.AddAsync(message);
+
+                // Log message creation activity
+                var group = await _groupRepository.GetByIdAsync(request.GroupId);
+                await _activityLogService.LogMessageCreateAsync(userId, message.MessageId, request.GroupId, group?.StudioId);
 
                 var user = await _userRepository.GetByIdAsync(userId);
 

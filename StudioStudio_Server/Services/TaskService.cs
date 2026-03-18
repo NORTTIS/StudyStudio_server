@@ -1,7 +1,5 @@
-﻿using DocumentFormat.OpenXml.Spreadsheet;
-using Microsoft.AspNetCore.Http;
+﻿using Microsoft.AspNetCore.Http;
 using Microsoft.IdentityModel.Tokens;
-using Org.BouncyCastle.Asn1.Ocsp;
 using StudioStudio_Server.Exceptions;
 using StudioStudio_Server.Models.DTOs.Request;
 using StudioStudio_Server.Models.DTOs.Response;
@@ -22,9 +20,9 @@ namespace StudioStudio_Server.Services
         private readonly IGroupTaskStatusRepository _groupTaskStatusRepository;
         private readonly ITaskAssignmentRepository _taskAssignmentRepository;
         private readonly IUserRepository _userRepository;
-        private readonly ITaskHistoryRepository _taskHistoryRepository;
         private readonly IPersonalTaskStatusRepository _personalTaskStatusRepository;
         private readonly IHttpContextAccessor _httpContextAccessor;
+        private readonly IActivityLogService _activityLogService;
 
         public TaskService(
             ITaskRepository taskRepository,
@@ -34,9 +32,9 @@ namespace StudioStudio_Server.Services
             IGroupTaskStatusRepository groupTaskStatusRepository,
             ITaskAssignmentRepository taskAssignmentRepository,
             IUserRepository userRepository,
-            ITaskHistoryRepository taskHistoryRepository,
             IPersonalTaskStatusRepository personalTaskStatusRepository,
-            IHttpContextAccessor httpContextAccessor)
+            IHttpContextAccessor httpContextAccessor,
+            IActivityLogService activityLogService)
         {
             _taskRepository = taskRepository;
             _logger = logger;
@@ -45,9 +43,9 @@ namespace StudioStudio_Server.Services
             _groupTaskStatusRepository = groupTaskStatusRepository;
             _taskAssignmentRepository = taskAssignmentRepository;
             _userRepository = userRepository;
-            _taskHistoryRepository = taskHistoryRepository;
             _personalTaskStatusRepository = personalTaskStatusRepository;
             _httpContextAccessor = httpContextAccessor;
+            _activityLogService = activityLogService;
         }
 
         /// <summary>
@@ -143,6 +141,9 @@ namespace StudioStudio_Server.Services
 
             await _taskRepository.AddAsync(taskItem);
 
+            // Log task creation activity
+            await _activityLogService.LogTaskCreateAsync(userId, taskItem.TaskId, taskItem.GroupId, null);
+
             var assigneeId = request.Assignees;
             var assigneeDetail = new UserDto();
 
@@ -168,6 +169,9 @@ namespace StudioStudio_Server.Services
                     AssignedAt = DateTime.UtcNow,
                     TaskId = taskItem.TaskId
                 });
+
+                // Log task assignment activity
+                await _activityLogService.LogTaskAssignAsync(userId, taskItem.TaskId, assigneeDetail.Id, taskItem.GroupId);
             }
             return new TaskItemResponse
             {
@@ -274,7 +278,15 @@ namespace StudioStudio_Server.Services
 
             if (request.Progress.HasValue)
             {
+                var oldProgress = task.Progress;
                 task.Progress = request.Progress.Value;
+
+                // Log task completion when progress reaches 100
+                if (oldProgress != 100 && task.Progress == 100)
+                {
+                    task.CompletedAt = DateTime.UtcNow;
+                    await _activityLogService.LogTaskCompleteAsync(userId, task.TaskId, task.GroupId);
+                }
             }
 
             // Update GroupStatusId if provided
@@ -387,14 +399,7 @@ namespace StudioStudio_Server.Services
             }
 
             await _taskRepository.SoftDeleteAsync(taskId);
-            await _taskHistoryRepository.AddAsync(new TaskHistory
-            {
-                HistoryId = Guid.NewGuid(),
-                TaskId = taskId,
-                ChangedBy = userId,
-                ChangedAt = DateTime.UtcNow,
-                ChangedContent = "DELETE"
-            });
+            await _activityLogService.LogTaskDeleteAsync(userId, taskId, groupId);
         }
 
         public async Task DeletePersonalTaskAsync(Guid userId, Guid taskId)
@@ -484,14 +489,14 @@ namespace StudioStudio_Server.Services
 
             var taskList = await _taskRepository.GetSoftDeleteTaskByGroup(groupId);
             var taskListId = taskList.Select(t => t.TaskId).ToList();
-            var taskHistory = await _taskHistoryRepository.GetListTaskHistoryByTaskIdsAsync(taskListId);
+            var taskDeleteLogs = await _activityLogService.GetTaskDeleteLogsAsync(taskListId);
 
-            var result = taskHistory.Select(t => new TaskDeleteResponse
+            var result = taskDeleteLogs.Select(t => new TaskDeleteResponse
             {
-                DeleteTaskId = t.TaskId,
-                TaskName = taskList.FirstOrDefault(task => task.TaskId == t.TaskId)?.Title ?? "Unknown Task",
-                DeletedOn = t.ChangedAt,
-                DeletedBy = t.ChangedBy
+                DeleteTaskId = t.TargetId!.Value,
+                TaskName = taskList.FirstOrDefault(task => task.TaskId == t.TargetId)?.Title ?? "Unknown Task",
+                DeletedOn = t.CreatedAt,
+                DeletedBy = t.UserId
             }).ToList();
 
             return result;
@@ -592,6 +597,9 @@ namespace StudioStudio_Server.Services
             };
 
             await _taskRepository.AddAsync(taskItem);
+
+            // Log task creation activity
+            await _activityLogService.LogTaskCreateAsync(userId, taskItem.TaskId, null, null);
 
             return new TaskItemResponse
             {
@@ -698,7 +706,15 @@ namespace StudioStudio_Server.Services
 
             if (request.Progress.HasValue)
             {
+                var oldProgress = task.Progress;
                 task.Progress = request.Progress.Value;
+
+                // Log task completion when progress reaches 100
+                if (oldProgress != 100 && task.Progress == 100)
+                {
+                    task.CompletedAt = DateTime.UtcNow;
+                    await _activityLogService.LogTaskCompleteAsync(userId, task.TaskId, task.GroupId);
+                }
             }
 
             // Update personal if provided

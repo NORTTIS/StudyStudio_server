@@ -19,17 +19,20 @@ namespace StudioStudio_Server.Services
         private readonly IGroupParticipantRepository _groupParticipantRepository;
         private readonly ILogger<GroupMessageService> _logger;
         private readonly IHttpContextAccessor _httpContextAccessor;
+        private readonly IActivityLogService _activityLogService;
 
         public GroupMessageService(
             IGroupMessageRepository messageRepository,
             IGroupParticipantRepository groupParticipantRepository,
             ILogger<GroupMessageService> logger,
-            IHttpContextAccessor httpContextAccessor)
+            IHttpContextAccessor httpContextAccessor,
+            IActivityLogService activityLogService)
         {
             _messageRepository = messageRepository;
             _groupParticipantRepository = groupParticipantRepository;
             _logger = logger;
             _httpContextAccessor = httpContextAccessor;
+            _activityLogService = activityLogService;
         }
 
         /// <summary>

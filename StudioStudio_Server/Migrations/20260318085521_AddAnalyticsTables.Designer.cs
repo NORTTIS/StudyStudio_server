@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using StudioStudio_Server.Data;
@@ -11,9 +12,11 @@ using StudioStudio_Server.Data;
 namespace StudioStudio_Server.Migrations
 {
     [DbContext(typeof(StudioDbContext))]
-    partial class StudioDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260318085521_AddAnalyticsTables")]
+    partial class AddAnalyticsTables
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -65,8 +68,6 @@ namespace StudioStudio_Server.Migrations
                         .HasColumnType("uuid");
 
                     b.HasKey("RequestId");
-
-                    b.HasIndex("UserId");
 
                     b.ToTable("AIRequestLogs");
                 });
@@ -342,10 +343,6 @@ namespace StudioStudio_Server.Migrations
 
                     b.HasKey("GroupAttachmentId");
 
-                    b.HasIndex("GroupId");
-
-                    b.HasIndex("UploadedBy");
-
                     b.ToTable("GroupAttachments");
                 });
 
@@ -494,6 +491,38 @@ namespace StudioStudio_Server.Migrations
                     b.ToTable("Payments");
                 });
 
+            modelBuilder.Entity("StudioStudio_Server.Models.Entities.PersonalAttachment", b =>
+                {
+                    b.Property<Guid>("AttachmentId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("FileName")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<long>("FileSize")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("FileType")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("FileUrl")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("UploadedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("AttachmentId");
+
+                    b.ToTable("PersonalAttachments");
+                });
+
             modelBuilder.Entity("StudioStudio_Server.Models.Entities.RefreshToken", b =>
                 {
                     b.Property<Guid>("Id")
@@ -562,8 +591,6 @@ namespace StudioStudio_Server.Migrations
                         .HasColumnType("uuid");
 
                     b.HasKey("ReportId");
-
-                    b.HasIndex("UserId");
 
                     b.ToTable("Reports");
                 });
@@ -797,6 +824,32 @@ namespace StudioStudio_Server.Migrations
                     b.HasIndex("UserId");
 
                     b.ToTable("TaskComments");
+                });
+
+            modelBuilder.Entity("StudioStudio_Server.Models.Entities.TaskHistory", b =>
+                {
+                    b.Property<Guid>("HistoryId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("ChangedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("ChangedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ChangedContent")
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("StatusId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("TaskId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("HistoryId");
+
+                    b.ToTable("TaskHistories");
                 });
 
             modelBuilder.Entity("StudioStudio_Server.Models.Entities.TaskPerformanceMetrics", b =>
@@ -1191,42 +1244,6 @@ namespace StudioStudio_Server.Migrations
                     b.Navigation("User");
                 });
 
-            modelBuilder.Entity("StudioStudio_Server.Models.Entities.AIRequestLog", b =>
-                {
-                    b.HasOne("StudioStudio_Server.Models.Entities.User", "User")
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.SetNull)
-                        .IsRequired();
-
-                    b.Navigation("User");
-                });
-
-            modelBuilder.Entity("StudioStudio_Server.Models.Entities.ActivityLog", b =>
-                {
-                    b.HasOne("StudioStudio_Server.Models.Entities.Group", "Group")
-                        .WithMany()
-                        .HasForeignKey("GroupId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
-                    b.HasOne("StudioStudio_Server.Models.Entities.Studio", "Studio")
-                        .WithMany()
-                        .HasForeignKey("StudioId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
-                    b.HasOne("StudioStudio_Server.Models.Entities.User", "User")
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.SetNull)
-                        .IsRequired();
-
-                    b.Navigation("Group");
-
-                    b.Navigation("Studio");
-
-                    b.Navigation("User");
-                });
-
             modelBuilder.Entity("StudioStudio_Server.Models.Entities.EmailVerificationToken", b =>
                 {
                     b.HasOne("StudioStudio_Server.Models.Entities.User", "User")
@@ -1270,25 +1287,6 @@ namespace StudioStudio_Server.Migrations
                         .IsRequired();
 
                     b.Navigation("Group");
-                });
-
-            modelBuilder.Entity("StudioStudio_Server.Models.Entities.GroupAttachment", b =>
-                {
-                    b.HasOne("StudioStudio_Server.Models.Entities.Group", "Group")
-                        .WithMany()
-                        .HasForeignKey("GroupId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("StudioStudio_Server.Models.Entities.User", "Uploader")
-                        .WithMany()
-                        .HasForeignKey("UploadedBy")
-                        .OnDelete(DeleteBehavior.SetNull)
-                        .IsRequired();
-
-                    b.Navigation("Group");
-
-                    b.Navigation("Uploader");
                 });
 
             modelBuilder.Entity("StudioStudio_Server.Models.Entities.GroupMessage", b =>
@@ -1358,16 +1356,6 @@ namespace StudioStudio_Server.Migrations
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
-
-                    b.Navigation("User");
-                });
-
-            modelBuilder.Entity("StudioStudio_Server.Models.Entities.Report", b =>
-                {
-                    b.HasOne("StudioStudio_Server.Models.Entities.User", "User")
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.SetNull);
 
                     b.Navigation("User");
                 });

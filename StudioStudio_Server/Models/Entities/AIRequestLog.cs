@@ -8,5 +8,8 @@
         public int TokenUsed { get; set; }
 
         public DateTime CreatedAt { get; set; }
+
+        // Navigation properties
+        public virtual User? User { get; set; }
     }
 }

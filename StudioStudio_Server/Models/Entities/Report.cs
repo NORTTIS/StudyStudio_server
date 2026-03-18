@@ -19,5 +19,8 @@ namespace StudioStudio_Server.Models.Entities
 
         public DateTime CreatedAt { get; set; }
         public DateTime? UpdatedAt { get; set; }
+
+        // Navigation properties
+        public virtual User? User { get; set; }
     }
 }

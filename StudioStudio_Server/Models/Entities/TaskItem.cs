@@ -16,6 +16,9 @@ public class TaskItem
 
     public DateTime? StartDate { get; set; }
     public DateTime? DueDate { get; set; }
+    public DateTime? CompletedAt { get; set; }
+    public decimal? EstimatedHours { get; set; }
+    public decimal? ActualHours { get; set; }
     public TaskPriority Priority { get; set; }
     public TaskSeverity Severity { get; set; }
 
