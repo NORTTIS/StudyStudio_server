@@ -13,5 +13,6 @@ namespace StudioStudio_Server.Models.Entities
         public DateTime CreatedAt { get; set; }
         public DateTime? UpdatedAt { get; set; }
         public DateTime? PublishedAt { get; set; }
+        public List<UserAnnouncement> UserAnnouncements { get; set; } = new List<UserAnnouncement>();
     }
 }

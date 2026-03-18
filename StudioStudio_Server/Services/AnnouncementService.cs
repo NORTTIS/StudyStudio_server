@@ -33,13 +33,13 @@ namespace StudioStudio_Server.Services
         /// Order by: PublishedAt DESC
         /// CACHED: Uses AnnouncementExpiration (5 minutes)
         /// </summary>
-        public async Task<List<AnnouncementResponse>> GetAllActiveAnnouncementsAsync()
+        public async Task<List<AnnouncementResponse>> GetAllActiveAnnouncementsAsync(Guid userId)
         {
             var cacheKey = _cacheService.GetAnnouncementsKey();
 
             var announcements = await _cacheService.GetOrSetAsync(
                 cacheKey,
-                async () => await _announcementRepository.GetAllActiveAsync(),
+                async () => await _announcementRepository.GetAllActiveAsync(userId),
                 _cacheService.GetExpirationForKey(cacheKey)
             );
 

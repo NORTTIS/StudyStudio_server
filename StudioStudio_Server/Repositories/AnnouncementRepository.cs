@@ -41,10 +41,12 @@ namespace StudioStudio_Server.Repositories
         /// Get all active announcements (IsActive = true)
         /// Order by: PublishedAt DESC (priority), then CreatedAt DESC
         /// </summary>
-        public async Task<List<Announcement>> GetAllActiveAsync()
+        public async Task<List<Announcement>> GetAllActiveAsync(Guid userId)
         {
             return await _context.Announcements
-                .Where(a => a.IsActive && a.Type != AnnouncementType.Mention)
+                .Where(a => a.IsActive &&
+                       a.Type != AnnouncementType.Mention &&
+                      !a.UserAnnouncements.Any(ua => ua.MentionedId == userId))
                 .OrderByDescending(a => a.PublishedAt ?? a.CreatedAt)
                 .AsNoTracking()
                 .ToListAsync();

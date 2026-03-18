@@ -110,6 +110,12 @@ namespace StudioStudio_Server.Hubs
             return matches.Select(m => Guid.Parse(m.Groups[1].Value)).ToList();
         }
 
+        private string ExtractPlainText(string content)
+        {
+            var text = Regex.Replace(content, @"@[a-fA-F0-9\-]{36}", "");
+            return Regex.Replace(text, @"\s+", " ").Trim();
+        }
+
         /// <summary>
         /// Validate delete permission
         /// Rules:
@@ -156,8 +162,8 @@ namespace StudioStudio_Server.Hubs
             {
                 AnnouncementId = Guid.NewGuid(),
                 Title = await GetLocalizedMessageAsync(ErrorCodes.AnnouncementTagTitle),
-                Content = $"{senderName} {await GetLocalizedMessageAsync(ErrorCodes.AnnouncementTagContent)} {group.GroupName}",
-                Type = AnnouncementType.Info,
+                Content = $"{senderName} {await GetLocalizedMessageAsync(ErrorCodes.AnnouncementTagContent)} {group.GroupName} - {ExtractPlainText(content)}",
+                Type = AnnouncementType.Mention,
                 IsActive = true,
                 CreatedBy = senderId,
                 CreatedAt = now,

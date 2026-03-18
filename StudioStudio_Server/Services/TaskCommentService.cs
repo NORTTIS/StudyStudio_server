@@ -226,6 +226,12 @@ namespace StudioStudio_Server.Services
             return matches.Select(m => Guid.Parse(m.Groups[1].Value)).ToList();
         }
 
+        private string ExtractPlainText(string content)
+        {
+            var text = Regex.Replace(content, @"@[a-fA-F0-9\-]{36}", "");
+            return Regex.Replace(text, @"\s+", " ").Trim();
+        }
+
         /// <summary>
         /// Handle @mention notifications
         /// Create Announcement and UserAnnouncement for tagged users
@@ -251,8 +257,8 @@ namespace StudioStudio_Server.Services
             {
                 AnnouncementId = Guid.NewGuid(),
                 Title = _messageService.GetMessage(ErrorCodes.AnnouncementTagTitle),
-                Content = $"{senderName} {_messageService.GetMessage(ErrorCodes.AnnouncementTagTask)} {task!.Title}",
-                Type = AnnouncementType.Info,
+                Content = $"{senderName} {_messageService.GetMessage(ErrorCodes.AnnouncementTagTask)} {task!.Title} - {ExtractPlainText(content)}",
+                Type = AnnouncementType.Mention,
                 IsActive = true,
                 CreatedBy = senderId,
                 CreatedAt = now,
