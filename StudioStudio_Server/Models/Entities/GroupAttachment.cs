@@ -22,5 +22,9 @@ namespace StudioStudio_Server.Models.Entities
         public DateTime? ProcessedAt { get; set; }
         public string? ErrorMessage { get; set; }
         public bool IsDeleted { get; set; } = false;
+
+        // Navigation properties
+        public virtual Group? Group { get; set; }
+        public virtual User? Uploader { get; set; }
     }
 }

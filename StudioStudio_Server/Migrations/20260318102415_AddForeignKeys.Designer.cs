@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using StudioStudio_Server.Data;
@@ -11,9 +12,11 @@ using StudioStudio_Server.Data;
 namespace StudioStudio_Server.Migrations
 {
     [DbContext(typeof(StudioDbContext))]
-    partial class StudioDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260318102415_AddForeignKeys")]
+    partial class AddForeignKeys
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -946,8 +949,7 @@ namespace StudioStudio_Server.Migrations
                     b.HasKey("UserId");
 
                     b.HasIndex("Email")
-                        .IsUnique()
-                        .HasFilter("\"Status\" != 2");
+                        .IsUnique();
 
                     b.ToTable("Users");
                 });
@@ -1002,9 +1004,6 @@ namespace StudioStudio_Server.Migrations
                     b.Property<Guid>("AnnouncementId")
                         .HasColumnType("uuid");
 
-                    b.Property<Guid?>("AnnouncementId1")
-                        .HasColumnType("uuid");
-
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -1026,8 +1025,6 @@ namespace StudioStudio_Server.Migrations
                     b.HasKey("UserAnnouncementId");
 
                     b.HasIndex("AnnouncementId");
-
-                    b.HasIndex("AnnouncementId1");
 
                     b.HasIndex("CreatedBy");
 
@@ -1512,14 +1509,10 @@ namespace StudioStudio_Server.Migrations
             modelBuilder.Entity("StudioStudio_Server.Models.Entities.UserAnnouncement", b =>
                 {
                     b.HasOne("StudioStudio_Server.Models.Entities.Announcement", null)
-                        .WithMany("UserAnnouncements")
+                        .WithMany()
                         .HasForeignKey("AnnouncementId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
-
-                    b.HasOne("StudioStudio_Server.Models.Entities.Announcement", "Announcement")
-                        .WithMany()
-                        .HasForeignKey("AnnouncementId1");
 
                     b.HasOne("StudioStudio_Server.Models.Entities.User", null)
                         .WithMany()
@@ -1531,8 +1524,6 @@ namespace StudioStudio_Server.Migrations
                         .HasForeignKey("MentionedId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
-
-                    b.Navigation("Announcement");
                 });
 
             modelBuilder.Entity("StudioStudio_Server.Models.Entities.UserProductivityScores", b =>
@@ -1600,11 +1591,6 @@ namespace StudioStudio_Server.Migrations
                     b.Navigation("Owner");
 
                     b.Navigation("PersonalStatus");
-                });
-
-            modelBuilder.Entity("StudioStudio_Server.Models.Entities.Announcement", b =>
-                {
-                    b.Navigation("UserAnnouncements");
                 });
 
             modelBuilder.Entity("StudioStudio_Server.Models.Entities.Group", b =>

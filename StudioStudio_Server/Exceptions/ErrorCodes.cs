@@ -223,5 +223,10 @@
 
         // COMMON
         public const string UnexpectedError = "SYS001";
+
+        // ANALYTICS
+        public const string AnalyticsNotFound = "ANALYTICS001";
+        public const string InvalidDateRange = "ANALYTICS002";
+        public const string InsufficientData = "ANALYTICS003";
     }
 }

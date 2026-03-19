@@ -104,7 +104,6 @@ builder.Services.AddScoped<ITemplateRepository, TemplateRepository>();
 builder.Services.AddScoped<ITemplateService, TemplateService>();
 builder.Services.AddScoped<IGroupTaskStatusRepository, GroupTaskStatusRepository>();
 builder.Services.AddScoped<IPersonalTaskStatusRepository, PersonalTaskStatusRepository>();
-builder.Services.AddScoped<ITaskHistoryRepository, TaskHistoryRepository>();
 builder.Services.AddScoped<ITaskAssignmentRepository, TaskAssignmentRepository>();
 builder.Services.AddScoped<ISeederService, SeederService>();
 builder.Services.AddScoped<IGroupInviteService, GroupInviteService>();
@@ -156,6 +155,18 @@ builder.Services.AddHostedService<StudioStudio_Server.Services.DeleteQueue.Delet
 
 // Refresh Token Cleanup Background Service (runs every 24 hours)
 builder.Services.AddHostedService<StudioStudio_Server.Services.BackgroundServices.RefreshTokenCleanupService>();
+
+// Analytics Services
+builder.Services.AddScoped<IActivityLogService, ActivityLogService>();
+builder.Services.AddScoped<IAnalyticsRepository, AnalyticsRepository>();
+builder.Services.AddScoped<IAnalyticsService, AnalyticsService>();
+
+// Analytics Background Jobs
+builder.Services.AddHostedService<StudioStudio_Server.Services.BackgroundServices.UserActivityMetricsJob>();
+builder.Services.AddHostedService<StudioStudio_Server.Services.BackgroundServices.GroupAnalyticsJob>();
+builder.Services.AddHostedService<StudioStudio_Server.Services.BackgroundServices.UserProductivityScoresJob>();
+builder.Services.AddHostedService<StudioStudio_Server.Services.BackgroundServices.StudioAnalyticsJob>();
+builder.Services.AddHostedService<StudioStudio_Server.Services.BackgroundServices.TaskPerformanceMetricsJob>();
 
 builder.Services.AddControllers(options =>
     {

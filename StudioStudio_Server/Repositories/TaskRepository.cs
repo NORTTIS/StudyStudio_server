@@ -879,19 +879,19 @@ namespace StudioStudio_Server.Repositories
 
         /// <summary>
         /// Permanent delete task from database (hard delete)
-        /// Also deletes related TaskHistory and TaskAssignment records
+        /// Also deletes related ActivityLog and TaskAssignment records
         /// </summary>
         public async Task PermanentDeleteAsync(Guid taskId)
         {
             using var transaction = await _context.Database.BeginTransactionAsync();
             try
             {
-                var taskHistories = await _context.TaskHistories
-                    .Where(h => h.TaskId == taskId)
+                var activityLogs = await _context.ActivityLogs
+                    .Where(h => h.TargetId == taskId && h.TargetType == "TASK")
                     .ToListAsync();
-                if (taskHistories.Any())
+                if (activityLogs.Any())
                 {
-                    _context.TaskHistories.RemoveRange(taskHistories);
+                    _context.ActivityLogs.RemoveRange(activityLogs);
                 }
 
                 var taskAssignments = await _context.TaskAssignments

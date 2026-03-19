@@ -20,9 +20,7 @@ namespace StudioStudio_Server.Data
         public DbSet<GroupTaskStatus> GroupTaskStatuses => Set<GroupTaskStatus>();
         public DbSet<PersonalTaskStatus> PersonalTaskStatuses => Set<PersonalTaskStatus>();
         public DbSet<TaskAssignment> TaskAssignments => Set<TaskAssignment>();
-        public DbSet<TaskHistory> TaskHistories => Set<TaskHistory>();
         public DbSet<GroupAttachment> GroupAttachments => Set<GroupAttachment>();
-        public DbSet<PersonalAttachment> PersonalAttachments => Set<PersonalAttachment>();
         public DbSet<SubscriptionPlan> SubscriptionPlans => Set<SubscriptionPlan>();
         public DbSet<UserSubscription> UserSubscriptions => Set<UserSubscription>();
         public DbSet<Payment> Payments => Set<Payment>();
@@ -37,6 +35,13 @@ namespace StudioStudio_Server.Data
         public DbSet<TaskComment> TaskComments => Set<TaskComment>();
         public DbSet<UserAnnouncement> UserAnnouncements => Set<UserAnnouncement>();
         public DbSet<StudioParticipant> StudioParticipants => Set<StudioParticipant>();
+
+        // Analytics Entities
+        public DbSet<UserActivityMetrics> UserActivityMetrics => Set<UserActivityMetrics>();
+        public DbSet<UserProductivityScores> UserProductivityScores => Set<UserProductivityScores>();
+        public DbSet<GroupAnalytics> GroupAnalytics => Set<GroupAnalytics>();
+        public DbSet<StudioAnalytics> StudioAnalytics => Set<StudioAnalytics>();
+        public DbSet<TaskPerformanceMetrics> TaskPerformanceMetrics => Set<TaskPerformanceMetrics>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -224,12 +229,6 @@ namespace StudioStudio_Server.Data
                     .IsUnique();
             });
 
-            // TASK HISTORY
-            modelBuilder.Entity<TaskHistory>(e =>
-            {
-                e.HasKey(x => x.HistoryId);
-            });
-
             // GROUP ATTACHMENT
             modelBuilder.Entity<GroupAttachment>(e =>
             {
@@ -237,15 +236,16 @@ namespace StudioStudio_Server.Data
 
                 e.Property(x => x.FileName).IsRequired();
                 e.Property(x => x.FileUrl).IsRequired();
-            });
 
-            // PERSONAL ATTACHMENT
-            modelBuilder.Entity<PersonalAttachment>(e =>
-            {
-                e.HasKey(x => x.AttachmentId);
+                e.HasOne(x => x.Group)
+                    .WithMany()
+                    .HasForeignKey(x => x.GroupId)
+                    .OnDelete(DeleteBehavior.Cascade);
 
-                e.Property(x => x.FileName).IsRequired();
-                e.Property(x => x.FileUrl).IsRequired();
+                e.HasOne(x => x.Uploader)
+                    .WithMany()
+                    .HasForeignKey(x => x.UploadedBy)
+                    .OnDelete(DeleteBehavior.SetNull);
             });
 
             // SUBSCRIPTION PLAN
@@ -293,18 +293,43 @@ namespace StudioStudio_Server.Data
             modelBuilder.Entity<AIRequestLog>(e =>
             {
                 e.HasKey(x => x.RequestId);
+
+                e.HasOne(x => x.User)
+                    .WithMany()
+                    .HasForeignKey(x => x.UserId)
+                    .OnDelete(DeleteBehavior.SetNull);
             });
 
             // ACTIVITY LOG
             modelBuilder.Entity<ActivityLog>(e =>
             {
                 e.HasKey(x => x.LogId);
+
+                e.HasOne(x => x.User)
+                    .WithMany()
+                    .HasForeignKey(x => x.UserId)
+                    .OnDelete(DeleteBehavior.SetNull);
+
+                e.HasOne(x => x.Group)
+                    .WithMany()
+                    .HasForeignKey(x => x.GroupId)
+                    .OnDelete(DeleteBehavior.SetNull);
+
+                e.HasOne(x => x.Studio)
+                    .WithMany()
+                    .HasForeignKey(x => x.StudioId)
+                    .OnDelete(DeleteBehavior.SetNull);
             });
 
             // REPORT
             modelBuilder.Entity<Report>(e =>
             {
                 e.HasKey(x => x.ReportId);
+
+                e.HasOne(x => x.User)
+                    .WithMany()
+                    .HasForeignKey(x => x.UserId)
+                    .OnDelete(DeleteBehavior.SetNull);
             });
 
             // ANNOUNCEMENT
@@ -416,6 +441,98 @@ namespace StudioStudio_Server.Data
 
                 e.Property(x => x.IsRead).IsRequired();
                 e.Property(x => x.CreatedAt).IsRequired();
+            });
+
+            // USER ACTIVITY METRICS
+            modelBuilder.Entity<UserActivityMetrics>(e =>
+            {
+                e.HasKey(x => x.Id);
+
+                e.HasIndex(x => new { x.UserId, x.Date })
+                    .IsUnique();
+
+                e.HasOne(x => x.User)
+                    .WithMany()
+                    .HasForeignKey(x => x.UserId)
+                    .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            // USER PRODUCTIVITY SCORES
+            modelBuilder.Entity<UserProductivityScores>(e =>
+            {
+                e.HasKey(x => x.Id);
+
+                e.HasIndex(x => new { x.UserId, x.GroupId, x.WeekStart })
+                    .IsUnique();
+
+                e.HasOne(x => x.User)
+                    .WithMany()
+                    .HasForeignKey(x => x.UserId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                e.HasOne(x => x.Group)
+                    .WithMany()
+                    .HasForeignKey(x => x.GroupId)
+                    .OnDelete(DeleteBehavior.Cascade)
+                    .IsRequired(false);
+            });
+
+            // GROUP ANALYTICS
+            modelBuilder.Entity<GroupAnalytics>(e =>
+            {
+                e.HasKey(x => x.Id);
+
+                e.HasIndex(x => new { x.GroupId, x.Date })
+                    .IsUnique();
+
+                e.HasOne(x => x.Group)
+                    .WithMany()
+                    .HasForeignKey(x => x.GroupId)
+                    .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            // STUDIO ANALYTICS
+            modelBuilder.Entity<StudioAnalytics>(e =>
+            {
+                e.HasKey(x => x.Id);
+
+                e.HasIndex(x => new { x.StudioId, x.Date })
+                    .IsUnique();
+
+                e.HasOne(x => x.Studio)
+                    .WithMany()
+                    .HasForeignKey(x => x.StudioId)
+                    .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            // TASK PERFORMANCE METRICS
+            modelBuilder.Entity<TaskPerformanceMetrics>(e =>
+            {
+                e.HasKey(x => x.Id);
+
+                e.HasIndex(x => x.TaskId)
+                    .IsUnique();
+
+                e.HasOne(x => x.Task)
+                    .WithMany()
+                    .HasForeignKey(x => x.TaskId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                e.HasOne(x => x.User)
+                    .WithMany()
+                    .HasForeignKey(x => x.UserId)
+                    .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            // ACTIVITY LOG - Add indexes for analytics queries
+            modelBuilder.Entity<ActivityLog>(e =>
+            {
+                e.HasKey(x => x.LogId);
+
+                e.HasIndex(x => new { x.UserId, x.CreatedAt });
+                e.HasIndex(x => new { x.GroupId, x.CreatedAt });
+                e.HasIndex(x => new { x.StudioId, x.CreatedAt });
+                e.HasIndex(x => x.ActionType);
             });
         }
     }

@@ -27,6 +27,7 @@ namespace StudioStudio_Server.Services
         private readonly IMessageService _messageService;
         private readonly ILogger<TaskCommentService> _logger;
         private readonly IHttpContextAccessor _httpContextAccessor;
+        private readonly IActivityLogService _activityLogService;
 
         public TaskCommentService(
             ITaskCommentRepository commentRepository,
@@ -38,7 +39,8 @@ namespace StudioStudio_Server.Services
             IGroupRepository groupRepository,
             IMessageService messageService,
             ILogger<TaskCommentService> logger,
-            IHttpContextAccessor httpContextAccessor)
+            IHttpContextAccessor httpContextAccessor,
+            IActivityLogService activityLogService)
         {
             _commentRepository = commentRepository;
             _taskRepository = taskRepository;
@@ -50,6 +52,7 @@ namespace StudioStudio_Server.Services
             _messageService = messageService;
             _logger = logger;
             _httpContextAccessor = httpContextAccessor;
+            _activityLogService = activityLogService;
         }
 
         /// <summary>
@@ -107,6 +110,13 @@ namespace StudioStudio_Server.Services
             };
 
             await _commentRepository.AddAsync(comment);
+
+            // Log comment creation activity
+            var taskForLog = await _taskRepository.GetByIdAsync(request.TaskId);
+            if (taskForLog != null)
+            {
+                await _activityLogService.LogCommentCreateAsync(userId, comment.CommentId, request.TaskId, taskForLog.GroupId);
+            }
 
             var user = await _userRepository.GetByIdAsync(userId);
             var commentDto = MapToTaskCommentDtoWithUser(comment, user!);
