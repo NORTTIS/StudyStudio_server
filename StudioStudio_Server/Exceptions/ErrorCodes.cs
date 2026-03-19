@@ -50,7 +50,7 @@
         public const string GroupCreateTaskStatusDenied = "GROUP018";
         public const string GroupDeleteTaskStatusDenied = "GROUP019";
         public const string GroupCreateTaskDeniedMissingStatus = "GROUP020";
-        //Change group021 to Status 002
+        public const string GroupPersonalAlreadyExists = "GROUP021";
         public const string GroupTaskStatusPositionExist = "GROUP022";
         public const string GroupDeleteTaskDenined = "GROUP023";
         public const string GroupRestoreTaskDenined = "GROUP024";
@@ -111,6 +111,24 @@
         public const string ValidationRateLimitExceeded = "VALIDATION012";
         public const string ValidationStringLength = "VALIDATION013";
         public const string ValidationInvalidRange = "VALIDATION014";
+        public const string ValidationInvalidEmailFormat = "VALIDATION015";
+        public const string ValidationUserNotInStudio = "VALIDATION016";
+        public const string ValidationInvalidRoleValue = "VALIDATION017";
+        public const string ValidationFileNoDataRows = "VALIDATION018";
+        public const string ValidationFileTooLarge = "VALIDATION019";
+        public const string ValidationInvalidFileHeaders = "VALIDATION020";
+
+        // BATCH
+        public const string BatchGroupNameNotFound = "BATCH001";
+        public const string BatchCannotAssignOwnerRole = "BATCH002";
+        public const string BatchRowParseError = "BATCH003";
+        public const string BatchStudioNotFound = "BATCH004";
+        public const string BatchNotStudioOwner = "BATCH005";
+        public const string BatchNoGroupsInStudio = "BATCH006";
+        public const string BatchGroupAlreadyHasModerator = "BATCH007";
+        public const string BatchDuplicateEmailGroupInFile = "BATCH008";
+        public const string BatchGroupMemberLimitExceeded = "BATCH009";
+        public const string BatchMemberAlreadyInAnotherGroup = "BATCH010";
 
         // STORAGE
         public const string StorageQuotaExceeded = "STORAGE001";
@@ -200,6 +218,8 @@
 
         // SUCCESS
         public const string SuccessUpdateData = "SUCCESS045";
+        public const string SuccessBatchAssign = "SUCCESS046";
+        public const string SuccessRandomAssign = "SUCCESS047";
 
         // COMMON
         public const string UnexpectedError = "SYS001";

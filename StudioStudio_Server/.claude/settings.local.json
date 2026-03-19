@@ -2,9 +2,7 @@
   "permissions": {
     "allow": [
       "WebSearch",
-      "Bash(dotnet build:*)",
-      "Bash(dotnet ef:*)",
-      "Bash(rm:*)"
+      "Bash(dotnet build:*)"
     ]
   }
 }

@@ -24,23 +24,6 @@ namespace StudioStudio_Server.Controllers
             _messageService = messageService;
         }
 
-        /// <summary>
-        /// Get RefreshToken from HTTP-only cookie
-        /// Return: Token string or null
-        /// </summary>
-        private string GetRefreshTokenFromCookie()
-        {
-            string? refreshToken = Request.Cookies["refreshToken"];
-
-            if (string.IsNullOrEmpty(refreshToken))
-            {
-                throw new AppException(
-                    ErrorCodes.AuthTokenExpired,
-                    StatusCodes.Status401Unauthorized);
-            }
-
-            return refreshToken;
-        }
 
         /// <summary>
         /// [PUBLIC] POST /api/auth/register

@@ -384,7 +384,7 @@ namespace StudioStudio_Server.Services
                 }
 
                 // Check if group name already exists in this studio
-                var nameExists = await _groupRepository.GroupNameExistsInStudioAsync(request.StudioId, request.GroupName);
+                var nameExists = await _groupRepository.GroupNameExistsInStudioAsync(request.StudioId, request.GroupName, null);
                 if (nameExists)
                 {
                     throw new AppException(ErrorCodes.GroupNameAlreadyExists, StatusCodes.Status400BadRequest);
@@ -393,10 +393,10 @@ namespace StudioStudio_Server.Services
             else
             {
                 // For independent groups, check if name exists (studioId = null)
-                var nameExists = await _groupRepository.GroupNameExistsInStudioAsync(null, request.GroupName);
+                var nameExists = await _groupRepository.GroupNameExistsInStudioAsync(null, request.GroupName, userId);
                 if (nameExists)
                 {
-                    throw new AppException(ErrorCodes.GroupNameAlreadyExists, StatusCodes.Status400BadRequest);
+                    throw new AppException(ErrorCodes.GroupPersonalAlreadyExists, StatusCodes.Status400BadRequest);
                 }
             }
 
@@ -967,8 +967,8 @@ namespace StudioStudio_Server.Services
                 StartDate = t.StartDate,
                 DueDate = t.DueDate,
                 CreatedAt = t.CreatedAt,
-                Assignees = taskAssigneesDict.TryGetValue(t.TaskId, out var assignees) 
-                    ? assignees 
+                Assignees = taskAssigneesDict.TryGetValue(t.TaskId, out var assignees)
+                    ? assignees
                     : new List<UserDto>(),
                 CreatedBy = new UserDto
                 {

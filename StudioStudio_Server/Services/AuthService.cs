@@ -173,10 +173,16 @@ namespace StudioStudio_Server.Services
                 throw new AppException(ErrorCodes.UserAccountAlreadyDeleted, StatusCodes.Status400BadRequest);
             }
 
-            if (user.Status == UserStatus.Active)
+            if (user.Status == UserStatus.Inactive)
+            {
+                throw new AppException(ErrorCodes.AuthAccountInactive, StatusCodes.Status403Forbidden);
+            }
+
+            if (user.IsVerify)
             {
                 throw new AppException(ErrorCodes.ValidationEmailAlreadyVerified, StatusCodes.Status400BadRequest);
             }
+
 
             user.IsVerify = true;
             user.UpdatedAt = DateTime.UtcNow;
@@ -232,6 +238,10 @@ namespace StudioStudio_Server.Services
                 throw new AppException(ErrorCodes.AuthAccountInactive, StatusCodes.Status403Forbidden);
             }
 
+            if (!user.IsVerify)
+            {
+                throw new AppException(ErrorCodes.AuthAccountNotVerified, StatusCodes.Status403Forbidden);
+            }
 
             var accessTokenExpireMs = _configuration.GetValue<long>("JWT:AccessTokenExpireMs", 3600000);
             var refreshTokenExpireMs = _configuration.GetValue<long>("JWT:RefreshTokenExpireMs", 86400000);

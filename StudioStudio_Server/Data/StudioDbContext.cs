@@ -52,10 +52,11 @@ namespace StudioStudio_Server.Data
             {
                 e.HasKey(x => x.UserId);
 
-                // Email is unique only for non-deleted users
-                // Deleted users have their email replaced with "deleted_{guid}@deleted.local"
+                // Email is unique only for non-deleted users (Status != Deleted)
                 // This allows new users to register with an email that belonged to a deleted account
-                e.HasIndex(x => x.Email).IsUnique();
+                e.HasIndex(x => x.Email)
+                    .IsUnique()
+                    .HasFilter(@"""Status"" != 2");
 
                 e.Property(x => x.Email).IsRequired();
                 e.Property(x => x.PasswordHash).IsRequired();
@@ -67,12 +68,12 @@ namespace StudioStudio_Server.Data
             modelBuilder.Entity<RefreshToken>(e =>
             {
                 e.HasKey(x => x.Id);
-                
+
                 e.HasOne(r => r.User)
                     .WithMany(u => u.RefreshTokens)
                     .HasForeignKey(r => r.UserId)
                     .OnDelete(DeleteBehavior.Cascade);
-                
+
                 e.HasIndex(x => x.UserId);
                 e.HasIndex(x => x.Token);
             });
@@ -162,7 +163,7 @@ namespace StudioStudio_Server.Data
                 e.HasKey(x => x.StatusId);
 
                 e.Property(x => x.StatusName).IsRequired();
-                
+
                 e.HasIndex(x => new { x.GroupId, x.Position })
                     .IsUnique();
             });
@@ -406,7 +407,7 @@ namespace StudioStudio_Server.Data
                     .HasForeignKey(x => x.UserId)
                     .OnDelete(DeleteBehavior.Restrict);
 
-                // ⚠️ FIX: Changed from Cascade to Restrict to avoid multiple cascade paths
+                // Changed from Cascade to Restrict to avoid multiple cascade paths
                 e.HasOne(x => x.ParentComment)
                     .WithMany(x => x.Replies)
                     .HasForeignKey(x => x.ParentCommentId)
@@ -424,7 +425,7 @@ namespace StudioStudio_Server.Data
                 e.HasKey(x => x.UserAnnouncementId);
 
                 e.HasOne<Announcement>()
-                    .WithMany()
+                    .WithMany(a => a.UserAnnouncements)
                     .HasForeignKey(x => x.AnnouncementId)
                     .OnDelete(DeleteBehavior.Cascade);
 

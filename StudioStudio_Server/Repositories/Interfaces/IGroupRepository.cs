@@ -10,7 +10,7 @@ namespace StudioStudio_Server.Repositories.Interfaces
         Task<List<Group>> GetUserGroupsAsync(Guid userId);
         Task<Group?> GetByIdAsync(Guid groupId);
         Task<Group?> GetGroupWithDetailsAsync(Guid groupId);
-        Task<bool> GroupNameExistsInStudioAsync(Guid? studioId, string groupName);
+        Task<bool> GroupNameExistsInStudioAsync(Guid? studioId, string groupName, Guid? userId);
         Task<int> CountGroupsCreatedByUserAsync(Guid userId);
         Task AddAsync(Group group);
         Task<bool> IsUserGroupOwnerAsync(Guid groupId, Guid userId);
@@ -19,6 +19,7 @@ namespace StudioStudio_Server.Repositories.Interfaces
         Task UpdateAsync(Group group);
         Task<bool> GroupNameExistsInStudioExcludingGroupAsync(Guid? studioId, string groupName, Guid excludeGroupId);
         Task<List<Group>> GetStudioGroupsAsync(Guid studioId);
+        Task<List<Group>> GetByIdsAsync(List<Guid> groupIds);
         Task<Guid> GetGroupOwnerIdAsync(Guid groupId);
         Task<List<string>> GetGroupNamesInStudioAsync(Guid? studioId);
         Task SaveChangesAsync();

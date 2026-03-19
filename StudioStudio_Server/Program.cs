@@ -131,6 +131,10 @@ builder.Services.AddScoped<IAdminGroupService, AdminGroupService>();
 builder.Services.AddScoped<IAdminStatisticsRepository, AdminStatisticsRepository>();
 builder.Services.AddScoped<IAdminStatisticsService, AdminStatisticsService>();
 
+// Batch Assignment Services
+builder.Services.AddScoped<StudioStudio_Server.Services.ExcelParsing.IExcelParser, StudioStudio_Server.Services.ExcelParsing.NpoiExcelParser>();
+builder.Services.AddScoped<StudioStudio_Server.Services.Interfaces.IBatchAssignService, StudioStudio_Server.Services.BatchAssignService>();
+
 // AI & Document Services
 builder.Services.AddScoped<IFileStorageService, BackblazeStorageService>();
 builder.Services.AddScoped<IVectorDatabaseService, QdrantService>();

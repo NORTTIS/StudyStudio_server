@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using StudioStudio_Server.Data;
@@ -11,9 +12,11 @@ using StudioStudio_Server.Data;
 namespace StudioStudio_Server.Migrations
 {
     [DbContext(typeof(StudioDbContext))]
-    partial class StudioDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260319043713_AddFilteredUniqueEmailIndex")]
+    partial class AddFilteredUniqueEmailIndex
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -66,8 +69,6 @@ namespace StudioStudio_Server.Migrations
 
                     b.HasKey("RequestId");
 
-                    b.HasIndex("UserId");
-
                     b.ToTable("AIRequestLogs");
                 });
 
@@ -84,18 +85,6 @@ namespace StudioStudio_Server.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<Guid?>("GroupId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Metadata")
-                        .HasColumnType("text");
-
-                    b.Property<Guid?>("StudioId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid?>("TargetId")
-                        .HasColumnType("uuid");
-
                     b.Property<string>("TargetType")
                         .IsRequired()
                         .HasColumnType("text");
@@ -104,14 +93,6 @@ namespace StudioStudio_Server.Migrations
                         .HasColumnType("uuid");
 
                     b.HasKey("LogId");
-
-                    b.HasIndex("ActionType");
-
-                    b.HasIndex("GroupId", "CreatedAt");
-
-                    b.HasIndex("StudioId", "CreatedAt");
-
-                    b.HasIndex("UserId", "CreatedAt");
 
                     b.ToTable("ActivityLogs");
                 });
@@ -248,53 +229,6 @@ namespace StudioStudio_Server.Migrations
                     b.ToTable("Groups");
                 });
 
-            modelBuilder.Entity("StudioStudio_Server.Models.Entities.GroupAnalytics", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<int>("ActiveMembers")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("CommentsCount")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("CompletedTasks")
-                        .HasColumnType("integer");
-
-                    b.Property<double>("CompletionRate")
-                        .HasColumnType("double precision");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateOnly>("Date")
-                        .HasColumnType("date");
-
-                    b.Property<Guid>("GroupId")
-                        .HasColumnType("uuid");
-
-                    b.Property<int>("MessagesCount")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("OverdueTasks")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("TotalTasks")
-                        .HasColumnType("integer");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("GroupId", "Date")
-                        .IsUnique();
-
-                    b.ToTable("GroupAnalytics");
-                });
-
             modelBuilder.Entity("StudioStudio_Server.Models.Entities.GroupAttachment", b =>
                 {
                     b.Property<Guid>("GroupAttachmentId")
@@ -341,10 +275,6 @@ namespace StudioStudio_Server.Migrations
                         .HasColumnType("uuid");
 
                     b.HasKey("GroupAttachmentId");
-
-                    b.HasIndex("GroupId");
-
-                    b.HasIndex("UploadedBy");
 
                     b.ToTable("GroupAttachments");
                 });
@@ -494,6 +424,38 @@ namespace StudioStudio_Server.Migrations
                     b.ToTable("Payments");
                 });
 
+            modelBuilder.Entity("StudioStudio_Server.Models.Entities.PersonalAttachment", b =>
+                {
+                    b.Property<Guid>("AttachmentId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("FileName")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<long>("FileSize")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("FileType")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("FileUrl")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("UploadedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("AttachmentId");
+
+                    b.ToTable("PersonalAttachments");
+                });
+
             modelBuilder.Entity("StudioStudio_Server.Models.Entities.RefreshToken", b =>
                 {
                     b.Property<Guid>("Id")
@@ -563,8 +525,6 @@ namespace StudioStudio_Server.Migrations
 
                     b.HasKey("ReportId");
 
-                    b.HasIndex("UserId");
-
                     b.ToTable("Reports");
                 });
 
@@ -598,53 +558,6 @@ namespace StudioStudio_Server.Migrations
                     b.HasIndex("OwnerId");
 
                     b.ToTable("Studios");
-                });
-
-            modelBuilder.Entity("StudioStudio_Server.Models.Entities.StudioAnalytics", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<int>("ActiveGroups")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("ActiveMembers")
-                        .HasColumnType("integer");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateOnly>("Date")
-                        .HasColumnType("date");
-
-                    b.Property<double>("EngagementScore")
-                        .HasColumnType("double precision");
-
-                    b.Property<double>("OverallCompletionRate")
-                        .HasColumnType("double precision");
-
-                    b.Property<Guid>("StudioId")
-                        .HasColumnType("uuid");
-
-                    b.Property<int>("TasksCompleted")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("TotalGroups")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("TotalMembers")
-                        .HasColumnType("integer");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("StudioId", "Date")
-                        .IsUnique();
-
-                    b.ToTable("StudioAnalytics");
                 });
 
             modelBuilder.Entity("StudioStudio_Server.Models.Entities.StudioParticipant", b =>
@@ -736,21 +649,10 @@ namespace StudioStudio_Server.Migrations
                     b.Property<Guid>("AssignedTo")
                         .HasColumnType("uuid");
 
-                    b.Property<Guid?>("AssignedToUserUserId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime?>("CompletedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<bool>("IsCompleted")
-                        .HasColumnType("boolean");
-
                     b.Property<Guid>("TaskId")
                         .HasColumnType("uuid");
 
                     b.HasKey("AssignmentId");
-
-                    b.HasIndex("AssignedToUserUserId");
 
                     b.HasIndex("TaskId", "AssignedTo")
                         .IsUnique();
@@ -799,56 +701,30 @@ namespace StudioStudio_Server.Migrations
                     b.ToTable("TaskComments");
                 });
 
-            modelBuilder.Entity("StudioStudio_Server.Models.Entities.TaskPerformanceMetrics", b =>
+            modelBuilder.Entity("StudioStudio_Server.Models.Entities.TaskHistory", b =>
                 {
-                    b.Property<Guid>("Id")
+                    b.Property<Guid>("HistoryId")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
-                    b.Property<decimal?>("ActualHours")
-                        .HasColumnType("numeric");
-
-                    b.Property<DateTime?>("CompletedAt")
+                    b.Property<DateTime>("ChangedAt")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<bool>("CompletedOnTime")
-                        .HasColumnType("boolean");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<int>("DaysEarlyOrLate")
-                        .HasColumnType("integer");
-
-                    b.Property<DateTime?>("DueDate")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<decimal?>("EstimatedHours")
-                        .HasColumnType("numeric");
-
-                    b.Property<Guid?>("GroupId")
+                    b.Property<Guid>("ChangedBy")
                         .HasColumnType("uuid");
 
-                    b.Property<double>("HourVariance")
-                        .HasColumnType("double precision");
+                    b.Property<string>("ChangedContent")
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("StatusId")
+                        .HasColumnType("uuid");
 
                     b.Property<Guid>("TaskId")
                         .HasColumnType("uuid");
 
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
+                    b.HasKey("HistoryId");
 
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("TaskId")
-                        .IsUnique();
-
-                    b.HasIndex("UserId");
-
-                    b.ToTable("TaskPerformanceMetrics");
+                    b.ToTable("TaskHistories");
                 });
 
             modelBuilder.Entity("StudioStudio_Server.Models.Entities.Template", b =>
@@ -952,47 +828,6 @@ namespace StudioStudio_Server.Migrations
                     b.ToTable("Users");
                 });
 
-            modelBuilder.Entity("StudioStudio_Server.Models.Entities.UserActivityMetrics", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<int>("CommentsPosted")
-                        .HasColumnType("integer");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateOnly>("Date")
-                        .HasColumnType("date");
-
-                    b.Property<int>("MessagesSent")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("TasksCompleted")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("TasksCreated")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("TotalActivityCount")
-                        .HasColumnType("integer");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("UserId", "Date")
-                        .IsUnique();
-
-                    b.ToTable("UserActivityMetrics");
-                });
-
             modelBuilder.Entity("StudioStudio_Server.Models.Entities.UserAnnouncement", b =>
                 {
                     b.Property<Guid>("UserAnnouncementId")
@@ -1036,52 +871,6 @@ namespace StudioStudio_Server.Migrations
                     b.ToTable("UserAnnouncements");
                 });
 
-            modelBuilder.Entity("StudioStudio_Server.Models.Entities.UserProductivityScores", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<double>("AverageTaskCompletionHours")
-                        .HasColumnType("double precision");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid?>("GroupId")
-                        .HasColumnType("uuid");
-
-                    b.Property<double>("OnTimeCompletionRate")
-                        .HasColumnType("double precision");
-
-                    b.Property<double>("ProductivityScore")
-                        .HasColumnType("double precision");
-
-                    b.Property<int>("TasksCompleted")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("TasksCreated")
-                        .HasColumnType("integer");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateOnly>("WeekStart")
-                        .HasColumnType("date");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("GroupId");
-
-                    b.HasIndex("UserId", "GroupId", "WeekStart")
-                        .IsUnique();
-
-                    b.ToTable("UserProductivityScores");
-                });
-
             modelBuilder.Entity("StudioStudio_Server.Models.Entities.UserSubscription", b =>
                 {
                     b.Property<Guid>("SubscriptionId")
@@ -1118,12 +907,6 @@ namespace StudioStudio_Server.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
-                    b.Property<decimal?>("ActualHours")
-                        .HasColumnType("numeric");
-
-                    b.Property<DateTime?>("CompletedAt")
-                        .HasColumnType("timestamp with time zone");
-
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -1132,9 +915,6 @@ namespace StudioStudio_Server.Migrations
 
                     b.Property<DateTime?>("DueDate")
                         .HasColumnType("timestamp with time zone");
-
-                    b.Property<decimal?>("EstimatedHours")
-                        .HasColumnType("numeric");
 
                     b.Property<Guid?>("GroupId")
                         .HasColumnType("uuid");
@@ -1197,42 +977,6 @@ namespace StudioStudio_Server.Migrations
                     b.Navigation("User");
                 });
 
-            modelBuilder.Entity("StudioStudio_Server.Models.Entities.AIRequestLog", b =>
-                {
-                    b.HasOne("StudioStudio_Server.Models.Entities.User", "User")
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.SetNull)
-                        .IsRequired();
-
-                    b.Navigation("User");
-                });
-
-            modelBuilder.Entity("StudioStudio_Server.Models.Entities.ActivityLog", b =>
-                {
-                    b.HasOne("StudioStudio_Server.Models.Entities.Group", "Group")
-                        .WithMany()
-                        .HasForeignKey("GroupId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
-                    b.HasOne("StudioStudio_Server.Models.Entities.Studio", "Studio")
-                        .WithMany()
-                        .HasForeignKey("StudioId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
-                    b.HasOne("StudioStudio_Server.Models.Entities.User", "User")
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.SetNull)
-                        .IsRequired();
-
-                    b.Navigation("Group");
-
-                    b.Navigation("Studio");
-
-                    b.Navigation("User");
-                });
-
             modelBuilder.Entity("StudioStudio_Server.Models.Entities.EmailVerificationToken", b =>
                 {
                     b.HasOne("StudioStudio_Server.Models.Entities.User", "User")
@@ -1265,36 +1009,6 @@ namespace StudioStudio_Server.Migrations
                         .WithMany("Groups")
                         .HasForeignKey("StudioId")
                         .OnDelete(DeleteBehavior.Cascade);
-                });
-
-            modelBuilder.Entity("StudioStudio_Server.Models.Entities.GroupAnalytics", b =>
-                {
-                    b.HasOne("StudioStudio_Server.Models.Entities.Group", "Group")
-                        .WithMany()
-                        .HasForeignKey("GroupId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Group");
-                });
-
-            modelBuilder.Entity("StudioStudio_Server.Models.Entities.GroupAttachment", b =>
-                {
-                    b.HasOne("StudioStudio_Server.Models.Entities.Group", "Group")
-                        .WithMany()
-                        .HasForeignKey("GroupId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("StudioStudio_Server.Models.Entities.User", "Uploader")
-                        .WithMany()
-                        .HasForeignKey("UploadedBy")
-                        .OnDelete(DeleteBehavior.SetNull)
-                        .IsRequired();
-
-                    b.Navigation("Group");
-
-                    b.Navigation("Uploader");
                 });
 
             modelBuilder.Entity("StudioStudio_Server.Models.Entities.GroupMessage", b =>
@@ -1368,16 +1082,6 @@ namespace StudioStudio_Server.Migrations
                     b.Navigation("User");
                 });
 
-            modelBuilder.Entity("StudioStudio_Server.Models.Entities.Report", b =>
-                {
-                    b.HasOne("StudioStudio_Server.Models.Entities.User", "User")
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
-                    b.Navigation("User");
-                });
-
             modelBuilder.Entity("StudioStudio_Server.Models.Entities.Studio", b =>
                 {
                     b.HasOne("StudioStudio_Server.Models.Entities.User", null)
@@ -1385,17 +1089,6 @@ namespace StudioStudio_Server.Migrations
                         .HasForeignKey("OwnerId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
-                });
-
-            modelBuilder.Entity("StudioStudio_Server.Models.Entities.StudioAnalytics", b =>
-                {
-                    b.HasOne("StudioStudio_Server.Models.Entities.Studio", "Studio")
-                        .WithMany()
-                        .HasForeignKey("StudioId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Studio");
                 });
 
             modelBuilder.Entity("StudioStudio_Server.Models.Entities.StudioParticipant", b =>
@@ -1415,23 +1108,6 @@ namespace StudioStudio_Server.Migrations
                     b.Navigation("Studio");
 
                     b.Navigation("User");
-                });
-
-            modelBuilder.Entity("StudioStudio_Server.Models.Entities.TaskAssignment", b =>
-                {
-                    b.HasOne("StudioStudio_Server.Models.Entities.User", "AssignedToUser")
-                        .WithMany()
-                        .HasForeignKey("AssignedToUserUserId");
-
-                    b.HasOne("TaskItem", "Task")
-                        .WithMany()
-                        .HasForeignKey("TaskId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("AssignedToUser");
-
-                    b.Navigation("Task");
                 });
 
             modelBuilder.Entity("StudioStudio_Server.Models.Entities.TaskComment", b =>
@@ -1460,25 +1136,6 @@ namespace StudioStudio_Server.Migrations
                     b.Navigation("User");
                 });
 
-            modelBuilder.Entity("StudioStudio_Server.Models.Entities.TaskPerformanceMetrics", b =>
-                {
-                    b.HasOne("TaskItem", "Task")
-                        .WithMany()
-                        .HasForeignKey("TaskId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("StudioStudio_Server.Models.Entities.User", "User")
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Task");
-
-                    b.Navigation("User");
-                });
-
             modelBuilder.Entity("StudioStudio_Server.Models.Entities.Template", b =>
                 {
                     b.HasOne("StudioStudio_Server.Models.Entities.Group", "Group")
@@ -1494,17 +1151,6 @@ namespace StudioStudio_Server.Migrations
                         .IsRequired();
 
                     b.Navigation("Group");
-
-                    b.Navigation("User");
-                });
-
-            modelBuilder.Entity("StudioStudio_Server.Models.Entities.UserActivityMetrics", b =>
-                {
-                    b.HasOne("StudioStudio_Server.Models.Entities.User", "User")
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
 
                     b.Navigation("User");
                 });
@@ -1533,24 +1179,6 @@ namespace StudioStudio_Server.Migrations
                         .IsRequired();
 
                     b.Navigation("Announcement");
-                });
-
-            modelBuilder.Entity("StudioStudio_Server.Models.Entities.UserProductivityScores", b =>
-                {
-                    b.HasOne("StudioStudio_Server.Models.Entities.Group", "Group")
-                        .WithMany()
-                        .HasForeignKey("GroupId")
-                        .OnDelete(DeleteBehavior.Cascade);
-
-                    b.HasOne("StudioStudio_Server.Models.Entities.User", "User")
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Group");
-
-                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("StudioStudio_Server.Models.Entities.UserSubscription", b =>

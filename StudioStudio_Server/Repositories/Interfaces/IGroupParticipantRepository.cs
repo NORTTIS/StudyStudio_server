@@ -16,5 +16,8 @@ namespace StudioStudio_Server.Repositories.Interfaces
         Task<int> GetRoleCountByGroupIdAsync(Guid groupId, GroupRole role);
         Task<List<GroupParticipant>> GetAllByGroupIdAsync(Guid groupId);
         Task<GroupRole> GetGroupRoleByUserIdAsync(Guid userId, Guid groupId);
+        Task AddRangeAsync(IEnumerable<GroupParticipant> participants);
+        Task UpdateRangeAsync(IEnumerable<GroupParticipant> participants);
+        Task RemoveRangeAsync(IEnumerable<GroupParticipant> participants);
     }
 }

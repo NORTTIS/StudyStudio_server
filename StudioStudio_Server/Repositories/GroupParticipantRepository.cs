@@ -174,5 +174,31 @@ namespace StudioStudio_Server.Repositories
             return user?.Role ?? GroupRole.Viewer;
         }
 
+        /// <summary>
+        /// Add multiple participants in a single batch
+        /// </summary>
+        public async Task AddRangeAsync(IEnumerable<GroupParticipant> participants)
+        {
+            _context.GroupParticipants.AddRange(participants);
+            await _context.SaveChangesAsync();
+        }
+
+        /// <summary>
+        /// Update multiple participants in a single batch
+        /// </summary>
+        public async Task UpdateRangeAsync(IEnumerable<GroupParticipant> participants)
+        {
+            _context.GroupParticipants.UpdateRange(participants);
+            await _context.SaveChangesAsync();
+        }
+
+        /// <summary>
+        /// Remove multiple participants in a single batch
+        /// </summary>
+        public async Task RemoveRangeAsync(IEnumerable<GroupParticipant> participants)
+        {
+            _context.GroupParticipants.RemoveRange(participants);
+            await _context.SaveChangesAsync();
+        }
     }
 }

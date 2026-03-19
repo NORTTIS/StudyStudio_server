@@ -119,6 +119,7 @@ namespace StudioStudio_Server.Services
                 LastName = adminLastName,
                 Status = UserStatus.Active,
                 IsAdmin = true,
+                IsVerify = true,
                 Language = "en",
                 EmailNotificationEnabled = true,
                 CreatedAt = DateTime.UtcNow,

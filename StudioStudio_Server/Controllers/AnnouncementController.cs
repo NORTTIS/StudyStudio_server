@@ -62,9 +62,11 @@ namespace StudioStudio_Server.Controllers
         /// Order by: PublishedAt/CreatedAt DESC
         /// </summary>
         [HttpGet]
+        [Authorize]
         public async Task<ActionResult<ApiResponse<List<AnnouncementResponse>>>> GetAnnouncements()
         {
-            var response = await _announcementService.GetAllActiveAnnouncementsAsync();
+            var userId = ValidateAndGetUserId();
+            var response = await _announcementService.GetAllActiveAnnouncementsAsync(userId);
             var message = _messageService.GetMessage(ErrorCodes.SuccessGetData);
 
             return Ok(ApiResponse<List<AnnouncementResponse>>.Success(
@@ -79,6 +81,7 @@ namespace StudioStudio_Server.Controllers
         /// Validate: Announcement must be active
         /// </summary>
         [HttpGet("{id}")]
+        [Authorize]
         public async Task<ActionResult<ApiResponse<AnnouncementResponse>>> GetAnnouncementById(Guid id)
         {
             var response = await _announcementService.GetAnnouncementByIdAsync(id);

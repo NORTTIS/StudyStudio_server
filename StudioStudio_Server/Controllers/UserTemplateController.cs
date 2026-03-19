@@ -2,6 +2,7 @@
 using Microsoft.AspNetCore.Mvc;
 using StudioStudio_Server.Exceptions;
 using StudioStudio_Server.Models.DTOs.Response;
+using StudioStudio_Server.Repositories.Interfaces;
 using StudioStudio_Server.Services.Interfaces;
 using System.Security.Claims;
 
@@ -19,13 +20,19 @@ namespace StudioStudio_Server.Controllers
     {
         private readonly ITemplateService _templateService;
         private readonly IMessageService _messageService;
+        private readonly IUserService _userService;
+        private readonly IGroupRepository _groupRepository;
 
         public UserTemplateController(
             ITemplateService templateService,
-            IMessageService messageService)
+            IMessageService messageService,
+            IUserService userService,
+            IGroupRepository groupRepository)
         {
             _templateService = templateService;
             _messageService = messageService;
+            _userService = userService;
+            _groupRepository = groupRepository;
         }
 
         /// <summary>
@@ -50,19 +57,40 @@ namespace StudioStudio_Server.Controllers
         /// Get list of templates available for user
         /// Include: System templates + User's own templates
         /// Exclude: Templates from other users
-        /// Order by: System templates first, then CreatedAt DESC
+        /// Returns: Subscription quota info + template list
         /// </summary>
         [HttpGet]
-        public async Task<ActionResult<ApiResponse<List<TemplateResponse>>>> GetAvailableTemplates()
+        public async Task<ActionResult<ApiResponse<TemplateListResponse>>> GetAvailableTemplates()
         {
             var userId = ValidateAndGetUserId();
+
+            // Get user's subscription plan
+            var subscriptionPlan = await _userService.GetUserSubscriptionPlan(userId);
+            var groupLimit = subscriptionPlan?.MaxGroups ?? 5;
+            var memberLimit = subscriptionPlan?.MaxMembersPerGroup ?? 10;
+
+            // Get current group count
+            var groupCreated = await _groupRepository.CountGroupsCreatedByUserAsync(userId);
+
             var templates = await _templateService.GetAvailableTemplatesForUserAsync(userId);
+
+            var response = new TemplateListResponse
+            {
+                Subscription = new SubscriptionQuota
+                {
+                    GroupLimit = groupLimit,
+                    GroupCreated = groupCreated,
+                    MemberLimit = memberLimit
+                },
+                Templates = templates
+            };
+
             var message = _messageService.GetMessage(ErrorCodes.SuccessGetData);
 
-            return Ok(ApiResponse<List<TemplateResponse>>.Success(
+            return Ok(ApiResponse<TemplateListResponse>.Success(
                 ErrorCodes.SuccessGetData,
                 message,
-                templates));
+                response));
         }
 
         /// <summary>

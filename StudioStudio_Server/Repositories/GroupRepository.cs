@@ -74,6 +74,17 @@ namespace StudioStudio_Server.Repositories
         }
 
         /// <summary>
+        /// Get groups by list of IDs
+        /// Condition: GroupId IN {groupIds} AND IsActive = true
+        /// </summary>
+        public async Task<List<Group>> GetByIdsAsync(List<Guid> groupIds)
+        {
+            return await _db.Groups
+                .Where(g => groupIds.Contains(g.GroupId) && g.IsActive)
+                .ToListAsync();
+        }
+
+        /// <summary>
         /// Count groups created by user (Owner)
         /// Condition: Participants contains {userId with Role = Owner} AND IsActive = true
         /// Use case: Check group creation limit
@@ -97,16 +108,21 @@ namespace StudioStudio_Server.Repositories
         }
 
         /// <summary>
-        /// Check if group name exists in studio
-        /// Condition: StudioId = {studioId} AND GroupName = {groupName} AND IsActive = true
-        /// Use case: Validate when creating new group
+        /// Check if group name exists
+        /// - If studioId != null: check within studio
+        /// - If studioId == null: check within user's personal groups
         /// </summary>
-        public async Task<bool> GroupNameExistsInStudioAsync(Guid? studioId, string groupName)
+        public async Task<bool> GroupNameExistsInStudioAsync(Guid? studioId, string groupName, Guid? userId)
         {
             return await _db.Groups
-                .AnyAsync(g => g.StudioId == studioId &&
-                              g.GroupName == groupName &&
-                              g.IsActive);
+                .AnyAsync(g =>
+                    g.GroupName == groupName &&
+                    g.IsActive &&
+                    (
+                        (studioId != null && g.StudioId == studioId) ||
+                        (studioId == null && g.StudioId == null && g.CreatedBy == userId)
+                    )
+                );
         }
 
         /// <summary>
