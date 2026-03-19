@@ -117,7 +117,6 @@ namespace StudioStudio_Server.Services
             // Note: Email is kept as-is because the unique index only applies to non-deleted users
             // This allows the original email to be reused after the user is restored (if needed)
             user.Status = UserStatus.Deleted;
-            user.IsVerify = false; // Reset verification status
             user.FirstName = "Deleted";
             user.LastName = "User";
             // Generate random password hash to satisfy NOT NULL constraint

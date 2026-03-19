@@ -173,10 +173,16 @@ namespace StudioStudio_Server.Services
                 throw new AppException(ErrorCodes.UserAccountAlreadyDeleted, StatusCodes.Status400BadRequest);
             }
 
-            if (user.Status == UserStatus.Active)
+            if (user.Status == UserStatus.Inactive)
+            {
+                throw new AppException(ErrorCodes.AuthAccountInactive, StatusCodes.Status403Forbidden);
+            }
+
+            if (user.IsVerify)
             {
                 throw new AppException(ErrorCodes.ValidationEmailAlreadyVerified, StatusCodes.Status400BadRequest);
             }
+
 
             user.IsVerify = true;
             user.UpdatedAt = DateTime.UtcNow;
