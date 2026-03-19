@@ -165,7 +165,6 @@ builder.Services.AddScoped<IAnalyticsService, AnalyticsService>();
 builder.Services.AddHostedService<StudioStudio_Server.Services.BackgroundServices.UserActivityMetricsJob>();
 builder.Services.AddHostedService<StudioStudio_Server.Services.BackgroundServices.GroupAnalyticsJob>();
 builder.Services.AddHostedService<StudioStudio_Server.Services.BackgroundServices.UserProductivityScoresJob>();
-builder.Services.AddHostedService<StudioStudio_Server.Services.BackgroundServices.StudioAnalyticsJob>();
 builder.Services.AddHostedService<StudioStudio_Server.Services.BackgroundServices.TaskPerformanceMetricsJob>();
 
 builder.Services.AddControllers(options =>

@@ -15,7 +15,7 @@ namespace StudioStudio_Server.Services.Interfaces
         Task<List<MemberContributionData>> GetGroupMemberContributionAsync(Guid groupId);
 
         // Studio Dashboard
-        Task<StudioAnalyticsResponse> GetStudioAnalyticsAsync(Guid studioId, Guid userId, DateOnly? startDate, DateOnly? endDate);
         Task<List<GroupComparisonData>> GetStudioGroupComparisonAsync(Guid studioId);
+        Task<StudioGroupHeatmapResponse> GetStudioGroupHeatmapAsync(Guid studioId, DateOnly startDate, DateOnly endDate);
     }
 }

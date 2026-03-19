@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using StudioStudio_Server.Data;
@@ -11,9 +12,11 @@ using StudioStudio_Server.Data;
 namespace StudioStudio_Server.Migrations
 {
     [DbContext(typeof(StudioDbContext))]
-    partial class StudioDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260319193022_AddStudioDateRange")]
+    partial class AddStudioDateRange
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -604,6 +607,53 @@ namespace StudioStudio_Server.Migrations
                     b.HasIndex("OwnerId");
 
                     b.ToTable("Studios");
+                });
+
+            modelBuilder.Entity("StudioStudio_Server.Models.Entities.StudioAnalytics", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("ActiveGroups")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("ActiveMembers")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateOnly>("Date")
+                        .HasColumnType("date");
+
+                    b.Property<double>("EngagementScore")
+                        .HasColumnType("double precision");
+
+                    b.Property<double>("OverallCompletionRate")
+                        .HasColumnType("double precision");
+
+                    b.Property<Guid>("StudioId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("TasksCompleted")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("TotalGroups")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("TotalMembers")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("StudioId", "Date")
+                        .IsUnique();
+
+                    b.ToTable("StudioAnalytics");
                 });
 
             modelBuilder.Entity("StudioStudio_Server.Models.Entities.StudioParticipant", b =>
@@ -1344,6 +1394,17 @@ namespace StudioStudio_Server.Migrations
                         .HasForeignKey("OwnerId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("StudioStudio_Server.Models.Entities.StudioAnalytics", b =>
+                {
+                    b.HasOne("StudioStudio_Server.Models.Entities.Studio", "Studio")
+                        .WithMany()
+                        .HasForeignKey("StudioId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Studio");
                 });
 
             modelBuilder.Entity("StudioStudio_Server.Models.Entities.StudioParticipant", b =>

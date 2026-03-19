@@ -12,11 +12,4 @@ namespace StudioStudio_Server.Models.DTOs.Request
         public DateTime? StartDate { get; set; }
         public DateTime? EndDate { get; set; }
     }
-
-    public class StudioAnalyticsRequest
-    {
-        public Guid StudioId { get; set; }
-        public DateTime? StartDate { get; set; }
-        public DateTime? EndDate { get; set; }
-    }
 }

@@ -179,29 +179,6 @@ namespace StudioStudio_Server.Controllers
         // ==================== STUDIO ANALYTICS ====================
 
         /// <summary>
-        /// Get studio analytics dashboard
-        /// </summary>
-        [HttpGet("studio/{studioId}")]
-        public async Task<ActionResult<ApiResponse<StudioAnalyticsResponse>>> GetStudioAnalytics(
-            Guid studioId,
-            [FromQuery] DateTime? startDate = null,
-            [FromQuery] DateTime? endDate = null)
-        {
-            var userId = ValidateAndGetUserId();
-
-            DateOnly? start = startDate.HasValue ? DateOnly.FromDateTime(startDate.Value) : null;
-            DateOnly? end = endDate.HasValue ? DateOnly.FromDateTime(endDate.Value) : null;
-
-            var result = await _analyticsService.GetStudioAnalyticsAsync(studioId, userId, start, end);
-            var message = _messageService.GetMessage(ErrorCodes.SuccessGetData);
-
-            return Ok(ApiResponse<StudioAnalyticsResponse>.Success(
-                ErrorCodes.SuccessGetData,
-                message,
-                result));
-        }
-
-        /// <summary>
         /// Get studio group comparison
         /// </summary>
         [HttpGet("studio/{studioId}/groups")]
@@ -214,6 +191,31 @@ namespace StudioStudio_Server.Controllers
             var message = _messageService.GetMessage(ErrorCodes.SuccessGetData);
 
             return Ok(ApiResponse<List<GroupComparisonData>>.Success(
+                ErrorCodes.SuccessGetData,
+                message,
+                result));
+        }
+
+        /// <summary>
+        /// Get studio group activity heatmap for chart visualization
+        /// Date range: default 30 days (matching UI navigation)
+        /// </summary>
+        [HttpGet("studio/{studioId}/heatmap")]
+        public async Task<ActionResult<ApiResponse<StudioGroupHeatmapResponse>>> GetStudioGroupHeatmap(
+            Guid studioId,
+            [FromQuery] DateTime? startDate = null,
+            [FromQuery] DateTime? endDate = null)
+        {
+            var userId = ValidateAndGetUserId();
+
+            // Default: endDate = today, startDate = today - 29 days (total 30 days)
+            var end = endDate.HasValue ? DateOnly.FromDateTime(endDate.Value) : DateOnly.FromDateTime(DateTime.UtcNow);
+            var start = startDate.HasValue ? DateOnly.FromDateTime(startDate.Value) : end.AddDays(-29);
+
+            var result = await _analyticsService.GetStudioGroupHeatmapAsync(studioId, start, end);
+            var message = _messageService.GetMessage(ErrorCodes.SuccessGetData);
+
+            return Ok(ApiResponse<StudioGroupHeatmapResponse>.Success(
                 ErrorCodes.SuccessGetData,
                 message,
                 result));

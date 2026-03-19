@@ -93,7 +93,9 @@ namespace StudioStudio_Server.Services
                 StudioRole = studio.OwnerId == userId ? StudioRole.Owner : StudioRole.Member,
                 CreatedAt = studio.CreatedAt,
                 UpdatedAt = studio.UpdatedAt,
-                GroupCount = 0
+                GroupCount = 0,
+                StartDate = studio.StartDate,
+                EndDate = studio.EndDate
             }).ToList();
 
             foreach (var response in studioResponses)
@@ -123,6 +125,12 @@ namespace StudioStudio_Server.Services
                 throw new AppException(ErrorCodes.StudioLimitReached, StatusCodes.Status403Forbidden);
             }
 
+            // Validate: EndDate must be >= StartDate if both are provided
+            if (studio.StartDate.HasValue && studio.EndDate.HasValue && studio.EndDate < studio.StartDate)
+            {
+                throw new AppException(ErrorCodes.StudioInvalidDateRange, StatusCodes.Status400BadRequest);
+            }
+
             var now = DateTime.UtcNow;
             var createStudio = new Studio
             {
@@ -131,7 +139,10 @@ namespace StudioStudio_Server.Services
                 StudioName = studio.StudioName,
                 Description = studio.Description,
                 CreatedAt = now,
-                UpdatedAt = now
+                UpdatedAt = now,
+                // Normalize to UTC for PostgreSQL timestamp with time zone compatibility
+                StartDate = studio.StartDate.HasValue ? DateTime.SpecifyKind(studio.StartDate.Value, DateTimeKind.Utc) : null,
+                EndDate = studio.EndDate.HasValue ? DateTime.SpecifyKind(studio.EndDate.Value, DateTimeKind.Utc) : null
             };
 
             await _studioRepository.CreateStudioAsync(createStudio);
@@ -155,7 +166,9 @@ namespace StudioStudio_Server.Services
                 Description = createStudio.Description,
                 CreatedAt = now,
                 UpdatedAt = now,
-                GroupCount = 0
+                GroupCount = 0,
+                StartDate = createStudio.StartDate,
+                EndDate = createStudio.EndDate
             };
         }
 
@@ -206,7 +219,9 @@ namespace StudioStudio_Server.Services
                 StudioRole = studio.OwnerId == userId ? StudioRole.Owner : StudioRole.Member,
                 CreatedAt = studio.CreatedAt,
                 UpdatedAt = studio.UpdatedAt,
-                GroupCount = groupCount
+                GroupCount = groupCount,
+                StartDate = studio.StartDate,
+                EndDate = studio.EndDate
             };
         }
 
@@ -248,8 +263,17 @@ namespace StudioStudio_Server.Services
                 throw new AppException(ErrorCodes.AuthForbidden, StatusCodes.Status403Forbidden);
             }
 
+            // Validate: EndDate must be >= StartDate if both are provided
+            if (studio.StartDate.HasValue && studio.EndDate.HasValue && studio.EndDate < studio.StartDate)
+            {
+                throw new AppException(ErrorCodes.StudioInvalidDateRange, StatusCodes.Status400BadRequest);
+            }
+
             updateStudio.StudioName = studio.StudioName;
             updateStudio.Description = studio.Description;
+            // Normalize to UTC for PostgreSQL timestamp with time zone compatibility
+            updateStudio.StartDate = studio.StartDate.HasValue ? DateTime.SpecifyKind(studio.StartDate.Value, DateTimeKind.Utc) : null;
+            updateStudio.EndDate = studio.EndDate.HasValue ? DateTime.SpecifyKind(studio.EndDate.Value, DateTimeKind.Utc) : null;
             updateStudio.UpdatedAt = DateTime.UtcNow;
 
             await _studioRepository.UpdateStudioAsync(updateStudio);
@@ -258,7 +282,9 @@ namespace StudioStudio_Server.Services
             {
                 StudioName = updateStudio.StudioName,
                 Description = updateStudio.Description,
-                UpdatedAt = updateStudio.UpdatedAt
+                UpdatedAt = updateStudio.UpdatedAt,
+                StartDate = updateStudio.StartDate,
+                EndDate = updateStudio.EndDate
             };
         }
 

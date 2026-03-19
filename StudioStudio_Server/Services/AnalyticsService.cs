@@ -334,100 +334,77 @@ namespace StudioStudio_Server.Services
         // ==================== STUDIO ANALYTICS ====================
 
         /// <summary>
-        /// Get studio analytics dashboard
-        /// </summary>
-        public async Task<StudioAnalyticsResponse> GetStudioAnalyticsAsync(Guid studioId, Guid userId, DateOnly? startDate, DateOnly? endDate)
-        {
-            var end = endDate ?? DateOnly.FromDateTime(DateTime.UtcNow);
-            var start = startDate ?? end.AddDays(-30);
-
-            // Check if user is member of the studio
-            var isMember = await _context.StudioParticipants
-                .AnyAsync(p => p.StudioId == studioId && p.UserId == userId);
-
-            if (!isMember)
-                throw new AppException(Exceptions.ErrorCodes.StudioPermissionDenied, StatusCodes.Status403Forbidden);
-
-            var completionRateHistory = await GetStudioProgressAsync(studioId, start, end);
-            var groupComparison = await GetStudioGroupComparisonAsync(studioId);
-            var groupHeatmapComparison = await GetGroupHeatmapComparisonAsync(studioId, 30);
-
-            var latestAnalytics = completionRateHistory.LastOrDefault();
-
-            return new StudioAnalyticsResponse
-            {
-                CompletionRate = latestAnalytics?.CompletionRate ?? 0,
-                ActiveUsers = latestAnalytics?.ActiveUsers ?? 0,
-                EngagementScore = Math.Round((latestAnalytics?.CompletionRate ?? 0) * 0.4 + (latestAnalytics?.ActiveUsers > 0 ? 60 : 0), 2),
-                GroupComparison = groupComparison,
-                CompletionRateHistory = completionRateHistory,
-                GroupHeatmapComparison = groupHeatmapComparison
-            };
-        }
-
-        /// <summary>
         /// Get studio group comparison
         /// </summary>
         public async Task<List<GroupComparisonData>> GetStudioGroupComparisonAsync(Guid studioId)
         {
             var thirtyDaysAgo = DateTime.UtcNow.AddDays(-30);
 
+            // Get all active groups with names in one query
             var groups = await _context.Groups
-                .Where(g => g.StudioId == studioId)
-                .Select(g => g.GroupId)
+                .Where(g => g.StudioId == studioId && g.IsActive)
+                .Select(g => new { g.GroupId, g.GroupName })
                 .ToListAsync();
 
-            var result = new List<GroupComparisonData>();
+            if (!groups.Any())
+                return new List<GroupComparisonData>();
 
-            foreach (var groupId in groups)
+            var groupIds = groups.Select(g => g.GroupId).ToList();
+
+            // Batch query: total tasks per group
+            var totalTasksDict = await _context.Tasks
+                .Where(t => t.GroupId.HasValue && groupIds.Contains(t.GroupId.Value))
+                .GroupBy(t => t.GroupId!.Value)
+                .Select(g => new { GroupId = g.Key, Count = g.Count() })
+                .ToDictionaryAsync(x => x.GroupId, x => x.Count);
+
+            // Batch query: completed tasks per group
+            var completedTasksDict = await _context.Tasks
+                .Where(t => t.GroupId.HasValue && groupIds.Contains(t.GroupId.Value) && t.Progress == 100)
+                .GroupBy(t => t.GroupId!.Value)
+                .Select(g => new { GroupId = g.Key, Count = g.Count() })
+                .ToDictionaryAsync(x => x.GroupId, x => x.Count);
+
+            // Batch query: active members per group (last 30 days)
+            var activeMembersDict = await _context.ActivityLogs
+                .Where(a => a.GroupId.HasValue && groupIds.Contains(a.GroupId.Value) && a.CreatedAt >= thirtyDaysAgo)
+                .GroupBy(a => a.GroupId)
+                .Select(g => new { GroupId = g.Key, Count = g.Select(a => a.UserId).Distinct().Count() })
+                .ToDictionaryAsync(x => x.GroupId!.Value, x => x.Count);
+
+            // Batch query: last activity datetime per group
+            var lastActivityDict = await _context.ActivityLogs
+                .Where(a => a.GroupId.HasValue && groupIds.Contains(a.GroupId.Value))
+                .GroupBy(a => a.GroupId)
+                .Select(g => new { GroupId = g.Key, LastActivity = (DateTime)g.Max(a => a.CreatedAt) })
+                .ToDictionaryAsync(x => x.GroupId!.Value, x => x.LastActivity); // DateTime (non-nullable)
+
+            // Batch query: overdue tasks count per group (due date < now && progress < 100)
+            var overdueTasksDict = await _context.Tasks
+                .Where(t => t.GroupId.HasValue && groupIds.Contains(t.GroupId.Value) && t.DueDate < DateTime.UtcNow && t.Progress < 100)
+                .GroupBy(t => t.GroupId!.Value)
+                .Select(g => new { GroupId = g.Key, Count = g.Count() })
+                .ToDictionaryAsync(x => x.GroupId, x => x.Count);
+
+            var result = groups.Select(g =>
             {
-                var totalTasks = await _context.Tasks
-                    .Where(t => t.GroupId == groupId)
-                    .CountAsync();
+                var totalTasks = totalTasksDict.GetValueOrDefault(g.GroupId, 0);
+                var completedTasks = completedTasksDict.GetValueOrDefault(g.GroupId, 0);
 
-                var completedTasks = await _context.Tasks
-                    .Where(t => t.GroupId == groupId && t.Progress == 100)
-                    .CountAsync();
-
-                var activeMembers = await _context.ActivityLogs
-                    .Where(a => a.GroupId == groupId && a.CreatedAt >= thirtyDaysAgo)
-                    .Select(a => a.UserId)
-                    .Distinct()
-                    .CountAsync();
-
-                var group = await _context.Groups.FindAsync(groupId);
-
-                result.Add(new GroupComparisonData
+                return new GroupComparisonData
                 {
-                    GroupId = groupId,
-                    GroupName = group?.GroupName ?? "Unknown",
+                    GroupId = g.GroupId,
+                    GroupName = g.GroupName,
                     TotalTasks = totalTasks,
                     CompletedTasks = completedTasks,
                     CompletionRate = totalTasks > 0 ? Math.Round((double)completedTasks / totalTasks * 100, 2) : 0,
-                    ActiveMembers = activeMembers
-                });
-            }
+                    ActiveMembers = activeMembersDict.GetValueOrDefault(g.GroupId, 0),
+                    LastActivityDateTime = lastActivityDict.TryGetValue(g.GroupId, out var lastActivity) ? lastActivity : null,
+                    OverdueTasksCount = overdueTasksDict.GetValueOrDefault(g.GroupId, 0)
+                };
+            }).ToList();
 
             return result.OrderByDescending(g => g.CompletionRate).ToList();
-        }
-
-        private async Task<List<StudioProgressData>> GetStudioProgressAsync(Guid studioId, DateOnly startDate, DateOnly endDate)
-        {
-            var analytics = await _analyticsRepository.GetStudioAnalyticsRangeAsync(studioId, startDate, endDate);
-
-            var result = new List<StudioProgressData>();
-            for (var date = startDate; date <= endDate; date = date.AddDays(1))
-            {
-                var metric = analytics.FirstOrDefault(a => a.Date == date);
-                result.Add(new StudioProgressData
-                {
-                    Date = date,
-                    CompletionRate = metric?.OverallCompletionRate ?? 0,
-                    ActiveUsers = metric?.ActiveMembers ?? 0
-                });
-            }
-
-            return result;
         }
 
         /// <summary>
@@ -441,9 +418,9 @@ namespace StudioStudio_Server.Services
             var startDateTime = DateTime.SpecifyKind(startDate.ToDateTime(TimeOnly.MinValue), DateTimeKind.Utc);
             var endDateTime = DateTime.SpecifyKind(endDate.ToDateTime(TimeOnly.MaxValue), DateTimeKind.Utc);
 
-            // Get all groups in studio
+            // Get all active groups in studio
             var groups = await _context.Groups
-                .Where(g => g.StudioId == studioId)
+                .Where(g => g.StudioId == studioId && g.IsActive)
                 .Select(g => new { g.GroupId, g.GroupName })
                 .ToListAsync();
 
@@ -486,6 +463,75 @@ namespace StudioStudio_Server.Services
                 }
 
                 result.Add(new GroupHeatmapComparisonData
+                {
+                    Date = date,
+                    Groups = groupItems
+                });
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// Get studio group activity heatmap for chart visualization
+        /// Returns date x group matrix with activity counts, tasks completed, and intensity levels
+        /// </summary>
+        public async Task<StudioGroupHeatmapResponse> GetStudioGroupHeatmapAsync(Guid studioId, DateOnly startDate, DateOnly endDate)
+        {
+            // Get all active groups in studio
+            var groups = await _context.Groups
+                .Where(g => g.StudioId == studioId && g.IsActive)
+                .Select(g => new { g.GroupId, g.GroupName })
+                .ToListAsync();
+
+            if (!groups.Any())
+            {
+                return new StudioGroupHeatmapResponse();
+            }
+
+            // Get all activity logs for the studio groups within date range
+            var startDateTime = DateTime.SpecifyKind(startDate.ToDateTime(TimeOnly.MinValue), DateTimeKind.Utc);
+            var endDateTime = DateTime.SpecifyKind(endDate.ToDateTime(TimeOnly.MaxValue), DateTimeKind.Utc);
+
+            var groupIds = groups.Select(g => g.GroupId).ToList();
+
+            // Get activity counts per group per day
+            var activityLogs = await _context.ActivityLogs
+                .Where(a => a.GroupId.HasValue && groupIds.Contains(a.GroupId.Value) && a.CreatedAt >= startDateTime && a.CreatedAt <= endDateTime)
+                .GroupBy(a => new { a.GroupId, Date = DateOnly.FromDateTime(a.CreatedAt) })
+                .Select(g => new { g.Key.GroupId, g.Key.Date, Count = g.Count() })
+                .ToListAsync();
+
+            // Get tasks completed per group per day
+            var tasksCompleted = await _context.Tasks
+                .Where(t => t.GroupId.HasValue && groupIds.Contains(t.GroupId.Value) && t.CompletedAt.HasValue && t.CompletedAt >= startDateTime && t.CompletedAt <= endDateTime)
+                .GroupBy(t => new { t.GroupId, Date = DateOnly.FromDateTime(t.CompletedAt!.Value) })
+                .Select(g => new { g.Key.GroupId, g.Key.Date, Count = g.Count() })
+                .ToListAsync();
+
+            // Build heatmap data
+            var result = new StudioGroupHeatmapResponse();
+
+            for (var date = startDate; date <= endDate; date = date.AddDays(1))
+            {
+                var dateActivityLogs = activityLogs.Where(a => a.Date == date).ToList();
+                var dateTasksCompleted = tasksCompleted.Where(t => t.Date == date).ToList();
+
+                var groupItems = groups.Select(group =>
+                {
+                    var activityCount = dateActivityLogs.FirstOrDefault(a => a.GroupId == group.GroupId)?.Count ?? 0;
+                    var completedCount = dateTasksCompleted.FirstOrDefault(t => t.GroupId == group.GroupId)?.Count ?? 0;
+
+                    return new StudioGroupActivityItem
+                    {
+                        GroupId = group.GroupId,
+                        GroupName = group.GroupName,
+                        ActivityCount = activityCount,
+                        TasksCompleted = completedCount
+                    };
+                }).ToList();
+
+                result.GroupHeatmap.Add(new StudioHeatmapData
                 {
                     Date = date,
                     Groups = groupItems

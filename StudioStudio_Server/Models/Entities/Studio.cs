@@ -14,6 +14,9 @@
         public DateTime CreatedAt { get; set; }
         public DateTime UpdatedAt { get; set; }
 
+        public DateTime? StartDate { get; set; }
+        public DateTime? EndDate { get; set; }
+
         public ICollection<Group> Groups { get; set; } = new List<Group>();
         public ICollection<StudioParticipant> Participants { get; set; } = new List<StudioParticipant>();
     }

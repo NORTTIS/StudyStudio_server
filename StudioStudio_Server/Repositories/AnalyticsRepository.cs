@@ -154,59 +154,6 @@ namespace StudioStudio_Server.Repositories
             await _context.SaveChangesAsync();
         }
 
-        // ==================== STUDIO ANALYTICS ====================
-
-        public async Task<StudioAnalytics?> GetStudioAnalyticsByDateAsync(Guid studioId, DateOnly date)
-        {
-            return await _context.StudioAnalytics
-                .AsNoTracking()
-                .FirstOrDefaultAsync(x => x.StudioId == studioId && x.Date == date);
-        }
-
-        public async Task<List<StudioAnalytics>> GetStudioAnalyticsRangeAsync(Guid studioId, DateOnly startDate, DateOnly endDate)
-        {
-            return await _context.StudioAnalytics
-                .AsNoTracking()
-                .Where(x => x.StudioId == studioId && x.Date >= startDate && x.Date <= endDate)
-                .OrderBy(x => x.Date)
-                .ToListAsync();
-        }
-
-        public async Task<List<StudioAnalytics>> GetAllStudioAnalyticsRangeAsync(DateOnly startDate, DateOnly endDate)
-        {
-            return await _context.StudioAnalytics
-                .AsNoTracking()
-                .Where(x => x.Date >= startDate && x.Date <= endDate)
-                .OrderBy(x => x.Date)
-                .ToListAsync();
-        }
-
-        public async Task UpsertStudioAnalyticsAsync(StudioAnalytics analytics)
-        {
-            var existing = await _context.StudioAnalytics
-                .FirstOrDefaultAsync(x => x.StudioId == analytics.StudioId && x.Date == analytics.Date);
-
-            if (existing != null)
-            {
-                existing.TotalGroups = analytics.TotalGroups;
-                existing.ActiveGroups = analytics.ActiveGroups;
-                existing.TotalMembers = analytics.TotalMembers;
-                existing.ActiveMembers = analytics.ActiveMembers;
-                existing.TasksCompleted = analytics.TasksCompleted;
-                existing.OverallCompletionRate = analytics.OverallCompletionRate;
-                existing.EngagementScore = analytics.EngagementScore;
-                existing.UpdatedAt = DateTime.UtcNow;
-            }
-            else
-            {
-                analytics.CreatedAt = DateTime.UtcNow;
-                analytics.UpdatedAt = DateTime.UtcNow;
-                _context.StudioAnalytics.Add(analytics);
-            }
-
-            await _context.SaveChangesAsync();
-        }
-
         // ==================== TASK PERFORMANCE METRICS ====================
 
         public async Task<TaskPerformanceMetrics?> GetTaskPerformanceAsync(Guid taskId)

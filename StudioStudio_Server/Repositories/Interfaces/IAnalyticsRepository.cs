@@ -20,12 +20,6 @@ namespace StudioStudio_Server.Repositories.Interfaces
         Task<List<GroupAnalytics>> GetAllGroupAnalyticsRangeAsync(DateOnly startDate, DateOnly endDate);
         Task UpsertGroupAnalyticsAsync(GroupAnalytics analytics);
 
-        // Studio Analytics
-        Task<StudioAnalytics?> GetStudioAnalyticsByDateAsync(Guid studioId, DateOnly date);
-        Task<List<StudioAnalytics>> GetStudioAnalyticsRangeAsync(Guid studioId, DateOnly startDate, DateOnly endDate);
-        Task<List<StudioAnalytics>> GetAllStudioAnalyticsRangeAsync(DateOnly startDate, DateOnly endDate);
-        Task UpsertStudioAnalyticsAsync(StudioAnalytics analytics);
-
         // Task Performance Metrics
         Task<TaskPerformanceMetrics?> GetTaskPerformanceAsync(Guid taskId);
         Task<List<TaskPerformanceMetrics>> GetTaskPerformanceRangeAsync(Guid? userId, Guid? groupId, DateOnly startDate, DateOnly endDate);

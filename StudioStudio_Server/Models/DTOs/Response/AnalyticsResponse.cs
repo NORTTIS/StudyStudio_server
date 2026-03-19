@@ -73,16 +73,6 @@ namespace StudioStudio_Server.Models.DTOs.Response
 
     // ==================== STUDIO ANALYTICS ====================
 
-    public class StudioAnalyticsResponse
-    {
-        public double CompletionRate { get; set; }
-        public int ActiveUsers { get; set; }
-        public double EngagementScore { get; set; }
-        public List<GroupComparisonData> GroupComparison { get; set; } = new();
-        public List<StudioProgressData> CompletionRateHistory { get; set; } = new();
-        public List<GroupHeatmapComparisonData> GroupHeatmapComparison { get; set; } = new();
-    }
-
     public class GroupComparisonData
     {
         public Guid GroupId { get; set; }
@@ -91,13 +81,8 @@ namespace StudioStudio_Server.Models.DTOs.Response
         public int CompletedTasks { get; set; }
         public double CompletionRate { get; set; }
         public int ActiveMembers { get; set; }
-    }
-
-    public class StudioProgressData
-    {
-        public DateOnly Date { get; set; }
-        public double CompletionRate { get; set; }
-        public int ActiveUsers { get; set; }
+        public DateTime? LastActivityDateTime { get; set; }
+        public int OverdueTasksCount { get; set; }
     }
 
     /// <summary>
@@ -116,6 +101,27 @@ namespace StudioStudio_Server.Models.DTOs.Response
         public int ActivityCount { get; set; }
         public int MessagesCount { get; set; }
         public int CommentsCount { get; set; }
+        public int TasksCompleted { get; set; }
+    }
+
+    // ==================== STUDIO GROUP HEATMAP ====================
+
+    public class StudioGroupHeatmapResponse
+    {
+        public List<StudioHeatmapData> GroupHeatmap { get; set; } = new();
+    }
+
+    public class StudioHeatmapData
+    {
+        public DateOnly Date { get; set; }
+        public List<StudioGroupActivityItem> Groups { get; set; } = new();
+    }
+
+    public class StudioGroupActivityItem
+    {
+        public Guid GroupId { get; set; }
+        public string GroupName { get; set; } = string.Empty;
+        public int ActivityCount { get; set; }
         public int TasksCompleted { get; set; }
     }
 }

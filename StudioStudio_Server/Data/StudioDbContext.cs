@@ -40,7 +40,6 @@ namespace StudioStudio_Server.Data
         public DbSet<UserActivityMetrics> UserActivityMetrics => Set<UserActivityMetrics>();
         public DbSet<UserProductivityScores> UserProductivityScores => Set<UserProductivityScores>();
         public DbSet<GroupAnalytics> GroupAnalytics => Set<GroupAnalytics>();
-        public DbSet<StudioAnalytics> StudioAnalytics => Set<StudioAnalytics>();
         public DbSet<TaskPerformanceMetrics> TaskPerformanceMetrics => Set<TaskPerformanceMetrics>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -488,20 +487,6 @@ namespace StudioStudio_Server.Data
                 e.HasOne(x => x.Group)
                     .WithMany()
                     .HasForeignKey(x => x.GroupId)
-                    .OnDelete(DeleteBehavior.Cascade);
-            });
-
-            // STUDIO ANALYTICS
-            modelBuilder.Entity<StudioAnalytics>(e =>
-            {
-                e.HasKey(x => x.Id);
-
-                e.HasIndex(x => new { x.StudioId, x.Date })
-                    .IsUnique();
-
-                e.HasOne(x => x.Studio)
-                    .WithMany()
-                    .HasForeignKey(x => x.StudioId)
                     .OnDelete(DeleteBehavior.Cascade);
             });
 
