@@ -10,7 +10,7 @@ namespace StudioStudio_Server.Repositories.Interfaces
         Task<List<Group>> GetUserGroupsAsync(Guid userId);
         Task<Group?> GetByIdAsync(Guid groupId);
         Task<Group?> GetGroupWithDetailsAsync(Guid groupId);
-        Task<bool> GroupNameExistsInStudioAsync(Guid? studioId, string groupName);
+        Task<bool> GroupNameExistsInStudioAsync(Guid? studioId, string groupName, Guid? userId);
         Task<int> CountGroupsCreatedByUserAsync(Guid userId);
         Task AddAsync(Group group);
         Task<bool> IsUserGroupOwnerAsync(Guid groupId, Guid userId);

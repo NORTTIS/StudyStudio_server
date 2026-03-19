@@ -44,7 +44,7 @@
   "GROUP018": "You do not have permission to create task status for this group",
   "GROUP019": "You do not have permission to delete this task status. Only owner and moderator can delete it",
   "GROUP020": "You can only create a task when a task status is available",
-  "Change group021 to Status 002": null,
+  "GROUP021": "Group name already exists in your independent group",
   "GROUP022": "This position is already taken by another task status",
   "GROUP023": "You do not have permission to delete this task. Only owner and moderator can delete it",
   "GROUP024": "You do not have permission to restore this task. Only owner and moderator can restore it",

@@ -238,6 +238,10 @@ namespace StudioStudio_Server.Services
                 throw new AppException(ErrorCodes.AuthAccountInactive, StatusCodes.Status403Forbidden);
             }
 
+            if (!user.IsVerify)
+            {
+                throw new AppException(ErrorCodes.AuthAccountNotVerified, StatusCodes.Status403Forbidden);
+            }
 
             var accessTokenExpireMs = _configuration.GetValue<long>("JWT:AccessTokenExpireMs", 3600000);
             var refreshTokenExpireMs = _configuration.GetValue<long>("JWT:RefreshTokenExpireMs", 86400000);

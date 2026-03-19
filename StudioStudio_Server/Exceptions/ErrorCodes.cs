@@ -50,7 +50,7 @@
         public const string GroupCreateTaskStatusDenied = "GROUP018";
         public const string GroupDeleteTaskStatusDenied = "GROUP019";
         public const string GroupCreateTaskDeniedMissingStatus = "GROUP020";
-        //Change group021 to Status 002
+        public const string GroupPersonalAlreadyExists = "GROUP021";
         public const string GroupTaskStatusPositionExist = "GROUP022";
         public const string GroupDeleteTaskDenined = "GROUP023";
         public const string GroupRestoreTaskDenined = "GROUP024";
