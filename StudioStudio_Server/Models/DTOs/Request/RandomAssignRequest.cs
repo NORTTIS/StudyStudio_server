@@ -28,28 +28,11 @@ namespace StudioStudio_Server.Models.DTOs.Request
         public GroupRole DefaultRole { get; set; } = GroupRole.Member;
 
         /// <summary>
-        /// Assignment strategy
-        /// </summary>
-        [Required(ErrorMessage = ErrorCodes.ValidationRequiredField)]
-        public AssignStrategy Strategy { get; set; } = AssignStrategy.RoundRobin;
-
-        /// <summary>
         /// Scope of members to assign
         /// </summary>
         [Required(ErrorMessage = ErrorCodes.ValidationRequiredField)]
         public AssignScope Scope { get; set; } = AssignScope.Unassigned;
 
-        /// <summary>
-        /// If true and scope=All: remove all non-owner members before assigning
-        /// Only applies when Scope = All
-        /// </summary>
-        public bool ClearExisting { get; set; } = false;
-    }
-
-    public enum AssignStrategy
-    {
-        RoundRobin,
-        Random
     }
 
     public enum AssignScope

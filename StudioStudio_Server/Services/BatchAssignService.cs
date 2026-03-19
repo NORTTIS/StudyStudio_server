@@ -63,6 +63,56 @@ namespace StudioStudio_Server.Services
         }
 
         /// <summary>
+        /// Create a new group when group name is not found in batch assign
+        /// Validates: plan limit, duplicate name within studio
+        /// </summary>
+        private async Task<Group> CreateMissingGroupAsync(
+            Guid studioId,
+            string groupName,
+            Guid userId,
+            CancellationToken cancellationToken)
+        {
+            // 1. Check plan limit
+            var plan = await _userSubscriptionRepository.GetSubscriptionPlanByUserIdAsync(userId);
+            var groupLimit = plan?.MaxGroups ?? 5;
+            var currentCount = await _groupRepository.CountGroupsCreatedByUserAsync(userId);
+
+            if (currentCount >= groupLimit)
+                throw new AppException(ErrorCodes.GroupLimitReached, StatusCodes.Status403Forbidden);
+
+            // 2. Check duplicate name in studio
+            var nameExists = await _groupRepository.GroupNameExistsInStudioAsync(studioId, groupName, userId);
+            if (nameExists)
+                throw new AppException(ErrorCodes.GroupNameAlreadyExists, StatusCodes.Status400BadRequest);
+
+            // 3. Create group
+            var newGroup = new Group
+            {
+                GroupId = Guid.NewGuid(),
+                GroupName = groupName,
+                StudioId = studioId,
+                CreatedBy = userId,
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            };
+            await _groupRepository.AddAsync(newGroup);
+
+            // 4. Add creator as Owner
+            var ownerParticipant = new GroupParticipant
+            {
+                ParticipantId = Guid.NewGuid(),
+                GroupId = newGroup.GroupId,
+                UserId = userId,
+                Role = GroupRole.Owner,
+                CreatedAt = DateTime.UtcNow
+            };
+            await _groupParticipantRepository.AddAsync(ownerParticipant);
+
+            return newGroup;
+        }
+
+        /// <summary>
         /// Get localized message for error code
         /// </summary>
         private string GetLocalizedMessage(string errorCode)
@@ -115,12 +165,8 @@ namespace StudioStudio_Server.Services
             var plan = await _userSubscriptionRepository.GetSubscriptionPlanByUserIdAsync(userId);
             var maxMembersPerGroup = plan?.MaxMembersPerGroup ?? 10;
 
-            // 4. Get studio groups
+            // 4. Get studio groups (can be empty if creating new groups via CSV)
             var studioGroups = await _groupRepository.GetStudioGroupsAsync(studioId);
-            if (studioGroups.Count == 0)
-            {
-                throw new AppException(ErrorCodes.BatchNoGroupsInStudio, StatusCodes.Status400BadRequest);
-            }
 
             // 5. Get studio members with email lookup
             var studioParticipants = await _studioParticipantRepository.GetParticipantsByStudioIdAsync(studioId);
@@ -197,8 +243,20 @@ namespace StudioStudio_Server.Services
 
                 if (!groupNameToGroup.TryGetValue(row.GroupName.ToLowerInvariant(), out var targetGroup))
                 {
-                    errors.Add(CreateErrorRow(row.RowNumber, row.Email, row.GroupName, ErrorCodes.BatchGroupNameNotFound));
-                    continue;
+                    // Group doesn't exist → create new
+                    try
+                    {
+                        targetGroup = await CreateMissingGroupAsync(studioId, row.GroupName, userId, cancellationToken);
+                        groupNameToGroup[row.GroupName.ToLowerInvariant()] = targetGroup;
+                        groupIds.Add(targetGroup.GroupId);
+                        currentMemberCounts[targetGroup.GroupId] = 0;
+                    }
+                    catch (AppException ex)
+                    {
+                        // Plan limit reached or duplicate name
+                        errors.Add(CreateErrorRow(row.RowNumber, row.Email, row.GroupName, ex.Code));
+                        continue;
+                    }
                 }
 
                 // Validate role
@@ -490,8 +548,8 @@ namespace StudioStudio_Server.Services
                 membersToAssign = memberUserIds;
             }
 
-            // 10. If clearExisting, remove non-owner members first
-            if (request.Scope == AssignScope.All && request.ClearExisting)
+            // 10. If scope is All, remove non-owner members first before reassigning
+            if (request.Scope == AssignScope.All)
             {
                 var nonOwnerParticipants = existingParticipants
                     .Where(p => p.Role != GroupRole.Owner)
@@ -513,16 +571,9 @@ namespace StudioStudio_Server.Services
             var currentMemberCounts = targetGroups.ToDictionary(g => g.GroupId, g =>
                 existingParticipants.Count(p => p.GroupId == g.GroupId && p.Role != GroupRole.Owner));
 
-            // 12. Assign members using RoundRobin or Random strategy
-            // Each member is assigned to only ONE group
+            // 12. Assign members using Pure Random strategy
+            // Each member is assigned to only ONE group with available slots
             var groupList = targetGroups.ToList();
-
-            if (request.Strategy == AssignStrategy.Random)
-            {
-                var rng = new Random();
-                groupList = groupList.OrderBy(_ => rng.Next()).ToList();
-                membersToAssign = membersToAssign.OrderBy(_ => rng.Next()).ToList();
-            }
 
             var newParticipants = new List<GroupParticipant>();
             var groupSummaries = new Dictionary<Guid, GroupAssignmentSummary>();
@@ -538,48 +589,41 @@ namespace StudioStudio_Server.Services
                 };
             }
 
-            // Round-robin assignment: each member goes to the next available group
-            // Stop when all members are assigned or all groups are full
-            var groupIndex = 0;
+            // Pure random assignment: each member is assigned to a random group with available slots
+            var rng = new Random();
             foreach (var memberUserId in membersToAssign)
             {
-                // Find next group with available slots
-                var attempts = 0;
-                while (attempts < groupList.Count)
+                // Filter groups with available slots
+                var availableGroups = groupList
+                    .Where(g => currentMemberCounts[g.GroupId] < maxMembersPerGroup)
+                    .ToList();
+
+                if (availableGroups.Count == 0) break;
+
+                // Select a random group
+                var group = availableGroups[rng.Next(availableGroups.Count)];
+
+                // Create participant
+                var newParticipant = new GroupParticipant
                 {
-                    var group = groupList[groupIndex % groupList.Count];
-                    groupIndex++;
+                    ParticipantId = Guid.NewGuid(),
+                    GroupId = group.GroupId,
+                    UserId = memberUserId,
+                    Role = request.DefaultRole,
+                    CreatedAt = DateTime.UtcNow
+                };
+                newParticipants.Add(newParticipant);
+                currentMemberCounts[group.GroupId]++;
 
-                    if (currentMemberCounts[group.GroupId] >= maxMembersPerGroup)
-                    {
-                        attempts++;
-                        continue;
-                    }
-
-                    // Create participant
-                    var newParticipant = new GroupParticipant
-                    {
-                        ParticipantId = Guid.NewGuid(),
-                        GroupId = group.GroupId,
-                        UserId = memberUserId,
-                        Role = request.DefaultRole,
-                        CreatedAt = DateTime.UtcNow
-                    };
-                    newParticipants.Add(newParticipant);
-                    currentMemberCounts[group.GroupId]++;
-
-                    // Add to summary
-                    var userEmail = studioParticipants.FirstOrDefault(sp => sp.UserId == memberUserId)?.User?.Email ?? memberUserId.ToString();
-                    groupSummaries[group.GroupId].Members.Add(new MemberAssignmentDetail
-                    {
-                        UserId = memberUserId,
-                        Email = userEmail,
-                        Role = request.DefaultRole.ToString()
-                    });
-                    groupSummaries[group.GroupId].MemberCount++;
-
-                    break;
-                }
+                // Add to summary
+                var userEmail = studioParticipants.FirstOrDefault(sp => sp.UserId == memberUserId)?.User?.Email ?? memberUserId.ToString();
+                groupSummaries[group.GroupId].Members.Add(new MemberAssignmentDetail
+                {
+                    UserId = memberUserId,
+                    Email = userEmail,
+                    Role = request.DefaultRole.ToString()
+                });
+                groupSummaries[group.GroupId].MemberCount++;
             }
 
             // 13. Save to database
