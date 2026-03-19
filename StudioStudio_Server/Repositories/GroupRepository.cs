@@ -74,6 +74,17 @@ namespace StudioStudio_Server.Repositories
         }
 
         /// <summary>
+        /// Get groups by list of IDs
+        /// Condition: GroupId IN {groupIds} AND IsActive = true
+        /// </summary>
+        public async Task<List<Group>> GetByIdsAsync(List<Guid> groupIds)
+        {
+            return await _db.Groups
+                .Where(g => groupIds.Contains(g.GroupId) && g.IsActive)
+                .ToListAsync();
+        }
+
+        /// <summary>
         /// Count groups created by user (Owner)
         /// Condition: Participants contains {userId with Role = Owner} AND IsActive = true
         /// Use case: Check group creation limit

@@ -20,15 +20,18 @@ namespace StudioStudio_Server.Controllers
         private readonly IStudioService _studioService;
         private readonly IGroupService _groupService;
         private readonly IMessageService _messageService;
+        private readonly IBatchAssignService _batchAssignService;
 
         public StudioController(
             IStudioService studioService,
             IGroupService groupService,
-            IMessageService messageService)
+            IMessageService messageService,
+            IBatchAssignService batchAssignService)
         {
             _studioService = studioService;
             _groupService = groupService;
             _messageService = messageService;
+            _batchAssignService = batchAssignService;
         }
 
         /// <summary>
@@ -168,6 +171,93 @@ namespace StudioStudio_Server.Controllers
 
             return Ok(ApiResponse<List<StudioMemberResponse>>.Success(
                 ErrorCodes.SuccessGetData,
+                message,
+                result));
+        }
+
+        /// <summary>
+        /// [AUTHORIZED] POST /api/studio/{studioId}/members/batch-assign
+        /// Upload CSV/Excel file to batch assign members to groups
+        /// File format: Email, GroupName, Role (columns)
+        /// Valid roles: Member, Moderator, Commenter, Viewer
+        /// Owner role is not allowed
+        /// </summary>
+        /// <param name="studioId">Studio ID</param>
+        /// <param name="file">CSV or Excel file (.csv, .xlsx)</param>
+        /// <param name="cancellationToken">Cancellation token</param>
+        [HttpPost("{studioId}/members/batch-assign")]
+        [RequestSizeLimit(5 * 1024 * 1024)] // 5MB limit
+        public async Task<ActionResult<ApiResponse<BatchAssignResponse>>> BatchAssign(
+            Guid studioId,
+            IFormFile file,
+            CancellationToken cancellationToken)
+        {
+            var userId = JwtHelper.ValidateAndGetUserId(User);
+
+            if (file == null || file.Length == 0)
+            {
+                throw new AppException(ErrorCodes.ValidationRequiredField, StatusCodes.Status400BadRequest);
+            }
+
+            if (file.Length > 5 * 1024 * 1024)
+            {
+                throw new AppException(ErrorCodes.ValidationFileTooLarge, StatusCodes.Status400BadRequest);
+            }
+
+            using var stream = file.OpenReadStream();
+            var result = await _batchAssignService.BatchAssignAsync(
+                studioId,
+                userId,
+                stream,
+                file.FileName,
+                cancellationToken);
+
+            var message = _messageService.GetMessage(ErrorCodes.SuccessBatchAssign);
+            return Ok(ApiResponse<BatchAssignResponse>.Success(
+                ErrorCodes.SuccessBatchAssign,
+                message,
+                result));
+        }
+
+        /// <summary>
+        /// [AUTHORIZED] GET /api/studio/{studioId}/members/batch-assign/template
+        /// Download pre-filled CSV template for batch assignment
+        /// Pre-fills Email and GroupName columns
+        /// </summary>
+        /// <param name="studioId">Studio ID</param>
+        [HttpGet("{studioId}/members/batch-assign/template")]
+        public async Task<IActionResult> DownloadBatchAssignTemplate(Guid studioId)
+        {
+            var userId = JwtHelper.ValidateAndGetUserId(User);
+            var template = await _batchAssignService.GenerateTemplateAsync(studioId, userId);
+
+            return File(template, "text/csv", "batch_assign_template.csv");
+        }
+
+        /// <summary>
+        /// [AUTHORIZED] POST /api/studio/{studioId}/groups/random-assign
+        /// Randomly assign studio members to groups
+        /// Can assign to specific groups or all groups in studio
+        /// </summary>
+        /// <param name="studioId">Studio ID</param>
+        /// <param name="request">Random assign parameters</param>
+        /// <param name="cancellationToken">Cancellation token</param>
+        [HttpPost("{studioId}/groups/random-assign")]
+        public async Task<ActionResult<ApiResponse<RandomAssignResponse>>> RandomAssign(
+            Guid studioId,
+            [FromBody] RandomAssignRequest request,
+            CancellationToken cancellationToken)
+        {
+            var userId = JwtHelper.ValidateAndGetUserId(User);
+            var result = await _batchAssignService.RandomAssignAsync(
+                studioId,
+                userId,
+                request,
+                cancellationToken);
+
+            var message = _messageService.GetMessage(ErrorCodes.SuccessRandomAssign);
+            return Ok(ApiResponse<RandomAssignResponse>.Success(
+                ErrorCodes.SuccessRandomAssign,
                 message,
                 result));
         }
