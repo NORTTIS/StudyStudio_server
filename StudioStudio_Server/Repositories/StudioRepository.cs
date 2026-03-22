@@ -111,5 +111,18 @@ namespace StudioStudio_Server.Repositories
             _context.Studios.Update(studio);
             await _context.SaveChangesAsync();
         }
+
+        /// <summary>
+        /// Get groups belonging to a studio
+        /// Condition: StudioId = {studioId}
+        /// </summary>
+        public async Task<List<Group>> GetGroupsByStudioIdAsync(Guid studioId)
+        {
+            return await _context.Groups
+                .Where(g => g.StudioId == studioId)
+                .Include(g => g.Participants)
+                .AsNoTracking()
+                .ToListAsync();
+        }
     }
 }

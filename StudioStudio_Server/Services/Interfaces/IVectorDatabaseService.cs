@@ -77,6 +77,21 @@ namespace StudioStudio_Server.Services.Interfaces
         Task<bool> DeleteVectorsByUserNotInGroupAsync(Guid userId, Guid groupId);
 
         /// <summary>
+        /// Search vectors across multiple groups (for studio-level AI)
+        /// Uses Qdrant MatchAny filter on groupId
+        /// </summary>
+        /// <param name="queryVector">Query vector for search</param>
+        /// <param name="topK">Number of results to return</param>
+        /// <param name="groupIds">List of group IDs to search across</param>
+        /// <param name="cancellationToken">Cancellation token</param>
+        /// <returns>List of search results from all specified groups</returns>
+        Task<List<VectorSearchResponse.SearchResult>> SearchVectorsMultiGroupAsync(
+            float[] queryVector,
+            int topK,
+            List<Guid> groupIds,
+            CancellationToken cancellationToken = default);
+
+        /// <summary>
         /// Delete all vectors of a specific document
         /// </summary>
         /// <param name="documentId">Document ID</param>

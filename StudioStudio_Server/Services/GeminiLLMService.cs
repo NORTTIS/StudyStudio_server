@@ -1,9 +1,10 @@
+using System.Text.Json;
+using System.Text.Json.Nodes;
 using Microsoft.Extensions.Options;
 using StudioStudio_Server.Configurations;
 using StudioStudio_Server.Services.Interfaces;
 using System.Runtime.CompilerServices;
 using System.Text;
-using System.Text.Json;
 
 namespace StudioStudio_Server.Services
 {
@@ -20,6 +21,24 @@ namespace StudioStudio_Server.Services
         private const string GEMINI_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models";
         private const string PRIMARY_MODEL = "gemini-2.5-flash";
         private const string FALLBACK_MODEL = "gemini-2.5-pro";
+
+        // JSON Schema for structured output
+        private static readonly JsonObject AgentResponseSchema = new()
+        {
+            ["type"] = "object",
+            ["properties"] = new JsonObject
+            {
+                ["action"] = new JsonObject
+                {
+                    ["type"] = "string",
+                    ["enum"] = new JsonArray { JsonValue.Create("tool_call"), JsonValue.Create("answer") }
+                },
+                ["tool_name"] = new JsonObject { ["type"] = "string" },
+                ["parameters"] = new JsonObject { ["type"] = "object" },
+                ["final_answer"] = new JsonObject { ["type"] = "string" }
+            },
+            ["required"] = new JsonArray { JsonValue.Create("action") }
+        };
 
         public GeminiLLMService(
             HttpClient httpClient,
@@ -144,7 +163,8 @@ namespace StudioStudio_Server.Services
                         topK = _config.TopK,
                         topP = _config.TopP,
                         maxOutputTokens = _config.MaxTokens,
-                        responseMimeType = "text/plain"
+                        responseMimeType = "application/json",
+                        responseSchema = AgentResponseSchema
                     }
                 };
 
@@ -370,7 +390,8 @@ namespace StudioStudio_Server.Services
                     topK = _config.TopK,
                     topP = _config.TopP,
                     maxOutputTokens = _config.MaxTokens,
-                    responseMimeType = "text/plain"
+                    responseMimeType = "application/json",
+                    responseSchema = AgentResponseSchema
                 }
             };
 

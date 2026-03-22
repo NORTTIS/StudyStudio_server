@@ -145,6 +145,9 @@ builder.Services.AddScoped<IDocumentService, DocumentService>();
 builder.Services.AddScoped<IAIService, AIService>();
 builder.Services.AddScoped<IAIRequestLogRepository, AIRequestLogRepository>();
 
+// AI Tool Calling (Agentic AI)
+builder.Services.AddAIToolCalling();
+
 // Embedding Queue & Background Service
 builder.Services.AddSingleton<StudioStudio_Server.Services.EmbeddingQueue.IEmbeddingQueue, StudioStudio_Server.Services.EmbeddingQueue.EmbeddingQueue>();
 builder.Services.AddHostedService<StudioStudio_Server.Services.EmbeddingQueue.EmbeddingBackgroundService>();
@@ -284,6 +287,9 @@ var logger = app.Services.GetRequiredService<ILogger<Program>>();
 logger.LogInformation($"WebRoot: {webRoot}");
 logger.LogInformation($"Uploads Path: {uploadsPath}");
 logger.LogInformation($"Directory exists: {Directory.Exists(uploadsPath)}");
+
+// Configure AI Tools (Agentic AI)
+app.Services.ConfigureAITools();
 
 using (var scope = app.Services.CreateScope())
 {

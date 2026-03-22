@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using StudioStudio_Server.Data;
 
 namespace StudioStudio_Server.Tests.Helpers
