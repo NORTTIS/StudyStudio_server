@@ -28,7 +28,6 @@ namespace StudioStudio_Server.Data
         public DbSet<ActivityLog> ActivityLogs => Set<ActivityLog>();
         public DbSet<Report> Reports => Set<Report>();
         public DbSet<RefreshToken> RefreshToken => Set<RefreshToken>();
-        public DbSet<EmailVerificationToken> EmailVerificationTokens => Set<EmailVerificationToken>();
         public DbSet<Announcement> Announcements => Set<Announcement>();
         public DbSet<Template> Templates => Set<Template>();
         public DbSet<GroupMessage> GroupMessages => Set<GroupMessage>();
@@ -75,16 +74,6 @@ namespace StudioStudio_Server.Data
 
                 e.HasIndex(x => x.UserId);
                 e.HasIndex(x => x.Token);
-            });
-
-            //Email verify token
-            modelBuilder.Entity<EmailVerificationToken>(e =>
-            {
-                e.HasKey(x => x.Id);
-                e.HasOne(x => x.User)
-                    .WithMany(u => u.EmailVerificationToken)
-                    .HasForeignKey(x => x.UserId)
-                    .OnDelete(DeleteBehavior.Cascade);
             });
 
             // STUDIO

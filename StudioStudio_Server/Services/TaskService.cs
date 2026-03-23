@@ -70,6 +70,25 @@ namespace StudioStudio_Server.Services
             }
         }
 
+        /// <summary>
+        /// Validate EstimatedHours or ActualHours does not exceed task duration
+        /// </summary>
+        private void ValidateHours(decimal? hours, DateTime? startDate, DateTime? dueDate, string fieldName)
+        {
+            if (hours == null || hours <= 0) return;
+
+            if (startDate != null && dueDate != null)
+            {
+                var availableHours = (dueDate.Value - startDate.Value).TotalHours;
+                if (availableHours > 0 && (double)hours > availableHours)
+                {
+                    throw new AppException(
+                        $"'{fieldName}' không được lớn hơn khoảng thời gian từ StartDate đến DueDate ({availableHours:F1} giờ).",
+                        StatusCodes.Status400BadRequest);
+                }
+            }
+        }
+
         public async Task<TaskItemResponse> AddGroupTaskAsync(Guid userId, TaskItemGroupRequest request)
         {
             // Validate enums
@@ -120,6 +139,10 @@ namespace StudioStudio_Server.Services
                 }
             }
 
+            // Validate hours
+            ValidateHours(request.EstimatedHours, startDateUtc, dueDateUtc, "EstimatedHours");
+            ValidateHours(request.ActualHours, startDateUtc, dueDateUtc, "ActualHours");
+
             var taskItem = new TaskItem
             {
                 TaskId = Guid.NewGuid(),
@@ -133,6 +156,8 @@ namespace StudioStudio_Server.Services
                 DueDate = dueDateUtc,
                 Priority = request.TaskPriority,
                 Severity = request.TaskSeverity,
+                EstimatedHours = request.EstimatedHours,
+                ActualHours = request.ActualHours,
                 Progress = 0,
                 IsPendingDeleted = false,
                 CreatedAt = now,
@@ -193,6 +218,8 @@ namespace StudioStudio_Server.Services
                     Position = groupStatus.Position
                 },
                 Assignee = assigneeDetail,
+                EstimatedHours = taskItem.EstimatedHours,
+                ActualHours = taskItem.ActualHours,
             };
         }
 
@@ -242,6 +269,14 @@ namespace StudioStudio_Server.Services
                     throw new AppException(ErrorCodes.TaskDateTimeError, StatusCodes.Status400BadRequest);
                 }
             }
+
+            // Effective dates for hours validation: use request values or existing task values
+            var effectiveStartDate = startDateUtc ?? task.StartDate;
+            var effectiveDueDate = dueDateUtc ?? task.DueDate;
+
+            // Validate hours
+            ValidateHours(request.EstimatedHours, effectiveStartDate, effectiveDueDate, "EstimatedHours");
+            ValidateHours(request.ActualHours, effectiveStartDate, effectiveDueDate, "ActualHours");
 
             // Update basic fields
             if (!string.IsNullOrWhiteSpace(request.TaskName))
@@ -293,6 +328,17 @@ namespace StudioStudio_Server.Services
             if (request.GroupStatusId.HasValue)
             {
                 task.GroupStatusId = request.GroupStatusId.Value;
+            }
+
+            // Update hours if provided
+            if (request.EstimatedHours.HasValue)
+            {
+                task.EstimatedHours = request.EstimatedHours.Value;
+            }
+
+            if (request.ActualHours.HasValue)
+            {
+                task.ActualHours = request.ActualHours.Value;
             }
 
             await _taskRepository.UpdateAsync(task);
@@ -387,6 +433,8 @@ namespace StudioStudio_Server.Services
                     Position = groupStatus.Position
                 } : null,
                 Assignee = assigneeDetail,
+                EstimatedHours = task.EstimatedHours,
+                ActualHours = task.ActualHours,
             };
         }
 
@@ -576,6 +624,10 @@ namespace StudioStudio_Server.Services
                 }
             }
 
+            // Validate hours
+            ValidateHours(request.EstimatedHours, startDateUtc, dueDateUtc, "EstimatedHours");
+            ValidateHours(request.ActualHours, startDateUtc, dueDateUtc, "ActualHours");
+
             var taskItem = new TaskItem
             {
                 TaskId = Guid.NewGuid(),
@@ -590,6 +642,8 @@ namespace StudioStudio_Server.Services
                 DueDate = dueDateUtc,
                 Priority = request.TaskPriority,
                 Severity = request.TaskSeverity,
+                EstimatedHours = request.EstimatedHours,
+                ActualHours = request.ActualHours,
                 Progress = 0,
                 IsPendingDeleted = false,
                 CreatedAt = now,
@@ -626,7 +680,9 @@ namespace StudioStudio_Server.Services
                     FirstName = user.FirstName,
                     LastName = user.LastName,
                     AvatarUrl = AvatarUrlHelper.BuildAbsoluteAvatarUrl(user.AvatarUrl, _httpContextAccessor.HttpContext)
-                }
+                },
+                EstimatedHours = taskItem.EstimatedHours,
+                ActualHours = taskItem.ActualHours,
             };
         }
         public async Task<TaskItemResponse> UpdatePersonalTaskAsync(Guid userId, Guid taskId, UpdatePersonalTaskRequest request)
@@ -670,6 +726,14 @@ namespace StudioStudio_Server.Services
                     throw new AppException(ErrorCodes.TaskDateTimeError, StatusCodes.Status400BadRequest);
                 }
             }
+
+            // Effective dates for hours validation: use request values or existing task values
+            var effectiveStartDate = startDateUtc ?? task.StartDate;
+            var effectiveDueDate = dueDateUtc ?? task.DueDate;
+
+            // Validate hours
+            ValidateHours(request.EstimatedHours, effectiveStartDate, effectiveDueDate, "EstimatedHours");
+            ValidateHours(request.ActualHours, effectiveStartDate, effectiveDueDate, "ActualHours");
 
             // Update basic fields
             if (!string.IsNullOrWhiteSpace(request.TaskName))
@@ -723,6 +787,17 @@ namespace StudioStudio_Server.Services
                 task.PersonalStatusId = request.PersonalStatusId.Value;
             }
 
+            // Update hours if provided
+            if (request.EstimatedHours.HasValue)
+            {
+                task.EstimatedHours = request.EstimatedHours.Value;
+            }
+
+            if (request.ActualHours.HasValue)
+            {
+                task.ActualHours = request.ActualHours.Value;
+            }
+
             await _taskRepository.UpdateAsync(task);
 
             // Prepare response
@@ -755,7 +830,9 @@ namespace StudioStudio_Server.Services
                     FirstName = user.FirstName,
                     LastName = user.LastName,
                     AvatarUrl = AvatarUrlHelper.BuildAbsoluteAvatarUrl(user.AvatarUrl, _httpContextAccessor.HttpContext)
-                }
+                },
+                EstimatedHours = task.EstimatedHours,
+                ActualHours = task.ActualHours,
             };
         }
         public async Task ReorderPersonalTaskAsync(Guid userId, ReorderTaskRequest request)

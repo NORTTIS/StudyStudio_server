@@ -9,10 +9,7 @@
         public Guid AssignedBy { get; set; }
 
         public DateTime AssignedAt { get; set; }
-        public bool IsCompleted { get; set; }
-        public DateTime? CompletedAt { get; set; }
 
         public TaskItem? Task { get; set; }
-        public User? AssignedToUser { get; set; }
     }
 }

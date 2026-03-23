@@ -92,7 +92,10 @@ public class GetTasksTool : IAITool
                 ["due_date"] = t.DueDate?.ToString("yyyy-MM-dd HH:mm") ?? "",
                 ["assignee_name"] = t.Owner != null ? $"{t.Owner.FirstName} {t.Owner.LastName}".Trim() : "Unassigned",
                 ["is_completed"] = t.Progress >= 100,
-                ["is_overdue"] = t.DueDate.HasValue && t.DueDate.Value < DateTime.UtcNow && t.Progress < 100
+                ["is_overdue"] = t.DueDate.HasValue && t.DueDate.Value < DateTime.UtcNow && t.Progress < 100,
+                ["severity"] = t.Severity.ToString(),
+                ["estimated_hours"] = t.EstimatedHours.HasValue ? JsonValue.Create(t.EstimatedHours.Value) : null,
+                ["actual_hours"] = t.ActualHours.HasValue ? JsonValue.Create(t.ActualHours.Value) : null
             }).ToList();
 
             sw.Stop();
