@@ -2,18 +2,21 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using StudioStudio_Server.Data;
 
 #nullable disable
 
-namespace StudioStudio_Server.Migrations
+namespace StudioStudio_Server.Data.Migrations
 {
     [DbContext(typeof(StudioDbContext))]
-    partial class StudioDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260323171445_DropEmailVerificationTokenTable")]
+    partial class DropEmailVerificationTokenTable
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -666,10 +669,21 @@ namespace StudioStudio_Server.Migrations
                     b.Property<Guid>("AssignedTo")
                         .HasColumnType("uuid");
 
+                    b.Property<Guid?>("AssignedToUserUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("CompletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsCompleted")
+                        .HasColumnType("boolean");
+
                     b.Property<Guid>("TaskId")
                         .HasColumnType("uuid");
 
                     b.HasKey("AssignmentId");
+
+                    b.HasIndex("AssignedToUserUserId");
 
                     b.HasIndex("TaskId", "AssignedTo")
                         .IsUnique();
@@ -1316,11 +1330,17 @@ namespace StudioStudio_Server.Migrations
 
             modelBuilder.Entity("StudioStudio_Server.Models.Entities.TaskAssignment", b =>
                 {
+                    b.HasOne("StudioStudio_Server.Models.Entities.User", "AssignedToUser")
+                        .WithMany()
+                        .HasForeignKey("AssignedToUserUserId");
+
                     b.HasOne("TaskItem", "Task")
                         .WithMany()
                         .HasForeignKey("TaskId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.Navigation("AssignedToUser");
 
                     b.Navigation("Task");
                 });

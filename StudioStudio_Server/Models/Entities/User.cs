@@ -22,7 +22,6 @@
         public string Language { get; set; } = "vi";
         public bool EmailNotificationEnabled { get; set; } = true;
         public ICollection<RefreshToken> RefreshTokens { get; set; } = new List<RefreshToken>();
-        public ICollection<EmailVerificationToken> EmailVerificationToken { get; set; } = new List<EmailVerificationToken>();
         public string? GoogleId { get; set; } = null;
         public ICollection<GroupParticipant> GroupParticipants { get; set; } = new List<GroupParticipant>();
         public ICollection<StudioParticipant> StudioParticipants { get; set; } = new List<StudioParticipant>();
