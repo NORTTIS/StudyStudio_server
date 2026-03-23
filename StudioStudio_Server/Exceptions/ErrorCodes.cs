@@ -28,6 +28,7 @@
         public const string TaskInvalidPriority = "TASK004";
         public const string TaskInvalidSeverity = "TASK005";
         public const string TaskNotPendingDeleted = "TASK006";
+        public const string TaskHoursExceedDuration = "TASK007";
 
         // GROUP
         public const string GroupNotFound = "GROUP001";

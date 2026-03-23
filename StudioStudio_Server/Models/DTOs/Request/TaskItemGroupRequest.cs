@@ -15,6 +15,8 @@ namespace StudioStudio_Server.Models.DTOs.Request
         public Guid? GroupStatusId { get; set; }
         public Guid? PersonalStatusId { get; set; }
         public Guid? Assignees { get; set; }
+        public decimal? EstimatedHours { get; set; }
+        public decimal? ActualHours { get; set; }
     }
 
     public class TaskItemPersonalRequest
@@ -26,6 +28,8 @@ namespace StudioStudio_Server.Models.DTOs.Request
         public DateTime? StartDate { get; set; }
         public DateTime? DueDate { get; set; }
         public Guid? PersonalStatusId { get; set; }
+        public decimal? EstimatedHours { get; set; }
+        public decimal? ActualHours { get; set; }
     }
 
     public class ReorderTaskRequest

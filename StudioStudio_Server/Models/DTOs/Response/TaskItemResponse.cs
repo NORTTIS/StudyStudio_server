@@ -19,6 +19,8 @@ namespace StudioStudio_Server.Models.DTOs.Response
         public GroupTaskStatusDto? GroupStatus { get; set; }
         public PersonalTaskStatusDto? PersonalStatus { get; set; }
         public UserDto Assignee { get; set; } = new UserDto();
+        public decimal? EstimatedHours { get; set; }
+        public decimal? ActualHours { get; set; }
 
     }
 

@@ -94,7 +94,10 @@ public class GetPersonalTasksTool : IAITool
                     ["is_overdue"] = t.DueDate.HasValue && t.DueDate.Value < now && !isCompleted,
                     ["source"] = x.IsPersonal ? "personal" : "group",
                     ["group_name"] = x.GroupName ?? "",
-                    ["created_at"] = t.CreatedAt.ToString("yyyy-MM-dd HH:mm")
+                    ["created_at"] = t.CreatedAt.ToString("yyyy-MM-dd HH:mm"),
+                    ["severity"] = t.Severity.ToString(),
+                    ["estimated_hours"] = t.EstimatedHours.HasValue ? JsonValue.Create(t.EstimatedHours.Value) : null,
+                    ["actual_hours"] = t.ActualHours.HasValue ? JsonValue.Create(t.ActualHours.Value) : null
                 };
             }).ToList();
 
