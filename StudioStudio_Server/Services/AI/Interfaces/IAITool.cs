@@ -44,14 +44,29 @@ public interface IAITool
 public interface IAIToolRegistry
 {
     /// <summary>
-    /// Lấy tool theo tên
+    /// Lấy tool theo tên (tool instance - dùng cho manifest)
     /// </summary>
     IAITool? GetTool(string name);
+
+    /// <summary>
+    /// Lấy Type của tool (để resolve fresh instance trong request scope)
+    /// </summary>
+    Type? GetToolType(string name);
 
     /// <summary>
     /// Lấy tất cả tools
     /// </summary>
     IReadOnlyList<IAITool> GetAllTools();
+
+    /// <summary>
+    /// Lấy tools được phép sử dụng theo context (role-based filtering)
+    /// </summary>
+    IReadOnlyList<IAITool> GetAllowedTools(AIQueryContext context);
+
+    /// <summary>
+    /// Lấy tools manifest cho một context cụ thể
+    /// </summary>
+    JsonObject GetToolsManifestForContext(AIQueryContext context);
 
     /// <summary>
     /// Đăng ký tool mới

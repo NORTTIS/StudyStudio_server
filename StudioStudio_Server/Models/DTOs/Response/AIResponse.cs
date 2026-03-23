@@ -27,6 +27,8 @@ namespace StudioStudio_Server.Models.DTOs.Response
     {
         public int TotalTasks { get; set; }
         public int CompletedTasks { get; set; }
+        public int InProgressTasks { get; set; }
+        public int NotStartedTasks { get; set; }
         public int CompletionPercentage { get; set; }
         public int OverdueTasks { get; set; }
         public DateTime? NearestDeadline { get; set; }

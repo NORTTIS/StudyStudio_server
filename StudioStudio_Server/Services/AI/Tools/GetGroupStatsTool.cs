@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using StudioStudio_Server.Models.Enums;
 using StudioStudio_Server.Repositories.Interfaces;
 using StudioStudio_Server.Services.AI.Models;
 using StudioStudio_Server.Services.AI.Tools.Interfaces;
@@ -15,15 +16,12 @@ public class GetGroupStatsTool : IAITool
     private readonly ILogger<GetGroupStatsTool> _logger;
 
     public string Name => "get_group_stats";
-    public string Description => "Lay thong ke nhom";
+    public string Description => "Lay thong ke cua nhom: tong so task, da hoan thanh, dang lam, chua lam, qua han. Khong can tham so.";
     public JsonObject ParametersSchema => new JsonObject
     {
         ["type"] = "object",
-        ["properties"] = new JsonObject
-        {
-            ["group_id"] = new JsonObject { ["type"] = "string" }
-        },
-        ["required"] = new JsonArray { "group_id" }
+        ["properties"] = new JsonObject { },
+        ["required"] = new JsonArray()
     };
 
     public GetGroupStatsTool(
@@ -40,16 +38,17 @@ public class GetGroupStatsTool : IAITool
 
     private static string? Js(JsonNode? n) => n?.GetValue<string>();
 
-    public bool ValidateParameters(JsonObject p) =>
-        Guid.TryParse(Js(p["group_id"]), out _);
+    public bool ValidateParameters(JsonObject p) => true;
 
     public async Task<AIQueryResult> ExecuteAsync(AIQueryContext context, JsonObject parameters, CancellationToken cancellationToken = default)
     {
         var sw = Stopwatch.StartNew();
         try
         {
-            if (!Guid.TryParse(Js(parameters["group_id"]), out var groupId))
-                return AIQueryResult.Error("Invalid group_id");
+            if (!context.GroupId.HasValue)
+                return AIQueryResult.Error("Khong co group_id - chi hoat dong trong group context");
+
+            var groupId = context.GroupId.Value;
 
             if (!await _participantRepository.IsUserInGroupAsync(groupId, context.UserId))
                 return AIQueryResult.Error("Ban khong co quyen");
@@ -75,8 +74,10 @@ public class GetGroupStatsTool : IAITool
                 {
                     ["total_tasks"] = taskSummary.TotalTasks,
                     ["completed_tasks"] = taskSummary.CompletedTasks,
+                    ["in_progress_tasks"] = taskSummary.InProgressTasks,
+                    ["not_started_tasks"] = taskSummary.NotStartedTasks,
                     ["completion_percentage"] = taskSummary.CompletionPercentage,
-                    ["pending_tasks"] = taskSummary.TotalTasks - taskSummary.CompletedTasks,
+                    ["pending_tasks"] = taskSummary.InProgressTasks + taskSummary.NotStartedTasks,
                     ["overdue_tasks"] = taskSummary.OverdueTasks,
                     ["nearest_deadline"] = taskSummary.NearestDeadline?.ToString("yyyy-MM-dd HH:mm")
                 },

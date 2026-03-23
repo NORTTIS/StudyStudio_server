@@ -22,19 +22,18 @@ public class SearchDocumentsTool : IAITool
 
     public string Name => "search_documents";
     public string Description => "Tim kiem noi dung trong tai lieu cua nhom. "
-        + "Parameters: query (bat buoc, cau hoi/tu khoa tim kiem), "
-        + "group_id (bat buoc), top_k (optional, mac dinh 3)";
+        + "Parameters: query (bat buoc, cau hoi/tu khoa tim kiem), top_k (optional, mac dinh 3). "
+        + "group_id tu dong lay tu he thong.";
 
     public JsonObject ParametersSchema => new JsonObject
     {
         ["type"] = "object",
         ["properties"] = new JsonObject
         {
-            ["query"] = new JsonObject { ["type"] = "string" },
-            ["group_id"] = new JsonObject { ["type"] = "string" },
-            ["top_k"] = new JsonObject { ["type"] = "number" }
+            ["query"] = new JsonObject { ["type"] = "string", ["description"] = "Cau hoi/tu khoa tim kiem (bat buoc)" },
+            ["top_k"] = new JsonObject { ["type"] = "number", ["description"] = "So ket qua toi da (default 3)" }
         },
-        ["required"] = new JsonArray { "query", "group_id" }
+        ["required"] = new JsonArray { "query" }
     };
 
     public SearchDocumentsTool(
@@ -53,8 +52,7 @@ public class SearchDocumentsTool : IAITool
     private static int Ji(JsonNode? n) => n == null ? 0 : n.GetValue<int>();
 
     public bool ValidateParameters(JsonObject p) =>
-        !string.IsNullOrWhiteSpace(Js(p["query"])) &&
-        Guid.TryParse(Js(p["group_id"]), out _);
+        !string.IsNullOrWhiteSpace(Js(p["query"]));
 
     public async Task<AIQueryResult> ExecuteAsync(
         AIQueryContext context, JsonObject parameters, CancellationToken cancellationToken = default)
@@ -62,8 +60,11 @@ public class SearchDocumentsTool : IAITool
         var sw = Stopwatch.StartNew();
         try
         {
+            if (!context.GroupId.HasValue)
+                return AIQueryResult.Error("Khong co group_id - chi hoat dong trong group context");
+
             var query = Js(parameters["query"])!;
-            var groupId = Guid.Parse(Js(parameters["group_id"])!);
+            var groupId = context.GroupId.Value;
             var topK = Ji(parameters["top_k"]);
             if (topK <= 0) topK = 3;
 

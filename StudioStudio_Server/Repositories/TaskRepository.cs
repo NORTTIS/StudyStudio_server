@@ -82,12 +82,14 @@ namespace StudioStudio_Server.Repositories
                 .ToListAsync();
 
             int totalTasks = tasks.Count;
-            int completedTasks = tasks.Count(t => t.GroupStatus != null &&
-                                                   t.GroupStatus.StatusName.ToLower().Contains("done"));
+            // Dung Progress>=100 lam dinh nghia "hoan thanh" (thong nhat voi GroupAnalyticsJob)
+            int completedTasks = tasks.Count(t => t.Progress >= 100);
+            int inProgressTasks = tasks.Count(t => t.Progress > 0 && t.Progress < 100);
+            int notStartedTasks = tasks.Count(t => t.Progress == 0);
+            // Qua han: co dueDate, da qua han, chua hoan thanh
             int overdueTasks = tasks.Count(t => t.DueDate.HasValue &&
                                                  t.DueDate.Value < now &&
-                                                 (t.GroupStatus == null ||
-                                                  !t.GroupStatus.StatusName.ToLower().Contains("done")));
+                                                 t.Progress < 100);
 
             DateTime? nearestDeadline = tasks
                 .Where(t => t.DueDate.HasValue && t.DueDate.Value > now)
@@ -112,6 +114,8 @@ namespace StudioStudio_Server.Repositories
             {
                 TotalTasks = totalTasks,
                 CompletedTasks = completedTasks,
+                InProgressTasks = inProgressTasks,
+                NotStartedTasks = notStartedTasks,
                 CompletionPercentage = completionPercentage,
                 OverdueTasks = overdueTasks,
                 NearestDeadline = nearestDeadline,

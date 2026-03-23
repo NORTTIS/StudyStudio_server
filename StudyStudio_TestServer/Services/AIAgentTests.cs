@@ -27,7 +27,8 @@ public class AIAgentTests
         _toolRegistry = new Mock<IAIToolRegistry>();
         _llmService = new Mock<ILLMService>();
         _logger = new Mock<ILogger<AIAgent>>();
-        _sut = new AIAgent(_toolRegistry.Object, _llmService.Object, _logger.Object);
+        var serviceProvider = new Mock<IServiceProvider>();
+        _sut = new AIAgent(_toolRegistry.Object, serviceProvider.Object, _llmService.Object, _logger.Object);
     }
 
     private static JsonObject EmptyToolManifest() => new JsonObject

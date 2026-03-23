@@ -43,6 +43,12 @@ public class GetStorageUsageTool : IAITool
         var sw = Stopwatch.StartNew();
         try
         {
+            // Auto-inject studio_id from context if LLM didn't provide it
+            if (!parameters.ContainsKey("studio_id") && context.StudioId.HasValue)
+            {
+                parameters["studio_id"] = JsonValue.Create(context.StudioId.Value.ToString());
+            }
+
             if (!Guid.TryParse(Js(parameters["studio_id"]), out var studioId))
                 return AIQueryResult.Error("Invalid studio_id");
 

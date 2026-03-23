@@ -203,8 +203,11 @@ public class MasterAIController : ControllerBase
                 toolCount = result.ToolCallCount
             });
 
-            // Send answer
-            await SendSSEvent(new { type = "chunk", content = result.Answer });
+            // Send full answer as one chunk to avoid losing text due to sentence splitting
+            if (!string.IsNullOrWhiteSpace(result.Answer))
+            {
+                await SendSSEvent(new { type = "chunk", content = result.Answer });
+            }
             await SendSSEvent(new { type = "done" });
         }
         catch (Exception ex)
@@ -376,59 +379,6 @@ public class MasterAIController : ControllerBase
         await Response.WriteAsync($"data: {JsonConvert.SerializeObject(data)}\n\n");
     }
 
-    /// <summary>
-    /// Get AI Suggestions - Proactive suggestions for Studio improvement (Master AI)
-    /// </summary>
-    [HttpGet("suggestions/{studioId}")]
-    public async Task<ActionResult<AIResponse>> GetStudioSuggestions(
-        Guid studioId,
-        CancellationToken cancellationToken = default)
-    {
-        var userId = GetUserId();
-        if (userId == null)
-            throw new AppException(ErrorCodes.AuthForbidden, StatusCodes.Status401Unauthorized);
-
-        var studio = await _studioRepository.GetByIdAsync(studioId);
-        if (studio == null)
-            throw new AppException(ErrorCodes.StudioNotFound, StatusCodes.Status404NotFound);
-
-        if (studio.OwnerId != userId.Value)
-            throw new AppException(ErrorCodes.AuthForbidden, StatusCodes.Status403Forbidden);
-
-        var rateLimitResult = await CheckRateLimitAsync(userId.Value);
-        if (!rateLimitResult.Allowed)
-            throw new AppException(ErrorCodes.AIRateLimitExceeded, StatusCodes.Status429TooManyRequests);
-
-        var context = new AIQueryContext
-        {
-            UserId = userId.Value,
-            Language = "vi",
-            StudioId = studioId
-        };
-
-        var prompt = "Phân tích toàn bộ dữ liệu Studio này và đưa ra 5 gợi ý quan trọng "
-            + "cho Owner để cải thiện Studio. Ví dụ: nhóm có hiệu suất kém, thành viên không hoạt động, "
-            + "dung lượng lưu trữ, vấn đề về quyền hạn. Trả lời bằng tiếng Việt.";
-
-        var result = await _aiAgent.ProcessAsync(prompt, context, cancellationToken);
-        await LogAIRequestAsync(userId.Value, 1);
-
-        return Ok(new AIResponse
-        {
-            Success = result.Success,
-            Answer = result.Answer,
-            Data = new
-            {
-                result.ToolCallCount,
-                result.ProcessingTimeMs,
-                ReasoningSteps = result.ReasoningSteps,
-                RemainingRequests = rateLimitResult.RemainingRequests - 1,
-                DailyLimit = rateLimitResult.DailyLimit,
-                SuggestionType = "StudioImprovement"
-            },
-            Message = result.Success ? "Success" : result.ErrorMessage
-        });
-    }
 }
 
 /// <summary>

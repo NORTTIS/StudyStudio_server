@@ -171,9 +171,12 @@ public class PersonalAIController : ControllerBase
             });
             await Response.WriteAsync($"data: {metadata}\n\n");
 
-            // Send answer
-            var chunk = JsonConvert.SerializeObject(new { type = "chunk", content = result.Answer });
-            await Response.WriteAsync($"data: {chunk}\n\n");
+            // Send full answer as one chunk to avoid losing text due to sentence splitting
+            if (!string.IsNullOrWhiteSpace(result.Answer))
+            {
+                var chunk = JsonConvert.SerializeObject(new { type = "chunk", content = result.Answer });
+                await Response.WriteAsync($"data: {chunk}\n\n");
+            }
             await Response.WriteAsync("data: {\"type\":\"done\"}\n\n");
         }
         catch (Exception ex)
@@ -186,55 +189,6 @@ public class PersonalAIController : ControllerBase
         {
             await Response.CompleteAsync();
         }
-    }
-
-    /// <summary>
-    /// Get AI Suggestions - Proactive suggestions for personal productivity
-    /// </summary>
-    [HttpGet("suggestions")]
-    public async Task<ActionResult<AIResponse>> GetPersonalSuggestions(
-        CancellationToken cancellationToken = default)
-    {
-        var userId = GetUserId();
-        if (userId == null)
-        {
-            throw new AppException(ErrorCodes.AuthForbidden, StatusCodes.Status401Unauthorized);
-        }
-
-        var rateLimitResult = await CheckRateLimitAsync(userId.Value);
-        if (!rateLimitResult.Allowed)
-        {
-            throw new AppException(ErrorCodes.AIRateLimitExceeded, StatusCodes.Status429TooManyRequests);
-        }
-
-        var context = new AIQueryContext
-        {
-            UserId = userId.Value,
-            Language = "vi"
-        };
-
-        var prompt = "Phân tích công việc và tiến độ của tôi, đưa ra 3-5 gợi ý "
-            + "để cải thiện năng suất cá nhân. Ví dụ: công việc quá hạn, deadline sắp tới, "
-            + "cách sắp xếp thời gian hiệu quả hơn. Trả lời bằng tiếng Việt.";
-
-        var result = await _aiAgent.ProcessAsync(prompt, context, cancellationToken);
-        await LogAIRequestAsync(userId.Value, 1);
-
-        return Ok(new AIResponse
-        {
-            Success = result.Success,
-            Answer = result.Answer,
-            Data = new
-            {
-                result.ToolCallCount,
-                result.ProcessingTimeMs,
-                ReasoningSteps = result.ReasoningSteps,
-                RemainingRequests = rateLimitResult.RemainingRequests - 1,
-                DailyLimit = rateLimitResult.DailyLimit,
-                SuggestionType = "PersonalProductivity"
-            },
-            Message = result.Success ? "Success" : result.ErrorMessage
-        });
     }
 
     private Guid? GetUserId()
@@ -283,5 +237,4 @@ public class PersonalAIController : ControllerBase
 public class PersonalAIRequest
 {
     public string Question { get; set; } = "";
-    public Guid? PersonalGroupId { get; set; } // Optional: nếu muốn hỏi về personal group
 }

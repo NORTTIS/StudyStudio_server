@@ -19,26 +19,36 @@ namespace StudioStudio_Server.Repositories
 
         /// <summary>
         /// Get favourite record of user and group
-        /// Condition: UserId = {userId} AND GroupId = {groupId}
+        /// Condition: UserId = {userId} AND GroupId = {groupId} AND Group.IsActive = true
         /// Use case: Check before add/remove favourite
         /// </summary>
         public async Task<Favourite?> GetByUserAndGroupIdAsync(Guid userId, Guid groupId)
         {
+            var activeGroupIds = await _context.Groups
+                .Where(g => g.IsActive)
+                .Select(g => g.GroupId)
+                .ToListAsync();
+
             return await _context.Favourites
                 .AsNoTracking()
-                .FirstOrDefaultAsync(f => f.UserId == userId && f.GroupId == groupId);
+                .FirstOrDefaultAsync(f => f.UserId == userId && f.GroupId == groupId && activeGroupIds.Contains(f.GroupId));
         }
 
         /// <summary>
         /// Get list of user's favourites (batch query for multiple groups)
-        /// Condition: UserId = {userId} AND GroupId IN {groupIds}
+        /// Condition: UserId = {userId} AND GroupId IN {groupIds} AND Group.IsActive = true
         /// Order by: CreatedAt DESC
         /// Use case: Check favourite status for list of groups
         /// </summary>
         public async Task<List<Favourite>> GetByUserAndGroupIdsAsync(Guid userId, List<Guid> groupIds)
         {
+            var activeGroupIds = await _context.Groups
+                .Where(g => g.IsActive)
+                .Select(g => g.GroupId)
+                .ToListAsync();
+
             return await _context.Favourites
-                .Where(f => f.UserId == userId && groupIds.Contains(f.GroupId))
+                .Where(f => f.UserId == userId && groupIds.Contains(f.GroupId) && activeGroupIds.Contains(f.GroupId))
                 .OrderByDescending(f => f.CreatedAt)
                 .AsNoTracking()
                 .ToListAsync();
@@ -46,19 +56,30 @@ namespace StudioStudio_Server.Repositories
 
         /// <summary>
         /// Check if group is in user's favourites
-        /// Condition: UserId = {userId} AND GroupId = {groupId}
+        /// Condition: UserId = {userId} AND GroupId = {groupId} AND Group.IsActive = true
         /// </summary>
         public async Task<bool> IsFavouriteAsync(Guid userId, Guid groupId)
         {
+            var isActive = await _context.Groups
+                .AnyAsync(g => g.GroupId == groupId && g.IsActive);
+
+            if (!isActive) return false;
+
             return await _context.Favourites
                 .AnyAsync(f => f.UserId == userId && f.GroupId == groupId);
         }
 
         /// <summary>
         /// Check if favourite record exists (alias of IsFavouriteAsync)
+        /// Condition: UserId = {userId} AND GroupId = {groupId} AND Group.IsActive = true
         /// </summary>
         public async Task<bool> ExistsAsync(Guid userId, Guid groupId)
         {
+            var isActive = await _context.Groups
+                .AnyAsync(g => g.GroupId == groupId && g.IsActive);
+
+            if (!isActive) return false;
+
             return await _context.Favourites
                 .AnyAsync(f => f.UserId == userId && f.GroupId == groupId);
         }

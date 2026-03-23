@@ -66,6 +66,12 @@ public class GetGroupComparisonTool : IAITool
         var sw = Stopwatch.StartNew();
         try
         {
+            // Auto-inject studio_id from context if LLM didn't provide it
+            if (!parameters.ContainsKey("studio_id") && context.StudioId.HasValue)
+            {
+                parameters["studio_id"] = JsonValue.Create(context.StudioId.Value.ToString());
+            }
+
             if (!Guid.TryParse(Js(parameters["studio_id"]), out var studioId))
                 return AIQueryResult.Error("Invalid studio_id");
 
@@ -80,6 +86,7 @@ public class GetGroupComparisonTool : IAITool
             List<Group> groupsToCompare;
             if (requestedGroupIds.Count > 0)
             {
+                // Defense-in-depth: only include active groups from allGroups (already filtered by GetGroupsByStudioIdAsync)
                 groupsToCompare = allGroups.Where(g => requestedGroupIds.Contains(g.GroupId)).ToList();
             }
             else

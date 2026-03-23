@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using StudioStudio_Server.Exceptions;
 using StudioStudio_Server.Models;
 using StudioStudio_Server.Models.DTOs.Request;
+using StudioStudio_Server.Models.Enums;
 using StudioStudio_Server.Repositories.Interfaces;
 using StudioStudio_Server.Services.AI;
 using StudioStudio_Server.Services.AI.Models;
@@ -56,9 +57,13 @@ public class GroupAIController : ControllerBase
             throw new AppException(ErrorCodes.AuthForbidden, StatusCodes.Status401Unauthorized);
         }
 
-        // Validate: User phải là thành viên của nhóm
-        var isMember = await _participantRepository.IsUserInGroupAsync(request.GroupId, userId.Value);
-        if (!isMember)
+        // Validate: phải là thành viên, và không phải Viewer/Commenter
+        if (!await _participantRepository.IsUserInGroupAsync(request.GroupId, userId.Value))
+        {
+            throw new AppException(ErrorCodes.GroupPermissionDenied, StatusCodes.Status403Forbidden);
+        }
+        var role = await _participantRepository.GetGroupRoleByUserIdAsync(userId.Value, request.GroupId);
+        if (role == GroupRole.Viewer || role == GroupRole.Commenter)
         {
             throw new AppException(ErrorCodes.GroupPermissionDenied, StatusCodes.Status403Forbidden);
         }
@@ -136,12 +141,18 @@ public class GroupAIController : ControllerBase
             return;
         }
 
-        // Validate membership
-        var isMember = await _participantRepository.IsUserInGroupAsync(request.GroupId, userId.Value);
-        if (!isMember)
+        // Validate: phải là thành viên, và không phải Viewer/Commenter
+        if (!await _participantRepository.IsUserInGroupAsync(request.GroupId, userId.Value))
         {
             Response.StatusCode = StatusCodes.Status403Forbidden;
             await Response.WriteAsync("Forbidden: Not a group member");
+            return;
+        }
+        var streamRole = await _participantRepository.GetGroupRoleByUserIdAsync(userId.Value, request.GroupId);
+        if (streamRole == GroupRole.Viewer || streamRole == GroupRole.Commenter)
+        {
+            Response.StatusCode = StatusCodes.Status403Forbidden;
+            await Response.WriteAsync("Forbidden: You do not have permission to use Group AI");
             return;
         }
 
@@ -184,8 +195,11 @@ public class GroupAIController : ControllerBase
                 toolCount = result.ToolCallCount
             });
 
-            // Send answer
-            await SendSSEvent(new { type = "chunk", content = result.Answer });
+            // Send full answer as one chunk to avoid losing text due to sentence splitting
+            if (!string.IsNullOrWhiteSpace(result.Answer))
+            {
+                await SendSSEvent(new { type = "chunk", content = result.Answer });
+            }
             await SendSSEvent(new { type = "done" });
         }
         catch (Exception ex)
@@ -291,62 +305,6 @@ public class GroupAIController : ControllerBase
         await Response.WriteAsync($"data: {Newtonsoft.Json.JsonConvert.SerializeObject(data)}\n\n");
     }
 
-    /// <summary>
-    /// Get AI Suggestions - Proactive suggestions for group improvement
-    /// </summary>
-    [HttpGet("suggestions/{groupId}")]
-    public async Task<ActionResult<AIResponse>> GetGroupSuggestions(
-        Guid groupId,
-        CancellationToken cancellationToken = default)
-    {
-        var userId = GetUserId();
-        if (userId == null)
-        {
-            throw new AppException(ErrorCodes.AuthForbidden, StatusCodes.Status401Unauthorized);
-        }
-
-        var isMember = await _participantRepository.IsUserInGroupAsync(groupId, userId.Value);
-        if (!isMember)
-        {
-            throw new AppException(ErrorCodes.GroupPermissionDenied, StatusCodes.Status403Forbidden);
-        }
-
-        var rateLimitResult = await CheckRateLimitAsync(userId.Value);
-        if (!rateLimitResult.Allowed)
-        {
-            throw new AppException(ErrorCodes.AIRateLimitExceeded, StatusCodes.Status429TooManyRequests);
-        }
-
-        var context = new AIQueryContext
-        {
-            UserId = userId.Value,
-            Language = "vi",
-            GroupId = groupId
-        };
-
-        var prompt = "Phân tích dữ liệu nhóm này và đưa ra 3-5 gợi ý cải thiện cho nhóm. "
-            + "Ví dụ: công việc chậm tiến độ, deadline sắp tới, thành viên không hoạt động, "
-            + "cơ hội cải thiện. Trả lời bằng tiếng Việt.";
-
-        var result = await _aiAgent.ProcessAsync(prompt, context, cancellationToken);
-        await LogAIRequestAsync(userId.Value, 1);
-
-        return Ok(new AIResponse
-        {
-            Success = result.Success,
-            Answer = result.Answer,
-            Data = new
-            {
-                result.ToolCallCount,
-                result.ProcessingTimeMs,
-                ReasoningSteps = result.ReasoningSteps,
-                RemainingRequests = rateLimitResult.RemainingRequests - 1,
-                DailyLimit = rateLimitResult.DailyLimit,
-                SuggestionType = "GroupImprovement"
-            },
-            Message = result.Success ? "Success" : result.ErrorMessage
-        });
-    }
 }
 
 public class RateLimitResult
