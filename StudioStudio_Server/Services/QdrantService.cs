@@ -292,8 +292,127 @@ namespace StudioStudio_Server.Services
                 }
             }
 
-            _logger.LogInformation("Qdrant search completed. Found {Count} results for groupId: {GroupId}", 
+            _logger.LogInformation("Qdrant search completed. Found {Count} results for groupId: {GroupId}",
                 results.Count, groupId);
+
+            return results;
+        }
+
+        /// <summary>
+        /// Search vectors across multiple groups (for studio-level AI)
+        /// Uses Qdrant MatchAny filter on groupId
+        /// </summary>
+        public async Task<List<VectorSearchResponse.SearchResult>> SearchVectorsMultiGroupAsync(
+            float[] queryVector,
+            int topK,
+            List<Guid> groupIds,
+            CancellationToken cancellationToken = default)
+        {
+            if (_httpClient == null)
+            {
+                _logger.LogWarning("Qdrant Cloud not configured. Cannot search vectors.");
+                return new List<VectorSearchResponse.SearchResult>();
+            }
+
+            if (queryVector.Length != _config.VectorSize)
+            {
+                _logger.LogError("Query vector size mismatch. Expected: {Expected}, Got: {Actual}",
+                    _config.VectorSize, queryVector.Length);
+                return new List<VectorSearchResponse.SearchResult>();
+            }
+
+            string url = $"/collections/{_config.CollectionName}/points/search";
+
+            // Build MatchAny filter for multiple groupIds (studio-level search)
+            object requestBody = new
+            {
+                vector = queryVector,
+                limit = topK,
+                with_payload = true,
+                with_vector = false,
+                filter = new
+                {
+                    must = new[]
+                    {
+                        new
+                        {
+                            key = "groupId",
+                            match = new
+                            {
+                                any = groupIds.Select(g => g.ToString()).ToArray()
+                            }
+                        }
+                    }
+                }
+            };
+
+            StringContent content = new StringContent(
+                JsonSerializer.Serialize(requestBody),
+                Encoding.UTF8,
+                "application/json");
+
+            _logger.LogInformation("Searching Qdrant across {Count} groups, topK: {TopK}",
+                groupIds.Count, topK);
+
+            HttpResponseMessage response = await _httpClient.PostAsync(url, content, cancellationToken);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                string errorContent = await response.Content.ReadAsStringAsync(cancellationToken);
+                _logger.LogError("Qdrant multi-group search failed. Status: {Status}, Error: {Error}",
+                    response.StatusCode, errorContent);
+                return new List<VectorSearchResponse.SearchResult>();
+            }
+
+            string jsonResponse = await response.Content.ReadAsStringAsync(cancellationToken);
+            JsonDocument doc = JsonDocument.Parse(jsonResponse);
+
+            List<VectorSearchResponse.SearchResult> results = new List<VectorSearchResponse.SearchResult>();
+
+            if (doc.RootElement.TryGetProperty("result", out JsonElement resultArray))
+            {
+                foreach (JsonElement item in resultArray.EnumerateArray())
+                {
+                    string itemId = item.GetProperty("id").GetString() ?? string.Empty;
+                    float score = item.GetProperty("score").GetSingle();
+                    JsonElement payloadElement = item.GetProperty("payload");
+
+                    Dictionary<string, object> payload = new Dictionary<string, object>();
+                    foreach (JsonProperty prop in payloadElement.EnumerateObject())
+                    {
+                        if (prop.Value.ValueKind == JsonValueKind.String)
+                        {
+                            payload[prop.Name] = prop.Value.GetString() ?? string.Empty;
+                        }
+                        else if (prop.Value.ValueKind == JsonValueKind.Number)
+                        {
+                            if (prop.Value.TryGetInt32(out int intValue))
+                                payload[prop.Name] = intValue;
+                            else
+                                payload[prop.Name] = prop.Value.GetDouble();
+                        }
+                        else if (prop.Value.ValueKind == JsonValueKind.True ||
+                                 prop.Value.ValueKind == JsonValueKind.False)
+                        {
+                            payload[prop.Name] = prop.Value.GetBoolean();
+                        }
+                        else
+                        {
+                            payload[prop.Name] = prop.Value.ToString();
+                        }
+                    }
+
+                    results.Add(new VectorSearchResponse.SearchResult
+                    {
+                        Id = itemId,
+                        Score = score,
+                        Payload = payload
+                    });
+                }
+            }
+
+            _logger.LogInformation("Qdrant multi-group search completed. Found {Count} results across {GroupCount} groups",
+                results.Count, groupIds.Count);
 
             return results;
         }

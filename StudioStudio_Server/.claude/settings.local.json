@@ -4,7 +4,10 @@
       "WebSearch",
       "Bash(dotnet build:*)",
       "Bash(Remove-Item:*)",
-      "Bash(dotnet ef:*)"
+      "Bash(dotnet ef:*)",
+      "Bash(dotnet test:*)",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\2132k\\\\OneDrive\\\\Desktop\\\\Workspace\\\\StudyStudio_backend\\\\StudioStudio_Server\\\\Services\\\\AI\" -Recurse)",
+      "Bash(Format-Table FullName, Length -AutoSize)"
     ]
   }
 }

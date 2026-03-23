@@ -19,18 +19,18 @@ namespace StudioStudio_Server.Repositories
 
         /// <summary>
         /// Get studio by ID
-        /// Condition: StudioId = {studioId}
+        /// Condition: StudioId = {studioId} AND IsDeleted = false
         /// </summary>
         public async Task<Studio?> GetByIdAsync(Guid studioId)
         {
             return await _context.Studios
                 .AsNoTracking()
-                .FirstOrDefaultAsync(s => s.StudioId == studioId);
+                .FirstOrDefaultAsync(s => s.StudioId == studioId && !s.IsDeleted);
         }
 
         /// <summary>
         /// Get multiple studios by list of IDs
-        /// Condition: StudioId IN {studioIds}
+        /// Condition: StudioId IN {studioIds} AND IsDeleted = false
         /// Return: Empty list if studioIds is empty
         /// </summary>
         public async Task<List<Studio>> GetByIdsAsync(List<Guid> studioIds)
@@ -41,7 +41,7 @@ namespace StudioStudio_Server.Repositories
             }
 
             return await _context.Studios
-                .Where(s => studioIds.Contains(s.StudioId))
+                .Where(s => studioIds.Contains(s.StudioId) && !s.IsDeleted)
                 .AsNoTracking()
                 .ToListAsync();
         }
@@ -75,12 +75,12 @@ namespace StudioStudio_Server.Repositories
 
         /// <summary>
         /// Check if user is owner of studio
-        /// Condition: StudioId = {studioId} AND OwnerId = {userId}
+        /// Condition: StudioId = {studioId} AND OwnerId = {userId} AND IsDeleted = false
         /// </summary>
         public async Task<bool> IsUserStudioOwnerAsync(Guid studioId, Guid userId)
         {
             return await _context.Studios
-                .AnyAsync(s => s.StudioId == studioId && s.OwnerId == userId);
+                .AnyAsync(s => s.StudioId == studioId && s.OwnerId == userId && !s.IsDeleted);
         }
 
         /// <summary>
@@ -110,6 +110,19 @@ namespace StudioStudio_Server.Repositories
             studio.UpdatedAt = DateTime.UtcNow;
             _context.Studios.Update(studio);
             await _context.SaveChangesAsync();
+        }
+
+        /// <summary>
+        /// Get groups belonging to a studio
+        /// Condition: StudioId = {studioId} AND IsActive = true
+        /// </summary>
+        public async Task<List<Group>> GetGroupsByStudioIdAsync(Guid studioId)
+        {
+            return await _context.Groups
+                .Where(g => g.StudioId == studioId && g.IsActive)
+                .Include(g => g.Participants)
+                .AsNoTracking()
+                .ToListAsync();
         }
     }
 }

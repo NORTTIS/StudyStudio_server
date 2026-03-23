@@ -2,18 +2,18 @@ namespace StudioStudio_Server.Services.Interfaces
 {
     /// <summary>
     /// Service interface cho LLM (Large Language Model) inference
-    /// Implementation: GeminiLLMService s? d?ng Gemini 2.5 Flash (primary) v?i fallback sang Gemini 1.5 Flash
+    /// Implementation: GeminiLLMService su dung Gemini 2.5 Flash (primary) voi fallback sang Gemini 1.5 Flash
     /// </summary>
     public interface ILLMService
     {
         /// <summary>
-        /// G?i LLM API ð? generate câu tr? l?i
+        /// Goi LLM API de generate cau tra loi
         /// </summary>
-        /// <param name="systemPrompt">System prompt ð? ð?nh ngh?a behavior c?a AI</param>
-        /// <param name="userMessage">Câu h?i t? user</param>
-        /// <param name="context">Context t? documents và tasks</param>
+        /// <param name="systemPrompt">System prompt de dinh nghia behavior cua AI</param>
+        /// <param name="userMessage">Cau hoi tu user</param>
+        /// <param name="context">Context tu documents va tasks</param>
         /// <param name="cancellationToken">Cancellation token</param>
-        /// <returns>Câu tr? l?i t? LLM</returns>
+        /// <returns>Cau tra loi tu LLM</returns>
         Task<string> GenerateAnswerAsync(
             string systemPrompt,
             string userMessage,
@@ -21,13 +21,13 @@ namespace StudioStudio_Server.Services.Interfaces
             CancellationToken cancellationToken = default);
 
         /// <summary>
-        /// G?i LLM API ð? generate câu tr? l?i d?ng streaming
+        /// Goi LLM API de generate cau tra loi dang streaming
         /// </summary>
-        /// <param name="systemPrompt">System prompt ð? ð?nh ngh?a behavior c?a AI</param>
-        /// <param name="userMessage">Câu h?i t? user</param>
-        /// <param name="context">Context t? documents và tasks</param>
+        /// <param name="systemPrompt">System prompt de dinh nghia behavior cua AI</param>
+        /// <param name="userMessage">Cau hoi tu user</param>
+        /// <param name="context">Context tu documents va tasks</param>
         /// <param name="cancellationToken">Cancellation token</param>
-        /// <returns>Stream c?a câu tr? l?i t? LLM</returns>
+        /// <returns>Stream cua cau tra loi tu LLM</returns>
         IAsyncEnumerable<string> GenerateAnswerStreamAsync(
             string systemPrompt,
             string userMessage,

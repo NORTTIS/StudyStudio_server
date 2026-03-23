@@ -19,14 +19,15 @@ namespace StudioStudio_Server.Repositories
 
         /// <summary>
         /// Get participant record by GroupId and UserId
-        /// Condition: GroupId = {groupId} AND UserId = {userId}
+        /// Condition: GroupId = {groupId} AND UserId = {userId} AND Group.IsActive = true
         /// Use case: Check role, permissions
         /// </summary>
         public async Task<GroupParticipant?> GetByGroupAndUserAsync(Guid groupId, Guid userId)
         {
             return await _context.GroupParticipants
                 .AsNoTracking()
-                .FirstOrDefaultAsync(gp => gp.GroupId == groupId && gp.UserId == userId);
+                .FirstOrDefaultAsync(gp => gp.GroupId == groupId && gp.UserId == userId &&
+                    _context.Groups.Any(g => g.GroupId == gp.GroupId && g.IsActive));
         }
 
         /// <summary>
@@ -42,23 +43,26 @@ namespace StudioStudio_Server.Repositories
 
         /// <summary>
         /// Get participant record by UserId and GroupId (alias of GetByGroupAndUserAsync)
+        /// Condition: GroupId = {groupId} AND UserId = {userId} AND Group.IsActive = true
         /// </summary>
         public async Task<GroupParticipant?> GetByUserAndGroupAsync(Guid userId, Guid groupId)
         {
             return await _context.GroupParticipants
                 .AsNoTracking()
-                .FirstOrDefaultAsync(gp => gp.GroupId == groupId && gp.UserId == userId);
+                .FirstOrDefaultAsync(gp => gp.GroupId == groupId && gp.UserId == userId &&
+                    _context.Groups.Any(g => g.GroupId == gp.GroupId && g.IsActive));
         }
 
         /// <summary>
         /// Get all participants of group
-        /// Condition: GroupId = {groupId}
+        /// Condition: GroupId = {groupId} AND Group.IsActive = true
         /// Order by: CreatedAt ASC (oldest member first)
         /// </summary>
         public async Task<List<GroupParticipant>> GetAllByGroupIdAsync(Guid groupId)
         {
             return await _context.GroupParticipants
-                .Where(gp => gp.GroupId == groupId)
+                .Where(gp => gp.GroupId == groupId &&
+                    _context.Groups.Any(g => g.GroupId == gp.GroupId && g.IsActive))
                 .OrderBy(gp => gp.CreatedAt)
                 .AsNoTracking()
                 .ToListAsync();
@@ -66,14 +70,15 @@ namespace StudioStudio_Server.Repositories
 
         /// <summary>
         /// Get participants for multiple groups (batch query)
-        /// Condition: GroupId IN {groupIds}
+        /// Condition: GroupId IN {groupIds} AND Group.IsActive = true
         /// Order by: CreatedAt ASC
         /// Use case: Load members info for list of groups
         /// </summary>
         public async Task<List<GroupParticipant>> GetByGroupIdsAsync(List<Guid> groupIds)
         {
             return await _context.GroupParticipants
-                .Where(gp => groupIds.Contains(gp.GroupId))
+                .Where(gp => groupIds.Contains(gp.GroupId) &&
+                    _context.Groups.Any(g => g.GroupId == gp.GroupId && g.IsActive))
                 .OrderBy(gp => gp.CreatedAt)
                 .AsNoTracking()
                 .ToListAsync();
@@ -105,12 +110,13 @@ namespace StudioStudio_Server.Repositories
 
         /// <summary>
         /// Check if user is member of group
-        /// Condition: GroupId = {groupId} AND UserId = {userId}
+        /// Condition: GroupId = {groupId} AND UserId = {userId} AND Group.IsActive = true
         /// </summary>
         public async Task<bool> IsUserInGroupAsync(Guid groupId, Guid userId)
         {
             return await _context.GroupParticipants
-                .AnyAsync(gp => gp.GroupId == groupId && gp.UserId == userId);
+                .AnyAsync(gp => gp.GroupId == groupId && gp.UserId == userId &&
+                    _context.Groups.Any(g => g.GroupId == gp.GroupId && g.IsActive));
         }
 
         /// <summary>
@@ -165,12 +171,13 @@ namespace StudioStudio_Server.Repositories
 
         /// <summary>
         /// Get the role of the user in the group
+        /// Condition: GroupId = {groupId} AND UserId = {userId} AND Group.IsActive = true
         /// </summary>
         public async Task<GroupRole> GetGroupRoleByUserIdAsync(Guid userId, Guid groupId)
         {
-            var user = await _context.GroupParticipants.FirstOrDefaultAsync(
-                u => u.UserId == userId &&
-                u.GroupId == groupId);
+            var user = await _context.GroupParticipants
+                .FirstOrDefaultAsync(gp => gp.UserId == userId && gp.GroupId == groupId &&
+                    _context.Groups.Any(g => g.GroupId == gp.GroupId && g.IsActive));
             return user?.Role ?? GroupRole.Viewer;
         }
 

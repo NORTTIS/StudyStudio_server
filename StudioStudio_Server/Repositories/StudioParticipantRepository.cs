@@ -28,24 +28,26 @@ namespace StudioStudio_Server.Repositories
 
         /// <summary>
         /// Check if user is member of studio
-        /// Condition: StudioId = {studioId} AND UserId = {userId}
+        /// Condition: StudioId = {studioId} AND UserId = {userId} AND Studio.IsDeleted = false
         /// </summary>
         public async Task<bool> IsUserInStudioAsync(Guid studioId, Guid userId)
         {
             return await _context.StudioParticipants
-                .AnyAsync(sp => sp.StudioId == studioId && sp.UserId == userId);
+                .Include(sp => sp.Studio)
+                .AnyAsync(sp => sp.StudioId == studioId && sp.UserId == userId && sp.Studio != null && !sp.Studio.IsDeleted);
         }
 
         /// <summary>
         /// Get participant record by StudioId and UserId
-        /// Condition: StudioId = {studioId} AND UserId = {userId}
+        /// Condition: StudioId = {studioId} AND UserId = {userId} AND Studio.IsDeleted = false
         /// Use case: Check role, permissions
         /// </summary>
         public async Task<StudioParticipant?> GetByStudioAndUserAsync(Guid studioId, Guid userId)
         {
             return await _context.StudioParticipants
+                .Include(sp => sp.Studio)
                 .AsNoTracking()
-                .FirstOrDefaultAsync(sp => sp.StudioId == studioId && sp.UserId == userId);
+                .FirstOrDefaultAsync(sp => sp.StudioId == studioId && sp.UserId == userId && sp.Studio != null && !sp.Studio.IsDeleted);
         }
 
         /// <summary>
@@ -62,13 +64,14 @@ namespace StudioStudio_Server.Repositories
 
         /// <summary>
         /// Get all participants in a studio
-        /// Condition: StudioId = {studioId}
+        /// Condition: StudioId = {studioId} AND Studio.IsDeleted = false
         /// Use case: List all members in studio
         /// </summary>
         public async Task<List<StudioParticipant>> GetParticipantsByStudioIdAsync(Guid studioId)
         {
             return await _context.StudioParticipants
-                .Where(sp => sp.StudioId == studioId)
+                .Include(sp => sp.Studio)
+                .Where(sp => sp.StudioId == studioId && sp.Studio != null && !sp.Studio.IsDeleted)
                 .Include(sp => sp.User)
                 .AsNoTracking()
                 .ToListAsync();
@@ -76,13 +79,14 @@ namespace StudioStudio_Server.Repositories
 
         /// <summary>
         /// Get all studio participant records for a user
-        /// Condition: UserId = {userId}
+        /// Condition: UserId = {userId} AND Studio.IsDeleted = false
         /// Use case: Get all studios where user is a participant (member)
         /// </summary>
         public async Task<List<StudioParticipant>> GetStudiosByUserIdAsync(Guid userId)
         {
             return await _context.StudioParticipants
-                .Where(sp => sp.UserId == userId)
+                .Include(sp => sp.Studio)
+                .Where(sp => sp.UserId == userId && sp.Studio != null && !sp.Studio.IsDeleted)
                 .AsNoTracking()
                 .ToListAsync();
         }

@@ -1,0 +1,53 @@
+# Build outputs
+**/bin/
+**/obj/
+**/publish/
+
+# IDE
+.vs/
+.vscode/
+.idea/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+*.sln.iml
+
+# Test results & coverage
+TestResults/
+coverage/
+coverage.*
+
+# Logs
+*.log
+logs/
+
+# Environment & secrets
+.env
+.env.*
+**/secrets.json
+appsettings.Local.json
+
+# NuGet
+*.nupkg
+*.snupkg
+.nuget/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Git
+.git/
+.gitignore
+
+# Docker
+docker-compose.override.yml
+
+# Rider/ReSharper
+_ReSharper*/
+*.DotSettings.user
+
+# Uploaded files (large binary data)
+**/wwwroot/uploads/
+**/avatars/

@@ -187,3 +187,30 @@ public async Task<IActionResult> GetProfile(CancellationToken cancellationToken)
 ## Cache Configuration
 
 Set `Cache:Provider` in appsettings to `"Memory"` (dev) or `"Redis"` (production)
+
+## Agentic AI System
+
+StudyStudio uses a **ReAct Agentic AI** pattern with three AI layers. Full documentation:
+
+```
+Docs/AI/README.md                  # Index & quick testing
+Docs/AI/AI-ARCHITECTURE.md        # Architecture overview
+Docs/AI/AI-PERSONAL-WORKFLOW.md   # Personal AI (user-scoped)
+Docs/AI/AI-GROUP-WORKFLOW.md      # Group AI (group-scoped)
+Docs/AI/AI-MASTER-WORKFLOW.md     # Master AI (studio owner-scoped)
+```
+
+### Three AI Layers
+
+| Layer | Route | Context | Tools |
+|-------|-------|---------|-------|
+| **Personal AI** | `/api/ai/personal/*` | `GroupId = null` | Default |
+| **Group AI** | `/api/ai/group/*` | `GroupId = groupId` | Group tools |
+| **Master AI** | `/api/ai/master/*` | `StudioId = studioId` | Full 10-tool set |
+
+### Key Patterns
+
+- **Rate limit**: 1 count per user prompt (not per tool call), from `AIRequestLog`
+- **Streaming**: SSE `text/event-stream` with `metadata`, `chunk`, `done` events
+- **ReAct Loop**: Max 5 tool calls per request to prevent infinite loops
+- **Role prompts**: AIAgent auto-selects prompt based on `AIQueryContext.StudioId` → Owner, `GroupId` → Personal, neither → Default
