@@ -622,10 +622,6 @@ namespace StudioStudio_Server.Services
                 throw new AppException(ErrorCodes.UserAccountAlreadyDeleted, StatusCodes.Status400BadRequest);
             }
 
-            if (user.Status == UserStatus.Active)
-            {
-                throw new AppException(ErrorCodes.ValidationEmailAlreadyVerified, StatusCodes.Status400BadRequest);
-            }
 
             // Generate new token and store in Redis
             var token = Convert.ToBase64String(RandomNumberGenerator.GetBytes(64));

@@ -59,7 +59,7 @@ namespace StudioStudio_Server.Repositories
         public async Task<Dictionary<Guid, int>> GetTaskCountByGroupIdsAsync(List<Guid> groupIds)
         {
             var taskCounts = await _context.Tasks
-                .Where(t => t.GroupId.HasValue && groupIds.Contains(t.GroupId.Value))
+                .Where(t => t.GroupId.HasValue && groupIds.Contains(t.GroupId.Value) && t.IsPendingDeleted == false)
                 .GroupBy(t => t.GroupId.Value)
                 .Select(g => new { GroupId = g.Key, Count = g.Count() })
                 .AsNoTracking()
