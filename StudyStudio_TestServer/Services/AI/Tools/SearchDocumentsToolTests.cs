@@ -78,21 +78,21 @@ public class SearchDocumentsToolTests
     }
 
     [Fact]
-    public void ValidateParameters_InvalidGroupId_ReturnsFalse()
+    public void ValidateParameters_InvalidGroupId_ReturnsTrue()
     {
         var p = new JsonObject
         {
             ["query"] = "test query",
             ["group_id"] = "not-a-guid"
         };
-        Assert.False(_sut.ValidateParameters(p));
+        Assert.True(_sut.ValidateParameters(p));
     }
 
     [Fact]
-    public void ValidateParameters_MissingGroupId_ReturnsFalse()
+    public void ValidateParameters_MissingGroupId_ReturnsTrue()
     {
         var p = new JsonObject { ["query"] = "test" };
-        Assert.False(_sut.ValidateParameters(p));
+        Assert.True(_sut.ValidateParameters(p));
     }
 
     #endregion
@@ -112,7 +112,7 @@ public class SearchDocumentsToolTests
             ["group_id"] = _groupId.ToString(),
             ["top_k"] = 3
         };
-        var context = new AIQueryContext { UserId = _userId, Language = "vi" };
+        var context = new AIQueryContext { UserId = _userId, GroupId = _groupId, Language = "vi" };
 
         _participantRepo.Setup(x => x.IsUserInGroupAsync(_groupId, _userId))
             .ReturnsAsync(true);
@@ -141,7 +141,7 @@ public class SearchDocumentsToolTests
             ["query"] = "test",
             ["group_id"] = _groupId.ToString()
         };
-        var context = new AIQueryContext { UserId = _userId, Language = "vi" };
+        var context = new AIQueryContext { UserId = _userId, GroupId = _groupId, Language = "vi" };
 
         _participantRepo.Setup(x => x.IsUserInGroupAsync(_groupId, _userId))
             .ReturnsAsync(false);
@@ -163,7 +163,7 @@ public class SearchDocumentsToolTests
             ["query"] = "nonexistent topic",
             ["group_id"] = _groupId.ToString()
         };
-        var context = new AIQueryContext { UserId = _userId, Language = "vi" };
+        var context = new AIQueryContext { UserId = _userId, GroupId = _groupId, Language = "vi" };
 
         _participantRepo.Setup(x => x.IsUserInGroupAsync(_groupId, _userId))
             .ReturnsAsync(true);
@@ -191,7 +191,7 @@ public class SearchDocumentsToolTests
             ["query"] = "test",
             ["group_id"] = _groupId.ToString()
         };
-        var context = new AIQueryContext { UserId = _userId, Language = "en" };
+        var context = new AIQueryContext { UserId = _userId, GroupId = _groupId, Language = "en" };
 
         _participantRepo.Setup(x => x.IsUserInGroupAsync(_groupId, _userId))
             .ReturnsAsync(true);
@@ -218,7 +218,7 @@ public class SearchDocumentsToolTests
             ["group_id"] = _groupId.ToString()
             // no top_k
         };
-        var context = new AIQueryContext { UserId = _userId, Language = "vi" };
+        var context = new AIQueryContext { UserId = _userId, GroupId = _groupId, Language = "vi" };
 
         _participantRepo.Setup(x => x.IsUserInGroupAsync(_groupId, _userId))
             .ReturnsAsync(true);
@@ -248,7 +248,7 @@ public class SearchDocumentsToolTests
             ["query"] = "test",
             ["group_id"] = _groupId.ToString()
         };
-        var context = new AIQueryContext { UserId = _userId, Language = "vi" };
+        var context = new AIQueryContext { UserId = _userId, GroupId = _groupId, Language = "vi" };
 
         _participantRepo.Setup(x => x.IsUserInGroupAsync(_groupId, _userId))
             .ReturnsAsync(true);
