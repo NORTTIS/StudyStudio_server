@@ -303,7 +303,17 @@ namespace StudioStudio_Server.Controllers
                 role.ToString(),
                 group.Description);
 
-            await _emailService.SendLinkAsync(request.Email, subject, body);
+            // Check email notification preference if invitee is an existing user
+            var invitee = await _userRepository.GetByEmailAsync(request.Email);
+            if (invitee != null)
+            {
+                await _emailService.SendEmailWithPreferenceCheckAsync(request.Email, subject, body, invitee.UserId);
+            }
+            else
+            {
+                // Invite to non-existing user - send email directly
+                await _emailService.SendLinkAsync(request.Email, subject, body);
+            }
 
             _logger.LogInformation(
                 "Invite email sent to {Email} for group {GroupId} with role {Role} by user {UserId}",

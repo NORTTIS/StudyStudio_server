@@ -31,5 +31,10 @@
         /// Region identifier (ví dụ: us-west-004, eu-central-003)
         /// </summary>
         public string Region { get; set; } = string.Empty;
+
+        /// <summary>
+        /// Bucket for public files (avatars, etc.)
+        /// </summary>
+        public string PublicBucketName { get; set; } = "studystudio-public";
     }
 }

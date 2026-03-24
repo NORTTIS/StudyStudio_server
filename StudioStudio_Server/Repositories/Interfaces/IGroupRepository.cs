@@ -17,6 +17,7 @@ namespace StudioStudio_Server.Repositories.Interfaces
         Task DeleteAsync(Group group);
         Task<int> GetGroupCountByStudioIdAsync(Guid studioId);
         Task UpdateAsync(Group group);
+        Task<Group?> GetByIdForUpdateAsync(Guid groupId);
         Task<bool> GroupNameExistsInStudioExcludingGroupAsync(Guid? studioId, string groupName, Guid excludeGroupId);
         Task<List<Group>> GetStudioGroupsAsync(Guid studioId);
         Task<List<Group>> GetByIdsAsync(List<Guid> groupIds);

@@ -1774,5 +1774,153 @@ style=""max-width:620px;margin:40px auto;background:#ffffff;border-radius:20px;o
         }
 
         #endregion
+
+        #region Task Notifications
+
+        public static string TaskAssignedEmail(string taskTitle, string assignerName, DateTime? deadline, string taskUrl, Language language = Language.Vietnamese)
+        {
+            var title = language == Language.Vietnamese ? "Bạn được giao task mới" : "You have been assigned a new task";
+            var detail = language == Language.Vietnamese
+                ? $"<p><strong>{assignerName}</strong> đã giao cho bạn task: <strong>{taskTitle}</strong>.</p><p>Deadline: <strong>{(deadline.HasValue ? deadline.Value.ToString("dd/MM/yyyy HH:mm") : "N/A")}</strong></p>"
+                : $"<p><strong>{assignerName}</strong> assigned you a task: <strong>{taskTitle}</strong>.</p><p>Deadline: <strong>{(deadline.HasValue ? deadline.Value.ToString("MM/dd/yyyy HH:mm") : "N/A")}</strong></p>";
+
+            return BuildTaskNotificationEmail(title, detail, taskUrl, language);
+        }
+
+        public static string TaskReassignedEmail(string taskTitle, string fromName, string toName, string taskUrl, Language language = Language.Vietnamese)
+        {
+            var title = language == Language.Vietnamese ? "Task đã được chuyển người phụ trách" : "Task has been reassigned";
+            var detail = language == Language.Vietnamese
+                ? $"<p>Task <strong>{taskTitle}</strong> đã được chuyển từ <strong>{fromName}</strong> sang <strong>{toName}</strong>.</p>"
+                : $"<p>Task <strong>{taskTitle}</strong> was reassigned from <strong>{fromName}</strong> to <strong>{toName}</strong>.</p>";
+
+            return BuildTaskNotificationEmail(title, detail, taskUrl, language);
+        }
+
+        public static string TaskStatusChangedEmail(string taskTitle, string oldStatus, string newStatus, string changedBy, string taskUrl, Language language = Language.Vietnamese)
+        {
+            var title = language == Language.Vietnamese ? "Trạng thái task đã thay đổi" : "Task status changed";
+            var detail = language == Language.Vietnamese
+                ? $"<p><strong>{changedBy}</strong> đã đổi trạng thái task <strong>{taskTitle}</strong>: <strong>{oldStatus}</strong> → <strong>{newStatus}</strong>.</p>"
+                : $"<p><strong>{changedBy}</strong> changed task <strong>{taskTitle}</strong> status: <strong>{oldStatus}</strong> → <strong>{newStatus}</strong>.</p>";
+
+            return BuildTaskNotificationEmail(title, detail, taskUrl, language);
+        }
+
+        public static string TaskCompletedEmail(string taskTitle, string completedBy, string taskUrl, Language language = Language.Vietnamese)
+        {
+            var title = language == Language.Vietnamese ? "Task đã hoàn thành" : "Task completed";
+            var detail = language == Language.Vietnamese
+                ? $"<p><strong>{completedBy}</strong> đã hoàn thành task: <strong>{taskTitle}</strong>.</p>"
+                : $"<p><strong>{completedBy}</strong> completed task: <strong>{taskTitle}</strong>.</p>";
+
+            return BuildTaskNotificationEmail(title, detail, taskUrl, language);
+        }
+
+        public static string MentionedInCommentEmail(string taskTitle, string mentionerName, string commentPreview, string taskUrl, Language language = Language.Vietnamese)
+        {
+            var title = language == Language.Vietnamese ? "Bạn được nhắc trong comment" : "You were mentioned in a comment";
+            var detail = language == Language.Vietnamese
+                ? $"<p><strong>{mentionerName}</strong> đã nhắc bạn trong task <strong>{taskTitle}</strong>.</p><p>Nội dung: " +
+                  $"<em>{commentPreview}</em></p>"
+                : $"<p><strong>{mentionerName}</strong> mentioned you in task <strong>{taskTitle}</strong>.</p><p>Comment: <em>{commentPreview}</em></p>";
+
+            return BuildTaskNotificationEmail(title, detail, taskUrl, language);
+        }
+
+        public static string MentionedInGroupDiscussEmail(string groupName, string mentionerName, string messagePreview, string discussUrl, Language language = Language.Vietnamese)
+        {
+            var title = language == Language.Vietnamese ? "Bạn được nhắc trong thảo luận nhóm" : "You were mentioned in group discussion";
+            var detail = language == Language.Vietnamese
+                ? $"<p><strong>{mentionerName}</strong> đã nhắc bạn trong nhóm <strong>{groupName}</strong>.</p><p>Nội dung: <em>{messagePreview}</em></p>"
+                : $"<p><strong>{mentionerName}</strong> mentioned you in group <strong>{groupName}</strong>.</p><p>Message: <em>{messagePreview}</em></p>";
+
+            return BuildTaskNotificationEmail(title, detail, discussUrl, language);
+        }
+
+        public static string TaskDeletedEmail(string taskTitle, string deletedBy, Language language = Language.Vietnamese)
+        {
+            var title = language == Language.Vietnamese ? "Task đã bị xóa" : "Task deleted";
+            var detail = language == Language.Vietnamese
+                ? $"<p><strong>{deletedBy}</strong> đã xóa task: <strong>{taskTitle}</strong>.</p>"
+                : $"<p><strong>{deletedBy}</strong> deleted task: <strong>{taskTitle}</strong>.</p>";
+
+            return BuildTaskNotificationEmail(title, detail, null, language);
+        }
+
+        public static string TaskUnassignedEmail(string taskTitle, string unassignedBy, Language language = Language.Vietnamese)
+        {
+            var title = language == Language.Vietnamese ? "Bạn không còn được giao task" : "You were unassigned from task";
+            var detail = language == Language.Vietnamese
+                ? $"<p><strong>{unassignedBy}</strong> đã gỡ bạn khỏi task: <strong>{taskTitle}</strong>.</p>"
+                : $"<p><strong>{unassignedBy}</strong> removed you from task: <strong>{taskTitle}</strong>.</p>";
+
+            return BuildTaskNotificationEmail(title, detail, null, language);
+        }
+
+        public static string TaskOverdueEmail(string taskTitle, DateTime deadline, int overdueDays, string taskUrl, Language language = Language.Vietnamese)
+        {
+            var title = language == Language.Vietnamese ? "Task đã quá hạn" : "Task is overdue";
+            var detail = language == Language.Vietnamese
+                ? $"<p>Task <strong>{taskTitle}</strong> đã quá hạn từ <strong>{overdueDays}</strong> ngày.</p><p>Deadline: <strong>{deadline:dd/MM/yyyy HH:mm}</strong></p>"
+                : $"<p>Task <strong>{taskTitle}</strong> is overdue by <strong>{overdueDays}</strong> day(s).</p><p>Deadline: <strong>{deadline:MM/dd/yyyy HH:mm}</strong></p>";
+
+            return BuildTaskNotificationEmail(title, detail, taskUrl, language);
+        }
+
+        public static string TaskReminderEmail(string taskTitle, DateTime deadline, int hoursUntilDeadline, string taskUrl, Language language = Language.Vietnamese)
+        {
+            var title = language == Language.Vietnamese ? "Nhắc deadline task" : "Task deadline reminder";
+            var detail = language == Language.Vietnamese
+                ? $"<p>Task <strong>{taskTitle}</strong> sẽ đến hạn sau khoảng <strong>{hoursUntilDeadline}</strong> giờ.</p><p>Deadline: <strong>{deadline:dd/MM/yyyy HH:mm}</strong></p>"
+                : $"<p>Task <strong>{taskTitle}</strong> will be due in about <strong>{hoursUntilDeadline}</strong> hour(s).</p><p>Deadline: <strong>{deadline:MM/dd/yyyy HH:mm}</strong></p>";
+
+            return BuildTaskNotificationEmail(title, detail, taskUrl, language);
+        }
+
+        private static string BuildTaskNotificationEmail(string title, string detailHtml, string? actionUrl, Language language)
+        {
+            var actionText = language == Language.Vietnamese ? "Xem chi tiết" : "View details";
+            var fallback = language == Language.Vietnamese ? "Đây là email tự động từ Study Studio." : "This is an automated email from Study Studio.";
+            var buttonHtml = string.IsNullOrWhiteSpace(actionUrl)
+                ? string.Empty
+                : $@"<div style=""text-align:center;margin:28px 0;""><a href=""{actionUrl}"" style=""background:#FF5722;color:#fff;padding:12px 28px;text-decoration:none;border-radius:24px;display:inline-block;font-weight:600;"">{actionText}</a></div>";
+
+            return $@"
+<!DOCTYPE html>
+<html lang=""{(language == Language.Vietnamese ? "vi" : "en")}"">
+<head>
+  <meta charset=""UTF-8"" />
+  <meta name=""viewport"" content=""width=device-width, initial-scale=1.0"" />
+  <title>{title}</title>
+</head>
+<body style=""margin:0;padding:0;background:#f5f7fa;font-family:Arial,Helvetica,sans-serif;"">
+  <table align=""center"" width=""100%"" cellpadding=""0"" cellspacing=""0"" style=""max-width:620px;margin:40px auto;background:#ffffff;border-radius:20px;overflow:hidden;box-shadow:0 10px 30px rgba(0,0,0,0.08);"">
+    <tr>
+      <td style=""background:linear-gradient(135deg,#FF7043,#FF5722);padding:38px 30px;text-align:center;color:white;"">
+        <h1 style=""margin:0;font-size:24px;font-weight:700;"">{title}</h1>
+      </td>
+    </tr>
+    <tr>
+      <td style=""padding:34px 30px;color:#333;font-size:15px;line-height:1.7;"">
+        {detailHtml}
+        {buttonHtml}
+        <hr style=""margin:30px 0;border:none;border-top:1px solid #eee;"" />
+        <p style=""font-size:12px;color:#999;"">{fallback}</p>
+      </td>
+    </tr>
+    <tr>
+      <td style=""background:#fafafa;padding:22px;text-align:center;font-size:12px;color:#999;"">
+        © 2026 Study Studio <br/>
+        Made with care for Students
+      </td>
+    </tr>
+  </table>
+</body>
+</html>";
+        }
+
+        #endregion
+
     }
 }

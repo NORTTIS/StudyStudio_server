@@ -18,6 +18,11 @@ namespace StudioStudio_Server.Models.DTOs.Response
         public int TaskCount { get; set; }
         public string UserRole { get; set; } = string.Empty;
         public List<TaskStatusDto> TaskStatuses { get; set; } = new();
+
+        // 🔹 ADDED: Group personalization
+        public string? AvatarUrl { get; set; }
+        public string? ColorHex { get; set; }
+        public string? IconEmoji { get; set; }
     }
 
     public class TaskStatusDto

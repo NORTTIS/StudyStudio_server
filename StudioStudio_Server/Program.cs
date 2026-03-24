@@ -13,6 +13,7 @@ using StudioStudio_Server.Data;
 using StudioStudio_Server.Filters;
 using StudioStudio_Server.HealthChecks;
 using StudioStudio_Server.Hubs;
+using StudioStudio_Server.Interceptors;
 using StudioStudio_Server.Middlewares;
 using StudioStudio_Server.Models.Entities;
 using StudioStudio_Server.Repositories;
@@ -81,6 +82,8 @@ else
 
 builder.Services.AddScoped<IMessageService, MessageService>();
 builder.Services.AddScoped<IEmailService, SMTPEmailService>();
+builder.Services.AddScoped<INotificationService, NotificationService>();
+builder.Services.AddScoped<INotificationService, NotificationService>();
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
@@ -142,6 +145,7 @@ builder.Services.AddScoped<IEmbeddingService, GeminiEmbeddingService>();
 builder.Services.AddScoped<ILLMService, GeminiLLMService>();
 builder.Services.AddScoped<IGroupAttachmentRepository, GroupAttachmentRepository>();
 builder.Services.AddScoped<IDocumentService, DocumentService>();
+builder.Services.AddScoped<IAvatarService, AvatarService>();
 builder.Services.AddScoped<IAIService, AIService>();
 builder.Services.AddScoped<IAIRequestLogRepository, AIRequestLogRepository>();
 
@@ -169,6 +173,8 @@ builder.Services.AddHostedService<StudioStudio_Server.Services.BackgroundService
 builder.Services.AddHostedService<StudioStudio_Server.Services.BackgroundServices.GroupAnalyticsJob>();
 builder.Services.AddHostedService<StudioStudio_Server.Services.BackgroundServices.UserProductivityScoresJob>();
 builder.Services.AddHostedService<StudioStudio_Server.Services.BackgroundServices.TaskPerformanceMetricsJob>();
+builder.Services.AddHostedService<StudioStudio_Server.Services.BackgroundServices.TaskNotificationBackgroundService>();
+builder.Services.AddHostedService<StudioStudio_Server.Services.BackgroundServices.TaskNotificationBackgroundService>();
 
 builder.Services.AddControllers(options =>
     {
@@ -188,7 +194,8 @@ builder.Services.Configure<FormOptions>(options =>
 });
 
 builder.Services.AddDbContext<StudioDbContext>(options =>
-    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
+    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection"))
+           .AddInterceptors(new QueryCounterInterceptor()));
 
 // Add SignalR
 builder.Services.AddSignalR();
@@ -308,6 +315,7 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseMiddleware<ExceptionHandlingMiddleware>();
+app.UseQueryCounter();
 app.UseStaticFiles();
 app.UseStaticFiles(new StaticFileOptions
 {

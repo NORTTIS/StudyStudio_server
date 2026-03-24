@@ -102,6 +102,15 @@ namespace StudioStudio_Server.Repositories
         }
 
         /// <summary>
+        /// Get studio by ID with tracking (for updates)
+        /// </summary>
+        public async Task<Studio?> GetByIdForUpdateAsync(Guid studioId)
+        {
+            return await _context.Studios
+                .FirstOrDefaultAsync(s => s.StudioId == studioId && !s.IsDeleted);
+        }
+
+        /// <summary>
         /// Soft delete studio
         /// </summary>
         public async Task DeleteStudioAsync(Studio studio)
