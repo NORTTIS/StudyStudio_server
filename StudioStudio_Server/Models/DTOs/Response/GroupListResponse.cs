@@ -48,6 +48,11 @@
         public int TaskCount { get; set; }
         public DateTime LastActivityAt { get; set; }
         public List<MemberPreviewDto> MembersPreview { get; set; } = new();
+
+        // 🔹 ADDED: Group personalization
+        public string? AvatarUrl { get; set; }
+        public string? ColorHex { get; set; }
+        public string? IconEmoji { get; set; }
     }
 
     public class StudioDto

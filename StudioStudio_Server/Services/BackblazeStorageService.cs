@@ -54,6 +54,14 @@ namespace StudioStudio_Server.Services
         /// <returns>Presigned URL ho?c empty string n?u ch�a config</returns>
         public async Task<string> GeneratePresignedUploadUrlAsync(string key, int expirationMinutes = 10)
         {
+            return await GeneratePresignedUploadUrlAsync(key, _config.BucketName, expirationMinutes);
+        }
+
+        /// <summary>
+        /// T?o presigned URL cho upload file v?i bucket t�y ch?nh
+        /// </summary>
+        public async Task<string> GeneratePresignedUploadUrlAsync(string key, string bucketName, int expirationMinutes = 10)
+        {
             if (_s3Client == null)
             {
                 _logger.LogWarning("Backblaze B2 storage ch�a ��?c c?u h?nh. Kh�ng th? t?o presigned upload URL cho key: {Key}", key);
@@ -62,14 +70,14 @@ namespace StudioStudio_Server.Services
 
             GetPreSignedUrlRequest request = new GetPreSignedUrlRequest
             {
-                BucketName = _config.BucketName,
+                BucketName = bucketName,
                 Key = key,
                 Verb = HttpVerb.PUT,
                 Expires = DateTime.UtcNow.AddMinutes(expirationMinutes)
             };
 
             string url = _s3Client.GetPreSignedURL(request);
-            _logger.LogInformation("�? t?o presigned upload URL cho key: {Key}", key);
+            _logger.LogInformation("�? t?o presigned upload URL cho key: {Key}, bucket: {Bucket}", key, bucketName);
 
             return url;
         }
@@ -111,6 +119,14 @@ namespace StudioStudio_Server.Services
         /// <returns>True n?u th�nh c�ng, false n?u th?t b?i</returns>
         public async Task<bool> DeleteFileAsync(string key)
         {
+            return await DeleteFileAsync(key, _config.BucketName);
+        }
+
+        /// <summary>
+        /// X�a file v?nh vi?n kh?i Backblaze B2 v?i bucket t�y ch?nh
+        /// </summary>
+        public async Task<bool> DeleteFileAsync(string key, string bucketName)
+        {
             if (_s3Client == null)
             {
                 _logger.LogWarning("Backblaze B2 storage ch�a ��?c c?u h?nh. Kh�ng th? x�a file v?i key: {Key}", key);
@@ -119,12 +135,12 @@ namespace StudioStudio_Server.Services
 
             DeleteObjectRequest request = new DeleteObjectRequest
             {
-                BucketName = _config.BucketName,
+                BucketName = bucketName,
                 Key = key
             };
 
             DeleteObjectResponse response = await _s3Client.DeleteObjectAsync(request);
-            _logger.LogInformation("�? x�a file v?i key: {Key}", key);
+            _logger.LogInformation("�? x�a file v?i key: {Key}, bucket: {Bucket}", key, bucketName);
 
             return response.HttpStatusCode == System.Net.HttpStatusCode.NoContent;
         }
@@ -136,6 +152,14 @@ namespace StudioStudio_Server.Services
         /// <returns>True n?u file t?n t?i</returns>
         public async Task<bool> FileExistsAsync(string key)
         {
+            return await FileExistsAsync(key, _config.BucketName);
+        }
+
+        /// <summary>
+        /// Ki?m tra file c� t?n t?i trong B2 v?i bucket t�y ch?nh
+        /// </summary>
+        public async Task<bool> FileExistsAsync(string key, string bucketName)
+        {
             if (_s3Client == null)
             {
                 _logger.LogWarning("Backblaze B2 storage ch�a ��?c c?u h?nh. Kh�ng th? ki?m tra file v?i key: {Key}", key);
@@ -146,7 +170,7 @@ namespace StudioStudio_Server.Services
             {
                 GetObjectMetadataRequest request = new GetObjectMetadataRequest
                 {
-                    BucketName = _config.BucketName,
+                    BucketName = bucketName,
                     Key = key
                 };
 

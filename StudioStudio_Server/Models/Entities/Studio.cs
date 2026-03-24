@@ -17,6 +17,10 @@
         public DateTime? StartDate { get; set; }
         public DateTime? EndDate { get; set; }
 
+        // 🔹 ADDED: Studio personalization
+        public string? AvatarUrl { get; set; }
+        public string? ColorHex { get; set; }
+
         public ICollection<Group> Groups { get; set; } = new List<Group>();
         public ICollection<StudioParticipant> Participants { get; set; } = new List<StudioParticipant>();
     }

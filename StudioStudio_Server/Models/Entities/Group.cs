@@ -17,6 +17,11 @@
         // 🔹 ADDED: Admin deactivate
         public bool IsActive { get; set; } = true;
 
+        // 🔹 ADDED: Group personalization
+        public string? AvatarUrl { get; set; }
+        public string? ColorHex { get; set; }
+        public string? IconEmoji { get; set; }
+
         public ICollection<GroupParticipant> Participants { get; set; } = new List<GroupParticipant>();
 
         public ICollection<Favourite> Favourites { get; set; } = new List<Favourite>();

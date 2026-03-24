@@ -14,5 +14,9 @@ namespace StudioStudio_Server.Models.DTOs.Response
         public int GroupCount { get; set; }
         public DateTime? StartDate { get; set; }
         public DateTime? EndDate { get; set; }
+
+        // 🔹 ADDED: Studio personalization
+        public string? AvatarUrl { get; set; }
+        public string? ColorHex { get; set; }
     }
 }

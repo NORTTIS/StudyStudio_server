@@ -221,7 +221,9 @@ namespace StudioStudio_Server.Services
                 UpdatedAt = studio.UpdatedAt,
                 GroupCount = groupCount,
                 StartDate = studio.StartDate,
-                EndDate = studio.EndDate
+                EndDate = studio.EndDate,
+                AvatarUrl = studio.AvatarUrl,
+                ColorHex = studio.ColorHex
             };
         }
 
@@ -274,6 +276,22 @@ namespace StudioStudio_Server.Services
             // Normalize to UTC for PostgreSQL timestamp with time zone compatibility
             updateStudio.StartDate = studio.StartDate.HasValue ? DateTime.SpecifyKind(studio.StartDate.Value, DateTimeKind.Utc) : null;
             updateStudio.EndDate = studio.EndDate.HasValue ? DateTime.SpecifyKind(studio.EndDate.Value, DateTimeKind.Utc) : null;
+
+            // 🔹 ADDED: Validate and update personalization fields
+            if (!string.IsNullOrEmpty(studio.ColorHex))
+            {
+                if (!System.Text.RegularExpressions.Regex.IsMatch(studio.ColorHex, @"^#[0-9A-Fa-f]{6}$"))
+                {
+                    throw new AppException(ErrorCodes.ValidationInvalidColor, StatusCodes.Status400BadRequest);
+                }
+                updateStudio.ColorHex = studio.ColorHex;
+            }
+            else if (studio.ColorHex == null)
+            {
+                updateStudio.ColorHex = null;
+            }
+
+            updateStudio.AvatarUrl = studio.AvatarUrl;
             updateStudio.UpdatedAt = DateTime.UtcNow;
 
             await _studioRepository.UpdateStudioAsync(updateStudio);
@@ -284,7 +302,9 @@ namespace StudioStudio_Server.Services
                 Description = updateStudio.Description,
                 UpdatedAt = updateStudio.UpdatedAt,
                 StartDate = updateStudio.StartDate,
-                EndDate = updateStudio.EndDate
+                EndDate = updateStudio.EndDate,
+                AvatarUrl = updateStudio.AvatarUrl,
+                ColorHex = updateStudio.ColorHex
             };
         }
 

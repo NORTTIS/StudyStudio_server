@@ -145,6 +145,7 @@ builder.Services.AddScoped<IEmbeddingService, GeminiEmbeddingService>();
 builder.Services.AddScoped<ILLMService, GeminiLLMService>();
 builder.Services.AddScoped<IGroupAttachmentRepository, GroupAttachmentRepository>();
 builder.Services.AddScoped<IDocumentService, DocumentService>();
+builder.Services.AddScoped<IAvatarService, AvatarService>();
 builder.Services.AddScoped<IAIService, AIService>();
 builder.Services.AddScoped<IAIRequestLogRepository, AIRequestLogRepository>();
 

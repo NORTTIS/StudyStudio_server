@@ -143,7 +143,10 @@ namespace StudioStudio_Server.Services
                     MemberCount = groupParticipants.Count,
                     TaskCount = taskCounts.TryGetValue(g.GroupId, out var count) ? count : 0,
                     LastActivityAt = g.UpdatedAt,
-                    MembersPreview = membersPreview
+                    MembersPreview = membersPreview,
+                    AvatarUrl = g.AvatarUrl,
+                    ColorHex = g.ColorHex,
+                    IconEmoji = g.IconEmoji
                 };
             }).ToList();
 
@@ -277,6 +280,9 @@ namespace StudioStudio_Server.Services
                 MemberCount = memberCount,
                 TaskCount = taskCount,
                 UserRole = userParticipant.Role.ToString(),
+                AvatarUrl = group.AvatarUrl,
+                ColorHex = group.ColorHex,
+                IconEmoji = group.IconEmoji,
                 TaskStatuses = taskStatuses.Select(ts => new TaskStatusDto
                 {
                     StatusId = ts.StatusId,
@@ -424,6 +430,21 @@ namespace StudioStudio_Server.Services
 
             // Create new group
             var now = DateTime.UtcNow;
+
+            // 🔹 ADDED: Validate personalization fields
+            if (!string.IsNullOrEmpty(request.ColorHex))
+            {
+                if (!System.Text.RegularExpressions.Regex.IsMatch(request.ColorHex, @"^#[0-9A-Fa-f]{6}$"))
+                {
+                    throw new AppException(ErrorCodes.ValidationInvalidColor, StatusCodes.Status400BadRequest);
+                }
+            }
+
+            if (!string.IsNullOrEmpty(request.IconEmoji) && request.IconEmoji.Length > 10)
+            {
+                throw new AppException(ErrorCodes.ValidationInvalidEmoji, StatusCodes.Status400BadRequest);
+            }
+
             var newGroup = new Group
             {
                 GroupId = Guid.NewGuid(),
@@ -434,7 +455,10 @@ namespace StudioStudio_Server.Services
                 IsTemplate = false,
                 IsActive = true,
                 CreatedAt = now,
-                UpdatedAt = now
+                UpdatedAt = now,
+                AvatarUrl = request.AvatarUrl,
+                ColorHex = request.ColorHex,
+                IconEmoji = request.IconEmoji
             };
 
             await _groupRepository.AddAsync(newGroup);
@@ -532,6 +556,36 @@ namespace StudioStudio_Server.Services
             // Update description
             group.Description = request.Description;
 
+            // 🔹 ADDED: Validate and update personalization fields
+            if (!string.IsNullOrEmpty(request.ColorHex))
+            {
+                if (!System.Text.RegularExpressions.Regex.IsMatch(request.ColorHex, @"^#[0-9A-Fa-f]{6}$"))
+                {
+                    throw new AppException(ErrorCodes.ValidationInvalidColor, StatusCodes.Status400BadRequest);
+                }
+                group.ColorHex = request.ColorHex;
+            }
+            else if (request.ColorHex == null)
+            {
+                // Allow null to reset the color
+                group.ColorHex = null;
+            }
+
+            if (!string.IsNullOrEmpty(request.IconEmoji))
+            {
+                if (request.IconEmoji.Length > 10)
+                {
+                    throw new AppException(ErrorCodes.ValidationInvalidEmoji, StatusCodes.Status400BadRequest);
+                }
+                group.IconEmoji = request.IconEmoji;
+            }
+            else if (request.IconEmoji == null)
+            {
+                group.IconEmoji = null;
+            }
+
+            group.AvatarUrl = request.AvatarUrl;
+
             // Handle template creation/deactivation
             var existingTemplate = await _templateRepository.GetByGroupIdAsync(request.GroupId);
             Template? activeTemplate = null;
@@ -596,7 +650,10 @@ namespace StudioStudio_Server.Services
                 GroupType = group.StudioId.HasValue ? "Studio" : "Independent",
                 IsTemplate = activeTemplate != null,
                 TemplateId = activeTemplate?.TemplateId,
-                UpdatedAt = group.UpdatedAt
+                UpdatedAt = group.UpdatedAt,
+                AvatarUrl = group.AvatarUrl,
+                ColorHex = group.ColorHex,
+                IconEmoji = group.IconEmoji
             };
         }
 
@@ -838,7 +895,10 @@ namespace StudioStudio_Server.Services
                     MemberCount = groupParticipants.Count,
                     TaskCount = taskCounts.TryGetValue(g.GroupId, out var count) ? count : 0,
                     LastActivityAt = g.UpdatedAt,
-                    MembersPreview = membersPreview
+                    MembersPreview = membersPreview,
+                    AvatarUrl = g.AvatarUrl,
+                    ColorHex = g.ColorHex,
+                    IconEmoji = g.IconEmoji
                 };
             }).ToList();
 

@@ -119,6 +119,8 @@
         public const string ValidationFileNoDataRows = "VALIDATION018";
         public const string ValidationFileTooLarge = "VALIDATION019";
         public const string ValidationInvalidFileHeaders = "VALIDATION020";
+        public const string ValidationInvalidColor = "VALIDATION021";
+        public const string ValidationInvalidEmoji = "VALIDATION022";
 
         // BATCH
         public const string BatchGroupNameNotFound = "BATCH001";

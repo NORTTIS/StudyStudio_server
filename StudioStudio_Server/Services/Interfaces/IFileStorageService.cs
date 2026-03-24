@@ -15,6 +15,21 @@ namespace StudioStudio_Server.Services.Interfaces
         Task<string> GeneratePresignedUploadUrlAsync(string key, int expirationMinutes = 10);
 
         /// <summary>
+        /// T?o presigned URL cho upload file v?i bucket t�y ch?nh
+        /// </summary>
+        Task<string> GeneratePresignedUploadUrlAsync(string key, string bucketName, int expirationMinutes = 10);
+
+        /// <summary>
+        /// Ki?m tra file c� t?n t?i trong bucket t�y ch?nh
+        /// </summary>
+        Task<bool> FileExistsAsync(string key, string bucketName);
+
+        /// <summary>
+        /// X�a file v?nh vi?n kh?i bucket t�y ch?nh
+        /// </summary>
+        Task<bool> DeleteFileAsync(string key, string bucketName);
+
+        /// <summary>
         /// T?o presigned URL cho download file
         /// </summary>
         /// <param name="key">��?ng d?n file</param>

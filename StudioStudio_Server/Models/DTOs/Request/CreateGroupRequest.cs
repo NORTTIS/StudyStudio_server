@@ -15,5 +15,10 @@ namespace StudioStudio_Server.Models.DTOs.Request
         public string? Description { get; set; }
 
         public Guid? TemplateId { get; set; } = null;
+
+        // 🔹 ADDED: Group personalization
+        public string? AvatarUrl { get; set; }
+        public string? ColorHex { get; set; }
+        public string? IconEmoji { get; set; }
     }
 }
