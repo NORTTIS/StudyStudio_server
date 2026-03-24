@@ -95,7 +95,9 @@ namespace StudioStudio_Server.Services
                 UpdatedAt = studio.UpdatedAt,
                 GroupCount = 0,
                 StartDate = studio.StartDate,
-                EndDate = studio.EndDate
+                EndDate = studio.EndDate,
+                AvatarUrl = studio.AvatarUrl,
+                ColorHex = studio.ColorHex
             }).ToList();
 
             foreach (var response in studioResponses)

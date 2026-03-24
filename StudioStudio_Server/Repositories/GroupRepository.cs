@@ -174,6 +174,16 @@ namespace StudioStudio_Server.Repositories
         }
 
         /// <summary>
+        /// Get group by ID with tracking (for updates)
+        /// Condition: GroupId = {groupId} AND IsActive = true
+        /// </summary>
+        public async Task<Group?> GetByIdForUpdateAsync(Guid groupId)
+        {
+            return await _db.Groups
+                .FirstOrDefaultAsync(g => g.GroupId == groupId && g.IsActive);
+        }
+
+        /// <summary>
         /// Soft delete group
         /// Set IsActive = false, UpdatedAt = UtcNow
         /// Note: Participants, tasks, messages remain in database

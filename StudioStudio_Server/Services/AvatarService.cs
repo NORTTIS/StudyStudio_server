@@ -92,7 +92,7 @@ namespace StudioStudio_Server.Services
         public async Task<AvatarUploadResponse> RequestGroupAvatarUploadAsync(
             Guid userId, Guid groupId, RequestAvatarUploadRequest request)
         {
-            // Check if group exists
+            // Check if group exists (with tracking for avatar URL access)
             var group = await _groupRepository.GetByIdAsync(groupId);
             if (group == null)
             {
@@ -161,7 +161,7 @@ namespace StudioStudio_Server.Services
         public async Task<AvatarUploadResponse> RequestStudioAvatarUploadAsync(
             Guid userId, Guid studioId, RequestAvatarUploadRequest request)
         {
-            // Check if studio exists
+            // Check if studio exists (with tracking for avatar URL access)
             var studio = await _studioRepository.GetByIdAsync(studioId);
             if (studio == null)
             {
@@ -228,8 +228,8 @@ namespace StudioStudio_Server.Services
         public async Task CompleteGroupAvatarUploadAsync(
             Guid userId, Guid groupId, CompleteAvatarUploadRequest request)
         {
-            // Check if group exists
-            var group = await _groupRepository.GetByIdAsync(groupId);
+            // Check if group exists (with tracking for update)
+            var group = await _groupRepository.GetByIdForUpdateAsync(groupId);
             if (group == null)
             {
                 throw new AppException(ErrorCodes.GroupNotFound, StatusCodes.Status404NotFound);
@@ -263,8 +263,8 @@ namespace StudioStudio_Server.Services
         public async Task CompleteStudioAvatarUploadAsync(
             Guid userId, Guid studioId, CompleteAvatarUploadRequest request)
         {
-            // Check if studio exists
-            var studio = await _studioRepository.GetByIdAsync(studioId);
+            // Check if studio exists (with tracking for update)
+            var studio = await _studioRepository.GetByIdForUpdateAsync(studioId);
             if (studio == null)
             {
                 throw new AppException(ErrorCodes.StudioNotFound, StatusCodes.Status404NotFound);
@@ -299,7 +299,7 @@ namespace StudioStudio_Server.Services
 
         public async Task DeleteGroupAvatarAsync(Guid userId, Guid groupId)
         {
-            var group = await _groupRepository.GetByIdAsync(groupId);
+            var group = await _groupRepository.GetByIdForUpdateAsync(groupId);
             if (group == null)
             {
                 throw new AppException(ErrorCodes.GroupNotFound, StatusCodes.Status404NotFound);
@@ -336,7 +336,7 @@ namespace StudioStudio_Server.Services
 
         public async Task DeleteStudioAvatarAsync(Guid userId, Guid studioId)
         {
-            var studio = await _studioRepository.GetByIdAsync(studioId);
+            var studio = await _studioRepository.GetByIdForUpdateAsync(studioId);
             if (studio == null)
             {
                 throw new AppException(ErrorCodes.StudioNotFound, StatusCodes.Status404NotFound);
