@@ -1,5 +1,6 @@
 ﻿using Microsoft.Extensions.Options;
 using StudioStudio_Server.Configurations;
+using StudioStudio_Server.Repositories.Interfaces;
 using StudioStudio_Server.Services.Interfaces;
 using System.Net;
 using System.Net.Mail;
@@ -9,18 +10,23 @@ namespace StudioStudio_Server.Services
     public class SMTPEmailService : IEmailService
     {
         private readonly EmailOptions _emailOptions;
+        private readonly IUserRepository _userRepository;
         private readonly ILogger<SMTPEmailService> _logger;
 
-        public SMTPEmailService(IOptions<EmailOptions> emailOptions, ILogger<SMTPEmailService> logger)
+        public SMTPEmailService(
+            IOptions<EmailOptions> emailOptions,
+            IUserRepository userRepository,
+            ILogger<SMTPEmailService> logger)
         {
             _emailOptions = emailOptions.Value;
+            _userRepository = userRepository;
             _logger = logger;
         }
-        
+
         public async Task SendLinkAsync(string to, string subject, string body)
         {
             // Skip sending email if SMTP is not configured
-            if (string.IsNullOrEmpty(_emailOptions.Host) || 
+            if (string.IsNullOrEmpty(_emailOptions.Host) ||
                 string.IsNullOrEmpty(_emailOptions.From))
             {
                 _logger.LogWarning("Email service is not configured. Skipping email to {To} with subject: {Subject}", to, subject);
@@ -48,6 +54,37 @@ namespace StudioStudio_Server.Services
 
             await smtp.SendMailAsync(message);
             _logger.LogInformation("Email sent successfully to {To}", to);
+        }
+
+        public async Task<bool> SendEmailWithPreferenceCheckAsync(string to, string subject, string body, Guid userId)
+        {
+            // Check user's email notification preference
+            var user = await _userRepository.GetByIdAsync(userId);
+            if (user != null && !user.EmailNotificationEnabled)
+            {
+                _logger.LogInformation(
+                    "Skipping email to {To} because user {UserId} has email notifications disabled",
+                    to, userId);
+                return false;
+            }
+
+            // User has notifications enabled or user not found (default to sending)
+            await SendLinkAsync(to, subject, body);
+            return true;
+        }
+
+        public async Task<bool> SendEmailWithPreferenceCheckAsync(string to, string subject, string body, Models.Entities.User user)
+        {
+            if (!user.EmailNotificationEnabled)
+            {
+                _logger.LogInformation(
+                    "Skipping email to {To} because user {UserId} has email notifications disabled",
+                    to, user.UserId);
+                return false;
+            }
+
+            await SendLinkAsync(to, subject, body);
+            return true;
         }
     }
 }

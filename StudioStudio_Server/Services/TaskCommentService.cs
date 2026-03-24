@@ -25,6 +25,7 @@ namespace StudioStudio_Server.Services
         private readonly IUserAnnouncementService _userAnnouncementService;
         private readonly IGroupRepository _groupRepository;
         private readonly IMessageService _messageService;
+        private readonly INotificationService _notificationService;
         private readonly ILogger<TaskCommentService> _logger;
         private readonly IHttpContextAccessor _httpContextAccessor;
         private readonly IActivityLogService _activityLogService;
@@ -38,6 +39,7 @@ namespace StudioStudio_Server.Services
             IUserAnnouncementService userAnnouncementService,
             IGroupRepository groupRepository,
             IMessageService messageService,
+            INotificationService notificationService,
             ILogger<TaskCommentService> logger,
             IHttpContextAccessor httpContextAccessor,
             IActivityLogService activityLogService)
@@ -50,6 +52,7 @@ namespace StudioStudio_Server.Services
             _userAnnouncementService = userAnnouncementService;
             _groupRepository = groupRepository;
             _messageService = messageService;
+            _notificationService = notificationService;
             _logger = logger;
             _httpContextAccessor = httpContextAccessor;
             _activityLogService = activityLogService;
@@ -290,6 +293,13 @@ namespace StudioStudio_Server.Services
                 };
 
                 await _userAnnouncementService.AddAnnouncementAsync(userAnnouncement);
+
+                await _notificationService.NotifyMentionedInCommentAsync(
+                    taggedUserId,
+                    taskId,
+                    task!.Title,
+                    senderId,
+                    ExtractPlainText(content));
             }
 
             _logger.LogInformation(

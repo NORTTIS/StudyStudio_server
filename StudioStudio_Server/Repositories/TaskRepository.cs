@@ -213,38 +213,63 @@ namespace StudioStudio_Server.Repositories
 
         public async Task<Dictionary<Guid, List<TaskItem>>> GetListTasksByListStatusId(List<Guid> listStatusIds)
         {
-            Dictionary<Guid, List<TaskItem>> result = new Dictionary<Guid, List<TaskItem>>();
-
-            foreach (var statusId in listStatusIds)
+            if (listStatusIds == null || listStatusIds.Count == 0)
             {
-                var tasks = await _context.Tasks
-                    .Where(t => t.GroupStatusId == statusId && !t.IsPendingDeleted)
-                    .AsNoTracking()
-                    .OrderBy(t => t.Position)
-                    .ToListAsync();
-
-                result[statusId] = tasks;
+                return new Dictionary<Guid, List<TaskItem>>();
             }
+
+            // Single set-based query instead of N+1 per-status loops
+            var allTasks = await _context.Tasks
+                .Where(t => t.GroupStatusId.HasValue
+                          && listStatusIds.Contains(t.GroupStatusId.Value)
+                          && !t.IsPendingDeleted)
+                .AsNoTracking()
+                .OrderBy(t => t.GroupStatusId)
+                .ThenBy(t => t.Position)
+                .ToListAsync();
+
+            // Group in-memory by statusId (ordered from SQL)
+            var grouped = allTasks
+                .GroupBy(t => t.GroupStatusId!.Value)
+                .ToDictionary(g => g.Key, g => g.ToList());
+
+            // Keep all requested statuses in result, including empty ones
+            var result = listStatusIds.ToDictionary(
+                statusId => statusId,
+                statusId => grouped.TryGetValue(statusId, out var tasks) ? tasks : new List<TaskItem>()
+            );
 
             return result;
         }
 
         public async Task<Dictionary<Guid, List<TaskItem>>> GetPersonalListTasksByListStatusId(List<Guid> listStatusIds)
         {
-            Dictionary<Guid, List<TaskItem>> result = new Dictionary<Guid, List<TaskItem>>();
-
-            foreach (var statusId in listStatusIds)
+            if (listStatusIds == null || listStatusIds.Count == 0)
             {
-                var tasks = await _context.Tasks
-                    .Where(t => t.PersonalStatusId == statusId
-                             && !t.GroupId.HasValue
-                             && !t.IsPendingDeleted)
-                    .AsNoTracking()
-                    .OrderBy(t => t.Position)
-                    .ToListAsync();
-
-                result[statusId] = tasks;
+                return new Dictionary<Guid, List<TaskItem>>();
             }
+
+            // Single set-based query instead of N+1 per-status loops
+            var allTasks = await _context.Tasks
+                .Where(t => t.PersonalStatusId.HasValue
+                         && listStatusIds.Contains(t.PersonalStatusId.Value)
+                         && !t.GroupId.HasValue
+                         && !t.IsPendingDeleted)
+                .AsNoTracking()
+                .OrderBy(t => t.PersonalStatusId)
+                .ThenBy(t => t.Position)
+                .ToListAsync();
+
+            // Group in-memory by statusId (ordered from SQL)
+            var grouped = allTasks
+                .GroupBy(t => t.PersonalStatusId!.Value)
+                .ToDictionary(g => g.Key, g => g.ToList());
+
+            // Keep all requested statuses in result, including empty ones
+            var result = listStatusIds.ToDictionary(
+                statusId => statusId,
+                statusId => grouped.TryGetValue(statusId, out var tasks) ? tasks : new List<TaskItem>()
+            );
 
             return result;
         }

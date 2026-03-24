@@ -31,6 +31,7 @@ namespace StudioStudio_Server.Hubs
         private readonly IAnnouncementRepository _announcementRepository;
         private readonly IUserAnnouncementService _userAnnouncementService;
         private readonly IGroupRepository _groupRepository;
+        private readonly INotificationService _notificationService;
         private readonly ILogger<GroupDiscussHub> _logger;
         private readonly IHttpContextAccessor _httpContextAccessor;
         private readonly IActivityLogService _activityLogService;
@@ -43,6 +44,7 @@ namespace StudioStudio_Server.Hubs
             IAnnouncementRepository announcementRepository,
             IUserAnnouncementService userAnnouncementService,
             IGroupRepository groupRepository,
+            INotificationService notificationService,
             ILogger<GroupDiscussHub> logger,
             IHttpContextAccessor httpContextAccessor,
             IActivityLogService activityLogService)
@@ -54,6 +56,7 @@ namespace StudioStudio_Server.Hubs
             _announcementRepository = announcementRepository;
             _userAnnouncementService = userAnnouncementService;
             _groupRepository = groupRepository;
+            _notificationService = notificationService;
             _logger = logger;
             _httpContextAccessor = httpContextAccessor;
             _activityLogService = activityLogService;
@@ -188,6 +191,12 @@ namespace StudioStudio_Server.Hubs
                 };
 
                 await _userAnnouncementService.AddAnnouncementAsync(userAnnouncement);
+                await _notificationService.NotifyMentionedInGroupDiscussAsync(
+                    taggedUserId,
+                    groupId,
+                    senderId,
+                    group.GroupName,
+                    ExtractPlainText(content));
                 await Clients.User(taggedUserId.ToString()).SendAsync("ReceiveAnnouncement", announcement);
             }
 

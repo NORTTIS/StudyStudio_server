@@ -23,6 +23,7 @@ namespace StudioStudio_Server.Services
         private readonly IPersonalTaskStatusRepository _personalTaskStatusRepository;
         private readonly IHttpContextAccessor _httpContextAccessor;
         private readonly IActivityLogService _activityLogService;
+        private readonly INotificationService _notificationService;
 
         public TaskService(
             ITaskRepository taskRepository,
@@ -34,7 +35,8 @@ namespace StudioStudio_Server.Services
             IUserRepository userRepository,
             IPersonalTaskStatusRepository personalTaskStatusRepository,
             IHttpContextAccessor httpContextAccessor,
-            IActivityLogService activityLogService)
+            IActivityLogService activityLogService,
+            INotificationService notificationService)
         {
             _taskRepository = taskRepository;
             _logger = logger;
@@ -46,6 +48,7 @@ namespace StudioStudio_Server.Services
             _personalTaskStatusRepository = personalTaskStatusRepository;
             _httpContextAccessor = httpContextAccessor;
             _activityLogService = activityLogService;
+            _notificationService = notificationService;
         }
 
         /// <summary>
@@ -197,6 +200,14 @@ namespace StudioStudio_Server.Services
 
                 // Log task assignment activity
                 await _activityLogService.LogTaskAssignAsync(userId, taskItem.TaskId, assigneeDetail.Id, taskItem.GroupId);
+
+                // Notify assignment
+                await _notificationService.NotifyTaskAssignedAsync(
+                    assigneeDetail.Id,
+                    taskItem.TaskId,
+                    userId,
+                    taskItem.Title,
+                    taskItem.DueDate);
             }
             return new TaskItemResponse
             {
@@ -242,11 +253,26 @@ namespace StudioStudio_Server.Services
                 throw new AppException(ErrorCodes.TaskNotFound, StatusCodes.Status404NotFound);
             }
 
+            // ============================================================
+            // PHASE 2 OPTIMIZATION: Preload all statuses in one call
+            // ============================================================
+            var statusIdsToLoad = new List<Guid>();
+            if (request.GroupStatusId.HasValue)
+                statusIdsToLoad.Add(request.GroupStatusId.Value);
+            if (task.GroupStatusId.HasValue)
+                statusIdsToLoad.Add(task.GroupStatusId.Value);
+            var statusMap = new Dictionary<Guid, GroupTaskStatus>();
+            if (statusIdsToLoad.Count > 0)
+            {
+                var statuses = await _groupTaskStatusRepository.GetByIdsAndGroupIdAsync(
+                    statusIdsToLoad.Distinct().ToList(), groupId);
+                statusMap = statuses.ToDictionary(s => s.StatusId);
+            }
+
             // Validate GroupStatusId if provided
             if (request.GroupStatusId.HasValue)
             {
-                var statusExists = await _groupTaskStatusRepository.GetDetailAsync(request.GroupStatusId.Value);
-                if (statusExists == null || statusExists.GroupId != groupId)
+                if (!statusMap.TryGetValue(request.GroupStatusId.Value, out var statusExists) || statusExists.GroupId != groupId)
                 {
                     throw new AppException(ErrorCodes.GroupStatusNotFound, StatusCodes.Status404NotFound);
                 }
@@ -324,9 +350,22 @@ namespace StudioStudio_Server.Services
                 }
             }
 
+            string? oldStatusName = null;
+            string? newStatusName = null;
+
             // Update GroupStatusId if provided
             if (request.GroupStatusId.HasValue)
             {
+                if (task.GroupStatusId.HasValue && statusMap.TryGetValue(task.GroupStatusId.Value, out var oldStatus))
+                {
+                    oldStatusName = oldStatus.StatusName;
+                }
+
+                if (statusMap.TryGetValue(request.GroupStatusId.Value, out var newStatus))
+                {
+                    newStatusName = newStatus.StatusName;
+                }
+
                 task.GroupStatusId = request.GroupStatusId.Value;
             }
 
@@ -343,25 +382,62 @@ namespace StudioStudio_Server.Services
 
             await _taskRepository.UpdateAsync(task);
 
-            // Handle assignee update if provided
+            // ============================================================
+            // PHASE 2 OPTIMIZATION: Get existing assignments ONCE and reuse
+            // ============================================================
+            var existingAssignments = await _taskAssignmentRepository.GetAssigneesByTaskId(taskId);
+            var oldAssigneeId = existingAssignments.FirstOrDefault()?.AssignedTo;
+
+            // ============================================================
+            // PHASE 2 OPTIMIZATION: Collect all user IDs needed for
+            // notifications, then batch-load them
+            // ============================================================
+            var userIdsForNotifications = new List<Guid>();
+
+            // Add current user for "changedBy" notification
+            userIdsForNotifications.Add(userId);
+
+            // Add old assignee for unassign notification
+            if (oldAssigneeId.HasValue)
+                userIdsForNotifications.Add(oldAssigneeId.Value);
+
+            // Add new assignee for assign notification
+            if (request.AssigneeId.HasValue && request.AssigneeId.Value != Guid.Empty)
+                userIdsForNotifications.Add(request.AssigneeId.Value);
+
+            var userDict = new Dictionary<Guid, User>();
+            if (userIdsForNotifications.Count > 0)
+            {
+                var users = await _userRepository.GetByIdsAsync(userIdsForNotifications.Distinct().ToList());
+                userDict = users.ToDictionary(u => u.UserId);
+            }
+
+            // ============================================================
+            // HANDLE ASSIGNEE UPDATE
+            // ============================================================
             if (request.AssigneeId.HasValue)
             {
-                // Get existing assignments
-                var existingAssignments = await _taskAssignmentRepository.GetAssigneesByTaskId(taskId);
-
                 // If AssigneeId is Guid.Empty, remove all assignments
                 if (request.AssigneeId.Value == Guid.Empty)
                 {
                     if (existingAssignments.Any())
                     {
                         await _taskAssignmentRepository.RemoveAsync(existingAssignments);
+
+                        if (oldAssigneeId.HasValue)
+                        {
+                            await _notificationService.NotifyTaskUnassignedAsync(
+                                oldAssigneeId.Value,
+                                taskId,
+                                task.Title,
+                                userId);
+                        }
                     }
                 }
                 else
                 {
-                    // Validate new assignee exists
-                    var newAssignee = await _userRepository.GetByIdAsync(request.AssigneeId.Value);
-                    if (newAssignee == null)
+                    // Validate new assignee exists (use preloaded user)
+                    if (!userDict.TryGetValue(request.AssigneeId.Value, out var newAssignee) || newAssignee == null)
                     {
                         throw new AppException(ErrorCodes.UserNotFound, StatusCodes.Status404NotFound);
                     }
@@ -386,31 +462,82 @@ namespace StudioStudio_Server.Services
                             AssignedAt = DateTime.UtcNow,
                             TaskId = taskId
                         });
+
+                        if (oldAssigneeId.HasValue)
+                        {
+                            await _notificationService.NotifyTaskReassignedAsync(
+                                request.AssigneeId.Value,
+                                oldAssigneeId.Value,
+                                taskId,
+                                userId,
+                                task.Title);
+                        }
+                        else
+                        {
+                            await _notificationService.NotifyTaskAssignedAsync(
+                                request.AssigneeId.Value,
+                                taskId,
+                                userId,
+                                task.Title,
+                                task.DueDate);
+                        }
                     }
                 }
             }
 
-            // Prepare response
-            var groupStatus = task.GroupStatusId.HasValue
-                ? await _groupTaskStatusRepository.GetDetailAsync(task.GroupStatusId.Value)
-                : null;
-
-            var assignmentList = await _taskAssignmentRepository.GetAssigneesByTaskId(taskId);
-            var assignment = assignmentList.FirstOrDefault();
-            var assigneeDetail = new UserDto();
-
-            if (assignment != null)
+            // Status change notification (reuse oldAssigneeId from existingAssignments)
+            if (!string.IsNullOrWhiteSpace(oldStatusName) && !string.IsNullOrWhiteSpace(newStatusName) && oldStatusName != newStatusName)
             {
-                var assignee = await _userRepository.GetByIdAsync(assignment.AssignedTo);
-                if (assignee != null)
+                if (oldAssigneeId.HasValue)
                 {
-                    assigneeDetail = new UserDto
-                    {
-                        Id = assignee.UserId,
-                        FirstName = assignee.FirstName,
-                        LastName = assignee.LastName
-                    };
+                    userDict.TryGetValue(userId, out var changedByUser);
+                    var changedBy = changedByUser != null ? $"{changedByUser.FirstName} {changedByUser.LastName}".Trim() : "A user";
+
+                    await _notificationService.NotifyTaskStatusChangedAsync(
+                        oldAssigneeId.Value,
+                        taskId,
+                        oldStatusName,
+                        newStatusName,
+                        changedBy);
                 }
+            }
+
+            // Task completion notification (reuse oldAssigneeId)
+            if (request.Progress.HasValue && request.Progress.Value == 100)
+            {
+                if (oldAssigneeId.HasValue)
+                {
+                    await _notificationService.NotifyTaskCompletedAsync(
+                        oldAssigneeId.Value,
+                        taskId,
+                        task.Title,
+                        userId);
+                }
+            }
+
+            // ============================================================
+            // PREPARE RESPONSE: reuse preloaded data
+            // ============================================================
+            GroupTaskStatusDto? groupStatusDto = null;
+            if (task.GroupStatusId.HasValue && statusMap.TryGetValue(task.GroupStatusId.Value, out var groupStatus))
+            {
+                groupStatusDto = new GroupTaskStatusDto
+                {
+                    GroupId = groupId,
+                    StatusName = groupStatus.StatusName,
+                    Position = groupStatus.Position
+                };
+            }
+
+            UserDto assigneeDetail = new UserDto();
+            if (oldAssigneeId.HasValue && userDict.TryGetValue(oldAssigneeId.Value, out var assigneeUser) && assigneeUser != null)
+            {
+                assigneeDetail = new UserDto
+                {
+                    Id = assigneeUser.UserId,
+                    FirstName = assigneeUser.FirstName,
+                    LastName = assigneeUser.LastName
+                };
             }
 
             return new TaskItemResponse
@@ -426,12 +553,7 @@ namespace StudioStudio_Server.Services
                 CreatedAt = task.CreatedAt,
                 StartDate = task.StartDate,
                 DueDate = task.DueDate,
-                GroupStatus = groupStatus != null ? new GroupTaskStatusDto
-                {
-                    GroupId = groupId,
-                    StatusName = groupStatus.StatusName,
-                    Position = groupStatus.Position
-                } : null,
+                GroupStatus = groupStatusDto,
                 Assignee = assigneeDetail,
                 EstimatedHours = task.EstimatedHours,
                 ActualHours = task.ActualHours,
@@ -446,8 +568,31 @@ namespace StudioStudio_Server.Services
                 throw new AppException(ErrorCodes.GroupDeleteTaskDenined, StatusCodes.Status403Forbidden);
             }
 
+            var task = await _taskRepository.GetByIdAsync(taskId);
+            if (task == null)
+            {
+                throw new AppException(ErrorCodes.TaskNotFound, StatusCodes.Status404NotFound);
+            }
+
             await _taskRepository.SoftDeleteAsync(taskId);
             await _activityLogService.LogTaskDeleteAsync(userId, taskId, groupId);
+
+            // Only notify Owner/Moderator of the group for soft-delete review workflow
+            var participants = await _participantRepository.GetAllByGroupIdAsync(groupId);
+            var reviewerIds = participants
+                .Where(p => p.Role == GroupRole.Owner || p.Role == GroupRole.Moderator)
+                .Select(p => p.UserId)
+                .Distinct()
+                .ToList();
+
+            foreach (var reviewerId in reviewerIds)
+            {
+                await _notificationService.NotifyTaskDeletedAsync(
+                    reviewerId,
+                    taskId,
+                    task.Title,
+                    userId);
+            }
         }
 
         public async Task DeletePersonalTaskAsync(Guid userId, Guid taskId)
