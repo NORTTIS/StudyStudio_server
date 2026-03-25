@@ -136,10 +136,29 @@ namespace StudioStudio_Server.Controllers
         // ==================== GROUP ANALYTICS ====================
 
         /// <summary>
-        /// Get group analytics dashboard
+        /// Get group summary (all time, no date filter)
+        /// Returns task breakdown, activity summary, and contribution data
         /// </summary>
-        [HttpGet("group/{groupId}")]
-        public async Task<ActionResult<ApiResponse<GroupAnalyticsResponse>>> GetGroupAnalytics(
+        [HttpGet("group/{groupId}/summary")]
+        public async Task<ActionResult<ApiResponse<GroupSummaryResponse>>> GetGroupSummary(
+            Guid groupId)
+        {
+            var userId = ValidateAndGetUserId();
+
+            var result = await _analyticsService.GetGroupSummaryAsync(groupId, userId);
+            var message = _messageService.GetMessage(ErrorCodes.SuccessGetData);
+
+            return Ok(ApiResponse<GroupSummaryResponse>.Success(
+                ErrorCodes.SuccessGetData,
+                message,
+                result));
+        }
+
+        /// <summary>
+        /// Get member progress trend with date filter
+        /// </summary>
+        [HttpGet("group/{groupId}/trend")]
+        public async Task<ActionResult<ApiResponse<List<MemberProgressTrendData>>>> GetMemberProgressTrend(
             Guid groupId,
             [FromQuery] DateTime? startDate = null,
             [FromQuery] DateTime? endDate = null)
@@ -149,17 +168,40 @@ namespace StudioStudio_Server.Controllers
             DateOnly? start = startDate.HasValue ? DateOnly.FromDateTime(startDate.Value) : null;
             DateOnly? end = endDate.HasValue ? DateOnly.FromDateTime(endDate.Value) : null;
 
-            var result = await _analyticsService.GetGroupAnalyticsAsync(groupId, userId, start, end);
+            var result = await _analyticsService.GetMemberProgressTrendAsync(groupId, start, end);
             var message = _messageService.GetMessage(ErrorCodes.SuccessGetData);
 
-            return Ok(ApiResponse<GroupAnalyticsResponse>.Success(
+            return Ok(ApiResponse<List<MemberProgressTrendData>>.Success(
                 ErrorCodes.SuccessGetData,
                 message,
                 result));
         }
 
         /// <summary>
-        /// Get group member contributions
+        /// Get member heatmap with date filter
+        /// </summary>
+        [HttpGet("group/{groupId}/heatmap")]
+        public async Task<ActionResult<ApiResponse<List<MemberHeatmapData>>>> GetMemberHeatmap(
+            Guid groupId,
+            [FromQuery] DateTime? startDate = null,
+            [FromQuery] DateTime? endDate = null)
+        {
+            var userId = ValidateAndGetUserId();
+
+            DateOnly? start = startDate.HasValue ? DateOnly.FromDateTime(startDate.Value) : null;
+            DateOnly? end = endDate.HasValue ? DateOnly.FromDateTime(endDate.Value) : null;
+
+            var result = await _analyticsService.GetMemberHeatmapAsync(groupId, start, end);
+            var message = _messageService.GetMessage(ErrorCodes.SuccessGetData);
+
+            return Ok(ApiResponse<List<MemberHeatmapData>>.Success(
+                ErrorCodes.SuccessGetData,
+                message,
+                result));
+        }
+
+        /// <summary>
+        /// Get group member contributions (kept for backward compatibility)
         /// </summary>
         [HttpGet("group/{groupId}/members")]
         public async Task<ActionResult<ApiResponse<List<MemberContributionData>>>> GetGroupMemberContribution(

@@ -15,19 +15,22 @@ namespace StudioStudio_Server.Services.Interfaces
         Task<List<ActivityLog>> GetTaskDeleteLogsAsync(List<Guid> taskIds);
 
         /// <summary>
-        /// Log task creation activity
+        /// Log task creation activity with priority/severity for weighted contribution scoring
         /// </summary>
-        Task LogTaskCreateAsync(Guid userId, Guid taskId, Guid? groupId, Guid? studioId);
+        Task LogTaskCreateAsync(Guid userId, Guid taskId, Guid? groupId, Guid? studioId,
+            int priority = 0, int severity = 0);
 
         /// <summary>
         /// Log task update activity
         /// </summary>
-        Task LogTaskUpdateAsync(Guid userId, Guid taskId, Guid? groupId, Guid? studioId, string field, string? oldValue, string? newValue);
+        Task LogTaskUpdateAsync(Guid userId, Guid taskId, Guid? groupId, Guid? studioId,
+            int priority = 0, int severity = 0, string? field = null, string? oldValue = null, string? newValue = null);
 
         /// <summary>
-        /// Log task completion activity
+        /// Log task completion activity with priority/severity for weighted contribution scoring
         /// </summary>
-        Task LogTaskCompleteAsync(Guid userId, Guid taskId, Guid? groupId);
+        Task LogTaskCompleteAsync(Guid userId, Guid taskId, Guid? groupId,
+            int priority = 0, int severity = 0);
 
         /// <summary>
         /// Log task assignment activity
@@ -57,6 +60,7 @@ namespace StudioStudio_Server.Services.Interfaces
         /// <summary>
         /// Log task delete activity
         /// </summary>
-        Task LogTaskDeleteAsync(Guid userId, Guid taskId, Guid? groupId);
+        Task LogTaskDeleteAsync(Guid userId, Guid taskId, Guid? groupId,
+            int priority = 0, int severity = 0);
     }
 }

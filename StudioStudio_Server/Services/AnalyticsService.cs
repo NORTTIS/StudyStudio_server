@@ -164,7 +164,7 @@ namespace StudioStudio_Server.Services
         // ==================== GROUP ANALYTICS ====================
 
         /// <summary>
-        /// Get group analytics dashboard
+        /// Get group analytics dashboard — now includes all data for GroupAnalyticPage
         /// </summary>
         public async Task<GroupAnalyticsResponse> GetGroupAnalyticsAsync(Guid groupId, Guid userId, DateOnly? startDate, DateOnly? endDate)
         {
@@ -178,10 +178,15 @@ namespace StudioStudio_Server.Services
             if (!isMember)
                 throw new AppException(Exceptions.ErrorCodes.GroupPermissionDenied, StatusCodes.Status403Forbidden);
 
+            // Run all data fetches sequentially (avoids DbContext concurrency issues)
             var progress = await GetGroupProgressAsync(groupId, start, end);
             var performanceRadar = await GetGroupPerformanceRadarAsync(groupId);
             var memberContribution = await GetGroupMemberContributionAsync(groupId);
             var activityHeatmap = await GetGroupActivityHeatmapAsync(groupId, 30);
+            var memberTaskBreakdown = await GetMemberTaskBreakdownAsync(groupId, start, end);
+            var memberProgressTrend = await GetMemberProgressTrendAsync(groupId, start, end);
+            var memberHeatmap = await GetMemberHeatmapAsync(groupId, start, end);
+            var memberActivitySummary = await GetMemberActivitySummaryAsync(groupId, start, end);
 
             // Calculate completion rate
             var latestProgress = progress.LastOrDefault();
@@ -193,16 +198,142 @@ namespace StudioStudio_Server.Services
                 Progress = progress,
                 PerformanceRadar = performanceRadar,
                 MemberContribution = memberContribution,
-                ActivityHeatmap = activityHeatmap
+                ActivityHeatmap = activityHeatmap,
+                // New fields for GroupAnalyticPage
+                MemberTaskBreakdown = memberTaskBreakdown,
+                MemberProgressTrend = memberProgressTrend,
+                MemberHeatmap = memberHeatmap,
+                MemberActivitySummary = memberActivitySummary
             };
         }
 
         /// <summary>
-        /// Get group member contributions
+        /// Get group summary without date filter (all time) - for Chart 1, 2, 4, 6
+        /// </summary>
+        public async Task<GroupSummaryResponse> GetGroupSummaryAsync(Guid groupId, Guid userId)
+        {
+            // Check if user is member of the group
+            var isMember = await _context.GroupParticipants
+                .AnyAsync(p => p.GroupId == groupId && p.UserId == userId);
+
+            if (!isMember)
+                throw new AppException(Exceptions.ErrorCodes.GroupPermissionDenied, StatusCodes.Status403Forbidden);
+
+            // Query all time data (no date filter)
+            var memberTaskBreakdown = await GetMemberTaskBreakdownAllTimeAsync(groupId);
+            var memberActivitySummary = await GetMemberActivitySummaryAllTimeAsync(groupId);
+            var memberContribution = await GetGroupMemberContributionAsync(groupId);
+
+            return new GroupSummaryResponse
+            {
+                MemberTaskBreakdown = memberTaskBreakdown,
+                MemberActivitySummary = memberActivitySummary,
+                MemberContribution = memberContribution
+            };
+        }
+
+        private async Task<List<MemberTaskBreakdownData>> GetMemberTaskBreakdownAllTimeAsync(Guid groupId)
+        {
+            var breakdown = await _analyticsRepository.GetMemberTaskStatusBreakdownAllTimeAsync(groupId);
+
+            var memberUserIds = await _context.GroupParticipants
+                .Where(p => p.GroupId == groupId)
+                .Select(p => p.UserId)
+                .ToListAsync();
+
+            var users = await _context.Users
+                .Where(u => memberUserIds.Contains(u.UserId))
+                .Select(u => new { u.UserId, FullName = u.FirstName + " " + u.LastName })
+                .ToDictionaryAsync(u => u.UserId, u => u.FullName);
+
+            // Get messages sent per member
+            var messagesSent = await _context.GroupMessages
+                .Where(m => m.GroupId == groupId)
+                .GroupBy(m => m.UserId)
+                .Select(g => new { UserId = g.Key, Count = g.Count() })
+                .ToDictionaryAsync(x => x.UserId, x => x.Count);
+
+            var totalDone = breakdown.Values.Sum(b => b.Done);
+            var totalInProgress = breakdown.Values.Sum(b => b.InProgress);
+            var totalTodo = breakdown.Values.Sum(b => b.Todo);
+            var totalOverdue = breakdown.Values.Sum(b => b.Overdue);
+            var totalActivity = totalDone + totalInProgress + totalTodo + totalOverdue;
+
+            var result = memberUserIds.Select(userId =>
+            {
+                var (done, inProgress, todo, overdue, total) = breakdown.GetValueOrDefault(userId, (0, 0, 0, 0, 0));
+                var contribution = totalActivity > 0
+                    ? Math.Round((double)(done + inProgress + todo + overdue) / totalActivity * 100, 2)
+                    : 0;
+
+                return new MemberTaskBreakdownData
+                {
+                    UserId = userId,
+                    UserName = users.GetValueOrDefault(userId, "Unknown"),
+                    TotalTasks = total,
+                    DoneTasks = done,
+                    InProgressTasks = inProgress,
+                    TodoTasks = todo,
+                    OverdueTasks = overdue,
+                    ContributionPercentage = contribution,
+                    MessagesSent = messagesSent.GetValueOrDefault(userId, 0)
+                };
+            }).ToList();
+
+            return result.OrderByDescending(r => r.DoneTasks).ToList();
+        }
+
+        private async Task<List<MemberActivitySummary>> GetMemberActivitySummaryAllTimeAsync(Guid groupId)
+        {
+            var taskBreakdown = await GetMemberTaskBreakdownAllTimeAsync(groupId);
+            var lastActivity = await _analyticsRepository.GetMemberLastActivityAsync(groupId);
+
+            var totalDone = taskBreakdown.Sum(b => b.DoneTasks);
+            var totalActivity = taskBreakdown.Sum(b => b.TotalTasks);
+
+            return taskBreakdown.Select(tb =>
+            {
+                var contribution = totalActivity > 0
+                    ? Math.Round((double)tb.TotalTasks / totalActivity * 100, 2)
+                    : 0;
+
+                return new MemberActivitySummary
+                {
+                    UserId = tb.UserId,
+                    UserName = tb.UserName,
+                    TotalTasks = tb.TotalTasks,
+                    CompletedTasks = tb.DoneTasks,
+                    InProgressTasks = tb.InProgressTasks,
+                    TodoTasks = tb.TodoTasks,
+                    OverdueTasks = tb.OverdueTasks,
+                    LastActivityAt = lastActivity.GetValueOrDefault(tb.UserId),
+                    ContributionPercentage = contribution,
+                    MessagesSent = tb.MessagesSent
+                };
+            }).ToList();
+        }
+
+        /// <summary>
+        /// Get group member contributions with weighted scoring based on priority/severity
+        /// Formula: Score = BasePoints × PriorityWeight × SeverityWeight
+        /// Priority: Low=1.0, Medium=1.5, High=2.0
+        /// Severity: Minor=1.0, Moderate=1.2, Major=1.5, Critical=2.0
+        /// Base Points: Complete=10, Create=5, Update=3, Delete=2, Assign=1, Comment=1, Message=1
         /// </summary>
         public async Task<List<MemberContributionData>> GetGroupMemberContributionAsync(Guid groupId)
         {
             var thirtyDaysAgo = DateTime.UtcNow.AddDays(-30);
+
+            // Weight coefficients
+            var priorityWeight = new[] { 1.0, 1.5, 2.0 };   // Low, Medium, High
+            var severityWeight = new[] { 1.0, 1.2, 1.5, 2.0 };  // Minor, Moderate, Major, Critical
+
+            // Base points per action
+            const double CompletePoints = 10;
+            const double CreatePoints = 5;
+            const double UpdatePoints = 3;
+            const double DeletePoints = 2;
+            const double AssignPoints = 1;
 
             // Get all members with user info
             var memberUserIds = await _context.GroupParticipants
@@ -215,57 +346,337 @@ namespace StudioStudio_Server.Services
                 .Select(u => new { u.UserId, u.FirstName, u.LastName })
                 .ToDictionaryAsync(u => u.UserId, u => $"{u.FirstName} {u.LastName}");
 
-            // Get tasks completed by each member
-            var tasksCompleted = await _context.Tasks
-                .Where(t => t.GroupId == groupId && t.CompletedAt >= thirtyDaysAgo)
-                .GroupBy(t => t.OwnerId)
-                .Select(g => new { UserId = g.Key, Count = g.Count() })
-                .ToDictionaryAsync(x => x.UserId, x => x.Count);
+            // Get ActivityLogs with priority/severity (30 days)
+            var activityLogs = await _context.ActivityLogs
+                .Where(l => l.GroupId == groupId && l.CreatedAt >= thirtyDaysAgo)
+                .ToListAsync();
 
-            // Get tasks created by each member
-            var tasksCreated = await _context.Tasks
-                .Where(t => t.GroupId == groupId && t.CreatedAt >= thirtyDaysAgo)
-                .GroupBy(t => t.OwnerId)
-                .Select(g => new { UserId = g.Key, Count = g.Count() })
-                .ToDictionaryAsync(x => x.UserId, x => x.Count);
-
-            // Get messages sent by each member
-            var messagesSent = await _context.GroupMessages
+            // Get messages sent directly from GroupMessages (not from ActivityLogs for consistency)
+            var messagesByUser = await _context.GroupMessages
                 .Where(m => m.GroupId == groupId && m.CreatedAt >= thirtyDaysAgo)
                 .GroupBy(m => m.UserId)
                 .Select(g => new { UserId = g.Key, Count = g.Count() })
                 .ToDictionaryAsync(x => x.UserId, x => x.Count);
 
-            var result = memberUserIds.Select(userId =>
-            {
-                var completed = tasksCompleted.GetValueOrDefault(userId, 0);
-                var created = tasksCreated.GetValueOrDefault(userId, 0);
-                var messages = messagesSent.GetValueOrDefault(userId, 0);
-                var total = completed + created + messages;
+            // Initialize member contribution data
+            var memberScores = memberUserIds.ToDictionary(
+                id => id,
+                userId => new MemberContributionData { UserId = userId }
+            );
 
-                return new MemberContributionData
-                {
-                    UserId = userId,
-                    UserName = users.GetValueOrDefault(userId, "Unknown"),
-                    TasksCompleted = completed,
-                    TasksCreated = created,
-                    MessagesSent = messages,
-                    ContributionPercentage = total > 0 ? Math.Round((double)total / (completed + created + messages) * 100, 2) : 0
-                };
-            }).ToList();
-
-            // Calculate percentages
-            var totalContribution = result.Sum(r => r.TasksCompleted + r.TasksCreated + r.MessagesSent);
-            if (totalContribution > 0)
+            // Process activity logs
+            foreach (var log in activityLogs)
             {
-                foreach (var r in result)
+                if (!memberScores.ContainsKey(log.UserId)) continue;
+
+                var priority = log.TaskPriority ?? 0;
+                var severity = log.TaskSeverity ?? 0;
+                var priorityW = priorityWeight[Math.Min(priority, 2)];
+                var severityW = severityWeight[Math.Min(severity, 3)];
+
+                switch (log.ActionType)
                 {
-                    r.ContributionPercentage = Math.Round(
-                        (double)(r.TasksCompleted + r.TasksCreated + r.MessagesSent) / totalContribution * 100, 2);
+                    case "TASK_CREATE":
+                        memberScores[log.UserId].TasksCreated++;
+                        memberScores[log.UserId].CreatedScore += CreatePoints * priorityW * severityW;
+                        break;
+                    case "TASK_COMPLETE":
+                        memberScores[log.UserId].TasksCompleted++;
+                        memberScores[log.UserId].CompletedScore += CompletePoints * priorityW * severityW;
+                        break;
+                    case "TASK_UPDATE":
+                        memberScores[log.UserId].TasksUpdated++;
+                        memberScores[log.UserId].UpdatedScore += UpdatePoints * priorityW * severityW;
+                        break;
+                    case "TASK_DELETE":
+                        memberScores[log.UserId].TasksDeleted++;
+                        memberScores[log.UserId].DeletedScore += DeletePoints * priorityW * severityW;
+                        break;
+                    case "TASK_ASSIGN":
+                        memberScores[log.UserId].TasksAssigned++;
+                        memberScores[log.UserId].AssignedScore += AssignPoints * priorityW * severityW;
+                        break;
+                    case "COMMENT_CREATE":
+                        memberScores[log.UserId].CommentsCreated++;
+                        break;
+                    // Note: Messages are counted directly from GroupMessages table for consistency
+                    // (not from ActivityLogs to match memberTaskBreakdown.messagesSent)
                 }
             }
 
-            return result.OrderByDescending(r => r.ContributionPercentage).ToList();
+            // Calculate total scores and percentages
+            foreach (var member in memberScores.Values)
+            {
+                member.UserName = users.GetValueOrDefault(member.UserId, "Unknown");
+                // Add messages from GroupMessages table (consistent with memberTaskBreakdown)
+                member.MessagesSent = messagesByUser.GetValueOrDefault(member.UserId, 0);
+                member.TotalScore = member.CompletedScore + member.CreatedScore +
+                                   member.UpdatedScore + member.DeletedScore +
+                                   member.AssignedScore + member.CommentsCreated +
+                                   member.MessagesSent;
+            }
+
+            var totalGroupScore = memberScores.Values.Sum(m => m.TotalScore);
+            if (totalGroupScore > 0)
+            {
+                foreach (var member in memberScores.Values)
+                {
+                    member.ContributionPercentage = Math.Round(member.TotalScore / totalGroupScore * 100, 2);
+                }
+            }
+
+            return memberScores.Values
+                .OrderByDescending(m => m.TotalScore)
+                .ToList();
+        }
+
+        // ==================== GROUP ANALYTICS ENHANCED: for GroupAnalyticPage ====================
+
+        /// <summary>
+        /// Get task status breakdown per member in a group (done, in-progress, todo, overdue)
+        /// Powers Chart 1 (Personal Donut), Chart 2 (Group Donut), Chart 4 (Bar Chart)
+        /// </summary>
+        public async Task<List<MemberTaskBreakdownData>> GetMemberTaskBreakdownAsync(
+            Guid groupId, DateOnly? startDate = null, DateOnly? endDate = null)
+        {
+            var end = endDate ?? DateOnly.FromDateTime(DateTime.UtcNow);
+            var start = startDate ?? end.AddDays(-30);
+            var from = DateTime.SpecifyKind(start.ToDateTime(TimeOnly.MinValue), DateTimeKind.Utc);
+            var to = DateTime.SpecifyKind(end.ToDateTime(TimeOnly.MaxValue), DateTimeKind.Utc);
+
+            // Get all group members with names
+            var memberUserIds = await _context.GroupParticipants
+                .Where(p => p.GroupId == groupId)
+                .Select(p => p.UserId)
+                .ToListAsync();
+
+            var users = await _context.Users
+                .Where(u => memberUserIds.Contains(u.UserId))
+                .Select(u => new { u.UserId, FullName = u.FirstName + " " + u.LastName })
+                .ToDictionaryAsync(u => u.UserId, u => u.FullName);
+
+            // Get task breakdown per member
+            var breakdown = await _analyticsRepository.GetMemberTaskStatusBreakdownAsync(groupId, from, to);
+
+            // Get messages sent per member
+            var messagesSent = await _context.GroupMessages
+                .Where(m => m.GroupId == groupId && m.CreatedAt >= from && m.CreatedAt <= to)
+                .GroupBy(m => m.UserId)
+                .Select(g => new { UserId = g.Key, Count = g.Count() })
+                .ToDictionaryAsync(x => x.UserId, x => x.Count);
+
+            // Get contribution percentages
+            var totalDone = breakdown.Values.Sum(b => b.Done);
+            var totalInProgress = breakdown.Values.Sum(b => b.InProgress);
+            var totalTodo = breakdown.Values.Sum(b => b.Todo);
+            var totalOverdue = breakdown.Values.Sum(b => b.Overdue);
+            var totalActivity = totalDone + totalInProgress + totalTodo + totalOverdue;
+
+            var result = memberUserIds.Select(userId =>
+            {
+                var (done, inProgress, todo, overdue, total) = breakdown.GetValueOrDefault(userId, (0, 0, 0, 0, 0));
+                var contribution = totalActivity > 0
+                    ? Math.Round((double)(done + inProgress + todo + overdue) / totalActivity * 100, 2)
+                    : 0;
+
+                return new MemberTaskBreakdownData
+                {
+                    UserId = userId,
+                    UserName = users.GetValueOrDefault(userId, "Unknown"),
+                    TotalTasks = total,
+                    DoneTasks = done,
+                    InProgressTasks = inProgress,
+                    TodoTasks = todo,
+                    OverdueTasks = overdue,
+                    ContributionPercentage = contribution,
+                    MessagesSent = messagesSent.GetValueOrDefault(userId, 0)
+                };
+            }).ToList();
+
+            return result.OrderByDescending(r => r.DoneTasks).ToList();
+        }
+
+        /// <summary>
+        /// Get per-member daily completion trend
+        /// Powers Chart 3 (Line Chart)
+        /// </summary>
+        public async Task<List<MemberProgressTrendData>> GetMemberProgressTrendAsync(
+            Guid groupId, DateOnly? startDate = null, DateOnly? endDate = null)
+        {
+            var end = endDate ?? DateOnly.FromDateTime(DateTime.UtcNow);
+            var start = startDate ?? end.AddDays(-30);
+
+            // Get all group members with names
+            var memberUserIds = await _context.GroupParticipants
+                .Where(p => p.GroupId == groupId)
+                .Select(p => p.UserId)
+                .ToListAsync();
+
+            var users = await _context.Users
+                .Where(u => memberUserIds.Contains(u.UserId))
+                .Select(u => new { u.UserId, FullName = u.FirstName + " " + u.LastName })
+                .ToDictionaryAsync(u => u.UserId, u => u.FullName);
+
+            // Get daily completions per member
+            var dailyCompletions = await _analyticsRepository.GetMemberDailyCompletionsAsync(groupId, start, end);
+
+            return memberUserIds.Select(userId =>
+            {
+                var memberDaily = dailyCompletions.GetValueOrDefault(userId, new Dictionary<DateOnly, int>());
+
+                var dailyPoints = new List<DailyProgressPoint>();
+                for (var date = start; date <= end; date = date.AddDays(1))
+                {
+                    dailyPoints.Add(new DailyProgressPoint
+                    {
+                        Date = date,
+                        CompletedTasks = memberDaily.GetValueOrDefault(date, 0)
+                    });
+                }
+
+                return new MemberProgressTrendData
+                {
+                    UserId = userId,
+                    UserName = users.GetValueOrDefault(userId, "Unknown"),
+                    DailyCompletions = dailyPoints
+                };
+            }).ToList();
+        }
+
+        /// <summary>
+        /// Get per-member heatmap activity (activity level 0-4 per day)
+        /// Powers Chart 5 (Member Heatmap)
+        /// Uses weighted scoring: Task points = 10 × PriorityWeight × SeverityWeight
+        /// </summary>
+        public async Task<List<MemberHeatmapData>> GetMemberHeatmapAsync(
+            Guid groupId, DateOnly? startDate = null, DateOnly? endDate = null)
+        {
+            var end = endDate ?? DateOnly.FromDateTime(DateTime.UtcNow);
+            var start = startDate ?? end.AddDays(-30);
+            var startDateTime = DateTime.SpecifyKind(start.ToDateTime(TimeOnly.MinValue), DateTimeKind.Utc);
+            var endDateTime = DateTime.SpecifyKind(end.ToDateTime(TimeOnly.MaxValue), DateTimeKind.Utc);
+
+            // Weight coefficients (same as contribution formula)
+            var priorityWeight = new[] { 1.0, 1.5, 2.0 };   // Low, Medium, High
+            var severityWeight = new[] { 1.0, 1.2, 1.5, 2.0 };  // Minor, Moderate, Major, Critical
+            const double CompletePoints = 10;
+
+            // Get all group members with names
+            var memberUserIds = await _context.GroupParticipants
+                .Where(p => p.GroupId == groupId)
+                .Select(p => p.UserId)
+                .ToListAsync();
+
+            var users = await _context.Users
+                .Where(u => memberUserIds.Contains(u.UserId))
+                .Select(u => new { u.UserId, FullName = u.FirstName + " " + u.LastName })
+                .ToDictionaryAsync(u => u.UserId, u => u.FullName);
+
+            // Get tasks completed per member per day WITH priority/severity for weighted scoring
+            var tasksCompleted = await _context.Tasks
+                .Where(t => t.GroupId == groupId && t.CompletedAt >= startDateTime && t.CompletedAt <= endDateTime)
+                .Select(t => new { t.OwnerId, Date = DateOnly.FromDateTime(t.CompletedAt!.Value), t.Priority, t.Severity })
+                .ToListAsync();
+
+            // Get messages sent per member per day
+            var messagesSent = await _context.GroupMessages
+                .Where(m => m.GroupId == groupId && m.CreatedAt >= startDateTime && m.CreatedAt <= endDateTime)
+                .Select(m => new { m.UserId, Date = DateOnly.FromDateTime(m.CreatedAt) })
+                .ToListAsync();
+
+            // Get comments posted per member per day
+            var commentsPosted = await _context.TaskComments
+                .Where(c => c.Task.GroupId == groupId && c.CreatedAt >= startDateTime && c.CreatedAt <= endDateTime)
+                .Select(c => new { c.UserId, Date = DateOnly.FromDateTime(c.CreatedAt) })
+                .ToListAsync();
+
+            // Calculate activity level (0-4) per member per day with weighted scoring
+            var allActivity = new Dictionary<(Guid userId, DateOnly date), int>();
+
+            // Tasks: weighted by Priority × Severity (10-40 points per task)
+            foreach (var item in tasksCompleted)
+            {
+                var pWeight = priorityWeight[Math.Min((int)item.Priority, 2)];
+                var sWeight = severityWeight[Math.Min((int)item.Severity, 3)];
+                var weightedPoints = (int)(CompletePoints * pWeight * sWeight);
+                allActivity[(item.OwnerId, item.Date)] = allActivity.GetValueOrDefault((item.OwnerId, item.Date), 0) + weightedPoints;
+            }
+            // Messages: +1 point
+            foreach (var item in messagesSent)
+                allActivity[(item.UserId, item.Date)] = allActivity.GetValueOrDefault((item.UserId, item.Date), 0) + 1;
+            // Comments: +1 point
+            foreach (var item in commentsPosted)
+                allActivity[(item.UserId, item.Date)] = allActivity.GetValueOrDefault((item.UserId, item.Date), 0) + 1;
+
+            var maxActivity = allActivity.Values.DefaultIfEmpty(0).Max();
+
+            return memberUserIds.Select(userId =>
+            {
+                var activityPoints = new List<DailyActivityPoint>();
+                for (var date = start; date <= end; date = date.AddDays(1))
+                {
+                    var rawActivity = allActivity.GetValueOrDefault((userId, date), 0);
+                    var level = maxActivity > 0
+                        ? rawActivity == 0 ? 0
+                            : rawActivity <= maxActivity * 0.25 ? 1
+                            : rawActivity <= maxActivity * 0.50 ? 2
+                            : rawActivity <= maxActivity * 0.75 ? 3
+                            : 4
+                        : 0;
+
+                    activityPoints.Add(new DailyActivityPoint
+                    {
+                        Date = date,
+                        ActivityLevel = level
+                    });
+                }
+
+                return new MemberHeatmapData
+                {
+                    UserId = userId,
+                    UserName = users.GetValueOrDefault(userId, "Unknown"),
+                    ActivityByDate = activityPoints
+                };
+            }).ToList();
+        }
+
+        /// <summary>
+        /// Get member activity summary with last activity timestamp
+        /// Powers Chart 6 (Member Progress Cards)
+        /// </summary>
+        public async Task<List<MemberActivitySummary>> GetMemberActivitySummaryAsync(
+            Guid groupId, DateOnly? startDate = null, DateOnly? endDate = null)
+        {
+            // Get task breakdown (reuse existing method)
+            var taskBreakdown = await GetMemberTaskBreakdownAsync(groupId, startDate, endDate);
+
+            // Get last activity per member
+            var lastActivity = await _analyticsRepository.GetMemberLastActivityAsync(groupId);
+
+            // Get contribution percentages
+            var totalDone = taskBreakdown.Sum(b => b.DoneTasks);
+            var totalActivity = taskBreakdown.Sum(b => b.TotalTasks);
+
+            return taskBreakdown.Select(tb =>
+            {
+                var contribution = totalActivity > 0
+                    ? Math.Round((double)tb.TotalTasks / totalActivity * 100, 2)
+                    : 0;
+
+                return new MemberActivitySummary
+                {
+                    UserId = tb.UserId,
+                    UserName = tb.UserName,
+                    TotalTasks = tb.TotalTasks,
+                    CompletedTasks = tb.DoneTasks,
+                    InProgressTasks = tb.InProgressTasks,
+                    TodoTasks = tb.TodoTasks,
+                    OverdueTasks = tb.OverdueTasks,
+                    LastActivityAt = lastActivity.GetValueOrDefault(tb.UserId),
+                    ContributionPercentage = contribution,
+                    MessagesSent = tb.MessagesSent
+                };
+            }).ToList();
         }
 
         private async Task<List<GroupProgressData>> GetGroupProgressAsync(Guid groupId, DateOnly startDate, DateOnly endDate)

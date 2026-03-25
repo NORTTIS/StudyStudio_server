@@ -1,3 +1,4 @@
+using StudioStudio_Server.Data;
 using StudioStudio_Server.Models.Entities;
 
 namespace StudioStudio_Server.Repositories.Interfaces
@@ -17,6 +18,7 @@ namespace StudioStudio_Server.Repositories.Interfaces
         // Group Analytics
         Task<GroupAnalytics?> GetGroupAnalyticsByDateAsync(Guid groupId, DateOnly date);
         Task<List<GroupAnalytics>> GetGroupAnalyticsRangeAsync(Guid groupId, DateOnly startDate, DateOnly endDate);
+        Task<List<GroupAnalytics>> GetGroupAnalyticsRangeAsync(StudioDbContext context, Guid groupId, DateOnly startDate, DateOnly endDate);
         Task<List<GroupAnalytics>> GetAllGroupAnalyticsRangeAsync(DateOnly startDate, DateOnly endDate);
         Task UpsertGroupAnalyticsAsync(GroupAnalytics analytics);
 
@@ -37,5 +39,33 @@ namespace StudioStudio_Server.Repositories.Interfaces
         Task<Dictionary<Guid, int>> AggregateActiveMembersByGroupAsync(Guid groupId, DateTime from, DateTime to);
         Task<Dictionary<Guid, int>> AggregateMessagesByGroupAsync(Guid groupId, DateTime from, DateTime to);
         Task<Dictionary<Guid, int>> AggregateCommentsByGroupAsync(Guid groupId, DateTime from, DateTime to);
+
+        // === GROUP ANALYTICS ENHANCED: Task status per member ===
+        /// <summary>
+        /// Get task status counts (done, in-progress, todo, overdue) per member in a group within date range
+        /// </summary>
+        Task<Dictionary<Guid, (int Done, int InProgress, int Todo, int Overdue, int Total)>> GetMemberTaskStatusBreakdownAsync(
+            Guid groupId, DateTime from, DateTime to);
+        Task<Dictionary<Guid, (int Done, int InProgress, int Todo, int Overdue, int Total)>> GetMemberTaskStatusBreakdownAsync(
+            StudioDbContext context, Guid groupId, DateTime from, DateTime to);
+
+        /// <summary>
+        /// Get daily completed tasks count per member within date range — for line chart
+        /// </summary>
+        Task<Dictionary<Guid, Dictionary<DateOnly, int>>> GetMemberDailyCompletionsAsync(
+            Guid groupId, DateOnly startDate, DateOnly endDate);
+        Task<Dictionary<Guid, Dictionary<DateOnly, int>>> GetMemberDailyCompletionsAsync(
+            StudioDbContext context, Guid groupId, DateOnly startDate, DateOnly endDate);
+
+        /// <summary>
+        /// Get last activity datetime per member in a group
+        /// </summary>
+        Task<Dictionary<Guid, DateTime?>> GetMemberLastActivityAsync(Guid groupId);
+        Task<Dictionary<Guid, DateTime?>> GetMemberLastActivityAsync(StudioDbContext context, Guid groupId);
+
+        /// <summary>
+        /// Get task status counts per member WITHOUT date filter (all time) - for summary endpoint
+        /// </summary>
+        Task<Dictionary<Guid, (int Done, int InProgress, int Todo, int Overdue, int Total)>> GetMemberTaskStatusBreakdownAllTimeAsync(Guid groupId);
     }
 }

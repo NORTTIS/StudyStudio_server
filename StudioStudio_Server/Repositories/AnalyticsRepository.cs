@@ -119,6 +119,15 @@ namespace StudioStudio_Server.Repositories
                 .ToListAsync();
         }
 
+        public async Task<List<GroupAnalytics>> GetGroupAnalyticsRangeAsync(StudioDbContext context, Guid groupId, DateOnly startDate, DateOnly endDate)
+        {
+            return await context.GroupAnalytics
+                .AsNoTracking()
+                .Where(x => x.GroupId == groupId && x.Date >= startDate && x.Date <= endDate)
+                .OrderBy(x => x.Date)
+                .ToListAsync();
+        }
+
         public async Task<List<GroupAnalytics>> GetAllGroupAnalyticsRangeAsync(DateOnly startDate, DateOnly endDate)
         {
             return await _context.GroupAnalytics
@@ -302,6 +311,197 @@ namespace StudioStudio_Server.Repositories
                 .GroupBy(c => c.Task.GroupId!.Value)
                 .Select(g => new { GroupId = g.Key, Count = g.Count() })
                 .ToDictionaryAsync(x => x.GroupId, x => x.Count);
+        }
+
+        // ==================== GROUP ANALYTICS ENHANCED ====================
+
+        /// <summary>
+        /// Get task status counts (done, in-progress, todo, overdue) per member in a group within date range
+        /// Done: Progress == 100 OR CompletedAt is not null
+        /// In-Progress: Progress > 0 AND Progress < 100 AND DueDate >= now
+        /// Todo: Progress == 0 AND (no due date OR due date >= now)
+        /// Overdue: DueDate < now AND Progress < 100
+        /// </summary>
+        public async Task<Dictionary<Guid, (int Done, int InProgress, int Todo, int Overdue, int Total)>> GetMemberTaskStatusBreakdownAsync(
+            Guid groupId, DateTime from, DateTime to)
+        {
+            return await GetMemberTaskStatusBreakdownAsync(_context, groupId, from, to);
+        }
+
+        public async Task<Dictionary<Guid, (int Done, int InProgress, int Todo, int Overdue, int Total)>> GetMemberTaskStatusBreakdownAsync(
+            StudioDbContext context, Guid groupId, DateTime from, DateTime to)
+        {
+            var tasks = await context.Tasks
+                .AsNoTracking()
+                .Where(t => t.GroupId == groupId && t.CreatedAt >= from && t.CreatedAt <= to)
+                .Select(t => new
+                {
+                    t.OwnerId,
+                    t.Progress,
+                    t.CompletedAt,
+                    t.DueDate,
+                    IsDone = t.Progress == 100 || t.CompletedAt != null,
+                    IsOverdue = t.DueDate.HasValue && t.DueDate.Value < DateTime.UtcNow && t.Progress < 100,
+                    IsInProgress = t.Progress > 0 && t.Progress < 100 && (!t.DueDate.HasValue || t.DueDate.Value >= DateTime.UtcNow)
+                })
+                .ToListAsync();
+
+            return tasks
+                .GroupBy(t => t.OwnerId)
+                .ToDictionary(
+                    g => g.Key,
+                    g =>
+                    {
+                        var done = g.Count(t => t.IsDone);
+                        var overdue = g.Count(t => t.IsOverdue);
+                        var inProgress = g.Count(t => t.IsInProgress && !t.IsDone && !t.IsOverdue);
+                        var todo = g.Count(t => !t.IsDone && !t.IsInProgress && !t.IsOverdue);
+                        var total = g.Count();
+                        return (done, inProgress, todo, overdue, total);
+                    });
+        }
+
+        /// <summary>
+        /// Get daily completed tasks count per member within date range
+        /// </summary>
+        public async Task<Dictionary<Guid, Dictionary<DateOnly, int>>> GetMemberDailyCompletionsAsync(
+            Guid groupId, DateOnly startDate, DateOnly endDate)
+        {
+            return await GetMemberDailyCompletionsAsync(_context, groupId, startDate, endDate);
+        }
+
+        public async Task<Dictionary<Guid, Dictionary<DateOnly, int>>> GetMemberDailyCompletionsAsync(
+            StudioDbContext context, Guid groupId, DateOnly startDate, DateOnly endDate)
+        {
+            var startDateTime = DateTime.SpecifyKind(startDate.ToDateTime(TimeOnly.MinValue), DateTimeKind.Utc);
+            var endDateTime = DateTime.SpecifyKind(endDate.ToDateTime(TimeOnly.MaxValue), DateTimeKind.Utc);
+
+            var completedTasks = await context.Tasks
+                .AsNoTracking()
+                .Where(t => t.GroupId == groupId
+                            && t.CompletedAt.HasValue
+                            && t.CompletedAt >= startDateTime
+                            && t.CompletedAt <= endDateTime)
+                .Select(t => new
+                {
+                    t.OwnerId,
+                    CompletedDate = DateOnly.FromDateTime(t.CompletedAt!.Value)
+                })
+                .ToListAsync();
+
+            var result = completedTasks
+                .GroupBy(t => t.OwnerId)
+                .ToDictionary(
+                    g => g.Key,
+                    g => g
+                        .GroupBy(t => t.CompletedDate)
+                        .ToDictionary(g2 => g2.Key, g2 => g2.Count()));
+
+            // Ensure all members have entries for all dates (fill with 0)
+            var ownerIds = completedTasks.Select(t => t.OwnerId).Distinct().ToList();
+            foreach (var ownerId in ownerIds)
+            {
+                if (!result.ContainsKey(ownerId))
+                    result[ownerId] = new Dictionary<DateOnly, int>();
+
+                for (var date = startDate; date <= endDate; date = date.AddDays(1))
+                {
+                    if (!result[ownerId].ContainsKey(date))
+                        result[ownerId][date] = 0;
+                }
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// Get last activity datetime per member in a group
+        /// Activity = task completion, message sent, or comment posted
+        /// </summary>
+        public async Task<Dictionary<Guid, DateTime?>> GetMemberLastActivityAsync(Guid groupId)
+        {
+            return await GetMemberLastActivityAsync(_context, groupId);
+        }
+
+        public async Task<Dictionary<Guid, DateTime?>> GetMemberLastActivityAsync(StudioDbContext context, Guid groupId)
+        {
+            var participantIds = await context.GroupParticipants
+                .Where(p => p.GroupId == groupId)
+                .Select(p => p.UserId)
+                .ToListAsync();
+
+            // Get last task completion
+            var lastTaskCompletion = await context.Tasks
+                .Where(t => t.GroupId == groupId && t.CompletedAt.HasValue)
+                .GroupBy(t => t.OwnerId)
+                .Select(g => new { UserId = g.Key, LastDate = g.Max(t => t.CompletedAt) })
+                .ToDictionaryAsync(x => x.UserId, x => (DateTime?)x.LastDate);
+
+            // Get last message
+            var lastMessage = await context.GroupMessages
+                .Where(m => m.GroupId == groupId)
+                .GroupBy(m => m.UserId)
+                .Select(g => new { UserId = g.Key, LastDate = g.Max(m => m.CreatedAt) })
+                .ToDictionaryAsync(x => x.UserId, x => (DateTime?)x.LastDate);
+
+            // Get last comment
+            var lastComment = await context.TaskComments
+                .Where(c => c.Task.GroupId == groupId)
+                .GroupBy(c => c.UserId)
+                .Select(g => new { UserId = g.Key, LastDate = g.Max(c => c.CreatedAt) })
+                .ToDictionaryAsync(x => x.UserId, x => (DateTime?)x.LastDate);
+
+            var result = new Dictionary<Guid, DateTime?>();
+            foreach (var userId in participantIds)
+            {
+                var taskDate = lastTaskCompletion.GetValueOrDefault(userId);
+                var messageDate = lastMessage.GetValueOrDefault(userId);
+                var commentDate = lastComment.GetValueOrDefault(userId);
+
+                var latest = new[] { taskDate, messageDate, commentDate }
+                    .Where(d => d.HasValue)
+                    .OrderByDescending(d => d)
+                    .FirstOrDefault();
+
+                result[userId] = latest;
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// Get task status counts per member WITHOUT date filter (all time) - for summary endpoint
+        /// </summary>
+        public async Task<Dictionary<Guid, (int Done, int InProgress, int Todo, int Overdue, int Total)>> GetMemberTaskStatusBreakdownAllTimeAsync(Guid groupId)
+        {
+            var tasks = await _context.Tasks
+                .AsNoTracking()
+                .Where(t => t.GroupId == groupId)
+                .Select(t => new
+                {
+                    t.OwnerId,
+                    t.Progress,
+                    t.CompletedAt,
+                    t.DueDate,
+                    IsDone = t.Progress == 100 || t.CompletedAt != null,
+                    IsOverdue = t.DueDate.HasValue && t.DueDate.Value < DateTime.UtcNow && t.Progress < 100,
+                    IsInProgress = t.Progress > 0 && t.Progress < 100 && (!t.DueDate.HasValue || t.DueDate.Value >= DateTime.UtcNow)
+                })
+                .ToListAsync();
+
+            return tasks
+                .GroupBy(t => t.OwnerId)
+                .ToDictionary(
+                    g => g.Key,
+                    g =>
+                    {
+                        var done = g.Count(t => t.IsDone);
+                        var overdue = g.Count(t => t.IsOverdue);
+                        var inProgress = g.Count(t => t.IsInProgress && !t.IsDone && !t.IsOverdue);
+                        var todo = g.Count(t => !t.IsDone && !t.IsInProgress && !t.IsOverdue);
+                        var total = g.Count();
+                        return (done, inProgress, todo, overdue, total);
+                    });
         }
     }
 }
