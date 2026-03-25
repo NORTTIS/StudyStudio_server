@@ -169,8 +169,10 @@ namespace StudioStudio_Server.Services
 
             await _taskRepository.AddAsync(taskItem);
 
-            // Log task creation activity
-            await _activityLogService.LogTaskCreateAsync(userId, taskItem.TaskId, taskItem.GroupId, null);
+            // Log task creation activity with priority/severity for weighted contribution scoring
+            await _activityLogService.LogTaskCreateAsync(
+                userId, taskItem.TaskId, taskItem.GroupId, null,
+                (int)taskItem.Priority, (int)taskItem.Severity);
 
             var assigneeId = request.Assignees;
             var assigneeDetail = new UserDto();
@@ -346,8 +348,16 @@ namespace StudioStudio_Server.Services
                 if (oldProgress != 100 && task.Progress == 100)
                 {
                     task.CompletedAt = DateTime.UtcNow;
-                    await _activityLogService.LogTaskCompleteAsync(userId, task.TaskId, task.GroupId);
+                    // Log with priority/severity for weighted contribution scoring
+                    await _activityLogService.LogTaskCompleteAsync(
+                        userId, task.TaskId, task.GroupId,
+                        (int)task.Priority, (int)task.Severity);
                 }
+
+                // Log task update activity for contribution scoring
+                await _activityLogService.LogTaskUpdateAsync(
+                    userId, task.TaskId, task.GroupId, null,
+                    (int)task.Priority, (int)task.Severity);
             }
 
             string? oldStatusName = null;
@@ -574,8 +584,12 @@ namespace StudioStudio_Server.Services
                 throw new AppException(ErrorCodes.TaskNotFound, StatusCodes.Status404NotFound);
             }
 
+            // Capture priority/severity before delete for weighted contribution scoring
+            var taskPriority = (int)task.Priority;
+            var taskSeverity = (int)task.Severity;
+
             await _taskRepository.SoftDeleteAsync(taskId);
-            await _activityLogService.LogTaskDeleteAsync(userId, taskId, groupId);
+            await _activityLogService.LogTaskDeleteAsync(userId, taskId, groupId, taskPriority, taskSeverity);
 
             // Only notify Owner/Moderator of the group for soft-delete review workflow
             var participants = await _participantRepository.GetAllByGroupIdAsync(groupId);
@@ -797,8 +811,10 @@ namespace StudioStudio_Server.Services
 
             await _taskRepository.AddAsync(taskItem);
 
-            // Log task creation activity
-            await _activityLogService.LogTaskCreateAsync(userId, taskItem.TaskId, null, null);
+            // Log task creation activity with priority/severity for weighted contribution scoring
+            await _activityLogService.LogTaskCreateAsync(
+                userId, taskItem.TaskId, null, null,
+                (int)taskItem.Priority, (int)taskItem.Severity);
 
             return new TaskItemResponse
             {
@@ -922,8 +938,16 @@ namespace StudioStudio_Server.Services
                 if (oldProgress != 100 && task.Progress == 100)
                 {
                     task.CompletedAt = DateTime.UtcNow;
-                    await _activityLogService.LogTaskCompleteAsync(userId, task.TaskId, task.GroupId);
+                    // Log with priority/severity for weighted contribution scoring
+                    await _activityLogService.LogTaskCompleteAsync(
+                        userId, task.TaskId, task.GroupId,
+                        (int)task.Priority, (int)task.Severity);
                 }
+
+                // Log task update activity for contribution scoring
+                await _activityLogService.LogTaskUpdateAsync(
+                    userId, task.TaskId, task.GroupId, null,
+                    (int)task.Priority, (int)task.Severity);
             }
 
             // Update personal if provided

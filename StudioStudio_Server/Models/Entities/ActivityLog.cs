@@ -18,6 +18,10 @@ namespace StudioStudio_Server.Models.Entities
 
         public DateTime CreatedAt { get; set; }
 
+        // NEW: Store task priority/severity at time of action for weighted contribution scoring
+        public int? TaskPriority { get; set; }  // 0=Low, 1=Medium, 2=High
+        public int? TaskSeverity { get; set; }  // 0=Minor, 1=Moderate, 2=Major, 3=Critical
+
         // Navigation properties
         public virtual User? User { get; set; }
         public virtual Group? Group { get; set; }

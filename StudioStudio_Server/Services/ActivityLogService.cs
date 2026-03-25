@@ -40,9 +40,10 @@ namespace StudioStudio_Server.Services
         }
 
         /// <summary>
-        /// Log task creation activity
+        /// Log task creation activity with priority/severity for weighted contribution scoring
         /// </summary>
-        public async Task LogTaskCreateAsync(Guid userId, Guid taskId, Guid? groupId, Guid? studioId)
+        public async Task LogTaskCreateAsync(Guid userId, Guid taskId, Guid? groupId, Guid? studioId,
+            int priority = 0, int severity = 0)
         {
             var log = new ActivityLog
             {
@@ -53,16 +54,19 @@ namespace StudioStudio_Server.Services
                 TargetId = taskId,
                 GroupId = groupId,
                 StudioId = studioId,
-                CreatedAt = DateTime.UtcNow
+                CreatedAt = DateTime.UtcNow,
+                TaskPriority = priority,
+                TaskSeverity = severity
             };
 
             await LogAsync(log);
         }
 
         /// <summary>
-        /// Log task update activity
+        /// Log task update activity with priority/severity for weighted contribution scoring
         /// </summary>
-        public async Task LogTaskUpdateAsync(Guid userId, Guid taskId, Guid? groupId, Guid? studioId, string field, string? oldValue, string? newValue)
+        public async Task LogTaskUpdateAsync(Guid userId, Guid taskId, Guid? groupId, Guid? studioId,
+            int priority = 0, int severity = 0, string? field = null, string? oldValue = null, string? newValue = null)
         {
             var metadata = JsonSerializer.Serialize(new
             {
@@ -81,16 +85,19 @@ namespace StudioStudio_Server.Services
                 GroupId = groupId,
                 StudioId = studioId,
                 Metadata = metadata,
-                CreatedAt = DateTime.UtcNow
+                CreatedAt = DateTime.UtcNow,
+                TaskPriority = priority,
+                TaskSeverity = severity
             };
 
             await LogAsync(log);
         }
 
         /// <summary>
-        /// Log task completion activity
+        /// Log task completion activity with priority/severity for weighted contribution scoring
         /// </summary>
-        public async Task LogTaskCompleteAsync(Guid userId, Guid taskId, Guid? groupId)
+        public async Task LogTaskCompleteAsync(Guid userId, Guid taskId, Guid? groupId,
+            int priority = 0, int severity = 0)
         {
             var log = new ActivityLog
             {
@@ -100,7 +107,9 @@ namespace StudioStudio_Server.Services
                 TargetType = ActivityTargetTypes.TASK,
                 TargetId = taskId,
                 GroupId = groupId,
-                CreatedAt = DateTime.UtcNow
+                CreatedAt = DateTime.UtcNow,
+                TaskPriority = priority,
+                TaskSeverity = severity
             };
 
             await LogAsync(log);
@@ -209,9 +218,10 @@ namespace StudioStudio_Server.Services
         }
 
         /// <summary>
-        /// Log task delete activity
+        /// Log task delete activity with priority/severity for weighted contribution scoring
         /// </summary>
-        public async Task LogTaskDeleteAsync(Guid userId, Guid taskId, Guid? groupId)
+        public async Task LogTaskDeleteAsync(Guid userId, Guid taskId, Guid? groupId,
+            int priority = 0, int severity = 0)
         {
             var log = new ActivityLog
             {
@@ -221,7 +231,9 @@ namespace StudioStudio_Server.Services
                 TargetType = ActivityTargetTypes.TASK,
                 TargetId = taskId,
                 GroupId = groupId,
-                CreatedAt = DateTime.UtcNow
+                CreatedAt = DateTime.UtcNow,
+                TaskPriority = priority,
+                TaskSeverity = severity
             };
 
             await LogAsync(log);
