@@ -262,5 +262,132 @@ namespace StudioStudio_Server.Controllers
                 message,
                 result));
         }
+
+        // ==================== STUDIO OVERVIEW (Chart 1 & 2) ====================
+
+        /// <summary>
+        /// GET /api/analytics/studio/{studioId}/overview
+        ///
+        /// Returns studio overview with all groups summary (no date filter).
+        /// Used for Chart 1 (Group Progress) & Chart 2 (Task Status per group).
+        /// </summary>
+        [HttpGet("studio/{studioId}/overview")]
+        public async Task<ActionResult<ApiResponse<StudioOverviewResponse>>> GetStudioOverview(
+            Guid studioId)
+        {
+            var userId = ValidateAndGetUserId();
+
+            var result = await _analyticsService.GetStudioOverviewAsync(studioId);
+            var message = _messageService.GetMessage(ErrorCodes.SuccessGetData);
+
+            return Ok(ApiResponse<StudioOverviewResponse>.Success(
+                ErrorCodes.SuccessGetData,
+                message,
+                result));
+        }
+
+        // ==================== STUDIO COMPLETION TREND (Chart 3) ====================
+
+        /// <summary>
+        /// GET /api/analytics/studio/{studioId}/completion-trend
+        ///
+        /// Returns completion trend per group WITH date filter.
+        /// Used for Chart 3 (Line Chart).
+        /// </summary>
+        [HttpGet("studio/{studioId}/completion-trend")]
+        public async Task<ActionResult<ApiResponse<StudioCompletionTrendResponse>>> GetStudioCompletionTrend(
+            Guid studioId,
+            [FromQuery] DateTime? startDate = null,
+            [FromQuery] DateTime? endDate = null,
+            [FromQuery] string? groupIds = null)
+        {
+            var userId = ValidateAndGetUserId();
+
+            DateOnly? start = startDate.HasValue ? DateOnly.FromDateTime(startDate.Value) : null;
+            DateOnly? end = endDate.HasValue ? DateOnly.FromDateTime(endDate.Value) : null;
+
+            // Parse comma-separated groupIds
+            List<Guid>? parsedGroupIds = null;
+            if (!string.IsNullOrWhiteSpace(groupIds))
+            {
+                parsedGroupIds = groupIds
+                    .Split(',', StringSplitOptions.RemoveEmptyEntries)
+                    .Select(s => Guid.TryParse(s.Trim(), out var g) ? g : (Guid?)null)
+                    .Where(g => g.HasValue)
+                    .Select(g => g!.Value)
+                    .ToList();
+            }
+
+            var result = await _analyticsService.GetStudioCompletionTrendAsync(studioId, start, end, parsedGroupIds);
+            var message = _messageService.GetMessage(ErrorCodes.SuccessGetData);
+
+            return Ok(ApiResponse<StudioCompletionTrendResponse>.Success(
+                ErrorCodes.SuccessGetData,
+                message,
+                result));
+        }
+
+        // ==================== STUDIO GROUP STATUS (Chart 4) ====================
+
+        /// <summary>
+        /// GET /api/analytics/studio/{studioId}/group-status
+        ///
+        /// Returns task status breakdown per group WITH date filter.
+        /// Used for Chart 4 (Grouped Bar Chart).
+        /// </summary>
+        [HttpGet("studio/{studioId}/group-status")]
+        public async Task<ActionResult<ApiResponse<StudioGroupStatusResponse>>> GetStudioGroupStatus(
+            Guid studioId,
+            [FromQuery] DateTime? startDate = null,
+            [FromQuery] DateTime? endDate = null)
+        {
+            var userId = ValidateAndGetUserId();
+
+            DateOnly? start = startDate.HasValue ? DateOnly.FromDateTime(startDate.Value) : null;
+            DateOnly? end = endDate.HasValue ? DateOnly.FromDateTime(endDate.Value) : null;
+
+            var result = await _analyticsService.GetStudioGroupStatusAsync(studioId, start, end);
+            var message = _messageService.GetMessage(ErrorCodes.SuccessGetData);
+
+            return Ok(ApiResponse<StudioGroupStatusResponse>.Success(
+                ErrorCodes.SuccessGetData,
+                message,
+                result));
+        }
+
+        // ==================== STUDIO GROUP ACTIVITY (Chart 5) ====================
+
+        /// <summary>
+        /// GET /api/analytics/studio/{studioId}/group-activity
+        ///
+        /// Returns activity heatmap data per group WITH date filter.
+        /// Activity Level (0-4) is pre-calculated by backend with fixed thresholds.
+        /// Used for Chart 5 (Activity Heatmap).
+        ///
+        /// Activity Score Formula:
+        ///   Score = tasksCompleted×4 + tasksCreated×3 + tasksUpdated×2 + commentsCreated×1 + messagesSent×1
+        ///
+        /// Activity Level Thresholds (FIXED):
+        ///   0 = 0, 1 = 1-5, 2 = 6-15, 3 = 16-30, 4 = 31+
+        /// </summary>
+        [HttpGet("studio/{studioId}/group-activity")]
+        public async Task<ActionResult<ApiResponse<StudioGroupActivityResponse>>> GetStudioGroupActivity(
+            Guid studioId,
+            [FromQuery] DateTime? startDate = null,
+            [FromQuery] DateTime? endDate = null)
+        {
+            var userId = ValidateAndGetUserId();
+
+            DateOnly? start = startDate.HasValue ? DateOnly.FromDateTime(startDate.Value) : null;
+            DateOnly? end = endDate.HasValue ? DateOnly.FromDateTime(endDate.Value) : null;
+
+            var result = await _analyticsService.GetStudioGroupActivityAsync(studioId, start, end);
+            var message = _messageService.GetMessage(ErrorCodes.SuccessGetData);
+
+            return Ok(ApiResponse<StudioGroupActivityResponse>.Success(
+                ErrorCodes.SuccessGetData,
+                message,
+                result));
+        }
     }
 }

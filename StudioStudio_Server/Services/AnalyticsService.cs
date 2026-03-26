@@ -17,10 +17,30 @@ namespace StudioStudio_Server.Services
         private readonly StudioDbContext _context;
         private readonly IAnalyticsRepository _analyticsRepository;
 
+        // Group color palette for generating consistent random colors
+        private static readonly string[] GROUP_COLORS = new[]
+        {
+            "#3b82f6", "#f97316", "#10b981", "#8b5cf6", "#ec4899",
+            "#14b8a6", "#f59e0b", "#6366f1", "#84cc16", "#e11d48"
+        };
+
         public AnalyticsService(StudioDbContext context, IAnalyticsRepository analyticsRepository)
         {
             _context = context;
             _analyticsRepository = analyticsRepository;
+        }
+
+        /// <summary>
+        /// Returns the group's color, or a consistent random color if ColorHex is null/empty.
+        /// </summary>
+        private string GetGroupColor(string? colorHex, Guid groupId)
+        {
+            if (!string.IsNullOrWhiteSpace(colorHex))
+                return colorHex;
+
+            // Consistent random color based on groupId hash
+            var hash = groupId.GetHashCode();
+            return GROUP_COLORS[Math.Abs(hash) % GROUP_COLORS.Length];
         }
 
         // ==================== USER DASHBOARD ====================
@@ -950,6 +970,418 @@ namespace StudioStudio_Server.Services
             }
 
             return result;
+        }
+
+        // ==================== STUDIO OVERVIEW (Chart 1 & 2) ====================
+
+        /// <summary>
+        /// Get studio overview with timeline and all groups summary (no date filter)
+        /// Powers Chart 1 (Group Progress) & Chart 2 (Task Status per group)
+        /// </summary>
+        public async Task<StudioOverviewResponse> GetStudioOverviewAsync(Guid studioId)
+        {
+            // Get studio info
+            var studio = await _context.Studios
+                .Where(s => s.StudioId == studioId)
+                .Select(s => new { s.StudioId, s.StartDate, EndDate = s.EndDate })
+                .FirstOrDefaultAsync();
+
+            if (studio == null)
+                throw new AppException(Exceptions.ErrorCodes.GroupNotFound, StatusCodes.Status404NotFound);
+
+            // Get all active groups with their colors
+            var groups = await _context.Groups
+                .Where(g => g.StudioId == studioId && g.IsActive)
+                .Select(g => new { g.GroupId, g.GroupName, g.ColorHex })
+                .ToListAsync();
+
+            if (!groups.Any())
+            {
+                return new StudioOverviewResponse
+                {
+                    StudioId = studioId,
+                    StartDate = studio.StartDate?.ToString("yyyy-MM-dd") ?? "",
+                    DueDate = studio.EndDate?.ToString("yyyy-MM-dd") ?? "",
+                    TotalTasks = 0,
+                    TotalGroups = 0,
+                    StatusBreakdown = new StudioStatusBreakdown(),
+                    Groups = new List<StudioGroupData>()
+                };
+            }
+
+            var groupIds = groups.Select(g => g.GroupId).ToList();
+
+            // Batch query: task status per group
+            var tasks = await _context.Tasks
+                .Where(t => t.GroupId.HasValue && groupIds.Contains(t.GroupId.Value))
+                .Select(t => new
+                {
+                    t.GroupId,
+                    t.GroupStatusId,
+                    t.Progress,
+                    t.DueDate,
+                    t.CompletedAt
+                })
+                .ToListAsync();
+
+            // Batch query: active members per group (last 30 days)
+            var thirtyDaysAgo = DateTime.UtcNow.AddDays(-30);
+            var activeMembers = await _context.ActivityLogs
+                .Where(a => a.GroupId.HasValue && groupIds.Contains(a.GroupId.Value) && a.CreatedAt >= thirtyDaysAgo)
+                .GroupBy(a => a.GroupId!.Value)
+                .Select(g => new { GroupId = g.Key, Count = g.Select(a => a.UserId).Distinct().Count() })
+                .ToDictionaryAsync(x => x.GroupId, x => x.Count);
+
+            // Batch query: last activity per group
+            var lastActivity = await _context.ActivityLogs
+                .Where(a => a.GroupId.HasValue && groupIds.Contains(a.GroupId.Value))
+                .GroupBy(a => a.GroupId)
+                .Select(g => new { GroupId = g.Key, Last = (DateTime)g.Max(a => a.CreatedAt) })
+                .ToDictionaryAsync(x => x.GroupId!.Value, x => x.Last);
+
+            // Get all group statuses for these groups
+            var groupStatuses = await _context.GroupTaskStatuses
+                .Where(s => groupIds.Contains(s.GroupId) && !s.IsDeleted)
+                .OrderBy(s => s.Position)
+                .ToListAsync();
+
+            // Calculate per-group status with dynamic statuses
+            var groupDataList = groups.Select(g =>
+            {
+                var groupTasks = tasks.Where(t => t.GroupId == g.GroupId).ToList();
+                var groupStatusList = groupStatuses.Where(s => s.GroupId == g.GroupId).ToList();
+                var overdue = groupTasks.Count(t => t.CompletedAt == null && t.DueDate < DateTime.UtcNow && t.Progress < 100);
+                var total = groupTasks.Count;
+                var totalCompleted = groupTasks.Count(t => t.CompletedAt != null || t.Progress == 100);
+
+                // Dynamic task statuses from GroupTaskStatus table
+                var taskStatuses = groupStatusList.Select(s => new GroupTaskStatusCount
+                {
+                    StatusId = s.StatusId,
+                    StatusName = s.StatusName,
+                    Count = groupTasks.Count(t => t.GroupStatusId == s.StatusId)
+                }).ToList();
+
+                return new StudioGroupData
+                {
+                    GroupId = g.GroupId,
+                    GroupName = g.GroupName,
+                    GroupColor = GetGroupColor(g.ColorHex, g.GroupId),
+                    TotalTasks = total,
+                    TotalCompletedTasks = totalCompleted,
+                    OverdueTasks = overdue,
+                    CompletionRate = total > 0 ? Math.Round((double)totalCompleted / total * 100, 2) : 0,
+                    ActiveMembers = activeMembers.GetValueOrDefault(g.GroupId, 0),
+                    LastActivityDateTime = lastActivity.TryGetValue(g.GroupId, out var last) ? last : null,
+                    TaskStatuses = taskStatuses
+                };
+            }).ToList();
+
+            // Calculate studio-wide status breakdown (aggregated from dynamic statuses)
+            var allTaskStatuses = groupDataList.SelectMany(g => g.TaskStatuses).ToList();
+            var statusBreakdown = new StudioStatusBreakdown
+            {
+                Todo = groupDataList.Sum(g => g.TaskStatuses.Sum(s => s.Count)),
+                InProgress = 0,
+                Done = groupDataList.Sum(g => g.TaskStatuses.Sum(s => s.Count)),
+                Overdue = groupDataList.Sum(g => g.OverdueTasks)
+            };
+
+            return new StudioOverviewResponse
+            {
+                StudioId = studioId,
+                StartDate = studio.StartDate?.ToString("yyyy-MM-dd") ?? "",
+                DueDate = studio.EndDate?.ToString("yyyy-MM-dd") ?? "",
+                TotalTasks = statusBreakdown.Todo + statusBreakdown.InProgress + statusBreakdown.Done + statusBreakdown.Overdue,
+                TotalGroups = groups.Count,
+                StatusBreakdown = statusBreakdown,
+                Groups = groupDataList
+            };
+        }
+
+        // ==================== STUDIO COMPLETION TREND (Chart 3) ====================
+
+        /// <summary>
+        /// Get completion trend per group with date filter
+        /// Powers Chart 3 (Line Chart)
+        /// Activity Score: tasksCompleted×4 + tasksCreated×3 + tasksUpdated×2 + commentsCreated×1 + messagesSent×1
+        /// </summary>
+        public async Task<StudioCompletionTrendResponse> GetStudioCompletionTrendAsync(
+            Guid studioId,
+            DateOnly? startDate,
+            DateOnly? endDate,
+            List<Guid>? groupIds)
+        {
+            var end = endDate ?? DateOnly.FromDateTime(DateTime.UtcNow);
+            var start = startDate ?? end.AddDays(-29);
+
+            // Get all active groups (or filter by groupIds)
+            var groupsQuery = _context.Groups.Where(g => g.StudioId == studioId && g.IsActive);
+            if (groupIds != null && groupIds.Any())
+                groupsQuery = groupsQuery.Where(g => groupIds.Contains(g.GroupId));
+
+            var groups = await groupsQuery
+                .Select(g => new { g.GroupId, g.GroupName, g.ColorHex })
+                .ToListAsync();
+
+            if (!groups.Any())
+                return new StudioCompletionTrendResponse { Groups = new List<StudioGroupTrendData>() };
+
+            var validGroupIds = groups.Select(g => g.GroupId).ToList();
+            var startDateTime = DateTime.SpecifyKind(start.ToDateTime(TimeOnly.MinValue), DateTimeKind.Utc);
+            var endDateTime = DateTime.SpecifyKind(end.ToDateTime(TimeOnly.MaxValue), DateTimeKind.Utc);
+
+            // Get completed tasks per group per day
+            var completedTasks = await _context.Tasks
+                .Where(t => t.GroupId.HasValue && validGroupIds.Contains(t.GroupId.Value) &&
+                           t.CompletedAt.HasValue && t.CompletedAt >= startDateTime && t.CompletedAt <= endDateTime)
+                .Select(t => new { t.GroupId, Date = DateOnly.FromDateTime(t.CompletedAt!.Value) })
+                .ToListAsync();
+
+            var result = groups.Select(g =>
+            {
+                var groupCompletions = completedTasks
+                    .Where(t => t.GroupId == g.GroupId)
+                    .GroupBy(t => t.Date)
+                    .ToDictionary(g => g.Key, g => g.Count());
+
+                var points = new List<StudioTrendPoint>();
+                var cumulative = 0;
+
+                for (var date = start; date <= end; date = date.AddDays(1))
+                {
+                    var daily = groupCompletions.GetValueOrDefault(date, 0);
+                    cumulative += daily;
+                    var dayOfWeek = date.DayOfWeek;
+                    var label = dayOfWeek == DayOfWeek.Sunday ? "CN"
+                        : $"T{(int)dayOfWeek}";
+
+                    points.Add(new StudioTrendPoint
+                    {
+                        Date = date,
+                        Label = label,
+                        Value = cumulative
+                    });
+                }
+
+                return new StudioGroupTrendData
+                {
+                    GroupId = g.GroupId,
+                    GroupName = g.GroupName,
+                    GroupColor = GetGroupColor(g.ColorHex, g.GroupId),
+                    Points = points
+                };
+            }).ToList();
+
+            return new StudioCompletionTrendResponse { Groups = result };
+        }
+
+        // ==================== STUDIO GROUP STATUS (Chart 4) ====================
+
+        /// <summary>
+        /// Get task status breakdown per group with date filter
+        /// Powers Chart 4 (Grouped Bar Chart)
+        /// </summary>
+        public async Task<StudioGroupStatusResponse> GetStudioGroupStatusAsync(
+            Guid studioId,
+            DateOnly? startDate,
+            DateOnly? endDate)
+        {
+            var end = endDate ?? DateOnly.FromDateTime(DateTime.UtcNow);
+            var start = startDate ?? end.AddDays(-29);
+            var startDateTime = DateTime.SpecifyKind(start.ToDateTime(TimeOnly.MinValue), DateTimeKind.Utc);
+            var endDateTime = DateTime.SpecifyKind(end.ToDateTime(TimeOnly.MaxValue), DateTimeKind.Utc);
+
+            // Get all active groups
+            var groups = await _context.Groups
+                .Where(g => g.StudioId == studioId && g.IsActive)
+                .Select(g => new { g.GroupId, g.GroupName, g.ColorHex })
+                .ToListAsync();
+
+            if (!groups.Any())
+                return new StudioGroupStatusResponse { Groups = new List<StudioGroupStatusData>() };
+
+            var groupIds = groups.Select(g => g.GroupId).ToList();
+
+            // Get dynamic group statuses
+            var groupStatuses = await _context.GroupTaskStatuses
+                .Where(s => groupIds.Contains(s.GroupId) && !s.IsDeleted)
+                .OrderBy(s => s.Position)
+                .ToListAsync();
+
+            // Get tasks within date range with GroupStatusId
+            var tasks = await _context.Tasks
+                .Where(t => t.GroupId.HasValue && groupIds.Contains(t.GroupId.Value) &&
+                           t.CreatedAt >= startDateTime && t.CreatedAt <= endDateTime)
+                .Select(t => new
+                {
+                    t.GroupId,
+                    t.GroupStatusId,
+                    t.Progress,
+                    t.DueDate,
+                    t.CompletedAt
+                })
+                .ToListAsync();
+
+            var result = groups.Select(g =>
+            {
+                var groupTasks = tasks.Where(t => t.GroupId == g.GroupId).ToList();
+                var gStatuses = groupStatuses.Where(s => s.GroupId == g.GroupId).ToList();
+
+                // Dynamic task statuses
+                var taskStatuses = gStatuses.Select(s => new GroupTaskStatusCount
+                {
+                    StatusId = s.StatusId,
+                    StatusName = s.StatusName,
+                    Count = groupTasks.Count(t => t.GroupStatusId == s.StatusId)
+                }).ToList();
+
+                // Legacy counts (fallback if no dynamic statuses)
+                return new StudioGroupStatusData
+                {
+                    GroupId = g.GroupId,
+                    GroupName = g.GroupName,
+                    GroupColor = GetGroupColor(g.ColorHex, g.GroupId),
+                    TaskStatuses = taskStatuses,
+                    TodoTasks = groupTasks.Count(t => t.CompletedAt == null && t.Progress == 0),
+                    InProgressTasks = groupTasks.Count(t => t.CompletedAt == null && t.Progress > 0 && t.Progress < 100),
+                    DoneTasks = groupTasks.Count(t => t.CompletedAt != null || t.Progress == 100),
+                    OverdueTasks = groupTasks.Count(t => t.CompletedAt == null && t.DueDate < DateTime.UtcNow && t.Progress < 100)
+                };
+            }).ToList();
+
+            return new StudioGroupStatusResponse { Groups = result };
+        }
+
+        // ==================== STUDIO GROUP ACTIVITY (Chart 5) ====================
+
+        /// <summary>
+        /// Get activity heatmap per group with date filter and pre-calculated activity level (0-4)
+        /// Powers Chart 5 (Activity Heatmap)
+        ///
+        /// Activity Score = tasksCompleted×4 + tasksCreated×3 + tasksUpdated×2 + commentsCreated×1 + messagesSent×1
+        /// Activity Level (FIXED thresholds):
+        ///   0 = 0 (No activity)
+        ///   1 = 1-5
+        ///   2 = 6-15
+        ///   3 = 16-30
+        ///   4 = 31+
+        /// </summary>
+        public async Task<StudioGroupActivityResponse> GetStudioGroupActivityAsync(
+            Guid studioId,
+            DateOnly? startDate,
+            DateOnly? endDate)
+        {
+            var end = endDate ?? DateOnly.FromDateTime(DateTime.UtcNow);
+            var start = startDate ?? end.AddDays(-29);
+            var startDateTime = DateTime.SpecifyKind(start.ToDateTime(TimeOnly.MinValue), DateTimeKind.Utc);
+            var endDateTime = DateTime.SpecifyKind(end.ToDateTime(TimeOnly.MaxValue), DateTimeKind.Utc);
+
+            // Get all active groups
+            var groups = await _context.Groups
+                .Where(g => g.StudioId == studioId && g.IsActive)
+                .Select(g => new { g.GroupId, g.GroupName, g.ColorHex })
+                .ToListAsync();
+
+            if (!groups.Any())
+                return new StudioGroupActivityResponse { Data = new List<StudioActivityRow>() };
+
+            var groupIds = groups.Select(g => g.GroupId).ToList();
+
+            // Get tasks completed per group per day
+            var tasksCompleted = await _context.Tasks
+                .Where(t => t.GroupId.HasValue && groupIds.Contains(t.GroupId.Value) &&
+                           t.CompletedAt.HasValue && t.CompletedAt >= startDateTime && t.CompletedAt <= endDateTime)
+                .Select(t => new { t.GroupId, Date = DateOnly.FromDateTime(t.CompletedAt!.Value) })
+                .ToListAsync();
+
+            // Get tasks created per group per day
+            var tasksCreated = await _context.Tasks
+                .Where(t => t.GroupId.HasValue && groupIds.Contains(t.GroupId.Value) &&
+                           t.CreatedAt >= startDateTime && t.CreatedAt <= endDateTime)
+                .Select(t => new { t.GroupId, Date = DateOnly.FromDateTime(t.CreatedAt) })
+                .ToListAsync();
+
+            // Get tasks updated per group per day (via ActivityLogs)
+            var tasksUpdated = await _context.ActivityLogs
+                .Where(a => a.GroupId.HasValue && groupIds.Contains(a.GroupId.Value) &&
+                           a.ActionType == "TASK_UPDATE" && a.CreatedAt >= startDateTime && a.CreatedAt <= endDateTime)
+                .Select(a => new { a.GroupId, Date = DateOnly.FromDateTime(a.CreatedAt) })
+                .ToListAsync();
+
+            // Get comments per group per day
+            var comments = await _context.TaskComments
+                .Where(c => c.Task.GroupId.HasValue && groupIds.Contains(c.Task.GroupId.Value) &&
+                           c.CreatedAt >= startDateTime && c.CreatedAt <= endDateTime)
+                .Select(c => new { GroupId = c.Task.GroupId!.Value, Date = DateOnly.FromDateTime(c.CreatedAt) })
+                .ToListAsync();
+
+            // Get messages per group per day
+            var messages = await _context.GroupMessages
+                .Where(m => groupIds.Contains(m.GroupId) &&
+                           m.CreatedAt >= startDateTime && m.CreatedAt <= endDateTime)
+                .Select(m => new { m.GroupId, Date = DateOnly.FromDateTime(m.CreatedAt) })
+                .ToListAsync();
+
+            // Build score map: (groupId, date) → score
+            var scoreMap = new Dictionary<(Guid groupId, DateOnly date), (int tasksCompleted, int messagesSent, int score)>();
+
+            foreach (var g in groups)
+            {
+                for (var date = start; date <= end; date = date.AddDays(1))
+                {
+                    var tc = tasksCompleted.Count(t => t.GroupId == g.GroupId && t.Date == date);
+                    var tcr = tasksCreated.Count(t => t.GroupId == g.GroupId && t.Date == date);
+                    var tu = tasksUpdated.Count(a => a.GroupId == g.GroupId && a.Date == date);
+                    var cm = comments.Count(c => c.GroupId == g.GroupId && c.Date == date);
+                    var ms = messages.Count(m => m.GroupId == g.GroupId && m.Date == date);
+
+                    var score = tc * 4 + tcr * 3 + tu * 2 + cm * 1 + ms * 1;
+
+                    scoreMap[(g.GroupId, date)] = (tc, ms, score);
+                }
+            }
+
+            // Build heatmap rows
+            var rows = new List<StudioActivityRow>();
+            for (var date = start; date <= end; date = date.AddDays(1))
+            {
+                var groupItems = groups.Select(g =>
+                {
+                    var value = scoreMap.GetValueOrDefault((g.GroupId, date), (0, 0, 0));
+                    var tasksCompletedCount = value.Item1;
+                    var messagesSentCount = value.Item2;
+                    var score = value.Item3;
+
+                    var level = score switch
+                    {
+                        0 => 0,
+                        <= 5 => 1,
+                        <= 15 => 2,
+                        <= 30 => 3,
+                        _ => 4
+                    };
+
+                    return new StudioActivityItem
+                    {
+                        GroupId = g.GroupId,
+                        GroupName = g.GroupName,
+                        GroupColor = GetGroupColor(g.ColorHex, g.GroupId),
+                        ActivityScore = score,
+                        ActivityLevel = level,
+                        TasksCompleted = tasksCompletedCount,
+                        MessagesSent = messagesSentCount
+                    };
+                }).ToList();
+
+                rows.Add(new StudioActivityRow
+                {
+                    Date = date.ToString("yyyy-MM-dd"),
+                    Groups = groupItems
+                });
+            }
+
+            return new StudioGroupActivityResponse { Data = rows };
         }
     }
 }

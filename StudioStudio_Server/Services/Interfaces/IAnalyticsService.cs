@@ -26,5 +26,27 @@ namespace StudioStudio_Server.Services.Interfaces
         // Studio Dashboard
         Task<List<GroupComparisonData>> GetStudioGroupComparisonAsync(Guid studioId);
         Task<StudioGroupHeatmapResponse> GetStudioGroupHeatmapAsync(Guid studioId, DateOnly startDate, DateOnly endDate);
+
+        // Studio Overview (Chart 1 & 2)
+        Task<StudioOverviewResponse> GetStudioOverviewAsync(Guid studioId);
+
+        // Studio Completion Trend (Chart 3)
+        Task<StudioCompletionTrendResponse> GetStudioCompletionTrendAsync(
+            Guid studioId,
+            DateOnly? startDate,
+            DateOnly? endDate,
+            List<Guid>? groupIds);
+
+        // Studio Group Status (Chart 4)
+        Task<StudioGroupStatusResponse> GetStudioGroupStatusAsync(
+            Guid studioId,
+            DateOnly? startDate,
+            DateOnly? endDate);
+
+        // Studio Group Activity Heatmap (Chart 5)
+        Task<StudioGroupActivityResponse> GetStudioGroupActivityAsync(
+            Guid studioId,
+            DateOnly? startDate,
+            DateOnly? endDate);
     }
 }
