@@ -231,4 +231,166 @@ namespace StudioStudio_Server.Models.DTOs.Response
         public int ActivityCount { get; set; }
         public int TasksCompleted { get; set; }
     }
+
+    // ==================== STUDIO OVERVIEW (Chart 1) ====================
+
+    /// <summary>
+    /// Studio overview response — powers Chart 1 (Group Progress) & Chart 2 (Task Status per group)
+    /// Returns studio timeline, status breakdown, and all groups with their task status
+    /// </summary>
+    public class StudioOverviewResponse
+    {
+        public Guid StudioId { get; set; }
+        public string StartDate { get; set; } = string.Empty;
+        public string DueDate { get; set; } = string.Empty;
+        public int TotalTasks { get; set; }
+        public int TotalGroups { get; set; }
+        public StudioStatusBreakdown StatusBreakdown { get; set; } = new();
+        public List<StudioGroupData> Groups { get; set; } = new();
+    }
+
+    /// <summary>
+    /// Task status breakdown for the entire studio
+    /// </summary>
+    public class StudioStatusBreakdown
+    {
+        public int Todo { get; set; }
+        public int InProgress { get; set; }
+        public int Done { get; set; }
+        public int Overdue { get; set; }
+    }
+
+    /// <summary>
+    /// Per-group data for studio overview
+    /// </summary>
+    public class StudioGroupData
+    {
+        public Guid GroupId { get; set; }
+        public string GroupName { get; set; } = string.Empty;
+        public string GroupColor { get; set; } = string.Empty;
+        public int TotalTasks { get; set; }
+        public int TotalCompletedTasks { get; set; }
+        public int OverdueTasks { get; set; }
+        public double CompletionRate { get; set; }
+        public int ActiveMembers { get; set; }
+        public DateTime? LastActivityDateTime { get; set; }
+        /// <summary>
+        /// Dynamic task statuses from GroupTaskStatus table
+        /// </summary>
+        public List<GroupTaskStatusCount> TaskStatuses { get; set; } = new();
+    }
+
+    /// <summary>
+    /// Dynamic task status count per group
+    /// </summary>
+    public class GroupTaskStatusCount
+    {
+        public Guid StatusId { get; set; }
+        public string StatusName { get; set; } = string.Empty;
+        public int Count { get; set; }
+    }
+
+    // ==================== STUDIO COMPLETION TREND (Chart 3) ====================
+
+    /// <summary>
+    /// Studio completion trend response — powers Chart 3 (Line Chart)
+    /// Returns cumulative completed tasks per group over time with date filter
+    /// </summary>
+    public class StudioCompletionTrendResponse
+    {
+        public List<StudioGroupTrendData> Groups { get; set; } = new();
+    }
+
+    /// <summary>
+    /// Per-group completion trend data
+    /// </summary>
+    public class StudioGroupTrendData
+    {
+        public Guid GroupId { get; set; }
+        public string GroupName { get; set; } = string.Empty;
+        public string GroupColor { get; set; } = string.Empty;
+        public List<StudioTrendPoint> Points { get; set; } = new();
+    }
+
+    /// <summary>
+    /// Single data point for completion trend
+    /// </summary>
+    public class StudioTrendPoint
+    {
+        public DateOnly Date { get; set; }
+        public string Label { get; set; } = string.Empty;
+        public int Value { get; set; }
+    }
+
+    // ==================== STUDIO GROUP STATUS (Chart 4) ====================
+
+    /// <summary>
+    /// Studio group status response — powers Chart 4 (Grouped Bar Chart)
+    /// Returns task status breakdown per group with date filter
+    /// </summary>
+    public class StudioGroupStatusResponse
+    {
+        public List<StudioGroupStatusData> Groups { get; set; } = new();
+    }
+
+    /// <summary>
+    /// Per-group status data with dynamic task statuses from GroupTaskStatus table
+    /// </summary>
+    public class StudioGroupStatusData
+    {
+        public Guid GroupId { get; set; }
+        public string GroupName { get; set; } = string.Empty;
+        public string GroupColor { get; set; } = string.Empty;
+        // Dynamic task statuses from GroupTaskStatus table
+        public List<GroupTaskStatusCount> TaskStatuses { get; set; } = new();
+        // Legacy fields for backward compatibility fallback
+        public int TodoTasks { get; set; }
+        public int InProgressTasks { get; set; }
+        public int DoneTasks { get; set; }
+        public int OverdueTasks { get; set; }
+    }
+
+    // ==================== STUDIO GROUP ACTIVITY (Chart 5) ====================
+
+    /// <summary>
+    /// Studio group activity response — powers Chart 5 (Activity Heatmap)
+    /// Returns activity heatmap with pre-calculated activity level (0-4) per group per day
+    ///
+    /// Activity Score Formula:
+    ///   Score = tasksCompleted × 4 + tasksCreated × 3 + tasksUpdated × 2 + commentsCreated × 1 + messagesSent × 1
+    ///
+    /// Activity Level Thresholds (FIXED, not dynamic):
+    ///   0 = 0 (No activity)
+    ///   1 = 1-5 score
+    ///   2 = 6-15 score
+    ///   3 = 16-30 score
+    ///   4 = 31+ score
+    /// </summary>
+    public class StudioGroupActivityResponse
+    {
+        public List<StudioActivityRow> Data { get; set; } = new();
+    }
+
+    /// <summary>
+    /// Single row of heatmap data (one date × all groups)
+    /// </summary>
+    public class StudioActivityRow
+    {
+        public string Date { get; set; } = string.Empty;
+        public List<StudioActivityItem> Groups { get; set; } = new();
+    }
+
+    /// <summary>
+    /// Activity data for a single group on a single date
+    /// </summary>
+    public class StudioActivityItem
+    {
+        public Guid GroupId { get; set; }
+        public string GroupName { get; set; } = string.Empty;
+        public string GroupColor { get; set; } = string.Empty;
+        public int ActivityScore { get; set; }
+        public int ActivityLevel { get; set; } // 0-4 (pre-calculated)
+        public int TasksCompleted { get; set; }
+        public int MessagesSent { get; set; }
+    }
 }
