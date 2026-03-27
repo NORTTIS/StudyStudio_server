@@ -234,8 +234,8 @@ namespace StudioStudio_Server.Services
             if (!response.IsSuccessStatusCode)
             {
                 string errorContent = await response.Content.ReadAsStringAsync(cancellationToken);
-                _logger.LogError("Qdrant search failed. Status: {Status}, Error: {Error}", 
-                    response.StatusCode, errorContent);
+                _logger.LogError("[QDRANT-FAIL] HTTP={Status} groupId={GroupId} | Qdrant returned non-200 — returning empty list",
+                    (int)response.StatusCode, groupId);
                 return new List<VectorSearchResponse.SearchResult>();
             }
 
@@ -272,7 +272,7 @@ namespace StudioStudio_Server.Services
                                 payload[prop.Name] = prop.Value.GetDouble();
                             }
                         }
-                        else if (prop.Value.ValueKind == JsonValueKind.True || 
+                        else if (prop.Value.ValueKind == JsonValueKind.True ||
                                  prop.Value.ValueKind == JsonValueKind.False)
                         {
                             payload[prop.Name] = prop.Value.GetBoolean();
@@ -292,8 +292,16 @@ namespace StudioStudio_Server.Services
                 }
             }
 
-            _logger.LogInformation("Qdrant search completed. Found {Count} results for groupId: {GroupId}",
-                results.Count, groupId);
+            if (results.Count == 0)
+            {
+                _logger.LogInformation("[QDRANT-OK] HTTP=200 groupId={GroupId} topK={TopK} | 0 results (collection may be empty)",
+                    groupId, topK);
+            }
+            else
+            {
+                _logger.LogInformation("[QDRANT-OK] HTTP=200 groupId={GroupId} | Found {Count} results",
+                    groupId, results.Count);
+            }
 
             return results;
         }
@@ -359,8 +367,8 @@ namespace StudioStudio_Server.Services
             if (!response.IsSuccessStatusCode)
             {
                 string errorContent = await response.Content.ReadAsStringAsync(cancellationToken);
-                _logger.LogError("Qdrant multi-group search failed. Status: {Status}, Error: {Error}",
-                    response.StatusCode, errorContent);
+                _logger.LogError("[QDRANT-FAIL] HTTP={Status} multi-group | Qdrant returned non-200 — returning empty list. Error: {Error}",
+                    (int)response.StatusCode, errorContent);
                 return new List<VectorSearchResponse.SearchResult>();
             }
 

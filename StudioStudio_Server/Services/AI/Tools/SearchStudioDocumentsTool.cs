@@ -67,18 +67,24 @@ public class SearchStudioDocumentsTool : IAITool
             var topK = Ji(parameters["top_k"]);
             if (topK <= 0) topK = 5;
 
+            _logger.LogInformation("[TOOL-START] search_studio_documents | query={Query} studioId={StudioId} topK={TopK}",
+                query, studioId, topK);
+
             // Get all groups in this studio
             var groups = await _studioRepository.GetGroupsByStudioIdAsync(studioId);
 
             if (groups.Count == 0)
             {
                 sw.Stop();
+                _logger.LogWarning("[TOOL-EMPTY] search_studio_documents | query={Query} studioId={StudioId} — No groups in studio",
+                    query, studioId);
                 return AIQueryResult.Success(new JsonObject
                 {
                     ["query"] = query,
                     ["documents"] = new JsonArray(),
                     ["total_found"] = 0,
                     ["groups_searched"] = 0,
+                    ["qdrant_reachable"] = true,
                     ["summary"] = context.Language.ToLower() == "en"
                         ? "No groups found in this studio"
                         : "Khong co nhom nao trong studio"
@@ -94,6 +100,9 @@ public class SearchStudioDocumentsTool : IAITool
             // Search across all studio groups
             var results = await _qdrantService.SearchVectorsMultiGroupAsync(
                 queryVector, topK, groupIds, cancellationToken);
+
+            _logger.LogInformation("[TOOL-QDRANT] search_studio_documents | resultsCount={Count} elapsedMs={Ms}",
+                results.Count, sw.ElapsedMilliseconds);
 
             // Build response with group info
             var docs = results.Select(r =>
@@ -115,12 +124,25 @@ public class SearchStudioDocumentsTool : IAITool
 
             sw.Stop();
             bool isEnglish = context.Language.ToLower() == "en";
+
+            if (docs.Count == 0)
+            {
+                _logger.LogWarning("[TOOL-EMPTY] search_studio_documents | query={Query} studioId={StudioId} — No documents found across {GroupCount} groups",
+                    query, studioId, groups.Count);
+            }
+            else
+            {
+                _logger.LogInformation("[TOOL-SUCCESS] search_studio_documents | docsReturned={Count} elapsedMs={Ms}",
+                    docs.Count, sw.ElapsedMilliseconds);
+            }
+
             return AIQueryResult.Success(new JsonObject
             {
                 ["query"] = query,
                 ["documents"] = new JsonArray(docs.ToArray()),
                 ["total_found"] = docs.Count,
                 ["groups_searched"] = groups.Count,
+                ["qdrant_reachable"] = true,
                 ["summary"] = isEnglish
                     ? $"Found {docs.Count} relevant chunks across {groups.Count} groups"
                     : $"Tim thay {docs.Count} doan noi dung trong {groups.Count} nhom"
@@ -128,8 +150,9 @@ public class SearchStudioDocumentsTool : IAITool
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "SearchStudioDocumentsTool error");
-            return AIQueryResult.Error("Da xay ra loi khi tim kiem tai lieu studio");
+            sw.Stop();
+            _logger.LogError(ex, "[TOOL-ERROR] search_studio_documents | query={Query} — Unexpected error", Js(parameters["query"]));
+            return AIQueryResult.Error($"search_studio_documents failed: {ex.Message}");
         }
     }
 }

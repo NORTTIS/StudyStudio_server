@@ -453,8 +453,11 @@ namespace StudioStudio_Server.Services
                     topK = _config.TopK,
                     topP = _config.TopP,
                     maxOutputTokens = _config.MaxTokens,
-                    responseMimeType = "application/json",
-                    responseSchema = BuildAgentResponseSchema()
+                    responseMimeType = "application/json"
+                    // NOTE: responseSchema removed from streaming path.
+                    // When set, Gemini enforces strict JSON output - if final_answer
+                    // contains unescaped newlines/quotes, JSON becomes malformed and
+                    // ParseDecision falls back to empty string.
                 }
             };
 

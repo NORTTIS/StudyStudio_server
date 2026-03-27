@@ -118,7 +118,10 @@ public class AIToolRegistry : IAIToolRegistry
         // Master AI (Studio Owner) - có quyền tất cả tools
         if (context.StudioId.HasValue)
         {
-            return _toolInstances.Values.ToList().AsReadOnly();
+           return _toolInstances.Values
+                .Where(t => StudioTools.Contains(t.Name))
+                .ToList()
+                .AsReadOnly();
         }
 
         // Group AI - chỉ group tools
