@@ -1,0 +1,281 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+# Docs: https://docs.coderabbit.ai/reference/configuration
+# Validator: https://docs.coderabbit.ai/configuration/yaml-validator
+
+# ==============================================================================
+# GENERAL SETTINGS
+# ==============================================================================
+language: "vi-VN"                   # Ngôn ngữ review (tiếng Việt)
+tone_instructions: >
+  Hãy review theo phong cách mentor cấp cao: thẳng thắn, rõ ràng,
+  giải thích lý do cho mỗi góp ý. Ưu tiên security, performance và
+  maintainability trước khi nói đến style.
+early_access: false                 # Bật true nếu muốn thử tính năng beta
+
+
+# ==============================================================================
+# REVIEWS — Cấu hình review PR
+# ==============================================================================
+reviews:
+  # --- Profile & Workflow ---
+  profile: "assertive"              # "chill" | "assertive" (assertive = nhiều feedback hơn)
+  request_changes_workflow: false   # true = tự approve khi tất cả comments đã resolved
+
+  # --- PR Summary / Walkthrough ---
+  high_level_summary: true          # Tóm tắt thay đổi trong PR description
+  high_level_summary_placeholder: "@coderabbitai summary"
+  high_level_summary_in_walkthrough: false
+  high_level_summary_instructions: >
+    Tóm tắt ngắn gọn theo dạng bullet points bằng tiếng Việt.
+    Nêu rõ: (1) mục đích thay đổi, (2) các file chính bị ảnh hưởng,
+    (3) breaking changes nếu có.
+  collapse_walkthrough: true        # Thu gọn walkthrough trong collapsible section
+  changed_files_summary: true       # Liệt kê file thay đổi trong walkthrough
+  sequence_diagrams: true           # Tạo sequence diagram khi phù hợp
+  estimate_code_review_effort: true # Ước lượng effort cần review
+  assess_linked_issues: true        # Đánh giá PR có giải quyết đúng issue không
+  related_issues: true              # Tìm issues liên quan
+  related_prs: true                 # Tìm PRs liên quan
+
+  # --- PR Title ---
+  auto_title_placeholder: "@coderabbitai"
+  auto_title_instructions: >
+    Format: "<type>: <mô tả ngắn gọn>".
+    Type phải là một trong: feat, fix, docs, style, refactor, perf, test, build, ci, chore.
+    Ví dụ: "feat: Thêm endpoint đăng ký tài khoản".
+    Tiêu đề tối đa 80 ký tự.
+
+  # --- Labels & Reviewers ---
+  suggested_labels: true
+  auto_apply_labels: false          # true = tự động gán label (cẩn thận với repo production)
+  suggested_reviewers: true
+  auto_assign_reviewers: false
+
+  labeling_instructions:
+    - label: "feature"
+      instructions: "Áp dụng khi PR thêm chức năng mới vào hệ thống."
+    - label: "bug-fix"
+      instructions: "Áp dụng khi PR sửa lỗi đang xảy ra ở production hoặc staging."
+    - label: "refactor"
+      instructions: "Áp dụng khi PR tái cấu trúc code mà không thay đổi behavior."
+    - label: "performance"
+      instructions: "Áp dụng khi PR cải thiện tốc độ xử lý, query, hoặc memory usage."
+    - label: "security"
+      instructions: "Áp dụng khi PR liên quan đến authentication, authorization, hoặc vá lỗ hổng bảo mật."
+    - label: "test"
+      instructions: "Áp dụng khi PR chủ yếu thêm hoặc cập nhật test."
+    - label: "dependencies"
+      instructions: "Áp dụng khi PR cập nhật NuGet packages hoặc thay đổi cấu trúc project dependencies."
+    - label: "ci/cd"
+      instructions: "Áp dụng khi PR thay đổi GitHub Actions workflow, Dockerfile, hoặc cấu hình deploy."
+    - label: "breaking-change"
+      instructions: "Áp dụng khi PR thay đổi API contract, database schema, hoặc behavior có thể phá vỡ tính tương thích ngược."
+
+  # --- Review Status & Misc ---
+  review_status: true               # Thông báo khi review bị skip
+  review_details: true              # Hiện chi tiết: file bị ignore, context extra, v.v.
+  commit_status: true               # Đặt commit status pending/success
+  fail_commit_status: false         # Đặt failed khi không review được
+  poem: false                       # Tắt thơ vui (giữ PR comment gọn hơn)
+  in_progress_fortune: false        # Tắt fortune message trong lúc review
+  enable_prompt_for_ai_agents: true # Hiện prompt cho AI agents trong inline comments
+  abort_on_close: true              # Dừng review nếu PR bị đóng hoặc merge
+
+  # --- Auto Review ---
+  auto_review:
+    enabled: true
+    auto_incremental_review: true   # Re-review mỗi khi có push mới
+    auto_pause_after_reviewed_commits: 5  # Dừng auto-review sau 5 commits liên tiếp
+    ignore_title_keywords:
+      - "WIP"
+      - "[WIP]"
+      - "DRAFT"
+      - "DO NOT MERGE"
+      - "DNM"
+    drafts: false                   # false = không review PR ở trạng thái Draft
+
+  # --- Path Filters (loại trừ file không cần review) ---
+  path_filters:
+    # Build output & generated code
+    - "!**/bin/**"
+    - "!**/obj/**"
+    - "!**/.vs/**"
+    - "!**/*.Designer.cs"
+    - "!**/Migrations/*.cs"         # EF Core migrations (đổi thành true nếu muốn review)
+    - "!**/Migrations/**"
+    # Static assets
+    - "!**/wwwroot/lib/**"
+    - "!**/wwwroot/css/**/*.min.css"
+    - "!**/wwwroot/js/**/*.min.js"
+    # Package & lock files
+    - "!**/node_modules/**"
+    - "!**/*.lock"
+    - "!**/packages/**"
+    # Test snapshots & fixtures
+    - "!**/__snapshots__/**"
+    # Documentation (comment dòng này nếu muốn review docs)
+    - "!**/*.md"
+    - "!**/*.txt"
+
+  # --- Path Instructions (hướng dẫn riêng theo từng loại file) ---
+  path_instructions:
+
+    # ----- APPLICATION CORE -----
+    - path: "**/Controllers/**/*.cs"
+      instructions: >
+        Review theo ASP.NET Core Controller best practices:
+        - Kiểm tra HTTP verbs (GET/POST/PUT/DELETE/PATCH) có đúng mục đích không.
+        - Đảm bảo dùng [ApiController], [Route], [HttpGet/Post/...] đúng cách.
+        - Model binding: kiểm tra [FromBody], [FromQuery], [FromRoute] hợp lý.
+        - Validate input với [Required], [MaxLength], v.v. hoặc FluentValidation.
+        - Controller không chứa business logic — logic phải ở Service/UseCase layer.
+        - Xử lý lỗi: dùng ActionResult<T> thay vì IActionResult khi có thể.
+        - Kiểm tra response codes có phù hợp không (200, 201, 400, 401, 403, 404, 422, 500).
+        - Tránh trả về domain entities trực tiếp — phải qua DTO/ViewModel.
+
+    - path: "**/Services/**/*.cs"
+      instructions: >
+        Review Service layer:
+        - Kiểm tra Single Responsibility Principle.
+        - Async/await: tất cả I/O operations phải async; không dùng .Result hoặc .Wait().
+        - Đảm bảo CancellationToken được truyền xuyên suốt call chain.
+        - Xử lý exception có ý nghĩa, không bắt exception rỗng.
+        - Kiểm tra logic phân nhánh có được test cover không.
+        - Không inject DbContext trực tiếp vào Service — dùng Repository pattern hoặc IUnitOfWork.
+
+    - path: "**/Repositories/**/*.cs"
+      instructions: >
+        Review Repository / Data Access layer:
+        - Không có business logic trong repository.
+        - Kiểm tra EF Core queries: tránh N+1 query (thiếu Include/ThenInclude).
+        - Dùng AsNoTracking() cho read-only queries.
+        - Kiểm tra index có phù hợp với query không.
+        - Không dùng raw SQL nếu không cần thiết; nếu dùng thì phải parameterize.
+        - Đảm bảo transaction scope đúng nếu có multi-step operation.
+
+    - path: "**/Models/**/*.cs"
+      instructions: >
+        Review Domain Model / Entity:
+        - Kiểm tra Data Annotations hoặc Fluent Configuration có nhất quán không.
+        - Navigation properties có lazy loading risk không (dùng explicit loading).
+        - Value Objects có implement Equals/GetHashCode đúng không.
+        - Tránh public setter trên domain entities (dùng constructor hoặc factory method).
+
+    - path: "**/DTOs/**/*.cs"
+      instructions: >
+        Review DTO / Request / Response objects:
+        - Kiểm tra validation attributes đầy đủ ([Required], [StringLength], [Range], v.v.).
+        - DTO không chứa logic.
+        - Naming: rõ ràng, có hậu tố Dto/Request/Response.
+        - Kiểm tra nullable reference types được khai báo đúng (string? vs string).
+
+    - path: "**/Middleware/**/*.cs"
+      instructions: >
+        Review ASP.NET Core Middleware:
+        - Đảm bảo gọi _next(context) đúng chỗ (hoặc cố tình short-circuit có lý do).
+        - Exception handling middleware phải ở đầu pipeline.
+        - Không thực hiện heavy computation đồng bộ trong middleware.
+        - Kiểm tra logging có gây lộ thông tin nhạy cảm không.
+
+    - path: "**/Program.cs"
+      instructions: >
+        Review cấu hình application startup:
+        - Thứ tự middleware có đúng không (Authentication phải trước Authorization).
+        - DI registrations: Singleton/Scoped/Transient có đúng lifetime không.
+        - Tránh hardcode connection string, secret, API key — phải qua IConfiguration/Secrets.
+        - Health checks, CORS, Swagger được cấu hình đúng không.
+
+    - path: "**/appsettings*.json"
+      instructions: >
+        Review cấu hình:
+        - KHÔNG được chứa secret, password, API key thật.
+        - Connection strings phải placeholder hoặc dùng User Secrets.
+        - Kiểm tra các key có sử dụng trong code không (tránh dead config).
+        - Môi trường (Development/Staging/Production) có phân tách rõ không.
+
+    # ----- SECURITY -----
+    - path: "**/*.cs"
+      instructions: >
+        Kiểm tra bảo mật tổng quát trên mọi file C#:
+        - SQL Injection: không nối string trực tiếp vào query.
+        - XSS: output phải được encode đúng context (HTML, JS, URL).
+        - Tránh lưu password dạng plaintext — phải hash với bcrypt/Argon2.
+        - Kiểm tra authorization: endpoint nhạy cảm phải có [Authorize] hoặc policy.
+        - Tránh log dữ liệu nhạy cảm (PII, token, password).
+        - Kiểm tra IDOR: không để user truy cập resource của người khác.
+        - Tránh dùng Random cho security-sensitive operations — dùng RandomNumberGenerator.
+
+    # ----- TESTS -----
+    - path: "**/*Tests*/**/*.cs"
+      instructions: >
+        Review unit/integration tests:
+        - Tên test rõ ràng theo pattern: MethodName_Scenario_ExpectedBehavior.
+        - Mỗi test chỉ kiểm tra 1 behavior duy nhất.
+        - Arrange-Act-Assert được phân tách rõ (comment hoặc blank line).
+        - Không dùng logic phức tạp (if/loop) bên trong test.
+        - Mock dependencies đúng cách; không mock System/BCL classes không cần thiết.
+        - Kiểm tra edge cases: null input, empty list, boundary values.
+        - Test có actually assert không? Tránh "passing tests" không assert gì.
+
+    - path: "**/*IntegrationTests*/**/*.cs"
+      instructions: >
+        Review integration tests:
+        - Dùng WebApplicationFactory hoặc TestContainers cho database.
+        - Đảm bảo cleanup data sau mỗi test (tránh test pollution).
+        - Kiểm tra test không phụ thuộc vào thứ tự chạy.
+
+    # ----- CI/CD & INFRA -----
+    - path: "**/*.yml"
+      instructions: >
+        Review GitHub Actions / YAML configs:
+        - Không hardcode secrets trong workflow file — dùng ${{ secrets.NAME }}.
+        - Kiểm tra actions có pinned version hash không (tránh supply chain attack).
+        - Đảm bảo có bước restore, build, test, publish đúng thứ tự.
+        - Kiểm tra điều kiện trigger (on:) có phù hợp không.
+
+    - path: "**/Dockerfile"
+      instructions: >
+        Review Dockerfile:
+        - Dùng multi-stage build để giảm image size.
+        - Không chạy container với root user.
+        - Không COPY toàn bộ thư mục nếu chỉ cần một số file.
+        - Base image có được pinned version không (tránh dùng :latest).
+
+    - path: "**/*.tf"
+      instructions: >
+        Review Terraform / Infrastructure-as-Code:
+        - Không hardcode credentials, keys trong .tf files.
+        - Kiểm tra security group rules không mở port không cần thiết.
+        - State file có được lưu remote (S3/GCS/Azure Blob) không.
+
+
+# ==============================================================================
+# CHAT — Cấu hình tương tác qua @coderabbitai
+# ==============================================================================
+chat:
+  auto_reply: true                  # Bot tự trả lời khi được mention
+
+
+# ==============================================================================
+# KNOWLEDGE BASE — Cơ sở tri thức
+# ==============================================================================
+knowledge_base:
+  opt_out: false                    # false = bật knowledge base
+  web_search:
+    enabled: true                   # Cho phép bot search web khi cần context
+  learnings:
+    scope: "auto"                   # "auto" | "local" | "global"
+  code_guidelines:
+    enabled: true
+    file_patterns:
+      - "CONTRIBUTING.md"           # File hướng dẫn đóng góp (nếu có)
+      - "docs/coding-standards.md"  # File coding standards của team (nếu có)
+      - ".github/pull_request_template.md"
+
+
+# ==============================================================================
+# CODE GENERATION — Tạo code tự động (unit test, docstring, v.v.)
+# ==============================================================================
+code_generation:
+  docstrings:
+    language: "csharp"              # Ngôn ngữ để generate docstring (XML doc comments)
