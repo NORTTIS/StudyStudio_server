@@ -73,8 +73,14 @@ public class AIAgent
 
         try
         {
+            // [METHOD A] Auto-fetch document context cho MỌI query (chỉ khi có GroupId)
+            if (context.GroupId.HasValue)
+            {
+                await AutoFetchDocumentContextAsync(userQuestion, history, reasoningSteps, context, cancellationToken);
+            }
+
             // Bước 1: Phân tích câu hỏi và quyết định có cần gọi tool không
-            reasoningSteps.Add($"Analyzing question: {userQuestion}");
+            reasoningSteps.Add($"[After-AutoDoc] Analyzing question: {userQuestion}");
 
             // Chỉ lấy tools phù hợp với role của user (Studio Owner / Group Member / Personal)
             var toolsManifest = _toolRegistry.GetToolsManifestForContext(context);
@@ -252,6 +258,50 @@ public class AIAgent
                 Success = false,
                 ErrorMessage = ex.Message
             };
+        }
+    }
+
+    /// <summary>
+    /// [METHOD A] Auto-fetch document context cho MỌI query — luôn chạy trước get_group_documents + search_documents
+    /// KHÔNG đếm vào MaxToolCalls budget của LLM
+    /// </summary>
+    private async Task AutoFetchDocumentContextAsync(
+        string userQuestion,
+        ToolExecutionHistory history,
+        List<string> reasoningSteps,
+        AIQueryContext context,
+        CancellationToken cancellationToken)
+    {
+        reasoningSteps.Add("[METHOD-A] Auto-fetching document context for every query...");
+
+        // Auto-Step 1: get_group_documents — lấy danh sách file có sẵn trong group
+        var docListResult = await ExecuteToolAsync(
+            "get_group_documents",
+            new JsonObject(),
+            context,
+            cancellationToken);
+        history.AddCall("get_group_documents", new JsonObject(), docListResult);
+        reasoningSteps.Add($"[METHOD-A] get_group_documents: {(docListResult.IsSuccess ? "OK" : $"FAIL ({docListResult.ErrorMessage})")}");
+
+        // Auto-Step 2: search_documents — tìm kiếm với query = câu hỏi user
+        // Chỉ search nếu có nội dung (tránh empty query error)
+        if (!string.IsNullOrWhiteSpace(userQuestion))
+        {
+            var searchParams = new JsonObject
+            {
+                ["query"] = JsonValue.Create(userQuestion)
+            };
+            var searchResult = await ExecuteToolAsync(
+                "search_documents",
+                searchParams,
+                context,
+                cancellationToken);
+            history.AddCall("search_documents", searchParams, searchResult);
+            reasoningSteps.Add($"[METHOD-A] search_documents(query='{userQuestion}'): {(searchResult.IsSuccess ? "OK" : $"FAIL ({searchResult.ErrorMessage})")}");
+        }
+        else
+        {
+            reasoningSteps.Add("[METHOD-A] search_documents: Skipped (empty question)");
         }
     }
 
