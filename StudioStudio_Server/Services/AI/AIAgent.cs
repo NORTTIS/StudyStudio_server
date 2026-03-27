@@ -32,6 +32,14 @@ public class AIAgent
     private const int MaxToolCalls = 5; // Giới hạn số lần gọi tool để tránh infinite loop
     private const int MaxContextLength = 3000; // Giới hạn độ dài context
 
+    /// <summary>
+    /// Kiem tra xem parameters co query rong hoac null khong
+    /// </summary>
+    private bool HasEmptyQuery(JsonObject? p) =>
+        p == null ||
+        !p.TryGetPropertyValue("query", out var q) ||
+        string.IsNullOrWhiteSpace(q?.GetValue<string>());
+
     public AIAgent(
         IAIToolRegistry toolRegistry,
         IServiceProvider serviceProvider,
@@ -65,8 +73,14 @@ public class AIAgent
 
         try
         {
+            // [METHOD A] Auto-fetch document context cho MỌI query (chỉ khi có GroupId)
+            if (context.GroupId.HasValue)
+            {
+                await AutoFetchDocumentContextAsync(userQuestion, history, reasoningSteps, context, cancellationToken);
+            }
+
             // Bước 1: Phân tích câu hỏi và quyết định có cần gọi tool không
-            reasoningSteps.Add($"Analyzing question: {userQuestion}");
+            reasoningSteps.Add($"[After-AutoDoc] Analyzing question: {userQuestion}");
 
             // Chỉ lấy tools phù hợp với role của user (Studio Owner / Group Member / Personal)
             var toolsManifest = _toolRegistry.GetToolsManifestForContext(context);
@@ -103,7 +117,7 @@ public class AIAgent
                         context,
                         cancellationToken,
                         isContinuation: true);
-                    break;
+                    continue; // LLM được chọn tool khác
                 }
 
                 // Execute tool
@@ -113,7 +127,28 @@ public class AIAgent
                 if (!toolResult.IsSuccess)
                 {
                     reasoningSteps.Add($"Tool '{decision.ToolName}' failed: {toolResult.ErrorMessage}");
-                    // Feed error back to LLM so it can generate a helpful answer
+
+                    // Khi search_documents that bai >= 2 lan voi query rong -> chuyen sang get_group_documents
+                    if (decision.ToolName == "search_documents" &&
+                        HasEmptyQuery(decision.ToolParameters!) &&
+                        history.Calls.Count(c => c.ToolName == "search_documents" && HasEmptyQuery(c.Parameters)) >= 2)
+                    {
+                        _logger.LogWarning(
+                            "[AI-DOCS-FIRST] search_documents failed {Count} times with empty query. "
+                            + "Redirecting to get_group_documents to get document list first.",
+                            history.Calls.Count(c => c.ToolName == "search_documents"));
+
+                        reasoningSteps.Add("Redirecting to get_group_documents - LLM does not know available documents");
+                        decision = new AgentDecision
+                        {
+                            ShouldCallTool = true,
+                            ToolName = "get_group_documents",
+                            ToolParameters = new JsonObject()
+                        };
+                        continue;
+                    }
+
+                    // Feed error back to LLM so it can retry with correct params
                     decision = await DecideActionAsync(
                         userQuestion,
                         systemPrompt,
@@ -122,7 +157,7 @@ public class AIAgent
                         context,
                         cancellationToken,
                         isContinuation: true);
-                    break;
+                    continue; // LLM được retry — KHÔNG break
                 }
 
                 reasoningSteps.Add($"Tool '{decision.ToolName}' executed successfully");
@@ -141,20 +176,71 @@ public class AIAgent
             // Bước 4: Generate final answer
             sw.Stop();
 
+            // Xác định FallbackReason
+            string? fallbackReason = null;
+
+            if (!string.IsNullOrWhiteSpace(decision?.FinalAnswer))
+            {
+                _logger.LogInformation(
+                    "[AI-SUCCESS] ToolCalls={Count} AnswerLen={Len} Question={Q}",
+                    history.Calls.Count,
+                    decision.FinalAnswer.Length,
+                    userQuestion);
+            }
+            else if (history.Calls.Count >= MaxToolCalls)
+            {
+                fallbackReason = $"MaxToolCalls reached ({MaxToolCalls}). LLM made no final_answer after {history.Calls.Count} tool calls.";
+            }
+            else if (history.Calls.Count > 0)
+            {
+                var last = history.Calls.Last();
+                fallbackReason = last.Result.IsSuccess
+                    ? $"All {history.Calls.Count} tool(s) succeeded but LLM returned empty final_answer."
+                    : $"Tool '{last.ToolName}' failed: {last.Result.ErrorMessage ?? "unknown"}. LLM could not recover.";
+            }
+            else
+            {
+                fallbackReason = "LLM returned empty final_answer on first call (no tools attempted).";
+            }
+
+            // Log chi tiết khi fallback fire
+            if (fallbackReason != null)
+            {
+                _logger.LogWarning(
+                    "[AI-FALLBACK] Reason={Reason} ToolCalls={Count} Question={Q}",
+                    fallbackReason,
+                    history.Calls.Count,
+                    userQuestion);
+
+                foreach (var call in history.Calls)
+                {
+                    _logger.LogInformation(
+                        "[AI-FALLBACK-TOOL] Tool={Tool} Success={Succ} Error={Err} TimeMs={Ms}",
+                        call.ToolName,
+                        call.Result.IsSuccess,
+                        call.Result.ErrorMessage ?? "",
+                        call.Result.ExecutionTimeMs);
+                }
+            }
+
             var result = new AIAgentResult
             {
-                Answer = decision.FinalAnswer ?? "",
+                Answer = !string.IsNullOrWhiteSpace(decision?.FinalAnswer)
+                    ? decision.FinalAnswer
+                    : "Xin lỗi, AI không trả lời được câu hỏi này.",
                 ReasoningSteps = reasoningSteps,
                 ToolCalls = history.Calls,
                 ProcessingTimeMs = sw.ElapsedMilliseconds,
                 ToolCallCount = history.Calls.Count,
-                Success = true
+                Success = true,
+                FallbackReason = fallbackReason
             };
 
             _logger.LogInformation(
-                "AIAgent completed: Question={Question}, ToolsCalled={Count}, Time={Ms}ms",
+                "AIAgent completed: Question={Question}, ToolsCalled={Count}, ToolNames={Tools}, Time={Ms}ms",
                 userQuestion.Length > 50 ? userQuestion[..50] + "..." : userQuestion,
                 history.Calls.Count,
+                string.Join(",", history.Calls.Select(c => c.ToolName)),
                 sw.ElapsedMilliseconds);
 
             return result;
@@ -172,6 +258,50 @@ public class AIAgent
                 Success = false,
                 ErrorMessage = ex.Message
             };
+        }
+    }
+
+    /// <summary>
+    /// [METHOD A] Auto-fetch document context cho MỌI query — luôn chạy trước get_group_documents + search_documents
+    /// KHÔNG đếm vào MaxToolCalls budget của LLM
+    /// </summary>
+    private async Task AutoFetchDocumentContextAsync(
+        string userQuestion,
+        ToolExecutionHistory history,
+        List<string> reasoningSteps,
+        AIQueryContext context,
+        CancellationToken cancellationToken)
+    {
+        reasoningSteps.Add("[METHOD-A] Auto-fetching document context for every query...");
+
+        // Auto-Step 1: get_group_documents — lấy danh sách file có sẵn trong group
+        var docListResult = await ExecuteToolAsync(
+            "get_group_documents",
+            new JsonObject(),
+            context,
+            cancellationToken);
+        history.AddCall("get_group_documents", new JsonObject(), docListResult);
+        reasoningSteps.Add($"[METHOD-A] get_group_documents: {(docListResult.IsSuccess ? "OK" : $"FAIL ({docListResult.ErrorMessage})")}");
+
+        // Auto-Step 2: search_documents — tìm kiếm với query = câu hỏi user
+        // Chỉ search nếu có nội dung (tránh empty query error)
+        if (!string.IsNullOrWhiteSpace(userQuestion))
+        {
+            var searchParams = new JsonObject
+            {
+                ["query"] = JsonValue.Create(userQuestion)
+            };
+            var searchResult = await ExecuteToolAsync(
+                "search_documents",
+                searchParams,
+                context,
+                cancellationToken);
+            history.AddCall("search_documents", searchParams, searchResult);
+            reasoningSteps.Add($"[METHOD-A] search_documents(query='{userQuestion}'): {(searchResult.IsSuccess ? "OK" : $"FAIL ({searchResult.ErrorMessage})")}");
+        }
+        else
+        {
+            reasoningSteps.Add("[METHOD-A] search_documents: Skipped (empty question)");
         }
     }
 
@@ -221,16 +351,32 @@ public class AIAgent
             promptBuilder.AppendLine("- Analyze the question carefully");
             promptBuilder.AppendLine("- If you need data, call the appropriate tool(s)");
             promptBuilder.AppendLine("- If you have enough information, provide the answer directly");
-            promptBuilder.AppendLine("- Format your response as JSON with 'action' (tool_call or answer) and either 'tool_name'/'parameters' or 'final_answer'");
+            promptBuilder.AppendLine("- IMPORTANT - JSON FORMAT: Your response MUST be a valid single-line JSON object.");
+            promptBuilder.AppendLine("  - Tool call: {\"action\": \"tool_call\", \"tool_name\": \"tool_name_here\", \"parameters\": {\"key\": \"value\"}}");
+            promptBuilder.AppendLine("  - Final answer: {\"action\": \"answer\", \"final_answer\": \"your answer text here\"}");
+            promptBuilder.AppendLine("  - NEVER omit the parameters field. If tool needs no params, use {\"parameters\": {}}");
             promptBuilder.AppendLine("- final_answer: chi la van ban thuan tuy. Khong dat trong ```, khong dat trong JSON object. Neu can xuong dong, dung \\n. Khong dung danh sach bullet dac biet.");
+            promptBuilder.AppendLine("- search_documents REQUIREMENTS: {\"action\": \"tool_call\", \"tool_name\": \"search_documents\", \"parameters\": {\"query\": \"YOUR_SEARCH_KEYWORD_HERE\"}}");
         }
         else
         {
             promptBuilder.AppendLine("- Based on the tool results, decide:");
             promptBuilder.AppendLine("  1. Call another tool if you need more data");
             promptBuilder.AppendLine("  2. Provide the final answer if you have enough information");
-            promptBuilder.AppendLine("- Format: {\"action\": \"tool_call\" or \"answer\", \"tool_name\": \"...\", \"parameters\": {...}, \"final_answer\": \"...\"}");
+            promptBuilder.AppendLine("- IMPORTANT - JSON FORMAT: Your response MUST be a valid single-line JSON object.");
+            promptBuilder.AppendLine("  - Tool call: {\"action\": \"tool_call\", \"tool_name\": \"tool_name_here\", \"parameters\": {\"key\": \"value\"}}");
+            promptBuilder.AppendLine("  - Final answer: {\"action\": \"answer\", \"final_answer\": \"your answer text here\"}");
+            promptBuilder.AppendLine("  - NEVER omit the parameters field. If tool needs no params, use {\"parameters\": {}}");
             promptBuilder.AppendLine("- final_answer: chi la van ban thuan tuy. Khong dat trong ```, khong dat trong JSON object. Neu can xuong dong, dung \\n. Khong dung danh sach bullet dac biet.");
+
+            // Hint: neu search_documents that bai vi query rong -> goi get_group_documents truoc
+            if (history.Calls.Any(c => c.ToolName == "search_documents" && !c.Result.IsSuccess))
+            {
+                promptBuilder.AppendLine("- PREVIOUS FAILURE: search_documents that bai vi thieu query. "
+                    + "Dieu nay xay ra vi ban khong biet trong nhom co nhung tai lieu gi. "
+                    + "Goi get_group_documents (khong can tham so) de lay danh sach tai lieu co san. "
+                    + "Sau do dua tren danh sach do, ban se biet phai tim kiem noi dung gi.");
+            }
         }
 
         // Gọi LLM
@@ -245,6 +391,13 @@ public class AIAgent
             userQuestion,
             "", // No extra context needed
             cancellationToken);
+
+        _logger.LogInformation(
+            "[LLM-RESPONSE] Step={Step} IsContinuation={IsCont} ResponseLength={Len} Response={Response}",
+            history.Calls.Count,
+            isContinuation,
+            response.Length,
+            response.Length > 300 ? response[..300] + "..." : response);
 
         // Parse response để quyết định action
         return ParseDecision(response, toolsManifest);
@@ -283,14 +436,13 @@ public class AIAgent
         // Validate parameters before execution
         if (!tool.ValidateParameters(parameters))
         {
-            parameters.TryGetPropertyValue("studio_id", out var studioIdNode);
-            var studioIdValue = studioIdNode?.GetValue<string>();
+            var queryVal = parameters.TryGetPropertyValue("query", out var q) ? q?.GetValue<string>() : "(missing)";
+            var topKVal = parameters.TryGetPropertyValue("top_k", out var tk) ? tk?.GetValue<string>() : "(missing)";
+            var studioIdVal = parameters.TryGetPropertyValue("studio_id", out var s) ? s?.GetValue<string>() : "(missing)";
             _logger.LogWarning(
-                "Invalid parameters for tool {ToolName}: Parameters={Parameters}, studio_id='{StudioId}', studioIdValid={IsValid}",
-                toolName, parameters.ToJsonString(),
-                studioIdValue ?? "NULL/MISSING",
-                !string.IsNullOrEmpty(studioIdValue) && Guid.TryParse(studioIdValue, out _));
-            return AIQueryResult.Error("Tham số không hợp lệ cho tool này");
+                "[TOOL-INVALID-PARAMS] Tool={ToolName} | query={Query} top_k={TopK} studio_id={StudioId}",
+                toolName, queryVal ?? "(null)", topKVal, studioIdVal ?? "(not in context)");
+            return AIQueryResult.Error($"Tham so khong hop le: query='{queryVal ?? "(null)"}' top_k='{topKVal}' studio_id='{studioIdVal ?? "(khong co trong context)"}'");
         }
 
         try
@@ -309,20 +461,64 @@ public class AIAgent
     /// </summary>
     private AgentDecision ParseDecision(string response, JsonObject toolsManifest)
     {
+        // Guard: JSON bị cắt (streaming bị interrupt) — phát hiện bằng dấu hiệu:
+        // - Chứa dấu `{` mở nhưng KHÔNG có `}` đóng hợp lệ
+        // - Thường xảy ra ở cuối stream — response bị cắt giữa chừng
+        if (response.Contains('{') && !response.TrimEnd().EndsWith('}'))
+        {
+            _logger.LogWarning(
+                "[PARSE-TRUNCATED] LLM response truncated (JSON incomplete). Length={Len} Preview={Preview}",
+                response.Length, response.Length > 200 ? response[..200] + "..." : response);
+
+            // Thử extract action từ phần đã nhận được
+            string? partialAction = null;
+            foreach (var line in response.Split('\n'))
+            {
+                var trimmed = line.Trim();
+                if (trimmed.Contains("\"action\""))
+                {
+                    var colonIdx = trimmed.IndexOf(':');
+                    if (colonIdx >= 0)
+                    {
+                        var val = trimmed[(colonIdx + 1)..].Trim().Trim(',', '"', ' ', '{', '}');
+                        if (val.StartsWith("tool_call")) partialAction = "tool_call";
+                        else if (val.StartsWith("answer")) partialAction = "answer";
+                    }
+                }
+            }
+
+            if (partialAction == "tool_call")
+            {
+                // Truncated tool_call → ask LLM to retry with complete JSON
+                return new AgentDecision
+                {
+                    ShouldCallTool = false,
+                    FinalAnswer = "[INTERNAL_RETRY: JSON bi cat. Vui long goi lai tool voi JSON day du, dung format: {\"action\": \"tool_call\", \"tool_name\": \"...\", \"parameters\": {\"query\": \"...\"}}]"
+                };
+            }
+
+            // Không extract được gì → fallback
+            return new AgentDecision
+            {
+                ShouldCallTool = false,
+                FinalAnswer = "Xin loi, phan hoi bi cat giua chung. Vui long thu lai."
+            };
+        }
+
         try
         {
             // Thử parse JSON
             var json = JsonSerializer.Deserialize<JsonElement>(response);
-            
+
             if (json.TryGetProperty("action", out var actionElement))
             {
                 var action = actionElement.GetString();
-                
+
                 if (action == "tool_call")
                 {
                     var toolName = json.TryGetProperty("tool_name", out var tn) ? tn.GetString() : null;
-                    var parameters = json.TryGetProperty("parameters", out var p) ? 
-                        JsonSerializer.Deserialize<JsonObject>(p.GetRawText()) ?? new JsonObject() : 
+                    var parameters = json.TryGetProperty("parameters", out var p) ?
+                        JsonSerializer.Deserialize<JsonObject>(p.GetRawText()) ?? new JsonObject() :
                         new JsonObject();
 
                     return new AgentDecision
@@ -334,10 +530,11 @@ public class AIAgent
                 }
                 else if (action == "answer")
                 {
+                    var fa = json.TryGetProperty("final_answer", out var faVal) ? faVal.GetString() : null;
                     return new AgentDecision
                     {
                         ShouldCallTool = false,
-                        FinalAnswer = json.TryGetProperty("final_answer", out var fa) ? fa.GetString() : response
+                        FinalAnswer = !string.IsNullOrWhiteSpace(fa) ? fa : response
                     };
                 }
             }
@@ -349,9 +546,11 @@ public class AIAgent
                 FinalAnswer = response
             };
         }
-        catch
+        catch (Exception ex)
         {
-            // Nếu parse fail, coi response là final answer
+            // Nếu parse fail, coi response là final answer nhưng log để debug
+            _logger.LogWarning(ex, "ParseDecision: LLM response is not valid JSON. Raw length: {Len}, Raw: {Raw}",
+                response.Length, response.Length > 200 ? response[..200] + "..." : response);
             return new AgentDecision
             {
                 ShouldCallTool = false,
@@ -362,8 +561,10 @@ public class AIAgent
 
     private string GetSystemPromptVi() => @"Bạn là trợ lý AI của Study Studio - nền tảng học tập nhóm.
 
-## KHẢ NĂNG ĐẶC BIỆT
-Bạn có quyền truy cập vào các tools để lấy dữ liệu từ database. Khi cần thông tin cụ thể, hãy gọi tool thay vì đoán.
+## NGỮ CẢNH
+- ĐÂY LÀ GROUP AI: user đang ở trong một nhóm cụ thể.
+- group_id ĐÃ ĐƯỢC CUNG CẤP TỰ ĐỘNG bởi hệ thống. KHÔNG cần hỏi user về group_id.
+- CÁC TOOL bên dưới sẽ tự động nhận group_id từ hệ thống. KHÔNG truyền group_id/studio_id trong parameters.
 
 ## CÁCH HOẠT ĐỘNG
 1. Đọc câu hỏi của user
@@ -371,17 +572,32 @@ Bạn có quyền truy cập vào các tools để lấy dữ liệu từ databa
 3. Nếu cần data → gọi tool → nhận kết quả → quyết định tiếp
 4. Nếu đủ thông tin → trả lời
 
-## CÁC TOOLS CÓ SẴN
-- get_tasks: Lấy danh sách công việc
-- get_group_stats: Lấy thống kê nhóm (bao gồm task đang thực hiện, chưa bắt đầu)
-- get_members: Lấy danh sách thành viên
-- get_deadlines: Lấy danh sách deadline
-- search_documents: Tìm kiếm tài liệu của nhóm
+## CÁC TOOLS CÓ SẴN (group_id đã được tự động cung cấp)
+- get_tasks: Lấy danh sách công việc (không cần tham số)
+- get_group_stats: Lấy thống kê nhóm (không cần tham số)
+- get_members: Lấy danh sách thành viên (không cần tham số)
+- get_deadlines: Lấy danh sách deadline (không cần tham số)
+- search_documents: Tìm kiếm tài liệu. Parameters: query (bắt buộc, câu hỏi/từ khóa tìm kiếm). group_id được tự động cung cấp.
+- get_group_documents: Lấy danh sách file đã upload. Không cần tham số.
+
+## QUY TRÌNH TÌM TÀI LIỆU (QUAN TRỌNG):
+1. Khi user hỏi về tài liệu mà bạn KHÔNG BIẾT trong nhóm có những file gì
+   → GỌI get_group_documents TRƯỚC để lấy danh sách file có sẵn
+2. Sau khi có danh sách → đánh giá file nào phù hợp với câu hỏi
+3. Nếu chưa rõ (ví dụ: ""tài liệu report 3"" nhưng có nhiều file chứa ""report"")
+   → HỎI USER làm rõ từ danh sách có sẵn, KHÔNG gọi search_documents ngay
+4. Khi đã xác định được file cần tìm → gọi search_documents với query phù hợp
+
+## LỖI THƯỜNG GẶP - TRÁNH XA:
+- ""Tham so khong hop le"" = LLM gọi tool nhưng THIẾU hoặc SAI tham số bắt buộc (query)
+- ""Khong co quyen"" = User không phải thành viên nhóm
+- KHÔNG BAO GIỜ hỏi user về group_id, studio_id, hay yêu cầu cung cấp thông tin đã có sẵn
 
 ## QUY TẮC
 - Chỉ gọi tool khi thực sự cần data
 - Trả lời bằng tiếng Việt
 - Trung thực, không bịa đặt thông tin
+- Nếu không tìm thấy tài liệu, nói rõ và gợi ý từ khóa khác
 - Nếu data không đủ, nói rõ là không đủ thông tin
 
 ## FORMAT TRẢ LỜI
@@ -391,8 +607,10 @@ Luôn trả lời dưới dạng JSON:
 
     private string GetSystemPromptEn() => @"You are an AI assistant for Study Studio - a group learning platform.
 
-## SPECIAL CAPABILITIES
-You have access to tools to retrieve data from the database. When you need specific information, call the tool instead of guessing.
+## CONTEXT
+- THIS IS GROUP AI: user is inside a specific group.
+- group_id IS AUTOMATICALLY PROVIDED by the system. DO NOT ask user for group_id.
+- Tools below will automatically receive group_id from the system. DO NOT pass group_id/studio_id in parameters.
 
 ## HOW IT WORKS
 1. Read user's question
@@ -400,16 +618,32 @@ You have access to tools to retrieve data from the database. When you need speci
 3. If need data → call tool → get results → decide next step
 4. If enough info → provide answer
 
-## AVAILABLE TOOLS
-- get_tasks: Get task list
-- get_group_stats: Get group statistics
-- get_members: Get member list
-- get_deadlines: Get upcoming deadlines
+## AVAILABLE TOOLS (group_id auto-provided)
+- get_tasks: Get task list (no parameters needed)
+- get_group_stats: Get group statistics (no parameters needed)
+- get_members: Get member list (no parameters needed)
+- get_deadlines: Get upcoming deadlines (no parameters needed)
+- search_documents: Search group documents. Parameters: query (required, search keyword/question). group_id auto-provided.
+- get_group_documents: List uploaded files (no parameters needed).
+
+## DOCUMENT SEARCH WORKFLOW (IMPORTANT):
+1. When user asks about documents and you DON'T KNOW what files exist in the group
+   → CALL get_group_documents FIRST to get the list of available files
+2. After getting the list → evaluate which file matches the question
+3. If unclear (e.g., ""report 3"" but multiple files contain ""report"")
+   → ASK USER to clarify from the available list, DO NOT call search_documents yet
+4. When you know which file to search → call search_documents with appropriate query
+
+## COMMON ERRORS - AVOID:
+- ""Tham so khong hop le"" = LLM called tool but MISSING or WRONG required parameter (e.g., query is null)
+- ""Khong co quyen"" = User is not a member of the group
+- NEVER ask user for group_id, studio_id, or information already available
 
 ## RULES
 - Only call tools when you really need data
 - Answer in English
 - Be honest, don't fabricate information
+- If no documents found, say so clearly and suggest alternative search terms
 - If data is insufficient, clearly state it
 
 ## RESPONSE FORMAT
@@ -616,8 +850,11 @@ public class AIAgentResult
     public int ToolCallCount { get; set; }
     public bool Success { get; set; }
     public string? ErrorMessage { get; set; }
+    /// <summary>
+    /// Lý do khi fallback fire — null nếu LLM trả lời thật.
+    /// </summary>
+    public string? FallbackReason { get; set; }
 }
-
 /// <summary>
 /// Quyết định của Agent
 /// </summary>

@@ -22,8 +22,9 @@ public class SearchDocumentsTool : IAITool
 
     public string Name => "search_documents";
     public string Description => "Tim kiem noi dung trong tai lieu cua nhom. "
-        + "Parameters: query (bat buoc, cau hoi/tu khoa tim kiem), top_k (optional, mac dinh 3). "
-        + "group_id tu dong lay tu he thong.";
+        + "IMPORTANT: query la tham so BAT BUOC (bat buoc phai co). "
+        + "Dien noi dung cau hoi hoac tu khoa tim kiem vao query. "
+        + "group_id duoc tu dong cung cap boi he thong. Khong can truyen group_id.";
 
     public JsonObject ParametersSchema => new JsonObject
     {
@@ -68,6 +69,9 @@ public class SearchDocumentsTool : IAITool
             var topK = Ji(parameters["top_k"]);
             if (topK <= 0) topK = 3;
 
+            _logger.LogInformation("[TOOL-START] search_documents | query={Query} groupId={GroupId} topK={TopK}",
+                query, groupId, topK);
+
             // Permission check
             if (!await _participantRepository.IsUserInGroupAsync(groupId, context.UserId))
                 return AIQueryResult.Error("Ban khong co quyen truy cap nhom nay");
@@ -78,6 +82,9 @@ public class SearchDocumentsTool : IAITool
             // Search Qdrant
             var results = await _qdrantService.SearchVectorsAsync(
                 queryVector, topK, groupId, cancellationToken);
+
+            _logger.LogInformation("[TOOL-QDRANT] search_documents | resultsCount={Count} elapsedMs={Ms}",
+                results.Count, sw.ElapsedMilliseconds);
 
             // Build response
             var docs = results.Select(r => new JsonObject
@@ -91,11 +98,24 @@ public class SearchDocumentsTool : IAITool
 
             sw.Stop();
             bool isEnglish = context.Language.ToLower() == "en";
+
+            if (docs.Count == 0)
+            {
+                _logger.LogWarning("[TOOL-EMPTY] search_documents | query={Query} — No documents found (Qdrant returned 0 results)",
+                    query);
+            }
+            else
+            {
+                _logger.LogInformation("[TOOL-SUCCESS] search_documents | docsReturned={Count} elapsedMs={Ms}",
+                    docs.Count, sw.ElapsedMilliseconds);
+            }
+
             return AIQueryResult.Success(new JsonObject
             {
                 ["query"] = query,
                 ["documents"] = new JsonArray(docs.ToArray()),
                 ["total_found"] = docs.Count,
+                ["qdrant_reachable"] = true,
                 ["summary"] = isEnglish
                     ? $"Found {docs.Count} relevant document chunks"
                     : $"Tim thay {docs.Count} doan noi dung lien quan"
@@ -103,8 +123,9 @@ public class SearchDocumentsTool : IAITool
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "SearchDocumentsTool error");
-            return AIQueryResult.Error("Da xay ra loi khi tim kiem tai lieu");
+            sw.Stop();
+            _logger.LogError(ex, "[TOOL-ERROR] search_documents | query={Query} — Unexpected error", Js(parameters["query"]));
+            return AIQueryResult.Error($"search_documents failed: {ex.Message}");
         }
     }
 }
