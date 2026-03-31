@@ -124,18 +124,27 @@ public class GetStudioAnalyticsTool : IAITool
                 else
                     fromDate = DateTime.UtcNow.AddDays(-30);
 
-                var allGroupIds = groups.Select(g => g.GroupId).ToList();
+                var toDate = DateTime.UtcNow;
+                var groupIds = groups.Select(g => g.GroupId).ToList();
 
-                var createdByGroup = await _analyticsRepository.AggregateTasksCreatedByUserAsync(fromDate, DateTime.UtcNow);
-                var completedByGroup = await _analyticsRepository.AggregateTasksCompletedByUserAsync(fromDate, DateTime.UtcNow);
-                var messagesByGroup = await _analyticsRepository.AggregateMessagesByGroupAsync(groups.First().GroupId, fromDate, DateTime.UtcNow);
+                // Aggregate tasks created and completed across all groups
+                var tasksCreatedTotal = 0;
+                var tasksCompletedTotal = 0;
+                foreach (var g in groups)
+                {
+                    var created = await _analyticsRepository.AggregateTasksByGroupAsync(g.GroupId, fromDate, toDate);
+                    tasksCreatedTotal += created.GetValueOrDefault(g.GroupId, 0);
+
+                    var completed = await _analyticsRepository.AggregateCompletedTasksByGroupAsync(g.GroupId, fromDate, toDate);
+                    tasksCompletedTotal += completed.GetValueOrDefault(g.GroupId, 0);
+                }
 
                 result["recent_activity"] = new JsonObject
                 {
                     ["from_date"] = fromDate.ToString("yyyy-MM-dd"),
-                    ["to_date"] = DateTime.UtcNow.ToString("yyyy-MM-dd"),
-                    ["tasks_created"] = createdByGroup.Values.Sum(),
-                    ["tasks_completed"] = completedByGroup.Values.Sum()
+                    ["to_date"] = toDate.ToString("yyyy-MM-dd"),
+                    ["tasks_created"] = tasksCreatedTotal,
+                    ["tasks_completed"] = tasksCompletedTotal
                 };
             }
 

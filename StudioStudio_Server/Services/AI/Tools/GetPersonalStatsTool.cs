@@ -15,8 +15,8 @@ namespace StudioStudio_Server.Services.AI.Tools;
 public class GetPersonalStatsTool : IAITool
 {
     private readonly ITaskRepository _taskRepository;
-    private readonly IAnalyticsRepository _analyticsRepository;
     private readonly IGroupRepository _groupRepository;
+    private readonly IAnalyticsRepository _analyticsRepository;
     private readonly ILogger<GetPersonalStatsTool> _logger;
 
     public string Name => "get_personal_stats";
@@ -31,13 +31,13 @@ public class GetPersonalStatsTool : IAITool
 
     public GetPersonalStatsTool(
         ITaskRepository taskRepository,
-        IAnalyticsRepository analyticsRepository,
         IGroupRepository groupRepository,
+        IAnalyticsRepository analyticsRepository,
         ILogger<GetPersonalStatsTool> logger)
     {
         _taskRepository = taskRepository;
-        _analyticsRepository = analyticsRepository;
         _groupRepository = groupRepository;
+        _analyticsRepository = analyticsRepository;
         _logger = logger;
     }
 
@@ -66,10 +66,6 @@ public class GetPersonalStatsTool : IAITool
                 .Where(t => t.DueDate.HasValue && t.DueDate.Value >= now && t.DueDate.Value <= now.AddDays(7))
                 .ToList();
 
-            // Get weekly productivity from analytics
-            var weeklyProductivity = await _analyticsRepository.GetUserProductivityAsync(
-                context.UserId, null, weekStart);
-
             // Get group memberships for context
             var userGroups = await _groupRepository.GetUserGroupsAsync(context.UserId);
 
@@ -83,6 +79,15 @@ public class GetPersonalStatsTool : IAITool
                 .Where(t => t.UpdatedAt >= now.AddDays(-7))
                 .ToList();
 
+            // Calculate productivity score from activity logs (7-day rolling window)
+            double productivityScore = 0;
+            var userGroupIds = userGroups.Select(g => g.GroupId).ToList();
+            if (userGroupIds.Count > 0)
+            {
+                var activityScores = await _analyticsRepository.GetUserGroupActivityScoresAsync(userGroupIds, context.UserId, now.AddDays(-7), now);
+                productivityScore = activityScores.Values.Sum();
+            }
+
             sw.Stop();
 
             return AIQueryResult.Success(new JsonObject
@@ -95,7 +100,7 @@ public class GetPersonalStatsTool : IAITool
                 ["weekly_completed"] = weeklyCompleted.Count,
                 ["completion_rate_percent"] = completionRate,
                 ["total_groups"] = userGroups.Count,
-                ["productivity_score"] = weeklyProductivity?.ProductivityScore ?? 0,
+                ["productivity_score"] = productivityScore,
                 ["period"] = new JsonObject
                 {
                     ["week_start"] = weekStart.ToString("yyyy-MM-dd"),

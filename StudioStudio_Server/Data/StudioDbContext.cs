@@ -36,10 +36,7 @@ namespace StudioStudio_Server.Data
         public DbSet<StudioParticipant> StudioParticipants => Set<StudioParticipant>();
 
         // Analytics Entities
-        public DbSet<UserActivityMetrics> UserActivityMetrics => Set<UserActivityMetrics>();
-        public DbSet<UserProductivityScores> UserProductivityScores => Set<UserProductivityScores>();
         public DbSet<GroupAnalytics> GroupAnalytics => Set<GroupAnalytics>();
-        public DbSet<TaskPerformanceMetrics> TaskPerformanceMetrics => Set<TaskPerformanceMetrics>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -431,40 +428,6 @@ namespace StudioStudio_Server.Data
                 e.Property(x => x.CreatedAt).IsRequired();
             });
 
-            // USER ACTIVITY METRICS
-            modelBuilder.Entity<UserActivityMetrics>(e =>
-            {
-                e.HasKey(x => x.Id);
-
-                e.HasIndex(x => new { x.UserId, x.Date })
-                    .IsUnique();
-
-                e.HasOne(x => x.User)
-                    .WithMany()
-                    .HasForeignKey(x => x.UserId)
-                    .OnDelete(DeleteBehavior.Cascade);
-            });
-
-            // USER PRODUCTIVITY SCORES
-            modelBuilder.Entity<UserProductivityScores>(e =>
-            {
-                e.HasKey(x => x.Id);
-
-                e.HasIndex(x => new { x.UserId, x.GroupId, x.WeekStart })
-                    .IsUnique();
-
-                e.HasOne(x => x.User)
-                    .WithMany()
-                    .HasForeignKey(x => x.UserId)
-                    .OnDelete(DeleteBehavior.Cascade);
-
-                e.HasOne(x => x.Group)
-                    .WithMany()
-                    .HasForeignKey(x => x.GroupId)
-                    .OnDelete(DeleteBehavior.Cascade)
-                    .IsRequired(false);
-            });
-
             // GROUP ANALYTICS
             modelBuilder.Entity<GroupAnalytics>(e =>
             {
@@ -476,25 +439,6 @@ namespace StudioStudio_Server.Data
                 e.HasOne(x => x.Group)
                     .WithMany()
                     .HasForeignKey(x => x.GroupId)
-                    .OnDelete(DeleteBehavior.Cascade);
-            });
-
-            // TASK PERFORMANCE METRICS
-            modelBuilder.Entity<TaskPerformanceMetrics>(e =>
-            {
-                e.HasKey(x => x.Id);
-
-                e.HasIndex(x => x.TaskId)
-                    .IsUnique();
-
-                e.HasOne(x => x.Task)
-                    .WithMany()
-                    .HasForeignKey(x => x.TaskId)
-                    .OnDelete(DeleteBehavior.Cascade);
-
-                e.HasOne(x => x.User)
-                    .WithMany()
-                    .HasForeignKey(x => x.UserId)
                     .OnDelete(DeleteBehavior.Cascade);
             });
 

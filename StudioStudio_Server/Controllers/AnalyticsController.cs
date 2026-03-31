@@ -1,10 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using StudioStudio_Server.Exceptions;
-using StudioStudio_Server.Models.DTOs.Request;
 using StudioStudio_Server.Models.DTOs.Response;
-using StudioStudio_Server.Services;
 using StudioStudio_Server.Services.Interfaces;
 using System.Security.Claims;
 
@@ -16,14 +13,10 @@ namespace StudioStudio_Server.Controllers
     public class AnalyticsController : ControllerBase
     {
         private readonly IAnalyticsService _analyticsService;
-        private readonly IMessageService _messageService;
 
-        public AnalyticsController(
-            IAnalyticsService analyticsService,
-            IMessageService messageService)
+        public AnalyticsController(IAnalyticsService analyticsService)
         {
             _analyticsService = analyticsService;
-            _messageService = messageService;
         }
 
         /// <summary>
@@ -56,83 +49,6 @@ namespace StudioStudio_Server.Controllers
             return userId;
         }
 
-        // ==================== USER ANALYTICS ====================
-
-        /// <summary>
-        /// Get user dashboard with productivity score, activity heatmap, task completion trend, and deadline performance
-        /// </summary>
-        [HttpGet("user/dashboard")]
-        public async Task<ActionResult<ApiResponse<UserDashboardResponse>>> GetUserDashboard(
-            [FromQuery] DateTime? startDate = null,
-            [FromQuery] DateTime? endDate = null)
-        {
-            var userId = ValidateAndGetUserId();
-
-            DateOnly? start = startDate.HasValue ? DateOnly.FromDateTime(startDate.Value) : null;
-            DateOnly? end = endDate.HasValue ? DateOnly.FromDateTime(endDate.Value) : null;
-
-            var result = await _analyticsService.GetUserDashboardAsync(userId, start, end);
-            var message = _messageService.GetMessage(ErrorCodes.SuccessGetData);
-
-            return Ok(ApiResponse<UserDashboardResponse>.Success(
-                ErrorCodes.SuccessGetData,
-                message,
-                result));
-        }
-
-        /// <summary>
-        /// Get user activity heatmap data
-        /// </summary>
-        [HttpGet("user/heatmap")]
-        public async Task<ActionResult<ApiResponse<List<ActivityHeatmapData>>>> GetUserActivityHeatmap(
-            [FromQuery] int days = 30)
-        {
-            var userId = ValidateAndGetUserId();
-
-            var result = await _analyticsService.GetUserActivityHeatmapAsync(userId, days);
-            var message = _messageService.GetMessage(ErrorCodes.SuccessGetData);
-
-            return Ok(ApiResponse<List<ActivityHeatmapData>>.Success(
-                ErrorCodes.SuccessGetData,
-                message,
-                result));
-        }
-
-        /// <summary>
-        /// Get task completion trend over time
-        /// </summary>
-        [HttpGet("user/trends")]
-        public async Task<ActionResult<ApiResponse<List<TaskCompletionTrendData>>>> GetTaskCompletionTrend(
-            [FromQuery] int days = 30)
-        {
-            var userId = ValidateAndGetUserId();
-
-            var result = await _analyticsService.GetTaskCompletionTrendAsync(userId, days);
-            var message = _messageService.GetMessage(ErrorCodes.SuccessGetData);
-
-            return Ok(ApiResponse<List<TaskCompletionTrendData>>.Success(
-                ErrorCodes.SuccessGetData,
-                message,
-                result));
-        }
-
-        /// <summary>
-        /// Get deadline performance (on-time vs late completion)
-        /// </summary>
-        [HttpGet("user/deadline-performance")]
-        public async Task<ActionResult<ApiResponse<DeadlinePerformanceData>>> GetDeadlinePerformance()
-        {
-            var userId = ValidateAndGetUserId();
-
-            var result = await _analyticsService.GetDeadlinePerformanceAsync(userId);
-            var message = _messageService.GetMessage(ErrorCodes.SuccessGetData);
-
-            return Ok(ApiResponse<DeadlinePerformanceData>.Success(
-                ErrorCodes.SuccessGetData,
-                message,
-                result));
-        }
-
         // ==================== GROUP ANALYTICS ====================
 
         /// <summary>
@@ -146,11 +62,10 @@ namespace StudioStudio_Server.Controllers
             var userId = ValidateAndGetUserId();
 
             var result = await _analyticsService.GetGroupSummaryAsync(groupId, userId);
-            var message = _messageService.GetMessage(ErrorCodes.SuccessGetData);
 
             return Ok(ApiResponse<GroupSummaryResponse>.Success(
                 ErrorCodes.SuccessGetData,
-                message,
+                "Data retrieved successfully",
                 result));
         }
 
@@ -169,11 +84,10 @@ namespace StudioStudio_Server.Controllers
             DateOnly? end = endDate.HasValue ? DateOnly.FromDateTime(endDate.Value) : null;
 
             var result = await _analyticsService.GetMemberProgressTrendAsync(groupId, start, end);
-            var message = _messageService.GetMessage(ErrorCodes.SuccessGetData);
 
             return Ok(ApiResponse<List<MemberProgressTrendData>>.Success(
                 ErrorCodes.SuccessGetData,
-                message,
+                "Data retrieved successfully",
                 result));
         }
 
@@ -192,11 +106,10 @@ namespace StudioStudio_Server.Controllers
             DateOnly? end = endDate.HasValue ? DateOnly.FromDateTime(endDate.Value) : null;
 
             var result = await _analyticsService.GetMemberHeatmapAsync(groupId, start, end);
-            var message = _messageService.GetMessage(ErrorCodes.SuccessGetData);
 
             return Ok(ApiResponse<List<MemberHeatmapData>>.Success(
                 ErrorCodes.SuccessGetData,
-                message,
+                "Data retrieved successfully",
                 result));
         }
 
@@ -210,11 +123,10 @@ namespace StudioStudio_Server.Controllers
             var userId = ValidateAndGetUserId();
 
             var result = await _analyticsService.GetGroupMemberContributionAsync(groupId);
-            var message = _messageService.GetMessage(ErrorCodes.SuccessGetData);
 
             return Ok(ApiResponse<List<MemberContributionData>>.Success(
                 ErrorCodes.SuccessGetData,
-                message,
+                "Data retrieved successfully",
                 result));
         }
 
@@ -230,11 +142,10 @@ namespace StudioStudio_Server.Controllers
             var userId = ValidateAndGetUserId();
 
             var result = await _analyticsService.GetStudioGroupComparisonAsync(studioId);
-            var message = _messageService.GetMessage(ErrorCodes.SuccessGetData);
 
             return Ok(ApiResponse<List<GroupComparisonData>>.Success(
                 ErrorCodes.SuccessGetData,
-                message,
+                "Data retrieved successfully",
                 result));
         }
 
@@ -255,11 +166,10 @@ namespace StudioStudio_Server.Controllers
             var start = startDate.HasValue ? DateOnly.FromDateTime(startDate.Value) : end.AddDays(-29);
 
             var result = await _analyticsService.GetStudioGroupHeatmapAsync(studioId, start, end);
-            var message = _messageService.GetMessage(ErrorCodes.SuccessGetData);
 
             return Ok(ApiResponse<StudioGroupHeatmapResponse>.Success(
                 ErrorCodes.SuccessGetData,
-                message,
+                "Data retrieved successfully",
                 result));
         }
 
@@ -278,11 +188,10 @@ namespace StudioStudio_Server.Controllers
             var userId = ValidateAndGetUserId();
 
             var result = await _analyticsService.GetStudioOverviewAsync(studioId);
-            var message = _messageService.GetMessage(ErrorCodes.SuccessGetData);
 
             return Ok(ApiResponse<StudioOverviewResponse>.Success(
                 ErrorCodes.SuccessGetData,
-                message,
+                "Data retrieved successfully",
                 result));
         }
 
@@ -319,11 +228,10 @@ namespace StudioStudio_Server.Controllers
             }
 
             var result = await _analyticsService.GetStudioCompletionTrendAsync(studioId, start, end, parsedGroupIds);
-            var message = _messageService.GetMessage(ErrorCodes.SuccessGetData);
 
             return Ok(ApiResponse<StudioCompletionTrendResponse>.Success(
                 ErrorCodes.SuccessGetData,
-                message,
+                "Data retrieved successfully",
                 result));
         }
 
@@ -347,11 +255,10 @@ namespace StudioStudio_Server.Controllers
             DateOnly? end = endDate.HasValue ? DateOnly.FromDateTime(endDate.Value) : null;
 
             var result = await _analyticsService.GetStudioGroupStatusAsync(studioId, start, end);
-            var message = _messageService.GetMessage(ErrorCodes.SuccessGetData);
 
             return Ok(ApiResponse<StudioGroupStatusResponse>.Success(
                 ErrorCodes.SuccessGetData,
-                message,
+                "Data retrieved successfully",
                 result));
         }
 
@@ -382,12 +289,182 @@ namespace StudioStudio_Server.Controllers
             DateOnly? end = endDate.HasValue ? DateOnly.FromDateTime(endDate.Value) : null;
 
             var result = await _analyticsService.GetStudioGroupActivityAsync(studioId, start, end);
-            var message = _messageService.GetMessage(ErrorCodes.SuccessGetData);
 
             return Ok(ApiResponse<StudioGroupActivityResponse>.Success(
                 ErrorCodes.SuccessGetData,
-                message,
+                "Data retrieved successfully",
                 result));
+        }
+
+        // ==================== PERSONAL ANALYTICS (AnalysisHome) ====================
+
+        /// <summary>
+        /// GET /api/analytics/user/{userId}/kpi-summary
+        /// KPI summary: total tasks, completed, overdue, completion rate, avg time
+        /// </summary>
+        [HttpGet("user/{userId}/kpi-summary")]
+        public async Task<ActionResult<ApiResponse<UserKpiSummaryResponse>>> GetUserKpiSummary(Guid userId)
+        {
+            var currentUserId = ValidateAndGetUserId();
+            if (currentUserId != userId)
+                throw new AppException(ErrorCodes.AuthForbidden, StatusCodes.Status403Forbidden);
+
+            var result = await _analyticsService.GetUserKpiSummaryAsync(userId);
+            return Ok(ApiResponse<UserKpiSummaryResponse>.Success(
+                ErrorCodes.SuccessGetData, "Data retrieved successfully", result));
+        }
+
+        /// <summary>
+        /// GET /api/analytics/user/{userId}/task-status
+        /// Task status donut: Hoàn thành, Đang làm, Chưa bắt đầu, Quá hạn
+        /// </summary>
+        [HttpGet("user/{userId}/task-status")]
+        public async Task<ActionResult<ApiResponse<UserTaskStatusResponse>>> GetUserTaskStatus(Guid userId)
+        {
+            var currentUserId = ValidateAndGetUserId();
+            if (currentUserId != userId)
+                throw new AppException(ErrorCodes.AuthForbidden, StatusCodes.Status403Forbidden);
+
+            var result = await _analyticsService.GetUserTaskStatusAsync(userId);
+            return Ok(ApiResponse<UserTaskStatusResponse>.Success(
+                ErrorCodes.SuccessGetData, "Data retrieved successfully", result));
+        }
+
+        /// <summary>
+        /// GET /api/analytics/user/{userId}/group-rankings
+        /// Cross-studio group rankings sorted by score
+        /// </summary>
+        [HttpGet("user/{userId}/group-rankings")]
+        public async Task<ActionResult<ApiResponse<UserGroupRankingsResponse>>> GetUserGroupRankings(Guid userId)
+        {
+            var currentUserId = ValidateAndGetUserId();
+            if (currentUserId != userId)
+                throw new AppException(ErrorCodes.AuthForbidden, StatusCodes.Status403Forbidden);
+
+            var result = await _analyticsService.GetUserGroupRankingsAsync(userId);
+            return Ok(ApiResponse<UserGroupRankingsResponse>.Success(
+                ErrorCodes.SuccessGetData, "Data retrieved successfully", result));
+        }
+
+        /// <summary>
+        /// GET /api/analytics/user/{userId}/productivity-trend?period=30
+        /// 30-day productivity trend (area chart)
+        /// </summary>
+        [HttpGet("user/{userId}/productivity-trend")]
+        public async Task<ActionResult<ApiResponse<UserProductivityTrendResponse>>> GetUserProductivityTrend(
+            Guid userId,
+            [FromQuery] int period = 30)
+        {
+            var currentUserId = ValidateAndGetUserId();
+            if (currentUserId != userId)
+                throw new AppException(ErrorCodes.AuthForbidden, StatusCodes.Status403Forbidden);
+
+            // Validate period bounds
+            if (period < 1 || period > 365)
+                throw new AppException(
+                    ErrorCodes.ValidationInvalidRange,
+                    StatusCodes.Status400BadRequest);
+
+            var result = await _analyticsService.GetUserProductivityTrendAsync(userId, period);
+            return Ok(ApiResponse<UserProductivityTrendResponse>.Success(
+                ErrorCodes.SuccessGetData, "Data retrieved successfully", result));
+        }
+
+        /// <summary>
+        /// GET /api/analytics/user/{userId}/on-time-overview
+        /// On-time vs overdue donut
+        /// </summary>
+        [HttpGet("user/{userId}/on-time-overview")]
+        public async Task<ActionResult<ApiResponse<UserOnTimeOverviewResponse>>> GetUserOnTimeOverview(Guid userId)
+        {
+            var currentUserId = ValidateAndGetUserId();
+            if (currentUserId != userId)
+                throw new AppException(ErrorCodes.AuthForbidden, StatusCodes.Status403Forbidden);
+
+            var result = await _analyticsService.GetUserOnTimeOverviewAsync(userId);
+            return Ok(ApiResponse<UserOnTimeOverviewResponse>.Success(
+                ErrorCodes.SuccessGetData, "Data retrieved successfully", result));
+        }
+
+        /// <summary>
+        /// GET /api/analytics/user/{userId}/priority-distribution
+        /// Task distribution by priority: Cao, Trung bình, Thấp
+        /// </summary>
+        [HttpGet("user/{userId}/priority-distribution")]
+        public async Task<ActionResult<ApiResponse<UserPriorityDistributionResponse>>> GetUserPriorityDistribution(Guid userId)
+        {
+            var currentUserId = ValidateAndGetUserId();
+            if (currentUserId != userId)
+                throw new AppException(ErrorCodes.AuthForbidden, StatusCodes.Status403Forbidden);
+
+            var result = await _analyticsService.GetUserPriorityDistributionAsync(userId);
+            return Ok(ApiResponse<UserPriorityDistributionResponse>.Success(
+                ErrorCodes.SuccessGetData, "Data retrieved successfully", result));
+        }
+
+        /// <summary>
+        /// GET /api/analytics/user/{userId}/urgency-distribution
+        /// Task distribution by urgency: Khẩn cấp, Cao, Trung bình, Thấp
+        /// </summary>
+        [HttpGet("user/{userId}/urgency-distribution")]
+        public async Task<ActionResult<ApiResponse<UserUrgencyDistributionResponse>>> GetUserUrgencyDistribution(Guid userId)
+        {
+            var currentUserId = ValidateAndGetUserId();
+            if (currentUserId != userId)
+                throw new AppException(ErrorCodes.AuthForbidden, StatusCodes.Status403Forbidden);
+
+            var result = await _analyticsService.GetUserUrgencyDistributionAsync(userId);
+            return Ok(ApiResponse<UserUrgencyDistributionResponse>.Success(
+                ErrorCodes.SuccessGetData, "Data retrieved successfully", result));
+        }
+
+        /// <summary>
+        /// GET /api/analytics/user/{userId}/benchmark?weeks=7&groupId={guid}
+        /// Weekly performance benchmark (user vs group avg)
+        /// </summary>
+        [HttpGet("user/{userId}/benchmark")]
+        public async Task<ActionResult<ApiResponse<UserBenchmarkResponse>>> GetUserBenchmark(
+            Guid userId,
+            [FromQuery] int weeks = 7,
+            [FromQuery] Guid? groupId = null)
+        {
+            var currentUserId = ValidateAndGetUserId();
+            if (currentUserId != userId)
+                throw new AppException(ErrorCodes.AuthForbidden, StatusCodes.Status403Forbidden);
+
+            // Validate weeks bounds
+            if (weeks < 1 || weeks > 52)
+                throw new AppException(
+                    ErrorCodes.ValidationInvalidRange,
+                    StatusCodes.Status400BadRequest);
+
+            var result = await _analyticsService.GetUserBenchmarkAsync(userId, weeks, groupId);
+            return Ok(ApiResponse<UserBenchmarkResponse>.Success(
+                ErrorCodes.SuccessGetData, "Data retrieved successfully", result));
+        }
+
+        /// <summary>
+        /// GET /api/analytics/user/{userId}/risk-alerts?limit=10
+        /// Risk alerts: overdue, due soon, stuck tasks
+        /// </summary>
+        [HttpGet("user/{userId}/risk-alerts")]
+        public async Task<ActionResult<ApiResponse<UserRiskAlertsResponse>>> GetUserRiskAlerts(
+            Guid userId,
+            [FromQuery] int limit = 10)
+        {
+            var currentUserId = ValidateAndGetUserId();
+            if (currentUserId != userId)
+                throw new AppException(ErrorCodes.AuthForbidden, StatusCodes.Status403Forbidden);
+
+            // Validate limit bounds
+            if (limit < 1 || limit > 100)
+                throw new AppException(
+                    ErrorCodes.ValidationInvalidRange,
+                    StatusCodes.Status400BadRequest);
+
+            var result = await _analyticsService.GetUserRiskAlertsAsync(userId, limit);
+            return Ok(ApiResponse<UserRiskAlertsResponse>.Success(
+                ErrorCodes.SuccessGetData, "Data retrieved successfully", result));
         }
     }
 }

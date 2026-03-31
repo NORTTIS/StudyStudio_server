@@ -169,10 +169,7 @@ builder.Services.AddScoped<IAnalyticsRepository, AnalyticsRepository>();
 builder.Services.AddScoped<IAnalyticsService, AnalyticsService>();
 
 // Analytics Background Jobs
-builder.Services.AddHostedService<StudioStudio_Server.Services.BackgroundServices.UserActivityMetricsJob>();
 builder.Services.AddHostedService<StudioStudio_Server.Services.BackgroundServices.GroupAnalyticsJob>();
-builder.Services.AddHostedService<StudioStudio_Server.Services.BackgroundServices.UserProductivityScoresJob>();
-builder.Services.AddHostedService<StudioStudio_Server.Services.BackgroundServices.TaskPerformanceMetricsJob>();
 builder.Services.AddHostedService<StudioStudio_Server.Services.BackgroundServices.TaskNotificationBackgroundService>();
 builder.Services.AddHostedService<StudioStudio_Server.Services.BackgroundServices.TaskNotificationBackgroundService>();
 
