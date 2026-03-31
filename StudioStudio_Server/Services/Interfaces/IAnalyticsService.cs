@@ -4,12 +4,6 @@ namespace StudioStudio_Server.Services.Interfaces
 {
     public interface IAnalyticsService
     {
-        // User Dashboard
-        Task<UserDashboardResponse> GetUserDashboardAsync(Guid userId, DateOnly? startDate, DateOnly? endDate);
-        Task<List<ActivityHeatmapData>> GetUserActivityHeatmapAsync(Guid userId, int days = 30);
-        Task<List<TaskCompletionTrendData>> GetTaskCompletionTrendAsync(Guid userId, int days = 30);
-        Task<DeadlinePerformanceData> GetDeadlinePerformanceAsync(Guid userId);
-
         // Group Dashboard
         Task<GroupAnalyticsResponse> GetGroupAnalyticsAsync(Guid groupId, Guid userId, DateOnly? startDate, DateOnly? endDate);
         Task<List<MemberContributionData>> GetGroupMemberContributionAsync(Guid groupId);
@@ -48,5 +42,16 @@ namespace StudioStudio_Server.Services.Interfaces
             Guid studioId,
             DateOnly? startDate,
             DateOnly? endDate);
+
+        // ==================== PERSONAL ANALYTICS (AnalysisHome) ====================
+        Task<UserKpiSummaryResponse> GetUserKpiSummaryAsync(Guid userId);
+        Task<UserTaskStatusResponse> GetUserTaskStatusAsync(Guid userId);
+        Task<UserGroupRankingsResponse> GetUserGroupRankingsAsync(Guid userId);
+        Task<UserProductivityTrendResponse> GetUserProductivityTrendAsync(Guid userId, int periodDays = 30);
+        Task<UserOnTimeOverviewResponse> GetUserOnTimeOverviewAsync(Guid userId);
+        Task<UserPriorityDistributionResponse> GetUserPriorityDistributionAsync(Guid userId);
+        Task<UserUrgencyDistributionResponse> GetUserUrgencyDistributionAsync(Guid userId);
+        Task<UserBenchmarkResponse> GetUserBenchmarkAsync(Guid userId, int weeks = 7, Guid? groupId = null);
+        Task<UserRiskAlertsResponse> GetUserRiskAlertsAsync(Guid userId, int limit = 10);
     }
 }

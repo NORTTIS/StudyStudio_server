@@ -1,7 +1,10 @@
+using System.Globalization;
 using Microsoft.EntityFrameworkCore;
 using StudioStudio_Server.Data;
 using StudioStudio_Server.Models.Entities;
+using StudioStudio_Server.Models.DTOs.Response;
 using StudioStudio_Server.Repositories.Interfaces;
+using StudioStudio_Server.Services;
 
 namespace StudioStudio_Server.Repositories
 {
@@ -15,90 +18,6 @@ namespace StudioStudio_Server.Repositories
         public AnalyticsRepository(StudioDbContext context)
         {
             _context = context;
-        }
-
-        // ==================== USER ACTIVITY METRICS ====================
-
-        public async Task<UserActivityMetrics?> GetUserActivityByDateAsync(Guid userId, DateOnly date)
-        {
-            return await _context.UserActivityMetrics
-                .AsNoTracking()
-                .FirstOrDefaultAsync(x => x.UserId == userId && x.Date == date);
-        }
-
-        public async Task<List<UserActivityMetrics>> GetUserActivityRangeAsync(Guid userId, DateOnly startDate, DateOnly endDate)
-        {
-            return await _context.UserActivityMetrics
-                .AsNoTracking()
-                .Where(x => x.UserId == userId && x.Date >= startDate && x.Date <= endDate)
-                .OrderBy(x => x.Date)
-                .ToListAsync();
-        }
-
-        public async Task UpsertUserActivityAsync(UserActivityMetrics metrics)
-        {
-            var existing = await _context.UserActivityMetrics
-                .FirstOrDefaultAsync(x => x.UserId == metrics.UserId && x.Date == metrics.Date);
-
-            if (existing != null)
-            {
-                existing.TasksCreated = metrics.TasksCreated;
-                existing.TasksCompleted = metrics.TasksCompleted;
-                existing.CommentsPosted = metrics.CommentsPosted;
-                existing.MessagesSent = metrics.MessagesSent;
-                existing.TotalActivityCount = metrics.TotalActivityCount;
-                existing.UpdatedAt = DateTime.UtcNow;
-            }
-            else
-            {
-                metrics.CreatedAt = DateTime.UtcNow;
-                metrics.UpdatedAt = DateTime.UtcNow;
-                _context.UserActivityMetrics.Add(metrics);
-            }
-
-            await _context.SaveChangesAsync();
-        }
-
-        // ==================== USER PRODUCTIVITY SCORES ====================
-
-        public async Task<UserProductivityScores?> GetUserProductivityAsync(Guid userId, Guid? groupId, DateOnly weekStart)
-        {
-            return await _context.UserProductivityScores
-                .AsNoTracking()
-                .FirstOrDefaultAsync(x => x.UserId == userId && x.GroupId == groupId && x.WeekStart == weekStart);
-        }
-
-        public async Task<List<UserProductivityScores>> GetUserProductivityRangeAsync(Guid userId, DateOnly startWeek, DateOnly endWeek)
-        {
-            return await _context.UserProductivityScores
-                .AsNoTracking()
-                .Where(x => x.UserId == userId && x.WeekStart >= startWeek && x.WeekStart <= endWeek)
-                .OrderBy(x => x.WeekStart)
-                .ToListAsync();
-        }
-
-        public async Task UpsertUserProductivityAsync(UserProductivityScores score)
-        {
-            var existing = await _context.UserProductivityScores
-                .FirstOrDefaultAsync(x => x.UserId == score.UserId && x.GroupId == score.GroupId && x.WeekStart == score.WeekStart);
-
-            if (existing != null)
-            {
-                existing.ProductivityScore = score.ProductivityScore;
-                existing.TasksCompleted = score.TasksCompleted;
-                existing.TasksCreated = score.TasksCreated;
-                existing.OnTimeCompletionRate = score.OnTimeCompletionRate;
-                existing.AverageTaskCompletionHours = score.AverageTaskCompletionHours;
-                existing.UpdatedAt = DateTime.UtcNow;
-            }
-            else
-            {
-                score.CreatedAt = DateTime.UtcNow;
-                score.UpdatedAt = DateTime.UtcNow;
-                _context.UserProductivityScores.Add(score);
-            }
-
-            await _context.SaveChangesAsync();
         }
 
         // ==================== GROUP ANALYTICS ====================
@@ -163,92 +82,7 @@ namespace StudioStudio_Server.Repositories
             await _context.SaveChangesAsync();
         }
 
-        // ==================== TASK PERFORMANCE METRICS ====================
-
-        public async Task<TaskPerformanceMetrics?> GetTaskPerformanceAsync(Guid taskId)
-        {
-            return await _context.TaskPerformanceMetrics
-                .AsNoTracking()
-                .FirstOrDefaultAsync(x => x.TaskId == taskId);
-        }
-
-        public async Task<List<TaskPerformanceMetrics>> GetTaskPerformanceRangeAsync(Guid? userId, Guid? groupId, DateOnly startDate, DateOnly endDate)
-        {
-            var query = _context.TaskPerformanceMetrics.AsNoTracking();
-
-            if (userId.HasValue)
-                query = query.Where(x => x.UserId == userId.Value);
-            if (groupId.HasValue)
-                query = query.Where(x => x.GroupId == groupId.Value);
-
-            return await query
-                .Where(x => x.CreatedAt >= DateTime.SpecifyKind(startDate.ToDateTime(TimeOnly.MinValue), DateTimeKind.Utc) && x.CreatedAt <= DateTime.SpecifyKind(endDate.ToDateTime(TimeOnly.MaxValue), DateTimeKind.Utc))
-                .ToListAsync();
-        }
-
-        public async Task UpsertTaskPerformanceAsync(TaskPerformanceMetrics metrics)
-        {
-            var existing = await _context.TaskPerformanceMetrics
-                .FirstOrDefaultAsync(x => x.TaskId == metrics.TaskId);
-
-            if (existing != null)
-            {
-                existing.EstimatedHours = metrics.EstimatedHours;
-                existing.ActualHours = metrics.ActualHours;
-                existing.HourVariance = metrics.HourVariance;
-                existing.CompletedOnTime = metrics.CompletedOnTime;
-                existing.DaysEarlyOrLate = metrics.DaysEarlyOrLate;
-                existing.CompletedAt = metrics.CompletedAt;
-                existing.DueDate = metrics.DueDate;
-                existing.UpdatedAt = DateTime.UtcNow;
-            }
-            else
-            {
-                metrics.CreatedAt = DateTime.UtcNow;
-                metrics.UpdatedAt = DateTime.UtcNow;
-                _context.TaskPerformanceMetrics.Add(metrics);
-            }
-
-            await _context.SaveChangesAsync();
-        }
-
         // ==================== AGGREGATION HELPERS FOR ETL JOBS ====================
-
-        public async Task<Dictionary<Guid, int>> AggregateTasksCreatedByUserAsync(DateTime from, DateTime to)
-        {
-            return await _context.Tasks
-                .Where(t => t.CreatedAt >= from && t.CreatedAt <= to)
-                .GroupBy(t => t.OwnerId)
-                .Select(g => new { UserId = g.Key, Count = g.Count() })
-                .ToDictionaryAsync(x => x.UserId, x => x.Count);
-        }
-
-        public async Task<Dictionary<Guid, int>> AggregateTasksCompletedByUserAsync(DateTime from, DateTime to)
-        {
-            return await _context.Tasks
-                .Where(t => t.CompletedAt.HasValue && t.CompletedAt >= from && t.CompletedAt <= to)
-                .GroupBy(t => t.OwnerId)
-                .Select(g => new { UserId = g.Key, Count = g.Count() })
-                .ToDictionaryAsync(x => x.UserId, x => x.Count);
-        }
-
-        public async Task<Dictionary<Guid, int>> AggregateCommentsByUserAsync(DateTime from, DateTime to)
-        {
-            return await _context.TaskComments
-                .Where(c => c.CreatedAt >= from && c.CreatedAt <= to)
-                .GroupBy(c => c.UserId)
-                .Select(g => new { UserId = g.Key, Count = g.Count() })
-                .ToDictionaryAsync(x => x.UserId, x => x.Count);
-        }
-
-        public async Task<Dictionary<Guid, int>> AggregateMessagesByUserAsync(DateTime from, DateTime to)
-        {
-            return await _context.GroupMessages
-                .Where(m => m.CreatedAt >= from && m.CreatedAt <= to)
-                .GroupBy(m => m.UserId)
-                .Select(g => new { UserId = g.Key, Count = g.Count() })
-                .ToDictionaryAsync(x => x.UserId, x => x.Count);
-        }
 
         public async Task<Dictionary<Guid, int>> AggregateTasksByGroupAsync(Guid groupId, DateTime from, DateTime to)
         {
@@ -502,6 +336,470 @@ namespace StudioStudio_Server.Repositories
                         var total = g.Count();
                         return (done, inProgress, todo, overdue, total);
                     });
+        }
+
+        // ==================== PERSONAL ANALYTICS ====================
+
+        public async Task<List<(Guid? GroupId, int Progress, DateTime? CompletedAt, DateTime? DueDate, int Priority)>> GetUserPersonalTasksAsync(Guid userId)
+        {
+            var items = await _context.Tasks
+                .AsNoTracking()
+                .Where(t => t.OwnerId == userId && t.GroupId == null)
+                .Select(t => new {
+                    t.GroupId,
+                    t.Progress,
+                    t.CompletedAt,
+                    t.DueDate,
+                    Priority = (int)t.Priority
+                })
+                .ToListAsync();
+
+            return items
+                .Select(x => (x.GroupId, x.Progress, x.CompletedAt, x.DueDate, x.Priority))
+                .ToList();
+        }
+
+        public async Task<List<(Guid GroupId, Guid OwnerId, string GroupName, int Progress, DateTime? CompletedAt, DateTime? DueDate, int Priority)>> GetUserGroupsTasksAsync(List<Guid> groupIds)
+        {
+            var items = await _context.Tasks
+                .AsNoTracking()
+                .Where(t => t.GroupId.HasValue && groupIds.Contains(t.GroupId.Value))
+                .Select(t => new {
+                    t.GroupId,
+                    t.OwnerId,
+                    t.Group!.GroupName,
+                    t.Progress,
+                    t.CompletedAt,
+                    t.DueDate,
+                    Priority = (int)t.Priority
+                })
+                .ToListAsync();
+
+            return items
+                .Select(x => (x.GroupId!.Value, x.OwnerId, x.GroupName, x.Progress, x.CompletedAt, x.DueDate, x.Priority))
+                .ToList();
+        }
+
+        public async Task<List<double>> GetUserPersonalTaskCompletionTimesAsync(Guid userId)
+        {
+            var completed = await _context.Tasks
+                .AsNoTracking()
+                .Where(t => t.OwnerId == userId && t.GroupId == null && t.CompletedAt.HasValue)
+                .Select(t => new { t.CreatedAt, t.CompletedAt })
+                .ToListAsync();
+
+            return completed
+                .Where(t => t.CompletedAt.HasValue)
+                .Select(t => (t.CompletedAt!.Value - t.CreatedAt).TotalDays)
+                .ToList();
+        }
+
+        public async Task<Dictionary<Guid, double>> GetUserGroupActivityScoresAsync(List<Guid> groupIds, Guid userId, DateTime? from = null, DateTime? to = null)
+        {
+            // Get user's activity from ActivityLogs in their groups
+            var query = _context.ActivityLogs
+                .AsNoTracking()
+                .Where(a => a.GroupId.HasValue && groupIds.Contains(a.GroupId.Value) && a.UserId == userId);
+
+            if (from.HasValue)
+                query = query.Where(a => a.CreatedAt >= from.Value);
+            if (to.HasValue)
+                query = query.Where(a => a.CreatedAt < to.Value.AddDays(1));
+
+            var activityLogs = await query
+                .Select(a => new { GroupId = a.GroupId, CreatedAt = a.CreatedAt, ActionType = a.ActionType, TaskPriority = a.TaskPriority ?? 0, TaskSeverity = a.TaskSeverity ?? 0 })
+                .ToListAsync();
+
+            return activityLogs
+                .GroupBy(a => a.GroupId!.Value)
+                .ToDictionary(
+                    g => g.Key,
+                    g => g.Sum(a =>
+                        ActivityScoreHelper.GetScore(a.ActionType, a.TaskPriority, a.TaskSeverity)));
+        }
+
+        /// <summary>
+        /// Get activity scores for ALL members in the given groups (all time).
+        /// Returns: Dictionary&lt;GroupId, Dictionary&lt;UserId, TotalScore&gt;&gt;
+        ///
+        /// Scoring rules:
+        /// - TASK_COMPLETE: credits points to the ASSIGNED user(s) via TaskAssignment (not the completer).
+        ///   If a task has multiple assignees, each receives full points.
+        ///   If no assignment exists, credits the completer (UserId) as fallback.
+        /// - All other action types: credits the UserId who performed the action.
+        /// </summary>
+        public async Task<Dictionary<Guid, Dictionary<Guid, double>>> GetAllMembersGroupActivityScoresAsync(
+            List<Guid> groupIds, DateTime? from = null, DateTime? to = null)
+        {
+            var activityLogs = await _context.ActivityLogs
+                .AsNoTracking()
+                .Where(a => a.GroupId.HasValue && groupIds.Contains(a.GroupId.Value)
+                    && a.ActionType != "MESSAGE_CREATE") // Messages counted via GroupMessages table
+                .Select(a => new
+                {
+                    GroupId = a.GroupId!.Value,
+                    UserId = a.UserId,
+                    TargetId = a.TargetId,
+                    CreatedAt = a.CreatedAt,
+                    ActionType = a.ActionType,
+                    TaskPriority = a.TaskPriority ?? 0,
+                    TaskSeverity = a.TaskSeverity ?? 0
+                })
+                .ToListAsync();
+
+            if (from.HasValue)
+                activityLogs = activityLogs.Where(a => a.CreatedAt >= from.Value).ToList();
+            if (to.HasValue)
+                activityLogs = activityLogs.Where(a => a.CreatedAt < to.Value.AddDays(1)).ToList();
+
+            // Pre-fetch all task assignments for tasks that belong to these groups
+            var taskIds = activityLogs
+                .Where(a => a.TargetId.HasValue)
+                .Select(a => a.TargetId!.Value)
+                .Distinct()
+                .ToList();
+
+            var assignments = await _context.TaskAssignments
+                .AsNoTracking()
+                .Where(a => taskIds.Contains(a.TaskId))
+                .Select(a => new { a.TaskId, a.AssignedTo })
+                .ToListAsync();
+
+            var assigneesByTask = assignments
+                .GroupBy(a => a.TaskId)
+                .ToDictionary(g => g.Key, g => g.Select(a => a.AssignedTo).ToList());
+
+            // Expand TASK_COMPLETE logs: one entry per assignee (or per completer if no assignment)
+            var expandedLogs = new List<(Guid GroupId, Guid UserId, string ActionType, int TaskPriority, int TaskSeverity)>();
+
+            foreach (var log in activityLogs)
+            {
+                if (log.ActionType == "TASK_COMPLETE" && log.TargetId.HasValue)
+                {
+                    if (assigneesByTask.TryGetValue(log.TargetId.Value, out var assignees) && assignees.Count > 0)
+                    {
+                        // Credit each assignee
+                        foreach (var assignee in assignees)
+                            expandedLogs.Add((log.GroupId, assignee, log.ActionType, log.TaskPriority, log.TaskSeverity));
+                    }
+                    else
+                    {
+                        // No assignment → credit the completer
+                        expandedLogs.Add((log.GroupId, log.UserId, log.ActionType, log.TaskPriority, log.TaskSeverity));
+                    }
+                }
+                else
+                {
+                    expandedLogs.Add((log.GroupId, log.UserId, log.ActionType, log.TaskPriority, log.TaskSeverity));
+                }
+            }
+
+            return expandedLogs
+                .GroupBy(a => a.GroupId)
+                .ToDictionary(
+                    g => g.Key,
+                    g => g.GroupBy(a => a.UserId)
+                         .ToDictionary(
+                            u => u.Key,
+                            u => u.Sum(a => ActivityScoreHelper.GetScore(a.ActionType, a.TaskPriority, a.TaskSeverity))));
+        }
+
+        /// <summary>
+        /// Get per-member total scores and messages for a SINGLE group (all time).
+        /// Scoring: ActivityScoreHelper with assignee credit for TASK_COMPLETE.
+        /// Messages: from GroupMessages table (not ActivityLogs).
+        /// </summary>
+        public async Task<Dictionary<Guid, MemberContributionResult>> GetGroupMemberScoresAsync(Guid groupId)
+        {
+            // Get activity scores via the existing multi-group method
+            var groupScores = await GetAllMembersGroupActivityScoresAsync(new List<Guid> { groupId });
+            var scores = groupScores.GetValueOrDefault(groupId, new Dictionary<Guid, double>());
+
+            // Get messages from GroupMessages (all time)
+            var messagesByUser = await _context.GroupMessages
+                .AsNoTracking()
+                .Where(m => m.GroupId == groupId)
+                .GroupBy(m => m.UserId)
+                .Select(g => new { UserId = g.Key, Count = g.Count() })
+                .ToDictionaryAsync(x => x.UserId, x => x.Count);
+
+            return scores.ToDictionary(
+                kvp => kvp.Key,
+                kvp => new MemberContributionResult
+                {
+                    UserId = kvp.Key,
+                    TotalScore = kvp.Value + messagesByUser.GetValueOrDefault(kvp.Key, 0),
+                    MessagesSent = messagesByUser.GetValueOrDefault(kvp.Key, 0)
+                });
+        }
+
+        public async Task<List<(int Priority, int Done, int InProgress, int Overdue, int Todo, int Total)>> GetUserTasksByPriorityAsync(
+            List<Guid> groupIds, Guid userId)
+        {
+            // Get personal tasks + all group tasks where user is owner
+            var personalTasks = await _context.Tasks
+                .AsNoTracking()
+                .Where(t => t.OwnerId == userId && t.GroupId == null)
+                .Select(t => new {
+                    Priority = (int)t.Priority,
+                    IsDone = t.Progress == 100 || t.CompletedAt != null,
+                    IsOverdue = t.DueDate.HasValue && t.DueDate.Value < DateTime.UtcNow && t.Progress < 100,
+                    IsInProgress = t.Progress > 0 && t.Progress < 100 && (!t.DueDate.HasValue || t.DueDate.Value >= DateTime.UtcNow)
+                })
+                .ToListAsync();
+
+            var groupTasks = await _context.Tasks
+                .AsNoTracking()
+                .Where(t => t.GroupId.HasValue && groupIds.Contains(t.GroupId.Value)
+                    && t.IsPendingDeleted == false
+                    && _context.TaskAssignments.Any(a => a.TaskId == t.TaskId && a.AssignedTo == userId))
+                .Select(t => new {
+                    Priority = (int)t.Priority,
+                    IsDone = t.Progress == 100 || t.CompletedAt != null,
+                    IsOverdue = t.DueDate.HasValue && t.DueDate.Value < DateTime.UtcNow && t.Progress < 100,
+                    IsInProgress = t.Progress > 0 && t.Progress < 100 && (!t.DueDate.HasValue || t.DueDate.Value >= DateTime.UtcNow)
+                })
+                .ToListAsync();
+
+            var all = personalTasks.Concat(groupTasks).ToList();
+
+            return all
+                .GroupBy(t => t.Priority)
+                .Select(g =>
+                {
+                    var done = g.Count(t => t.IsDone);
+                    var overdue = g.Count(t => t.IsOverdue);
+                    var inProgress = g.Count(t => t.IsInProgress && !t.IsDone && !t.IsOverdue);
+                    var todo = g.Count(t => !t.IsDone && !t.IsInProgress && !t.IsOverdue);
+                    var total = g.Count();
+                    var priority = g.Key;
+                    return (priority, done, inProgress, overdue, todo, total);
+                })
+                .OrderByDescending(x => x.priority)
+                .ToList();
+        }
+
+        public async Task<List<(Guid? GroupId, Guid? TaskId, string Title, string GroupName, DateTime DueDate)>> GetUserOverdueTasksAsync(
+            List<Guid> groupIds, Guid userId, int limit = 10)
+        {
+            var now = DateTime.UtcNow;
+
+            var personal = await _context.Tasks
+                .AsNoTracking()
+                .Where(t => t.OwnerId == userId && t.GroupId == null && t.DueDate < now && t.Progress < 100)
+                .Select(t => new {
+                    t.GroupId,
+                    t.TaskId,
+                    t.Title,
+                    GroupName = (string?)"Cá nhân",
+                    t.DueDate
+                })
+                .Take(limit)
+                .ToListAsync();
+
+            var group = await _context.Tasks
+                .AsNoTracking()
+                .Where(t => t.GroupId.HasValue && groupIds.Contains(t.GroupId.Value)
+                    && t.IsPendingDeleted == false
+                    && _context.TaskAssignments.Any(a => a.TaskId == t.TaskId && a.AssignedTo == userId)
+                    && t.DueDate < now && t.Progress < 100)
+                .Select(t => new {
+                    t.GroupId,
+                    t.TaskId,
+                    t.Title,
+                    t.Group!.GroupName,
+                    t.DueDate
+                })
+                .Take(limit)
+                .ToListAsync();
+
+            var combined = personal
+                .Concat(group)
+                .Take(limit)
+                .Select(x => new { x.GroupId, x.TaskId, x.Title, x.GroupName, x.DueDate })
+                .ToList();
+
+            return combined
+                .Where(x => x.DueDate.HasValue)
+                .Select(x => (x.GroupId, (Guid?)x.TaskId, x.Title, x.GroupName!, x.DueDate!.Value))
+                .ToList();
+        }
+
+        public async Task<List<(Guid? GroupId, Guid? TaskId, string Title, string GroupName, DateTime DueDate)>> GetUserDueSoonTasksAsync(
+            List<Guid> groupIds, Guid userId, int days = 1, int limit = 10)
+        {
+            const string PersonalGroupName = "Cá nhân";
+            var now = DateTime.UtcNow;
+            var threshold = now.AddDays(days);
+
+            var personal = await _context.Tasks
+                .AsNoTracking()
+                .Where(t => t.OwnerId == userId && t.GroupId == null && t.DueDate >= now && t.DueDate <= threshold && t.Progress < 100)
+                .OrderBy(t => t.DueDate)
+                .Select(t => new {
+                    t.GroupId,
+                    t.TaskId,
+                    t.Title,
+                    GroupName = (string?)PersonalGroupName,
+                    t.DueDate
+                })
+                .Take(limit)
+                .ToListAsync();
+
+            var group = await _context.Tasks
+                .AsNoTracking()
+                .Where(t => t.GroupId.HasValue && groupIds.Contains(t.GroupId.Value)
+                    && t.IsPendingDeleted == false
+                    && _context.TaskAssignments.Any(a => a.TaskId == t.TaskId && a.AssignedTo == userId)
+                    && t.DueDate >= now && t.DueDate <= threshold && t.Progress < 100)
+                .OrderBy(t => t.DueDate)
+                .Select(t => new {
+                    t.GroupId,
+                    t.TaskId,
+                    t.Title,
+                    t.Group!.GroupName,
+                    t.DueDate
+                })
+                .Take(limit)
+                .ToListAsync();
+
+            var combined = personal
+                .Concat(group)
+                .OrderBy(x => x.DueDate)
+                .Take(limit)
+                .Select(x => new { x.GroupId, x.TaskId, x.Title, x.GroupName, x.DueDate })
+                .ToList();
+
+            return combined
+                .Where(x => x.DueDate.HasValue)
+                .Select(x => (x.GroupId, (Guid?)x.TaskId, x.Title, x.GroupName!, x.DueDate!.Value))
+                .ToList();
+        }
+
+        public async Task<List<(Guid? GroupId, Guid? TaskId, string Title, string GroupName, DateTime LastUpdated)>> GetUserStuckTasksAsync(
+            List<Guid> groupIds, Guid userId, int noUpdateDays = 5, int limit = 10)
+        {
+            var threshold = DateTime.UtcNow.AddDays(-noUpdateDays);
+
+            var personal = await _context.Tasks
+                .AsNoTracking()
+                .Where(t => t.OwnerId == userId && t.GroupId == null && t.UpdatedAt <= threshold && t.Progress < 100)
+                .OrderBy(t => t.UpdatedAt)
+                .Select(t => new {
+                    t.GroupId,
+                    t.TaskId,
+                    t.Title,
+                    GroupName = (string?)"Cá nhân",
+                    t.UpdatedAt
+                })
+                .Take(limit)
+                .ToListAsync();
+
+            var group = await _context.Tasks
+                .AsNoTracking()
+                .Where(t => t.GroupId.HasValue && groupIds.Contains(t.GroupId.Value)
+                    && t.IsPendingDeleted == false
+                    && _context.TaskAssignments.Any(a => a.TaskId == t.TaskId && a.AssignedTo == userId)
+                    && t.UpdatedAt <= threshold && t.Progress < 100)
+                .OrderBy(t => t.UpdatedAt)
+                .Select(t => new {
+                    t.GroupId,
+                    t.TaskId,
+                    t.Title,
+                    t.Group!.GroupName,
+                    t.UpdatedAt
+                })
+                .Take(limit)
+                .ToListAsync();
+
+            var combined = personal
+                .Concat(group)
+                .OrderBy(x => x.UpdatedAt)
+                .Take(limit)
+                .Select(x => new { x.GroupId, x.TaskId, x.Title, x.GroupName, x.UpdatedAt })
+                .ToList();
+
+            return combined
+                .Select(x => (x.GroupId, (Guid?)x.TaskId, x.Title, x.GroupName!, x.UpdatedAt))
+                .ToList();
+        }
+
+        public async Task<List<(int Year, int Week, int Score, int Count)>> GetUserWeeklyScoresAsync(
+            List<Guid> groupIds, Guid userId, int weeks = 7)
+        {
+            var startDate = DateTime.UtcNow.AddDays(-7 * weeks);
+
+            var activityLogs = await _context.ActivityLogs
+                .AsNoTracking()
+                .Where(a => a.GroupId.HasValue && groupIds.Contains(a.GroupId.Value) && a.UserId == userId && a.CreatedAt >= startDate)
+                .Select(a => new {
+                    CreatedAt = a.CreatedAt,
+                    ActionType = a.ActionType,
+                    TaskPriority = a.TaskPriority ?? 0,
+                    TaskSeverity = a.TaskSeverity ?? 0
+                })
+                .ToListAsync();
+
+            // Single query to get messages (replaces N+1 Task.WhenAll)
+            var allMessages = await _context.GroupMessages
+                .AsNoTracking()
+                .Where(m => groupIds.Contains(m.GroupId) && m.UserId == userId && m.CreatedAt >= startDate)
+                .Select(m => new { m.CreatedAt })
+                .ToListAsync();
+
+            return activityLogs
+                .Select(a =>
+                {
+                    var cal = System.Globalization.CultureInfo.InvariantCulture.Calendar;
+                    var year = cal.GetYear(a.CreatedAt);
+                    var week = cal.GetWeekOfYear(a.CreatedAt, System.Globalization.CalendarWeekRule.FirstFourDayWeek, DayOfWeek.Monday);
+                    var score = ActivityScoreHelper.GetScore(a.ActionType, a.TaskPriority, a.TaskSeverity);
+                    return (Year: year, Week: week, Score: score, Count: 1);
+                })
+                .Concat(allMessages.Select(m =>
+                {
+                    var cal = System.Globalization.CultureInfo.InvariantCulture.Calendar;
+                    var year = cal.GetYear(m.CreatedAt);
+                    var week = cal.GetWeekOfYear(m.CreatedAt, System.Globalization.CalendarWeekRule.FirstFourDayWeek, DayOfWeek.Monday);
+                    return (Year: year, Week: week, Score: 1.0, Count: 1);
+                }))
+                .GroupBy(x => (x.Year, x.Week))
+                .Select(g => (g.Key.Year, g.Key.Week, Score: (int)g.Sum(x => x.Score), Count: g.Count()))
+                .OrderBy(x => x.Year)
+                .ThenBy(x => x.Week)
+                .ToList();
+        }
+
+        public async Task<double?> GetGroupAvgWeeklyScoreAsync(Guid groupId, int year, int week)
+        {
+            var weekStart = DateTime.SpecifyKind(ISOWeek.ToDateTime(year, week, DayOfWeek.Monday), DateTimeKind.Utc);
+            var weekEnd = DateTime.SpecifyKind(weekStart.AddDays(7), DateTimeKind.Utc);
+
+            var memberIds = await _context.GroupParticipants
+                .Where(p => p.GroupId == groupId)
+                .Select(p => p.UserId)
+                .ToListAsync();
+
+            if (!memberIds.Any()) return null;
+
+            var activityLogs = await _context.ActivityLogs
+                .AsNoTracking()
+                .Where(a => a.GroupId == groupId && memberIds.Contains(a.UserId) && a.CreatedAt >= weekStart && a.CreatedAt < weekEnd)
+                .Select(a => new { ActionType = a.ActionType, TaskPriority = a.TaskPriority ?? 0, TaskSeverity = a.TaskSeverity ?? 0 })
+                .ToListAsync();
+
+            var activityScore = activityLogs.Sum(a =>
+                ActivityScoreHelper.GetScore(a.ActionType, a.TaskPriority, a.TaskSeverity));
+
+            // Count group messages from all members in the week
+            var messageCount = await _context.GroupMessages
+                .AsNoTracking()
+                .Where(m => m.GroupId == groupId && memberIds.Contains(m.UserId) && m.CreatedAt >= weekStart && m.CreatedAt < weekEnd)
+                .CountAsync();
+
+            var totalScore = activityScore + messageCount;
+
+            return memberIds.Count > 0 ? totalScore / memberIds.Count : null;
         }
     }
 }

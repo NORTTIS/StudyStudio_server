@@ -232,5 +232,8 @@
         public const string AnalyticsNotFound = "ANALYTICS001";
         public const string InvalidDateRange = "ANALYTICS002";
         public const string InsufficientData = "ANALYTICS003";
+
+        // PERSONAL ANALYTICS
+        public const string PersonalAnalyticsNoGroups = "ANALYTICSP001";
     }
 }

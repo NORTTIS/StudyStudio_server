@@ -1,35 +1,5 @@
 namespace StudioStudio_Server.Models.DTOs.Response
 {
-    // ==================== USER DASHBOARD ====================
-
-    public class UserDashboardResponse
-    {
-        public double ProductivityScore { get; set; }
-        public List<ActivityHeatmapData> ActivityHeatmap { get; set; } = new();
-        public List<TaskCompletionTrendData> TaskCompletionTrend { get; set; } = new();
-        public DeadlinePerformanceData DeadlinePerformance { get; set; } = new();
-    }
-
-    public class ActivityHeatmapData
-    {
-        public DateOnly Date { get; set; }
-        public int ActivityCount { get; set; }
-    }
-
-    public class TaskCompletionTrendData
-    {
-        public DateOnly Date { get; set; }
-        public int TasksCompleted { get; set; }
-        public int TasksCreated { get; set; }
-    }
-
-    public class DeadlinePerformanceData
-    {
-        public int OnTimeCount { get; set; }
-        public int LateCount { get; set; }
-        public double OnTimePercentage { get; set; }
-    }
-
     // ==================== GROUP ANALYTICS ====================
 
     public class GroupAnalyticsResponse
@@ -89,14 +59,26 @@ namespace StudioStudio_Server.Models.DTOs.Response
         // Weighted scores
         public double CompletedScore { get; set; }
         public double CreatedScore { get; set; }
-        public double UpdatedScore { get; set; }
+        public double UpdatedScore { get; set; }  // Task updates + Task assign (1 pt flat each)
+        public double CommentsScore { get; set; } // Comments only (1 pt flat)
         public double DeletedScore { get; set; }
-        public double AssignedScore { get; set; }
 
         // Total weighted score for this member
         public double TotalScore { get; set; }
-        // Percentage relative to group total
-        public double ContributionPercentage { get; set; }
+        // Percentage of this member's total score vs. group total score (score-based)
+        public double ContributionScoreRate { get; set; }
+    }
+
+    /// <summary>
+    /// Per-member contribution result returned by repository (scores + messages).
+    /// Used to build MemberContributionData in service for both GroupSummary and GroupRankings.
+    /// Scoring: ActivityScoreHelper with assignee credit for TASK_COMPLETE, messages from GroupMessages.
+    /// </summary>
+    public class MemberContributionResult
+    {
+        public Guid UserId { get; set; }
+        public double TotalScore { get; set; }
+        public int MessagesSent { get; set; }
     }
 
     public class GroupActivityHeatmapData
@@ -119,7 +101,10 @@ namespace StudioStudio_Server.Models.DTOs.Response
         public int InProgressTasks { get; set; }
         public int TodoTasks { get; set; }
         public int OverdueTasks { get; set; }
-        public double ContributionPercentage { get; set; }
+        // Percentage of this member's task count vs. group total task count (count-based)
+        public double ContributionCountRate { get; set; }
+        // Percentage of this member's weighted score vs. group total weighted score (score-based)
+        public double ContributionScoreRate { get; set; }
         public int MessagesSent { get; set; }
     }
 
@@ -174,7 +159,7 @@ namespace StudioStudio_Server.Models.DTOs.Response
         public int TodoTasks { get; set; }
         public int OverdueTasks { get; set; }
         public DateTime? LastActivityAt { get; set; }
-        public double ContributionPercentage { get; set; }
+        public double ContributionCountRate { get; set; }
         public int MessagesSent { get; set; }
     }
 
