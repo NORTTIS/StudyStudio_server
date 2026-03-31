@@ -1322,7 +1322,7 @@ namespace StudioStudio_Server.Services
             // Personal tasks (GroupId = null)
             var personalTasks = await _context.Tasks
                 .AsNoTracking()
-                .Where(t => t.OwnerId == userId && t.GroupId == null)
+                .Where(t => t.OwnerId == userId && !t.GroupId.HasValue && !t.IsPendingDeleted)
                 .Select(t => new { t.Progress, t.CompletedAt, t.DueDate })
                 .ToListAsync();
 
@@ -1337,7 +1337,7 @@ namespace StudioStudio_Server.Services
 
             var allTasks = personalTasks.Concat(groupTasks).ToList();
             var completed = allTasks.Count(t => t.CompletedAt != null || t.Progress == 100);
-            var inProgress = allTasks.Count(t => t.Progress > 0 && t.Progress < 100 && t.DueDate >= now && t.CompletedAt == null);
+            var inProgress = allTasks.Count(t => t.Progress > 0 && t.Progress < 100 && (!t.DueDate.HasValue || t.DueDate >= now) && t.CompletedAt == null);
             var overdue = allTasks.Count(t => t.CompletedAt == null && t.DueDate < now && t.Progress < 100);
             var total = allTasks.Count;
             var completionRate = total > 0 ? (int)Math.Round((double)completed / total * 100) : 0;
@@ -1370,7 +1370,7 @@ namespace StudioStudio_Server.Services
 
             var personalTasks = await _context.Tasks
                 .AsNoTracking()
-                .Where(t => t.OwnerId == userId && t.GroupId == null)
+                .Where(t => t.OwnerId == userId && !t.GroupId.HasValue && !t.IsPendingDeleted)
                 .Select(t => new { t.Progress, t.CompletedAt, t.DueDate })
                 .ToListAsync();
 
@@ -1386,7 +1386,7 @@ namespace StudioStudio_Server.Services
 
             var completed = all.Count(t => t.CompletedAt != null || t.Progress == 100);
             var overdue = all.Count(t => t.CompletedAt == null && t.DueDate < now && t.Progress < 100);
-            var inProgress = all.Count(t => t.Progress > 0 && t.Progress < 100 && t.DueDate >= now && t.CompletedAt == null);
+            var inProgress = all.Count(t => t.Progress > 0 && t.Progress < 100 && (!t.DueDate.HasValue || t.DueDate >= now) && t.CompletedAt == null);
             var notStarted = all.Count(t => t.CompletedAt == null && t.Progress == 0 && (!t.DueDate.HasValue || t.DueDate >= now));
 
             return new UserTaskStatusResponse
@@ -1480,7 +1480,7 @@ namespace StudioStudio_Server.Services
             // Get all user's tasks (no CreatedAt filter — date range is for display only)
             var personalTasks = await _context.Tasks
                 .AsNoTracking()
-                .Where(t => t.OwnerId == userId && t.GroupId == null)
+                .Where(t => t.OwnerId == userId && !t.GroupId.HasValue && !t.IsPendingDeleted)
                 .Select(t => new { t.TaskId, t.CompletedAt, t.CreatedAt, t.DueDate })
                 .ToListAsync();
 
@@ -1546,7 +1546,7 @@ namespace StudioStudio_Server.Services
 
             var personalTasks = await _context.Tasks
                 .AsNoTracking()
-                .Where(t => t.OwnerId == userId && t.GroupId == null && t.DueDate.HasValue)
+                .Where(t => t.OwnerId == userId && !t.GroupId.HasValue && !t.IsPendingDeleted && t.DueDate.HasValue)
                 .Select(t => new { t.CompletedAt, t.DueDate })
                 .ToListAsync();
 
@@ -1603,7 +1603,7 @@ namespace StudioStudio_Server.Services
             // Use explicit record type to avoid anonymous type issues with List<> inference
             var personalTasks = await _context.Tasks
                 .AsNoTracking()
-                .Where(t => t.OwnerId == userId && t.GroupId == null)
+                .Where(t => t.OwnerId == userId && !t.GroupId.HasValue && !t.IsPendingDeleted)
                 .Select(t => new UrgencyTaskDto(t.CompletedAt, t.DueDate, t.Progress, t.Severity))
                 .ToListAsync();
 
@@ -1626,7 +1626,7 @@ namespace StudioStudio_Server.Services
             UrgencyDistributionItem MakeItem(string label, List<UrgencyTaskDto> bucket, string accentColor)
             {
                 var done = bucket.Count(t => t.CompletedAt != null || t.Progress == 100);
-                var inProgress = bucket.Count(t => t.CompletedAt == null && t.Progress > 0 && t.Progress < 100 && t.DueDate >= now);
+                var inProgress = bucket.Count(t => t.CompletedAt == null && t.Progress > 0 && t.Progress < 100 && (!t.DueDate.HasValue || t.DueDate >= now));
                 var overdue = bucket.Count(t => t.CompletedAt == null && t.DueDate < now && t.Progress < 100);
                 var todo = bucket.Count(t => t.CompletedAt == null && t.Progress == 0 && t.DueDate >= now);
                 return new UrgencyDistributionItem
