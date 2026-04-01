@@ -193,6 +193,8 @@
         public const string SuccessPaymentCancelled = "SUCCESS042";
         public const string SuccessUpdateReport = "SUCCESS043";
         public const string SuccessUpdateSubscriptionPlan = "SUCCESS044";
+        public const string SuccessLeaveGroup = "SUCCESS048";
+        public const string SuccessLeaveStudio = "SUCCESS049";
 
         // ANNOUNCEMENT
         public const string AnnouncementTagTitle = "ANNOUNCEMENTTAGTITLE";

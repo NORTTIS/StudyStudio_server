@@ -93,10 +93,10 @@ namespace StudioStudio_Server.Controllers
         {
             var userId = ValidateAndGetUserId();
             var result = await _groupMemberService.LeaveGroupAsync(userId, groupId);
-            var message = _messageService.GetMessage(ErrorCodes.SuccessRemoveMember);
+            var message = _messageService.GetMessage(ErrorCodes.SuccessLeaveGroup);
 
             return Ok(ApiResponse<LeaveGroupResponse>.Success(
-                ErrorCodes.SuccessRemoveMember,
+                ErrorCodes.SuccessLeaveGroup,
                 message,
                 result));
         }

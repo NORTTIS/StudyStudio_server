@@ -375,6 +375,7 @@ namespace StudioStudio_Server.Services
 
         /// <summary>
         /// Leave a studio (self-remove)
+        /// Also leaves all groups in the studio that the user is a member of
         /// Validate:
         /// - Studio must exist
         /// - User must be a member of the studio
@@ -397,6 +398,22 @@ namespace StudioStudio_Server.Services
             if (studio.OwnerId == userId)
             {
                 throw new AppException(ErrorCodes.StudioCannotLeaveAsOwner, StatusCodes.Status403Forbidden);
+            }
+
+            // Remove user from all groups in this studio
+            var studioGroups = await _groupRepository.GetStudioGroupsAsync(studioId);
+            if (studioGroups.Any())
+            {
+                var groupIds = studioGroups.Select(g => g.GroupId).ToList();
+                var groupParticipants = await _groupParticipantRepository.GetByGroupIdsAsync(groupIds);
+                var userGroupParticipants = groupParticipants
+                    .Where(gp => gp.UserId == userId && gp.Role != GroupRole.Owner)
+                    .ToList();
+
+                if (userGroupParticipants.Any())
+                {
+                    await _groupParticipantRepository.RemoveRangeAsync(userGroupParticipants);
+                }
             }
 
             await _studioParticipantRepository.RemoveAsync(participant);

@@ -172,6 +172,8 @@
   "SUCCESS045": "Data updated successfully",
   "SUCCESS046": "Batch member assignment successful",
   "SUCCESS047": "Random assignment successful",
+  "SUCCESS048": "Left group successfully",
+  "SUCCESS049": "Left studio successfully",
 
   "PAYMENT001": "Subscription plan not found",
   "PAYMENT002": "Cannot create payment for a free plan",

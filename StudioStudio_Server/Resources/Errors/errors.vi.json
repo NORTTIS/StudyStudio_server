@@ -171,6 +171,8 @@
   "SUCCESS045": "Cập nhật dữ liệu thành công",
   "SUCCESS046": "Gán thành viên hàng loạt thành công",
   "SUCCESS047": "Phân ngẫu nhiên thành công",
+  "SUCCESS048": "Rời nhóm thành công",
+  "SUCCESS049": "Rời studio thành công",
 
   "PAYMENT001": "Không tìm thấy gói đăng ký",
   "PAYMENT002": "Không thể thanh toán cho gói miễn phí",

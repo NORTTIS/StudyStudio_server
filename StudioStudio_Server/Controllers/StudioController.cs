@@ -188,10 +188,10 @@ namespace StudioStudio_Server.Controllers
         {
             var userId = JwtHelper.ValidateAndGetUserId(User);
             var result = await _studioService.LeaveStudioAsync(userId, studioId);
-            var message = _messageService.GetMessage(ErrorCodes.SuccessDeleteStudio);
+            var message = _messageService.GetMessage(ErrorCodes.SuccessLeaveStudio);
 
             return Ok(ApiResponse<LeaveStudioResponse>.Success(
-                ErrorCodes.SuccessDeleteStudio,
+                ErrorCodes.SuccessLeaveStudio,
                 message,
                 result));
         }
