@@ -20,6 +20,9 @@
         // 🔹 ADDED: Studio personalization
         public string? AvatarUrl { get; set; }
         public string? ColorHex { get; set; }
+        public string? BannerUrl { get; set; }
+        public string? Tagline { get; set; }
+        public string? Alias { get; set; }
 
         public ICollection<Group> Groups { get; set; } = new List<Group>();
         public ICollection<StudioParticipant> Participants { get; set; } = new List<StudioParticipant>();

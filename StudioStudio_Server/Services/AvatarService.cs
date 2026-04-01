@@ -372,6 +372,138 @@ namespace StudioStudio_Server.Services
             studio.UpdatedAt = DateTime.UtcNow;
             await _studioRepository.UpdateStudioAsync(studio);
         }
-        
+
+        // 🔹 ADDED: Group Banner Methods
+        private const long MaxBannerFileSize = 10 * 1024 * 1024; // 10MB
+
+        private async Task<AvatarUploadResponse> GenerateBannerUploadAsync(
+            string currentUrl, RequestAvatarUploadRequest request, string fileKey)
+        {
+            if (request.FileSize <= 0 || request.FileSize > MaxBannerFileSize)
+                throw new AppException(ErrorCodes.ValidationFileSizeExceeded, StatusCodes.Status400BadRequest);
+
+            if (!AllowedContentTypes.Contains(request.ContentType.ToLowerInvariant()))
+                throw new AppException(ErrorCodes.ValidationInvalidFileFormat, StatusCodes.Status400BadRequest);
+
+            if (!string.IsNullOrEmpty(currentUrl))
+            {
+                try
+                {
+                    var oldKey = ExtractFileKey(currentUrl);
+                    if (!string.IsNullOrEmpty(oldKey))
+                        await _fileStorageService.DeleteFileAsync(oldKey, _backblazeConfig.PublicBucketName);
+                }
+                catch (Exception ex) { _logger.LogWarning(ex, "Failed to delete old banner"); }
+            }
+
+            var uploadUrl = await _fileStorageService.GeneratePresignedUploadUrlAsync(fileKey, _backblazeConfig.PublicBucketName, 60);
+            return new AvatarUploadResponse { EntityId = Guid.NewGuid(), UploadUrl = uploadUrl, FileKey = fileKey, ExpiresIn = 60 };
+        }
+
+        public async Task<AvatarUploadResponse> RequestGroupBannerUploadAsync(
+            Guid userId, Guid groupId, RequestAvatarUploadRequest request)
+        {
+            var group = await _groupRepository.GetByIdAsync(groupId);
+            if (group == null) throw new AppException(ErrorCodes.GroupNotFound, StatusCodes.Status404NotFound);
+
+            var participant = await _groupParticipantRepository.GetByGroupAndUserAsync(groupId, userId);
+            if (participant == null || (participant.Role != GroupRole.Owner && participant.Role != GroupRole.Moderator))
+                throw new AppException(ErrorCodes.GroupUpdatePermissionDenied, StatusCodes.Status403Forbidden);
+
+            var extension = ContentTypeToExtension.GetValueOrDefault(request.ContentType.ToLowerInvariant(), ".jpg");
+            var fileKey = $"banners/groups/{groupId}/banner{extension}";
+            return await GenerateBannerUploadAsync(group.BannerUrl ?? "", request, fileKey);
+        }
+
+        public async Task CompleteGroupBannerUploadAsync(
+            Guid userId, Guid groupId, CompleteAvatarUploadRequest request)
+        {
+            var group = await _groupRepository.GetByIdForUpdateAsync(groupId);
+            if (group == null) throw new AppException(ErrorCodes.GroupNotFound, StatusCodes.Status404NotFound);
+
+            var participant = await _groupParticipantRepository.GetByGroupAndUserAsync(groupId, userId);
+            if (participant == null || (participant.Role != GroupRole.Owner && participant.Role != GroupRole.Moderator))
+                throw new AppException(ErrorCodes.GroupUpdatePermissionDenied, StatusCodes.Status403Forbidden);
+
+            var fileExists = await _fileStorageService.FileExistsAsync(request.FileKey, _backblazeConfig.PublicBucketName);
+            if (!fileExists) throw new AppException(ErrorCodes.ValidationInvalidFileFormat, StatusCodes.Status400BadRequest);
+
+            group.BannerUrl = BuildAvatarUrl(request.FileKey);
+            group.UpdatedAt = DateTime.UtcNow;
+            await _groupRepository.UpdateAsync(group);
+        }
+
+        public async Task DeleteGroupBannerAsync(Guid userId, Guid groupId)
+        {
+            var group = await _groupRepository.GetByIdForUpdateAsync(groupId);
+            if (group == null) throw new AppException(ErrorCodes.GroupNotFound, StatusCodes.Status404NotFound);
+
+            var participant = await _groupParticipantRepository.GetByGroupAndUserAsync(groupId, userId);
+            if (participant == null || (participant.Role != GroupRole.Owner && participant.Role != GroupRole.Moderator))
+                throw new AppException(ErrorCodes.GroupUpdatePermissionDenied, StatusCodes.Status403Forbidden);
+
+            if (!string.IsNullOrEmpty(group.BannerUrl))
+            {
+                try
+                {
+                    var fileKey = ExtractFileKey(group.BannerUrl);
+                    if (!string.IsNullOrEmpty(fileKey))
+                        await _fileStorageService.DeleteFileAsync(fileKey, _backblazeConfig.PublicBucketName);
+                }
+                catch (Exception ex) { _logger.LogWarning(ex, "Failed to delete banner from B2"); }
+            }
+            group.BannerUrl = null;
+            group.UpdatedAt = DateTime.UtcNow;
+            await _groupRepository.UpdateAsync(group);
+        }
+
+        // 🔹 ADDED: Studio Banner Methods
+        public async Task<AvatarUploadResponse> RequestStudioBannerUploadAsync(
+            Guid userId, Guid studioId, RequestAvatarUploadRequest request)
+        {
+            var studio = await _studioRepository.GetByIdAsync(studioId);
+            if (studio == null) throw new AppException(ErrorCodes.StudioNotFound, StatusCodes.Status404NotFound);
+            if (studio.OwnerId != userId) throw new AppException(ErrorCodes.AuthForbidden, StatusCodes.Status403Forbidden);
+
+            var extension = ContentTypeToExtension.GetValueOrDefault(request.ContentType.ToLowerInvariant(), ".jpg");
+            var fileKey = $"banners/studios/{studioId}/banner{extension}";
+            return await GenerateBannerUploadAsync(studio.BannerUrl ?? "", request, fileKey);
+        }
+
+        public async Task CompleteStudioBannerUploadAsync(
+            Guid userId, Guid studioId, CompleteAvatarUploadRequest request)
+        {
+            var studio = await _studioRepository.GetByIdForUpdateAsync(studioId);
+            if (studio == null) throw new AppException(ErrorCodes.StudioNotFound, StatusCodes.Status404NotFound);
+            if (studio.OwnerId != userId) throw new AppException(ErrorCodes.AuthForbidden, StatusCodes.Status403Forbidden);
+
+            var fileExists = await _fileStorageService.FileExistsAsync(request.FileKey, _backblazeConfig.PublicBucketName);
+            if (!fileExists) throw new AppException(ErrorCodes.ValidationInvalidFileFormat, StatusCodes.Status400BadRequest);
+
+            studio.BannerUrl = BuildAvatarUrl(request.FileKey);
+            studio.UpdatedAt = DateTime.UtcNow;
+            await _studioRepository.UpdateStudioAsync(studio);
+        }
+
+        public async Task DeleteStudioBannerAsync(Guid userId, Guid studioId)
+        {
+            var studio = await _studioRepository.GetByIdForUpdateAsync(studioId);
+            if (studio == null) throw new AppException(ErrorCodes.StudioNotFound, StatusCodes.Status404NotFound);
+            if (studio.OwnerId != userId) throw new AppException(ErrorCodes.AuthForbidden, StatusCodes.Status403Forbidden);
+
+            if (!string.IsNullOrEmpty(studio.BannerUrl))
+            {
+                try
+                {
+                    var fileKey = ExtractFileKey(studio.BannerUrl);
+                    if (!string.IsNullOrEmpty(fileKey))
+                        await _fileStorageService.DeleteFileAsync(fileKey, _backblazeConfig.PublicBucketName);
+                }
+                catch (Exception ex) { _logger.LogWarning(ex, "Failed to delete banner from B2"); }
+            }
+            studio.BannerUrl = null;
+            studio.UpdatedAt = DateTime.UtcNow;
+            await _studioRepository.UpdateStudioAsync(studio);
+        }
     }
 }

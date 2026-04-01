@@ -121,6 +121,8 @@
         public const string ValidationInvalidFileHeaders = "VALIDATION020";
         public const string ValidationInvalidColor = "VALIDATION021";
         public const string ValidationInvalidEmoji = "VALIDATION022";
+        public const string ValidationInvalidBannerUrl = "VALIDATION023";
+        public const string ValidationInvalidAlias = "VALIDATION024";
 
         // BATCH
         public const string BatchGroupNameNotFound = "BATCH001";

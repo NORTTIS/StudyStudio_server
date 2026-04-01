@@ -102,6 +102,8 @@
   "VALIDATION018": "File contains no data rows",
   "VALIDATION019": "File size exceeds the maximum limit of 5MB",
   "VALIDATION020": "Invalid file headers format",
+  "VALIDATION023": "Invalid banner/logo URL format",
+  "VALIDATION024": "Alias can only contain letters, numbers, spaces, underscores and hyphens",
 
   "BATCH001": "Group name not found in this studio",
   "BATCH002": "Cannot assign Owner role",
