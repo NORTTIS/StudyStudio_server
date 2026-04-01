@@ -133,5 +133,23 @@ namespace StudioStudio_Server.Repositories
                 .AsNoTracking()
                 .ToListAsync();
         }
+
+        public async Task<bool> IsStudioNameExistByOwnerIdAsync(string studioName, Guid ownerId)
+        {
+            var trimmedName = studioName.Trim();
+            return await _context.Studios
+                .AnyAsync(s => s.StudioName.ToLower().Trim() == trimmedName.ToLower() && s.OwnerId == ownerId && !s.IsDeleted);
+        }
+
+        /// <summary>
+        /// Check if studio name already exists for owner, excluding a specific studio (for update)
+        /// </summary>
+        public async Task<bool> IsStudioNameExistExcludingStudioAsync(string studioName, Guid ownerId, Guid excludeStudioId)
+        {
+            var trimmedName = studioName.Trim();
+            return await _context.Studios
+                .AnyAsync(s => s.StudioName.ToLower().Trim() == trimmedName.ToLower() && s.OwnerId == ownerId && !s.IsDeleted && s.StudioId != excludeStudioId);
+        }
+
     }
 }

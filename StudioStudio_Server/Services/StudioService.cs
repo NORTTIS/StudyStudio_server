@@ -133,6 +133,22 @@ namespace StudioStudio_Server.Services
                 throw new AppException(ErrorCodes.StudioInvalidDateRange, StatusCodes.Status400BadRequest);
             }
 
+            if (studio.StudioName.Length > 255)
+            {
+                throw new AppException(ErrorCodes.StudioNameInvalid, StatusCodes.Status400BadRequest);
+            }
+
+            if (studio.Description != null && studio.Description.Length > 500)
+            {
+                throw new AppException(ErrorCodes.StudioDescriptionInvalid, StatusCodes.Status400BadRequest);
+            }
+
+            var isStudioNameExist = await _studioRepository.IsStudioNameExistByOwnerIdAsync(studio.StudioName, ownerId);
+            if (isStudioNameExist)
+            {
+                throw new AppException(ErrorCodes.StudioNameAlreadyExist, StatusCodes.Status400BadRequest);
+            }
+
             var now = DateTime.UtcNow;
             var createStudio = new Studio
             {
@@ -271,6 +287,23 @@ namespace StudioStudio_Server.Services
             if (studio.StartDate.HasValue && studio.EndDate.HasValue && studio.EndDate < studio.StartDate)
             {
                 throw new AppException(ErrorCodes.StudioInvalidDateRange, StatusCodes.Status400BadRequest);
+            }
+
+            if (studio.StudioName.Length > 255)
+            {
+                throw new AppException(ErrorCodes.StudioNameInvalid, StatusCodes.Status400BadRequest);
+            }
+
+            if (studio.Description != null && studio.Description.Length > 500)
+            {
+                throw new AppException(ErrorCodes.StudioDescriptionInvalid, StatusCodes.Status400BadRequest);
+            }
+
+            var isStudioNameExist = await _studioRepository.IsStudioNameExistExcludingStudioAsync(
+                studio.StudioName, userId, studio.Id);
+            if (isStudioNameExist)
+            {
+                throw new AppException(ErrorCodes.StudioNameAlreadyExist, StatusCodes.Status400BadRequest);
             }
 
             updateStudio.StudioName = studio.StudioName;

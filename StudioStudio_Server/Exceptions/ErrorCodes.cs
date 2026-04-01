@@ -59,12 +59,17 @@
         public const string GroupDeleteTaskStatusFailed = "GROUP026";
         public const string GroupStatusNotFound = "GROUP027";
         public const string GroupCannotLeaveAsOwner = "GROUP028";
+        public const string GroupNameInvalid = "GROUP029";
+        public const string GroupDescriptionInvalid = "GROUP030";
 
         // STUDIO
         public const string StudioLimitReached = "STUDIO001";
         public const string StudioAlreadyMember = "STUDIO002";
         public const string StudioInvalidDateRange = "STUDIO003";
         public const string StudioCannotLeaveAsOwner = "STUDIO005";
+        public const string StudioNameAlreadyExist = "STUDIO006";
+        public const string StudioNameInvalid = "STUDIO007";
+        public const string StudioDescriptionInvalid = "STUDIO008";
 
         // STATUS
         public const string StatusNotFound = "STATUS001";
