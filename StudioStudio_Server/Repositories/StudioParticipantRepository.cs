@@ -90,5 +90,14 @@ namespace StudioStudio_Server.Repositories
                 .AsNoTracking()
                 .ToListAsync();
         }
+
+        /// <summary>
+        /// Remove a participant from studio
+        /// </summary>
+        public async Task RemoveAsync(StudioParticipant participant)
+        {
+            _context.StudioParticipants.Remove(participant);
+            await _context.SaveChangesAsync();
+        }
     }
 }

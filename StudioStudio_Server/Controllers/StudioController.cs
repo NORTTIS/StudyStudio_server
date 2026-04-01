@@ -176,6 +176,27 @@ namespace StudioStudio_Server.Controllers
         }
 
         /// <summary>
+        /// [AUTHORIZED] DELETE /api/studio/{studioId}/leave
+        /// Leave a studio (self-remove)
+        /// Validate:
+        /// - Studio must exist
+        /// - User must be a member of the studio
+        /// - Owner cannot leave
+        /// </summary>
+        [HttpDelete("{studioId}/leave")]
+        public async Task<ActionResult<ApiResponse<LeaveStudioResponse>>> LeaveStudio(Guid studioId)
+        {
+            var userId = JwtHelper.ValidateAndGetUserId(User);
+            var result = await _studioService.LeaveStudioAsync(userId, studioId);
+            var message = _messageService.GetMessage(ErrorCodes.SuccessLeaveStudio);
+
+            return Ok(ApiResponse<LeaveStudioResponse>.Success(
+                ErrorCodes.SuccessLeaveStudio,
+                message,
+                result));
+        }
+
+        /// <summary>
         /// [AUTHORIZED] POST /api/studio/{studioId}/members/batch-assign
         /// Upload CSV/Excel file to batch assign members to groups
         /// File format: Email, GroupName, Role (columns)

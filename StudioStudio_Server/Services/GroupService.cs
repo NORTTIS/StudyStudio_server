@@ -1,4 +1,4 @@
-﻿using iText.Layout.Renderer;
+using iText.Layout.Renderer;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
@@ -374,6 +374,18 @@ namespace StudioStudio_Server.Services
                 throw new AppException(ErrorCodes.GroupLimitReached, StatusCodes.Status403Forbidden);
             }
 
+            // Validate: GroupName must not exceed 255 characters
+            if (request.GroupName.Length > 255)
+            {
+                throw new AppException(ErrorCodes.GroupNameInvalid, StatusCodes.Status400BadRequest);
+            }
+
+            // Validate: Description must not exceed 500 characters
+            if (request.Description != null && request.Description.Length > 500)
+            {
+                throw new AppException(ErrorCodes.GroupDescriptionInvalid, StatusCodes.Status400BadRequest);
+            }
+
             // Check if creating in studio
             if (request.StudioId.HasValue)
             {
@@ -536,6 +548,18 @@ namespace StudioStudio_Server.Services
                 (userParticipant.Role != GroupRole.Owner && userParticipant.Role != GroupRole.Moderator))
             {
                 throw new AppException(ErrorCodes.GroupUpdatePermissionDenied, StatusCodes.Status403Forbidden);
+            }
+
+            // Validate: GroupName must not exceed 255 characters
+            if (request.GroupName.Length > 255)
+            {
+                throw new AppException(ErrorCodes.GroupNameInvalid, StatusCodes.Status400BadRequest);
+            }
+
+            // Validate: Description must not exceed 500 characters
+            if (request.Description != null && request.Description.Length > 500)
+            {
+                throw new AppException(ErrorCodes.GroupDescriptionInvalid, StatusCodes.Status400BadRequest);
             }
 
             // Check if name is being changed

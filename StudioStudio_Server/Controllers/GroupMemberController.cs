@@ -82,6 +82,26 @@ namespace StudioStudio_Server.Controllers
         }
 
         /// <summary>
+        /// [AUTHORIZED] DELETE /api/group/member/{groupId}/leave
+        /// Leave a group (self-remove)
+        /// Validate:
+        /// - User must be a member of the group
+        /// - Owner cannot leave
+        /// </summary>
+        [HttpDelete("{groupId}/leave")]
+        public async Task<ActionResult<ApiResponse<LeaveGroupResponse>>> LeaveGroup(Guid groupId)
+        {
+            var userId = ValidateAndGetUserId();
+            var result = await _groupMemberService.LeaveGroupAsync(userId, groupId);
+            var message = _messageService.GetMessage(ErrorCodes.SuccessLeaveGroup);
+
+            return Ok(ApiResponse<LeaveGroupResponse>.Success(
+                ErrorCodes.SuccessLeaveGroup,
+                message,
+                result));
+        }
+
+        /// <summary>
         /// [AUTHORIZED] PUT /api/group/member/assign-role
         /// Change member's role in group
         /// Validate:

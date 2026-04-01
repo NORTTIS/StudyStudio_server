@@ -51,9 +51,11 @@
   "GROUP025": "Nhóm cần ít nhất một trạng thái công việc để có thể khôi phục công việc",
   "GROUP026": "Trạng thái công việc cần phải trống để có thể xóa",
   "GROUP027": "Không tìm thấy trạng thái công việc",
+  "GROUP028": "Chủ nhóm không thể rời khỏi nhóm.",
 
   "STUDIO001": "Bạn đã đạt giới hạn số lượng studio có thể tạo",
   "STUDIO004": "Bạn đã là thành viên của studio này",
+  "STUDIO005": "Chủ studio không thể rời khỏi studio.",
 
   "STATUS001": "Không tìm thấy trạng thái",
   "STATUS002": "Trạng thái này đã tồn tại",
@@ -169,6 +171,8 @@
   "SUCCESS045": "Cập nhật dữ liệu thành công",
   "SUCCESS046": "Gán thành viên hàng loạt thành công",
   "SUCCESS047": "Phân ngẫu nhiên thành công",
+  "SUCCESS048": "Rời nhóm thành công",
+  "SUCCESS049": "Rời studio thành công",
 
   "PAYMENT001": "Không tìm thấy gói đăng ký",
   "PAYMENT002": "Không thể thanh toán cho gói miễn phí",

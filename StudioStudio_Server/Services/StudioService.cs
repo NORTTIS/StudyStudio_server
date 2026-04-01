@@ -133,6 +133,22 @@ namespace StudioStudio_Server.Services
                 throw new AppException(ErrorCodes.StudioInvalidDateRange, StatusCodes.Status400BadRequest);
             }
 
+            if (studio.StudioName.Length > 255)
+            {
+                throw new AppException(ErrorCodes.StudioNameInvalid, StatusCodes.Status400BadRequest);
+            }
+
+            if (studio.Description != null && studio.Description.Length > 500)
+            {
+                throw new AppException(ErrorCodes.StudioDescriptionInvalid, StatusCodes.Status400BadRequest);
+            }
+
+            var isStudioNameExist = await _studioRepository.IsStudioNameExistByOwnerIdAsync(studio.StudioName, ownerId);
+            if (isStudioNameExist)
+            {
+                throw new AppException(ErrorCodes.StudioNameAlreadyExist, StatusCodes.Status400BadRequest);
+            }
+
             var now = DateTime.UtcNow;
             var createStudio = new Studio
             {
@@ -273,6 +289,23 @@ namespace StudioStudio_Server.Services
                 throw new AppException(ErrorCodes.StudioInvalidDateRange, StatusCodes.Status400BadRequest);
             }
 
+            if (studio.StudioName.Length > 255)
+            {
+                throw new AppException(ErrorCodes.StudioNameInvalid, StatusCodes.Status400BadRequest);
+            }
+
+            if (studio.Description != null && studio.Description.Length > 500)
+            {
+                throw new AppException(ErrorCodes.StudioDescriptionInvalid, StatusCodes.Status400BadRequest);
+            }
+
+            var isStudioNameExist = await _studioRepository.IsStudioNameExistExcludingStudioAsync(
+                studio.StudioName, userId, studio.Id);
+            if (isStudioNameExist)
+            {
+                throw new AppException(ErrorCodes.StudioNameAlreadyExist, StatusCodes.Status400BadRequest);
+            }
+
             updateStudio.StudioName = studio.StudioName;
             updateStudio.Description = studio.Description;
             // Normalize to UTC for PostgreSQL timestamp with time zone compatibility
@@ -371,6 +404,59 @@ namespace StudioStudio_Server.Services
             }
 
             return result;
+        }
+
+        /// <summary>
+        /// Leave a studio (self-remove)
+        /// Also leaves all groups in the studio that the user is a member of
+        /// Validate:
+        /// - Studio must exist
+        /// - User must be a member of the studio
+        /// - Owner cannot leave (must transfer ownership or delete studio)
+        /// </summary>
+        public async Task<LeaveStudioResponse> LeaveStudioAsync(Guid userId, Guid studioId)
+        {
+            var studio = await _studioRepository.GetByIdAsync(studioId);
+            if (studio == null)
+            {
+                throw new AppException(ErrorCodes.StudioNotFound, StatusCodes.Status404NotFound);
+            }
+
+            var participant = await _studioParticipantRepository.GetByStudioAndUserAsync(studioId, userId);
+            if (participant == null)
+            {
+                throw new AppException(ErrorCodes.StudioNotFound, StatusCodes.Status404NotFound);
+            }
+
+            if (studio.OwnerId == userId)
+            {
+                throw new AppException(ErrorCodes.StudioCannotLeaveAsOwner, StatusCodes.Status403Forbidden);
+            }
+
+            // Remove user from all groups in this studio
+            var studioGroups = await _groupRepository.GetStudioGroupsAsync(studioId);
+            if (studioGroups.Any())
+            {
+                var groupIds = studioGroups.Select(g => g.GroupId).ToList();
+                var groupParticipants = await _groupParticipantRepository.GetByGroupIdsAsync(groupIds);
+                var userGroupParticipants = groupParticipants
+                    .Where(gp => gp.UserId == userId && gp.Role != GroupRole.Owner)
+                    .ToList();
+
+                if (userGroupParticipants.Any())
+                {
+                    await _groupParticipantRepository.RemoveRangeAsync(userGroupParticipants);
+                }
+            }
+
+            await _studioParticipantRepository.RemoveAsync(participant);
+
+            return new LeaveStudioResponse
+            {
+                StudioId = studio.StudioId,
+                StudioName = studio.StudioName,
+                LeftAt = DateTime.UtcNow
+            };
         }
     }
 }

@@ -14,5 +14,7 @@ namespace StudioStudio_Server.Repositories.Interfaces
         Task UpdateStudioAsync(Studio studio);
         Task<Studio?> GetByIdForUpdateAsync(Guid studioId);
         Task<List<Group>> GetGroupsByStudioIdAsync(Guid studioId);
+        Task<bool> IsStudioNameExistByOwnerIdAsync(string studioName, Guid ownerId);
+        Task<bool> IsStudioNameExistExcludingStudioAsync(string studioName, Guid ownerId, Guid excludeStudioId);
     }
 }

@@ -114,9 +114,10 @@ namespace StudioStudio_Server.Repositories
         /// </summary>
         public async Task<bool> GroupNameExistsInStudioAsync(Guid? studioId, string groupName, Guid? userId)
         {
+            var trimmedName = groupName.Trim();
             return await _db.Groups
                 .AnyAsync(g =>
-                    g.GroupName == groupName &&
+                    g.GroupName.Trim() == trimmedName &&
                     g.IsActive &&
                     (
                         (studioId != null && g.StudioId == studioId) ||
@@ -135,9 +136,10 @@ namespace StudioStudio_Server.Repositories
             string groupName,
             Guid excludeGroupId)
         {
+            var trimmedName = groupName.Trim();
             return await _db.Groups
                 .AnyAsync(g => g.StudioId == studioId &&
-                              g.GroupName == groupName &&
+                              g.GroupName.Trim() == trimmedName &&
                               g.GroupId != excludeGroupId &&
                               g.IsActive);
         }
