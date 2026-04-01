@@ -138,7 +138,7 @@ namespace StudioStudio_Server.Repositories
         {
             var trimmedName = studioName.Trim();
             return await _context.Studios
-                .AnyAsync(s => s.StudioName.ToLower().Trim() == trimmedName.ToLower() && s.OwnerId == ownerId && !s.IsDeleted);
+                .AnyAsync(s => s.StudioName.Trim() == trimmedName && s.OwnerId == ownerId && !s.IsDeleted);
         }
 
         /// <summary>
@@ -148,7 +148,7 @@ namespace StudioStudio_Server.Repositories
         {
             var trimmedName = studioName.Trim();
             return await _context.Studios
-                .AnyAsync(s => s.StudioName.ToLower().Trim() == trimmedName.ToLower() && s.OwnerId == ownerId && !s.IsDeleted && s.StudioId != excludeStudioId);
+                .AnyAsync(s => s.StudioName.Trim() == trimmedName && s.OwnerId == ownerId && !s.IsDeleted && s.StudioId != excludeStudioId);
         }
 
     }
