@@ -1,0 +1,205 @@
+{
+  "$schema": "http://json.schemastore.org/sarif-1.0.0",
+  "version": "1.0.0",
+  "runs": [
+    {
+      "tool": {
+        "name": "Microsoft (R) Visual C# Compiler",
+        "version": "4.14.0.0",
+        "fileVersion": "4.14.0-3.26064.1 (450493a9)",
+        "semanticVersion": "4.14.0",
+        "language": "en-US"
+      },
+      "results": [
+        {
+          "ruleId": "CS0219",
+          "level": "warning",
+          "message": "The variable 'emailExists' is assigned but its value is never used",
+          "locations": [
+            {
+              "resultFile": {
+                "uri": "file:///D:/Code/StudyStudio/StudyStudio_server/StudyStudio_TestServer/Controllers/AuthControllerTests.cs",
+                "region": {
+                  "startLine": 278,
+                  "startColumn": 17,
+                  "endLine": 278,
+                  "endColumn": 28
+                }
+              }
+            }
+          ],
+          "properties": {
+            "warningLevel": 3
+          }
+        },
+        {
+          "ruleId": "CS0219",
+          "level": "warning",
+          "message": "The variable 'currentRole' is assigned but its value is never used",
+          "locations": [
+            {
+              "resultFile": {
+                "uri": "file:///D:/Code/StudyStudio/StudyStudio_server/StudyStudio_TestServer/Controllers/GroupControllerTests.cs",
+                "region": {
+                  "startLine": 314,
+                  "startColumn": 17,
+                  "endLine": 314,
+                  "endColumn": 28
+                }
+              }
+            }
+          ],
+          "properties": {
+            "warningLevel": 3
+          }
+        },
+        {
+          "ruleId": "SYSLIB1045",
+          "level": "note",
+          "message": "Use 'GeneratedRegexAttribute' to generate the regular expression implementation at compile-time.",
+          "locations": [
+            {
+              "resultFile": {
+                "uri": "file:///D:/Code/StudyStudio/StudyStudio_server/StudyStudio_TestServer/Services/NotificationScenarioIdTests.cs",
+                "region": {
+                  "startLine": 61,
+                  "startColumn": 32,
+                  "endLine": 61,
+                  "endColumn": 56
+                }
+              }
+            }
+          ],
+          "properties": {
+            "warningLevel": 1
+          }
+        },
+        {
+          "ruleId": "CA1847",
+          "level": "note",
+          "message": "Use 'string.Contains(char)' instead of 'string.Contains(string)' when searching for a single character",
+          "locations": [
+            {
+              "resultFile": {
+                "uri": "file:///D:/Code/StudyStudio/StudyStudio_server/StudyStudio_TestServer/Services/AuthServiceTests.cs",
+                "region": {
+                  "startLine": 63,
+                  "startColumn": 42,
+                  "endLine": 63,
+                  "endColumn": 45
+                }
+              }
+            }
+          ],
+          "properties": {
+            "warningLevel": 1
+          }
+        },
+        {
+          "ruleId": "CA1847",
+          "level": "note",
+          "message": "Use 'string.Contains(char)' instead of 'string.Contains(string)' when searching for a single character",
+          "locations": [
+            {
+              "resultFile": {
+                "uri": "file:///D:/Code/StudyStudio/StudyStudio_server/StudyStudio_TestServer/Services/AuthServiceTests.cs",
+                "region": {
+                  "startLine": 63,
+                  "startColumn": 65,
+                  "endLine": 63,
+                  "endColumn": 68
+                }
+              }
+            }
+          ],
+          "properties": {
+            "warningLevel": 1
+          }
+        },
+        {
+          "ruleId": "CA1847",
+          "level": "note",
+          "message": "Use 'string.Contains(char)' instead of 'string.Contains(string)' when searching for a single character",
+          "locations": [
+            {
+              "resultFile": {
+                "uri": "file:///D:/Code/StudyStudio/StudyStudio_server/StudyStudio_TestServer/Services/AuthServiceTests.cs",
+                "region": {
+                  "startLine": 76,
+                  "startColumn": 42,
+                  "endLine": 76,
+                  "endColumn": 45
+                }
+              }
+            }
+          ],
+          "properties": {
+            "warningLevel": 1
+          }
+        },
+        {
+          "ruleId": "CA1847",
+          "level": "note",
+          "message": "Use 'string.Contains(char)' instead of 'string.Contains(string)' when searching for a single character",
+          "locations": [
+            {
+              "resultFile": {
+                "uri": "file:///D:/Code/StudyStudio/StudyStudio_server/StudyStudio_TestServer/Services/AuthServiceTests.cs",
+                "region": {
+                  "startLine": 76,
+                  "startColumn": 65,
+                  "endLine": 76,
+                  "endColumn": 68
+                }
+              }
+            }
+          ],
+          "properties": {
+            "warningLevel": 1
+          }
+        }
+      ],
+      "rules": {
+        "CA1847": {
+          "id": "CA1847",
+          "shortDescription": "Use char literal for a single character lookup",
+          "fullDescription": "'string.Contains(char)' is available as a better performing overload for single char lookup.",
+          "defaultLevel": "note",
+          "helpUri": "https://learn.microsoft.com/dotnet/fundamentals/code-analysis/quality-rules/ca1847",
+          "properties": {
+            "category": "Performance",
+            "isEnabledByDefault": true,
+            "tags": [
+              "Telemetry",
+              "EnabledRuleInAggressiveMode"
+            ]
+          }
+        },
+        "CS0219": {
+          "id": "CS0219",
+          "shortDescription": "Variable is assigned but its value is never used",
+          "defaultLevel": "warning",
+          "helpUri": "https://msdn.microsoft.com/query/roslyn.query?appId=roslyn&k=k(CS0219)",
+          "properties": {
+            "category": "Compiler",
+            "isEnabledByDefault": true,
+            "tags": [
+              "Compiler",
+              "Telemetry"
+            ]
+          }
+        },
+        "SYSLIB1045": {
+          "id": "SYSLIB1045",
+          "shortDescription": "Convert to 'GeneratedRegexAttribute'.",
+          "defaultLevel": "note",
+          "helpUri": "https://learn.microsoft.com/dotnet/fundamentals/syslib-diagnostics/syslib1045",
+          "properties": {
+            "category": "Performance",
+            "isEnabledByDefault": true
+          }
+        }
+      }
+    }
+  ]
+}

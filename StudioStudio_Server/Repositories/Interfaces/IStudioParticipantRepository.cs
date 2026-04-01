@@ -10,6 +10,7 @@ namespace StudioStudio_Server.Repositories.Interfaces
         Task<StudioParticipant?> GetByStudioAndUserAsync(Guid studioId, Guid userId);
         Task<int> GetParticipantCountByStudioIdAsync(Guid studioId);
         Task<List<StudioParticipant>> GetParticipantsByStudioIdAsync(Guid studioId);
+        Task RemoveAsync(StudioParticipant participant);
 
         /// <summary>
         /// Get all studio participant records for a user

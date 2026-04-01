@@ -51,9 +51,11 @@
   "GROUP025": "Group need at least one task status to restore this task",
   "GROUP026": "Task status must empty to able to delete it",
   "GROUP027": "Status not found",
+  "GROUP028": "Group owners cannot leave the group.",
 
   "STUDIO001": "You have reached the limit of studios you can create",
   "STUDIO004": "You are already a member of this studio",
+  "STUDIO005": "Studio owners cannot leave the studio.",
 
   "STATUS001": "Status not found",
   "STATUS002": "This status name already exist",

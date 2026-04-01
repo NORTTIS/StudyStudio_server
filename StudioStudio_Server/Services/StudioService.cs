@@ -372,5 +372,41 @@ namespace StudioStudio_Server.Services
 
             return result;
         }
+
+        /// <summary>
+        /// Leave a studio (self-remove)
+        /// Validate:
+        /// - Studio must exist
+        /// - User must be a member of the studio
+        /// - Owner cannot leave (must transfer ownership or delete studio)
+        /// </summary>
+        public async Task<LeaveStudioResponse> LeaveStudioAsync(Guid userId, Guid studioId)
+        {
+            var studio = await _studioRepository.GetByIdAsync(studioId);
+            if (studio == null)
+            {
+                throw new AppException(ErrorCodes.StudioNotFound, StatusCodes.Status404NotFound);
+            }
+
+            var participant = await _studioParticipantRepository.GetByStudioAndUserAsync(studioId, userId);
+            if (participant == null)
+            {
+                throw new AppException(ErrorCodes.StudioNotFound, StatusCodes.Status404NotFound);
+            }
+
+            if (studio.OwnerId == userId)
+            {
+                throw new AppException(ErrorCodes.StudioCannotLeaveAsOwner, StatusCodes.Status403Forbidden);
+            }
+
+            await _studioParticipantRepository.RemoveAsync(participant);
+
+            return new LeaveStudioResponse
+            {
+                StudioId = studio.StudioId,
+                StudioName = studio.StudioName,
+                LeftAt = DateTime.UtcNow
+            };
+        }
     }
 }

@@ -58,11 +58,13 @@
         public const string GroupRestoreTaskFailed = "GROUP025";
         public const string GroupDeleteTaskStatusFailed = "GROUP026";
         public const string GroupStatusNotFound = "GROUP027";
+        public const string GroupCannotLeaveAsOwner = "GROUP028";
 
         // STUDIO
         public const string StudioLimitReached = "STUDIO001";
         public const string StudioAlreadyMember = "STUDIO002";
         public const string StudioInvalidDateRange = "STUDIO003";
+        public const string StudioCannotLeaveAsOwner = "STUDIO005";
 
         // STATUS
         public const string StatusNotFound = "STATUS001";

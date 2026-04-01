@@ -99,6 +99,47 @@ namespace StudioStudio_Server.Services
         }
 
         /// <summary>
+        /// Leave a group (self-remove)
+        /// Validate:
+        /// - User must be a member of the group
+        /// - Owner cannot leave (must transfer ownership or delete group)
+        /// </summary>
+        public async Task<LeaveGroupResponse> LeaveGroupAsync(Guid userId, Guid groupId)
+        {
+            var group = await ValidateGroupExistsAsync(groupId);
+
+            var participant = await _groupParticipantRepository
+                .GetByGroupAndUserAsync(groupId, userId);
+
+            if (participant == null)
+            {
+                throw new AppException(
+                    ErrorCodes.GroupNotFound,
+                    StatusCodes.Status404NotFound);
+            }
+
+            if (participant.Role == GroupRole.Owner)
+            {
+                throw new AppException(
+                    ErrorCodes.GroupCannotLeaveAsOwner,
+                    StatusCodes.Status403Forbidden);
+            }
+
+            await _groupParticipantRepository.RemoveAsync(participant);
+
+            _logger.LogInformation(
+                "User {UserId} left group {GroupId}",
+                userId, groupId);
+
+            return new LeaveGroupResponse
+            {
+                GroupId = group.GroupId,
+                GroupName = group.GroupName,
+                LeftAt = DateTime.UtcNow
+            };
+        }
+
+        /// <summary>
         /// Assign (change) role of member in group
         /// Validate:
         /// - Group must exist

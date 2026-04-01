@@ -10,5 +10,6 @@ namespace StudioStudio_Server.Services.Interfaces
     {
         Task<RemoveMemberResponse> RemoveMemberAsync(Guid currentUserId, RemoveMemberRequest request);
         Task<AssignRoleResponse> AssignRoleAsync(Guid currentUserId, AssignRoleRequest request);
+        Task<LeaveGroupResponse> LeaveGroupAsync(Guid userId, Guid groupId);
     }
 }
