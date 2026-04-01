@@ -104,6 +104,8 @@
   "VALIDATION018": "File không có dòng dữ liệu",
   "VALIDATION019": "Kích thước file vượt quá giới hạn tối đa 5MB",
   "VALIDATION020": "Định dạng tiêu đề file không hợp lệ",
+  "VALIDATION023": "Định dạng URL banner/logo không hợp lệ",
+  "VALIDATION024": "Alias chỉ được chứa chữ cái, số, dấu cách, gạch dưới và gạch ngang",
 
   "BATCH001": "Tên nhóm không tồn tại trong studio này",
   "BATCH002": "Không thể gán vai trò Chủ nhóm",

@@ -97,7 +97,10 @@ namespace StudioStudio_Server.Services
                 StartDate = studio.StartDate,
                 EndDate = studio.EndDate,
                 AvatarUrl = studio.AvatarUrl,
-                ColorHex = studio.ColorHex
+                ColorHex = studio.ColorHex,
+                BannerUrl = studio.BannerUrl,
+                Tagline = studio.Tagline,
+                Alias = studio.Alias
             }).ToList();
 
             foreach (var response in studioResponses)
@@ -160,7 +163,13 @@ namespace StudioStudio_Server.Services
                 UpdatedAt = now,
                 // Normalize to UTC for PostgreSQL timestamp with time zone compatibility
                 StartDate = studio.StartDate.HasValue ? DateTime.SpecifyKind(studio.StartDate.Value, DateTimeKind.Utc) : null,
-                EndDate = studio.EndDate.HasValue ? DateTime.SpecifyKind(studio.EndDate.Value, DateTimeKind.Utc) : null
+                EndDate = studio.EndDate.HasValue ? DateTime.SpecifyKind(studio.EndDate.Value, DateTimeKind.Utc) : null,
+                // 🔹 FIX + ADD: Studio personalization
+                AvatarUrl = studio.AvatarUrl,
+                ColorHex = studio.ColorHex,
+                BannerUrl = studio.BannerUrl,
+                Tagline = studio.Tagline,
+                Alias = studio.Alias
             };
 
             await _studioRepository.CreateStudioAsync(createStudio);
@@ -186,7 +195,12 @@ namespace StudioStudio_Server.Services
                 UpdatedAt = now,
                 GroupCount = 0,
                 StartDate = createStudio.StartDate,
-                EndDate = createStudio.EndDate
+                EndDate = createStudio.EndDate,
+                AvatarUrl = createStudio.AvatarUrl,
+                ColorHex = createStudio.ColorHex,
+                BannerUrl = createStudio.BannerUrl,
+                Tagline = createStudio.Tagline,
+                Alias = createStudio.Alias
             };
         }
 
@@ -241,7 +255,10 @@ namespace StudioStudio_Server.Services
                 StartDate = studio.StartDate,
                 EndDate = studio.EndDate,
                 AvatarUrl = studio.AvatarUrl,
-                ColorHex = studio.ColorHex
+                ColorHex = studio.ColorHex,
+                BannerUrl = studio.BannerUrl,
+                Tagline = studio.Tagline,
+                Alias = studio.Alias
             };
         }
 
@@ -329,6 +346,38 @@ namespace StudioStudio_Server.Services
             updateStudio.AvatarUrl = studio.AvatarUrl;
             updateStudio.UpdatedAt = DateTime.UtcNow;
 
+            // 🔹 ADDED: Validate and update BannerUrl
+            if (!string.IsNullOrEmpty(studio.BannerUrl) && !Uri.TryCreate(studio.BannerUrl, UriKind.Absolute, out _))
+            {
+                throw new AppException(ErrorCodes.ValidationInvalidBannerUrl, StatusCodes.Status400BadRequest);
+            }
+            updateStudio.BannerUrl = studio.BannerUrl;
+
+            // 🔹 ADDED: Validate and update Tagline
+            if (!string.IsNullOrEmpty(studio.Tagline) && studio.Tagline.Length > 200)
+            {
+                throw new AppException(ErrorCodes.ValidationStringLength, StatusCodes.Status400BadRequest);
+            }
+            updateStudio.Tagline = studio.Tagline;
+
+            // 🔹 ADDED: Validate and update Alias
+            if (!string.IsNullOrEmpty(studio.Alias))
+            {
+                if (studio.Alias.Length > 50)
+                {
+                    throw new AppException(ErrorCodes.ValidationStringLength, StatusCodes.Status400BadRequest);
+                }
+                if (!System.Text.RegularExpressions.Regex.IsMatch(studio.Alias, @"^[a-zA-Z0-9\sÀ-ỹ_\-]+$"))
+                {
+                    throw new AppException(ErrorCodes.ValidationInvalidAlias, StatusCodes.Status400BadRequest);
+                }
+                updateStudio.Alias = studio.Alias;
+            }
+            else if (studio.Alias == null)
+            {
+                updateStudio.Alias = null;
+            }
+
             await _studioRepository.UpdateStudioAsync(updateStudio);
 
             return new UpdateStudioResponse
@@ -339,7 +388,10 @@ namespace StudioStudio_Server.Services
                 StartDate = updateStudio.StartDate,
                 EndDate = updateStudio.EndDate,
                 AvatarUrl = updateStudio.AvatarUrl,
-                ColorHex = updateStudio.ColorHex
+                ColorHex = updateStudio.ColorHex,
+                BannerUrl = updateStudio.BannerUrl,
+                Tagline = updateStudio.Tagline,
+                Alias = updateStudio.Alias
             };
         }
 

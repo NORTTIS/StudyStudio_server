@@ -146,7 +146,10 @@ namespace StudioStudio_Server.Services
                     MembersPreview = membersPreview,
                     AvatarUrl = g.AvatarUrl,
                     ColorHex = g.ColorHex,
-                    IconEmoji = g.IconEmoji
+                    IconEmoji = g.IconEmoji,
+                    BannerUrl = g.BannerUrl,
+                    Tagline = g.Tagline,
+                    Alias = g.Alias
                 };
             }).ToList();
 
@@ -283,6 +286,9 @@ namespace StudioStudio_Server.Services
                 AvatarUrl = group.AvatarUrl,
                 ColorHex = group.ColorHex,
                 IconEmoji = group.IconEmoji,
+                BannerUrl = group.BannerUrl,
+                Tagline = group.Tagline,
+                Alias = group.Alias,
                 TaskStatuses = taskStatuses.Select(ts => new TaskStatusDto
                 {
                     StatusId = ts.StatusId,
@@ -457,6 +463,31 @@ namespace StudioStudio_Server.Services
                 throw new AppException(ErrorCodes.ValidationInvalidEmoji, StatusCodes.Status400BadRequest);
             }
 
+            // 🔹 ADDED: Validate BannerUrl
+            if (!string.IsNullOrEmpty(request.BannerUrl) && !Uri.TryCreate(request.BannerUrl, UriKind.Absolute, out _))
+            {
+                throw new AppException(ErrorCodes.ValidationInvalidBannerUrl, StatusCodes.Status400BadRequest);
+            }
+
+            // 🔹 ADDED: Validate Tagline
+            if (!string.IsNullOrEmpty(request.Tagline) && request.Tagline.Length > 200)
+            {
+                throw new AppException(ErrorCodes.ValidationStringLength, StatusCodes.Status400BadRequest);
+            }
+
+            // 🔹 ADDED: Validate Alias pattern
+            if (!string.IsNullOrEmpty(request.Alias))
+            {
+                if (request.Alias.Length > 50)
+                {
+                    throw new AppException(ErrorCodes.ValidationStringLength, StatusCodes.Status400BadRequest);
+                }
+                if (!System.Text.RegularExpressions.Regex.IsMatch(request.Alias, @"^[a-zA-Z0-9\sÀ-ỹ_\-]+$"))
+                {
+                    throw new AppException(ErrorCodes.ValidationInvalidAlias, StatusCodes.Status400BadRequest);
+                }
+            }
+
             var newGroup = new Group
             {
                 GroupId = Guid.NewGuid(),
@@ -470,7 +501,10 @@ namespace StudioStudio_Server.Services
                 UpdatedAt = now,
                 AvatarUrl = request.AvatarUrl,
                 ColorHex = request.ColorHex,
-                IconEmoji = request.IconEmoji
+                IconEmoji = request.IconEmoji,
+                BannerUrl = request.BannerUrl,
+                Tagline = request.Tagline,
+                Alias = request.Alias
             };
 
             await _groupRepository.AddAsync(newGroup);
@@ -509,7 +543,13 @@ namespace StudioStudio_Server.Services
                 StudioId = newGroup.StudioId,
                 GroupType = newGroup.StudioId.HasValue ? "Studio" : "Independent",
                 CreatedBy = userId,
-                CreatedAt = newGroup.CreatedAt
+                CreatedAt = newGroup.CreatedAt,
+                AvatarUrl = newGroup.AvatarUrl,
+                ColorHex = newGroup.ColorHex,
+                IconEmoji = newGroup.IconEmoji,
+                BannerUrl = newGroup.BannerUrl,
+                Tagline = newGroup.Tagline,
+                Alias = newGroup.Alias
             };
         }
 
@@ -608,7 +648,37 @@ namespace StudioStudio_Server.Services
                 group.IconEmoji = null;
             }
 
-            group.AvatarUrl = request.AvatarUrl;
+            // 🔹 ADDED: Validate and update BannerUrl
+            if (!string.IsNullOrEmpty(request.BannerUrl) && !Uri.TryCreate(request.BannerUrl, UriKind.Absolute, out _))
+            {
+                throw new AppException(ErrorCodes.ValidationInvalidBannerUrl, StatusCodes.Status400BadRequest);
+            }
+            group.BannerUrl = request.BannerUrl;
+
+            // 🔹 ADDED: Validate and update Tagline
+            if (!string.IsNullOrEmpty(request.Tagline) && request.Tagline.Length > 200)
+            {
+                throw new AppException(ErrorCodes.ValidationStringLength, StatusCodes.Status400BadRequest);
+            }
+            group.Tagline = request.Tagline;
+
+            // 🔹 ADDED: Validate and update Alias
+            if (!string.IsNullOrEmpty(request.Alias))
+            {
+                if (request.Alias.Length > 50)
+                {
+                    throw new AppException(ErrorCodes.ValidationStringLength, StatusCodes.Status400BadRequest);
+                }
+                if (!System.Text.RegularExpressions.Regex.IsMatch(request.Alias, @"^[a-zA-Z0-9\sÀ-ỹ_\-]+$"))
+                {
+                    throw new AppException(ErrorCodes.ValidationInvalidAlias, StatusCodes.Status400BadRequest);
+                }
+                group.Alias = request.Alias;
+            }
+            else if (request.Alias == null)
+            {
+                group.Alias = null;
+            }
 
             // Handle template creation/deactivation
             var existingTemplate = await _templateRepository.GetByGroupIdAsync(request.GroupId);
@@ -677,7 +747,10 @@ namespace StudioStudio_Server.Services
                 UpdatedAt = group.UpdatedAt,
                 AvatarUrl = group.AvatarUrl,
                 ColorHex = group.ColorHex,
-                IconEmoji = group.IconEmoji
+                IconEmoji = group.IconEmoji,
+                BannerUrl = group.BannerUrl,
+                Tagline = group.Tagline,
+                Alias = group.Alias
             };
         }
 
@@ -922,7 +995,10 @@ namespace StudioStudio_Server.Services
                     MembersPreview = membersPreview,
                     AvatarUrl = g.AvatarUrl,
                     ColorHex = g.ColorHex,
-                    IconEmoji = g.IconEmoji
+                    IconEmoji = g.IconEmoji,
+                    BannerUrl = g.BannerUrl,
+                    Tagline = g.Tagline,
+                    Alias = g.Alias
                 };
             }).ToList();
 

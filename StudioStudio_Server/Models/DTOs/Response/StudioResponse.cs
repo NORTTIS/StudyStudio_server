@@ -17,5 +17,10 @@ namespace StudioStudio_Server.Models.DTOs.Response
 
         public string? AvatarUrl { get; set; }
         public string? ColorHex { get; set; }
+
+        // 🔹 ADDED: Studio personalization
+        public string? BannerUrl { get; set; }
+        public string? Tagline { get; set; }
+        public string? Alias { get; set; }
     }
 }

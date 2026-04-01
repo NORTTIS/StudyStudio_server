@@ -135,5 +135,115 @@ namespace StudioStudio_Server.Controllers
                 "Studio avatar deleted successfully",
                 new { studioId }));
         }
+
+        // 🔹 ADDED: Group Banner Endpoints
+
+        /// <summary>
+        /// Request a presigned upload URL for group banner
+        /// Auth: Owner or Moderator of the group
+        /// </summary>
+        [HttpPost("group/{groupId}/banner/request-upload")]
+        public async Task<IActionResult> RequestGroupBannerUpload(
+            Guid groupId,
+            [FromBody] RequestAvatarUploadRequest request,
+            CancellationToken cancellationToken)
+        {
+            var userId = GetUserId();
+            var result = await _avatarService.RequestGroupBannerUploadAsync(userId, groupId, request);
+            return Ok(ApiResponse<AvatarUploadResponse>.Success(
+                ErrorCodes.SuccessGetData,
+                "Presigned upload URL generated successfully",
+                result));
+        }
+
+        /// <summary>
+        /// Complete group banner upload
+        /// Auth: Owner or Moderator of the group
+        /// </summary>
+        [HttpPost("group/{groupId}/banner/complete")]
+        public async Task<IActionResult> CompleteGroupBannerUpload(
+            Guid groupId,
+            [FromBody] CompleteAvatarUploadRequest request,
+            CancellationToken cancellationToken)
+        {
+            var userId = GetUserId();
+            await _avatarService.CompleteGroupBannerUploadAsync(userId, groupId, request);
+            return Ok(ApiResponse<object>.Success(
+                ErrorCodes.SuccessUpdateData,
+                "Group banner updated successfully",
+                new { groupId }));
+        }
+
+        /// <summary>
+        /// Delete group banner
+        /// Auth: Owner or Moderator of the group
+        /// </summary>
+        [HttpDelete("group/{groupId}/banner")]
+        public async Task<IActionResult> DeleteGroupBanner(
+            Guid groupId,
+            CancellationToken cancellationToken)
+        {
+            var userId = GetUserId();
+            await _avatarService.DeleteGroupBannerAsync(userId, groupId);
+            return Ok(ApiResponse<object>.Success(
+                ErrorCodes.SuccessUpdateData,
+                "Group banner deleted successfully",
+                new { groupId }));
+        }
+
+        // 🔹 ADDED: Studio Banner Endpoints
+
+        /// <summary>
+        /// Request a presigned upload URL for studio banner
+        /// Auth: Studio Owner
+        /// </summary>
+        [HttpPost("studio/{studioId}/banner/request-upload")]
+        public async Task<IActionResult> RequestStudioBannerUpload(
+            Guid studioId,
+            [FromBody] RequestAvatarUploadRequest request,
+            CancellationToken cancellationToken)
+        {
+            var userId = GetUserId();
+            var result = await _avatarService.RequestStudioBannerUploadAsync(userId, studioId, request);
+            return Ok(ApiResponse<AvatarUploadResponse>.Success(
+                ErrorCodes.SuccessGetData,
+                "Presigned upload URL generated successfully",
+                result));
+        }
+
+        /// <summary>
+        /// Complete studio banner upload
+        /// Auth: Studio Owner
+        /// </summary>
+        [HttpPost("studio/{studioId}/banner/complete")]
+        public async Task<IActionResult> CompleteStudioBannerUpload(
+            Guid studioId,
+            [FromBody] CompleteAvatarUploadRequest request,
+            CancellationToken cancellationToken)
+        {
+            var userId = GetUserId();
+            await _avatarService.CompleteStudioBannerUploadAsync(userId, studioId, request);
+            return Ok(ApiResponse<object>.Success(
+                ErrorCodes.SuccessUpdateData,
+                "Studio banner updated successfully",
+                new { studioId }));
+        }
+
+        /// <summary>
+        /// Delete studio banner
+        /// Auth: Studio Owner
+        /// </summary>
+        [HttpDelete("studio/{studioId}/banner")]
+        public async Task<IActionResult> DeleteStudioBanner(
+            Guid studioId,
+            CancellationToken cancellationToken)
+        {
+            var userId = GetUserId();
+            await _avatarService.DeleteStudioBannerAsync(userId, studioId);
+            return Ok(ApiResponse<object>.Success(
+                ErrorCodes.SuccessUpdateData,
+                "Studio banner deleted successfully",
+                new { studioId }));
+        }
     }
 }
