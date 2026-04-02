@@ -1300,6 +1300,60 @@ namespace StudioStudio_Server.Services
             targetParticipant.IsApproved = true;
             await _groupParticipantRepository.UpdateAsync(targetParticipant);
 
+            // 🔹 ADDED: Auto-approve user in studio if they were added as pending when joining group
+            if (group.StudioId.HasValue)
+            {
+                var existingStudioParticipant = await _studioParticipantRepository
+                    .GetPendingByStudioAndUserAsync(group.StudioId.Value, targetUserId);
+
+                if (existingStudioParticipant != null)
+                {
+                    // User was added as pending when joining the group - now approve them in studio
+                    existingStudioParticipant.IsApproved = true;
+                    await _studioParticipantRepository.UpdateAsync(existingStudioParticipant);
+
+                    _logger.LogInformation(
+                        "User {TargetUserId} auto-approved in studio {StudioId} after group {GroupId} approval",
+                        targetUserId, group.StudioId.Value, groupId);
+                }
+                else
+                {
+                    // Check if user is already an approved studio member
+                    var isStudioMember = await _studioParticipantRepository
+                        .IsUserApprovedInStudioAsync(group.StudioId.Value, targetUserId);
+
+                    if (!isStudioMember)
+                    {
+                        // User not in studio at all - add them as approved member
+                        var studioParticipant = new StudioParticipant
+                        {
+                            ParticipantId = Guid.NewGuid(),
+                            StudioId = group.StudioId.Value,
+                            UserId = targetUserId,
+                            Role = StudioRole.Member,
+                            IsApproved = true,
+                            CreatedAt = DateTime.UtcNow
+                        };
+
+                        try
+                        {
+                            await _studioParticipantRepository.AddAsync(studioParticipant);
+
+                            _logger.LogInformation(
+                                "User {TargetUserId} auto-added to studio {StudioId} after group {GroupId} approval",
+                                targetUserId, group.StudioId.Value, groupId);
+                        }
+                        catch (DbUpdateException ex) when (ex.InnerException?.Message.Contains("IX_StudioParticipants_StudioId_UserId") == true)
+                        {
+                            // User already in studio (race condition), ignore
+                            _logger.LogWarning(
+                                "User {TargetUserId} already in studio {StudioId} when approving group {GroupId}",
+                                targetUserId, group.StudioId.Value, groupId);
+                        }
+                    }
+                }
+            }
+
             var targetUser = await _userRepository.GetByIdAsync(targetUserId);
 
             _logger.LogInformation(
