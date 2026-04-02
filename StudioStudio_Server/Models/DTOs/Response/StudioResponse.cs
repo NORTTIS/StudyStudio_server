@@ -12,6 +12,7 @@ namespace StudioStudio_Server.Models.DTOs.Response
         public DateTime CreatedAt { get; set; }
         public DateTime UpdatedAt { get; set; }
         public int GroupCount { get; set; }
+        public int MemberCount { get; set; }
         public DateTime? StartDate { get; set; }
         public DateTime? EndDate { get; set; }
 

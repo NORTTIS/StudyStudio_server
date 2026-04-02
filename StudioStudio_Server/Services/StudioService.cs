@@ -94,6 +94,7 @@ namespace StudioStudio_Server.Services
                 CreatedAt = studio.CreatedAt,
                 UpdatedAt = studio.UpdatedAt,
                 GroupCount = 0,
+                MemberCount = 0,
                 StartDate = studio.StartDate,
                 EndDate = studio.EndDate,
                 AvatarUrl = studio.AvatarUrl,
@@ -106,6 +107,7 @@ namespace StudioStudio_Server.Services
             foreach (var response in studioResponses)
             {
                 response.GroupCount = await _groupRepository.GetGroupCountByStudioIdAsync(response.StudioId);
+                response.MemberCount = await _studioParticipantRepository.GetParticipantCountByStudioIdAsync(response.StudioId);
             }
 
             return new StudioListResponse
@@ -194,6 +196,7 @@ namespace StudioStudio_Server.Services
                 CreatedAt = now,
                 UpdatedAt = now,
                 GroupCount = 0,
+                MemberCount = 1,
                 StartDate = createStudio.StartDate,
                 EndDate = createStudio.EndDate,
                 AvatarUrl = createStudio.AvatarUrl,
@@ -252,6 +255,7 @@ namespace StudioStudio_Server.Services
                 CreatedAt = studio.CreatedAt,
                 UpdatedAt = studio.UpdatedAt,
                 GroupCount = groupCount,
+                MemberCount = await _studioParticipantRepository.GetParticipantCountByStudioIdAsync(studio.StudioId),
                 StartDate = studio.StartDate,
                 EndDate = studio.EndDate,
                 AvatarUrl = studio.AvatarUrl,
