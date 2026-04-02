@@ -26,6 +26,9 @@ namespace StudioStudio_Server.Models.DTOs.Response
         public string? BannerUrl { get; set; }
         public string? Tagline { get; set; }
         public string? Alias { get; set; }
+
+        // 🔹 ADDED: Open/Closed group
+        public bool IsOpen { get; set; }
     }
 
     public class TaskStatusDto

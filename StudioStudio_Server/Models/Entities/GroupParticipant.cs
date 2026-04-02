@@ -10,5 +10,8 @@
         public GroupRole Role { get; set; }
 
         public DateTime CreatedAt { get; set; }
+
+        // 🔹 ADDED: Approval status (true = auto-approved for open groups; must be approved for closed groups)
+        public bool IsApproved { get; set; } = true;
     }
 }

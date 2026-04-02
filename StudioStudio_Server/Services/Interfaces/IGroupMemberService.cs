@@ -11,5 +11,8 @@ namespace StudioStudio_Server.Services.Interfaces
         Task<RemoveMemberResponse> RemoveMemberAsync(Guid currentUserId, RemoveMemberRequest request);
         Task<AssignRoleResponse> AssignRoleAsync(Guid currentUserId, AssignRoleRequest request);
         Task<LeaveGroupResponse> LeaveGroupAsync(Guid userId, Guid groupId);
+
+        // 🔹 ADDED: Reject pending member (kick without approval record)
+        Task<RemoveMemberResponse> RejectMemberAsync(Guid currentUserId, Guid groupId, Guid targetUserId);
     }
 }

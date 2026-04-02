@@ -20,43 +20,87 @@ namespace StudioStudio_Server.Repositories
 
         /// <summary>
         /// Get list of groups user is member of
-        /// Condition: Participants contains {userId} AND IsActive = true
-        /// Include: Studio, Participants
+        /// Condition: Participants contains {userId} AND IsApproved = true AND IsActive = true
+        /// Include: Participants (filtered by IsApproved = true only)
         /// Order by: UpdatedAt DESC
         /// </summary>
         public async Task<List<Group>> GetUserGroupsAsync(Guid userId)
         {
-            return await _db.Groups
-                .Where(g => g.Participants.Any(p => p.UserId == userId) && g.IsActive)
-                .Include(g => g.Participants)
+            // First get group IDs where user is approved
+            var approvedGroupIds = await _db.GroupParticipants
+                .Where(p => p.UserId == userId && p.IsApproved)
+                .Select(p => p.GroupId)
+                .ToListAsync();
+
+            // Then get groups with only approved participants (avoid EF Core eager-loading all participants)
+            var groups = await _db.Groups
+                .Where(g => approvedGroupIds.Contains(g.GroupId) && g.IsActive)
                 .OrderByDescending(g => g.CreatedAt)
                 .AsNoTracking()
                 .ToListAsync();
+
+            // Load only approved participants for these groups
+            var approvedParticipants = await _db.GroupParticipants
+                .Where(p => approvedGroupIds.Contains(p.GroupId) && p.IsApproved)
+                .ToListAsync();
+
+            // Manually attach participants to groups
+            foreach (var group in groups)
+            {
+                var groupParticipants = approvedParticipants
+                    .Where(p => p.GroupId == group.GroupId)
+                    .ToList();
+                group.Participants = groupParticipants;
+            }
+
+            return groups;
         }
 
         /// <summary>
         /// Get group by ID
         /// Condition: GroupId = {groupId} AND IsActive = true
-        /// No Include
+        /// Include: Only approved participants (IsApproved = true)
         /// </summary>
         public async Task<Group?> GetByIdAsync(Guid groupId)
         {
-            return await _db.Groups
-                .Include(g => g.Participants)
+            var group = await _db.Groups
                 .FirstOrDefaultAsync(g => g.GroupId == groupId && g.IsActive);
+
+            if (group != null)
+            {
+                // Load only approved participants
+                var approvedParticipants = await _db.GroupParticipants
+                    .Where(p => p.GroupId == groupId && p.IsApproved)
+                    .ToListAsync();
+
+                group.Participants = approvedParticipants;
+            }
+
+            return group;
         }
 
         /// <summary>
         /// Get group with details
         /// Condition: GroupId = {groupId} AND IsActive = true
-        /// Include: Studio, Participants → User
+        /// Include: Only approved participants (IsApproved = true)
         /// </summary>
         public async Task<Group?> GetGroupWithDetailsAsync(Guid groupId)
         {
-            return await _db.Groups
-                .Include(g => g.Participants)
+            var group = await _db.Groups
                 .AsNoTracking()
                 .FirstOrDefaultAsync(g => g.GroupId == groupId && g.IsActive);
+
+            if (group != null)
+            {
+                // Load only approved participants
+                var approvedParticipants = await _db.GroupParticipants
+                    .Where(p => p.GroupId == groupId && p.IsApproved)
+                    .ToListAsync();
+
+                group.Participants = approvedParticipants;
+            }
+
+            return group;
         }
 
         /// <summary>
@@ -276,7 +320,7 @@ namespace StudioStudio_Server.Repositories
         }
 
         /// <summary>
-        /// Get member counts for a list of groups
+        /// Get member counts for a list of groups (approved members only)
         /// </summary>
         public async Task<Dictionary<Guid, int>> GetMemberCountsAsync(List<Guid> groupIds)
         {
@@ -286,7 +330,7 @@ namespace StudioStudio_Server.Repositories
             }
 
             var counts = await _db.GroupParticipants
-                .Where(p => groupIds.Contains(p.GroupId))
+                .Where(p => groupIds.Contains(p.GroupId) && p.IsApproved)
                 .GroupBy(p => p.GroupId)
                 .Select(g => new { GroupId = g.Key, Count = g.Count() })
                 .ToDictionaryAsync(x => x.GroupId, x => x.Count);

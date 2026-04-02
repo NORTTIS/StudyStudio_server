@@ -9,6 +9,9 @@
 
         public bool IsDeleted { get; set; } = false;
 
+        // 🔹 ADDED: Open/Closed studio membership
+        public bool IsOpen { get; set; } = true;
+
         public Guid OwnerId { get; set; }
 
         public DateTime CreatedAt { get; set; }

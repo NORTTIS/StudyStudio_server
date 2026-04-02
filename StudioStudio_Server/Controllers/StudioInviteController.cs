@@ -355,12 +355,16 @@ namespace StudioStudio_Server.Controllers
                     StatusCodes.Status400BadRequest);
             }
 
+            // 🔹 ADDED: Determine IsApproved based on studio's IsOpen setting
+            bool isApproved = studio.IsOpen;
+
             var participant = new StudioParticipant
             {
                 ParticipantId = Guid.NewGuid(),
                 StudioId = inviteData.StudioId,
                 UserId = userId,
                 Role = role,
+                IsApproved = isApproved,
                 CreatedAt = DateTime.UtcNow
             };
 
@@ -369,8 +373,8 @@ namespace StudioStudio_Server.Controllers
                 await _studioParticipantRepository.AddAsync(participant);
 
                 _logger.LogInformation(
-                    "User {UserId} accepted invite and joined studio {StudioId} with role {Role}",
-                    userId, inviteData.StudioId, role);
+                    "User {UserId} accepted invite for studio {StudioId} with role {Role}, IsApproved={IsApproved}",
+                    userId, inviteData.StudioId, role, isApproved);
             }
             catch (DbUpdateException ex) when (ex.InnerException?.Message.Contains("IX_StudioParticipants_StudioId_UserId") == true)
             {
@@ -384,6 +388,7 @@ namespace StudioStudio_Server.Controllers
                 StudioId = studio.StudioId,
                 StudioName = studio.StudioName,
                 Role = role.ToString(),
+                IsApproved = isApproved,
                 JoinedAt = participant.CreatedAt
             };
 

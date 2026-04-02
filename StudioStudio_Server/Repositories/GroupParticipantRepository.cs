@@ -61,7 +61,7 @@ namespace StudioStudio_Server.Repositories
         public async Task<List<GroupParticipant>> GetAllByGroupIdAsync(Guid groupId)
         {
             return await _context.GroupParticipants
-                .Where(gp => gp.GroupId == groupId &&
+                .Where(gp => gp.GroupId == groupId && gp.IsApproved &&
                     _context.Groups.Any(g => g.GroupId == gp.GroupId && g.IsActive))
                 .OrderBy(gp => gp.CreatedAt)
                 .AsNoTracking()
@@ -77,7 +77,7 @@ namespace StudioStudio_Server.Repositories
         public async Task<List<GroupParticipant>> GetByGroupIdsAsync(List<Guid> groupIds)
         {
             return await _context.GroupParticipants
-                .Where(gp => groupIds.Contains(gp.GroupId) &&
+                .Where(gp => groupIds.Contains(gp.GroupId) && gp.IsApproved &&
                     _context.Groups.Any(g => g.GroupId == gp.GroupId && g.IsActive))
                 .OrderBy(gp => gp.CreatedAt)
                 .AsNoTracking()
@@ -92,7 +92,7 @@ namespace StudioStudio_Server.Repositories
         public async Task<int> GetParticipantCountByGroupIdAsync(Guid groupId)
         {
             return await _context.GroupParticipants
-                .Where(gp => gp.GroupId == groupId)
+                .Where(gp => gp.GroupId == groupId && gp.IsApproved)
                 .CountAsync();
         }
 
@@ -104,7 +104,7 @@ namespace StudioStudio_Server.Repositories
         public async Task<int> GetRoleCountByGroupIdAsync(Guid groupId, GroupRole role)
         {
             return await _context.GroupParticipants
-                .Where(gp => gp.GroupId == groupId && gp.Role == role)
+                .Where(gp => gp.GroupId == groupId && gp.Role == role && gp.IsApproved)
                 .CountAsync();
         }
 
@@ -206,6 +206,44 @@ namespace StudioStudio_Server.Repositories
         {
             _context.GroupParticipants.RemoveRange(participants);
             await _context.SaveChangesAsync();
+        }
+
+        // 🔹 ADDED: Pending membership & approval methods
+
+        /// <summary>
+        /// Get all pending (not yet approved) members of a group
+        /// Condition: GroupId = {groupId} AND IsApproved = false AND Group.IsActive = true
+        /// </summary>
+        public async Task<List<GroupParticipant>> GetPendingByGroupIdAsync(Guid groupId)
+        {
+            return await _context.GroupParticipants
+                .Where(gp => gp.GroupId == groupId && !gp.IsApproved &&
+                    _context.Groups.Any(g => g.GroupId == gp.GroupId && g.IsActive))
+                .OrderBy(gp => gp.CreatedAt)
+                .AsNoTracking()
+                .ToListAsync();
+        }
+
+        /// <summary>
+        /// Check if user is an approved member of a group
+        /// Condition: GroupId+UserId in GroupParticipants AND IsApproved = true AND Group.IsActive = true
+        /// </summary>
+        public async Task<bool> IsUserApprovedInGroupAsync(Guid groupId, Guid userId)
+        {
+            return await _context.GroupParticipants
+                .AnyAsync(gp => gp.GroupId == groupId && gp.UserId == userId && gp.IsApproved &&
+                    _context.Groups.Any(g => g.GroupId == gp.GroupId && g.IsActive));
+        }
+
+        /// <summary>
+        /// Get pending participant record for a user in a group (if any)
+        /// Condition: GroupId+UserId in GroupParticipants AND IsApproved = false
+        /// </summary>
+        public async Task<GroupParticipant?> GetPendingByGroupAndUserAsync(Guid groupId, Guid userId)
+        {
+            return await _context.GroupParticipants
+                .AsNoTracking()
+                .FirstOrDefaultAsync(gp => gp.GroupId == groupId && gp.UserId == userId && !gp.IsApproved);
         }
     }
 }
