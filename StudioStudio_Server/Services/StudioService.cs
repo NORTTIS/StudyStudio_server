@@ -1,4 +1,6 @@
 using Microsoft.AspNetCore.Http;
+using Microsoft.EntityFrameworkCore;
+using StudioStudio_Server.Configurations;
 using StudioStudio_Server.Exceptions;
 using StudioStudio_Server.Models.DTOs.Request;
 using StudioStudio_Server.Models.DTOs.Response;
@@ -20,8 +22,10 @@ namespace StudioStudio_Server.Services
         private readonly IStudioParticipantRepository _studioParticipantRepository;
         private readonly IGroupParticipantRepository _groupParticipantRepository;
         private readonly IUserRepository _userRepository;
+        private readonly IEmailService _emailService;
         private readonly IHttpContextAccessor _httpContextAccessor;
         private readonly ILogger<StudioService> _logger;
+        private readonly IConfiguration _configuration;
 
         public StudioService(
             IStudioRepository studioRepository,
@@ -30,8 +34,10 @@ namespace StudioStudio_Server.Services
             IStudioParticipantRepository studioParticipantRepository,
             IGroupParticipantRepository groupParticipantRepository,
             IUserRepository userRepository,
+            IEmailService emailService,
             IHttpContextAccessor httpContextAccessor,
-            ILogger<StudioService> logger)
+            ILogger<StudioService> logger,
+            IConfiguration configuration)
         {
             _studioRepository = studioRepository;
             _groupRepository = groupRepository;
@@ -39,8 +45,10 @@ namespace StudioStudio_Server.Services
             _studioParticipantRepository = studioParticipantRepository;
             _groupParticipantRepository = groupParticipantRepository;
             _userRepository = userRepository;
+            _emailService = emailService;
             _httpContextAccessor = httpContextAccessor;
             _logger = logger;
+            _configuration = configuration;
         }
 
         public async Task<StudioListResponse> GetUserStudiosAsync(Guid userId)
@@ -603,7 +611,7 @@ namespace StudioStudio_Server.Services
             };
         }
 
-        // 🔹 ADDED: Approve pending member (Owner only)
+        // Approve pending member (Owner only)
         public async Task<ApproveMemberResponse> ApproveMemberAsync(Guid userId, Guid studioId, Guid targetUserId)
         {
             var studio = await _studioRepository.GetByIdAsync(studioId);
@@ -626,7 +634,104 @@ namespace StudioStudio_Server.Services
             targetParticipant.IsApproved = true;
             await _studioParticipantRepository.UpdateAsync(targetParticipant);
 
+            // Auto-approve user in all studio groups if they were added as pending
+            var studioGroups = await _groupRepository.GetStudioGroupsAsync(studioId);
+            var groupIds = studioGroups.Select(g => g.GroupId).ToList();
+
+            if (groupIds.Any())
+            {
+                var existingGroupParticipants = await _groupParticipantRepository.GetByGroupIdsAsync(groupIds);
+
+                foreach (var group in studioGroups)
+                {
+                    var pendingInGroup = existingGroupParticipants
+                        .FirstOrDefault(p => p.GroupId == group.GroupId && p.UserId == targetUserId && !p.IsApproved);
+
+                    if (pendingInGroup != null)
+                    {
+                        // User was added as pending when joining the group - now approve them
+                        pendingInGroup.IsApproved = true;
+                        await _groupParticipantRepository.UpdateAsync(pendingInGroup);
+
+                        _logger.LogInformation(
+                            "User {TargetUserId} auto-approved in group {GroupId} after studio {StudioId} approval",
+                            targetUserId, group.GroupId, studioId);
+                    }
+                    else
+                    {
+                        // Check if user is already an approved member or doesn't exist
+                        var isGroupMember = await _groupParticipantRepository
+                            .IsUserApprovedInGroupAsync(group.GroupId, targetUserId);
+
+                        if (!isGroupMember && !existingGroupParticipants.Any(p => p.GroupId == group.GroupId && p.UserId == targetUserId))
+                        {
+                            // User not in group at all - add them if group is open (auto-join groups)
+                            if (group.IsOpen)
+                            {
+                                var groupParticipant = new GroupParticipant
+                                {
+                                    ParticipantId = Guid.NewGuid(),
+                                    GroupId = group.GroupId,
+                                    UserId = targetUserId,
+                                    Role = GroupRole.Member,
+                                    IsApproved = true,
+                                    CreatedAt = DateTime.UtcNow
+                                };
+
+                                try
+                                {
+                                    await _groupParticipantRepository.AddAsync(groupParticipant);
+
+                                    _logger.LogInformation(
+                                        "User {TargetUserId} auto-added to group {GroupId} after studio {StudioId} approval",
+                                        targetUserId, group.GroupId, studioId);
+                                }
+                                catch (DbUpdateException)
+                                {
+                                    // User already in group (race condition), ignore
+                                    _logger.LogWarning(
+                                        "User {TargetUserId} already in group {GroupId} when approving studio {StudioId}",
+                                        targetUserId, group.GroupId, studioId);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
             var targetUser = await _userRepository.GetByIdAsync(targetUserId);
+
+            // Send approval notification email
+            if (targetUser != null && !string.IsNullOrEmpty(targetUser.Email))
+            {
+                try
+                {
+                    var approvalUrl = BuildStudioUrl(studioId);
+                    var language = targetUser?.Language == "vi" ? Language.Vietnamese : Language.English;
+                    string nameToShow = targetUser?.Language == "vi" ? $"quản lý {studio.StudioName}" : $"studio {studio.StudioName}";
+
+                    var emailBody = EmailTemplate.MemberApprovedNotification(
+                        nameToShow,
+                        approvalUrl,
+                        DateTime.UtcNow,
+                        language);
+
+                    await _emailService.SendLinkAsync(
+                        targetUser.Email,
+                        "Join studio request approved",
+                        emailBody);
+
+                    _logger.LogInformation(
+                        "Approval notification email sent to {Email} for studio {StudioId}",
+                        targetUser.Email, studioId);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex,
+                        "Failed to send approval notification email to {Email}",
+                        targetUser.Email);
+                }
+            }
 
             _logger.LogInformation(
                 "User {UserId} approved member {TargetUserId} in studio {StudioId}",
@@ -641,6 +746,11 @@ namespace StudioStudio_Server.Services
                 IsApproved = true,
                 UpdatedAt = DateTime.UtcNow
             };
+        }
+        private string BuildStudioUrl(Guid studioId)
+        {
+            var baseUrl = _configuration["Frontend:BaseUrl"] ?? "http://localhost:3000";
+            return $"{baseUrl}/master/{studioId}";
         }
     }
 }

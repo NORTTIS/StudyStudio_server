@@ -7,6 +7,7 @@ using StudioStudio_Server.Models.Caches;
 using StudioStudio_Server.Models.DTOs.Request;
 using StudioStudio_Server.Models.DTOs.Response;
 using StudioStudio_Server.Models.Entities;
+using StudioStudio_Server.Models.Enums;
 using StudioStudio_Server.Repositories.Interfaces;
 using StudioStudio_Server.Services.Interfaces;
 using System.Security.Claims;
@@ -26,6 +27,7 @@ namespace StudioStudio_Server.Controllers
         private readonly IGroupInviteService _groupInviteService;
         private readonly IGroupRepository _groupRepository;
         private readonly IGroupParticipantRepository _groupParticipantRepository;
+        private readonly IStudioParticipantRepository _studioParticipantRepository;
         private readonly IUserSubscriptionRepository _userSubscriptionRepository;
         private readonly IEmailService _emailService;
         private readonly IUserRepository _userRepository;
@@ -37,6 +39,7 @@ namespace StudioStudio_Server.Controllers
             IGroupInviteService groupInviteService,
             IGroupRepository groupRepository,
             IGroupParticipantRepository groupParticipantRepository,
+            IStudioParticipantRepository studioParticipantRepository,
             IUserSubscriptionRepository userSubscriptionRepository,
             IEmailService emailService,
             IUserRepository userRepository,
@@ -47,6 +50,7 @@ namespace StudioStudio_Server.Controllers
             _groupInviteService = groupInviteService;
             _groupRepository = groupRepository;
             _groupParticipantRepository = groupParticipantRepository;
+            _studioParticipantRepository = studioParticipantRepository;
             _userSubscriptionRepository = userSubscriptionRepository;
             _emailService = emailService;
             _userRepository = userRepository;
@@ -444,6 +448,42 @@ namespace StudioStudio_Server.Controllers
             try
             {
                 await _groupParticipantRepository.AddAsync(participant);
+
+                // 🔹 ADDED: Auto-add user to studio if group belongs to a studio and user is not already a member
+                if (group.StudioId.HasValue)
+                {
+                    var isAlreadyStudioMember = await _studioParticipantRepository
+                        .IsUserApprovedInStudioAsync(group.StudioId.Value, userId);
+
+                    if (!isAlreadyStudioMember)
+                    {
+                        var studioParticipant = new StudioParticipant
+                        {
+                            ParticipantId = Guid.NewGuid(),
+                            StudioId = group.StudioId.Value,
+                            UserId = userId,
+                            Role = StudioRole.Member,
+                            IsApproved = isApproved,
+                            CreatedAt = DateTime.UtcNow
+                        };
+
+                        try
+                        {
+                            await _studioParticipantRepository.AddAsync(studioParticipant);
+
+                            _logger.LogInformation(
+                                "User {UserId} auto-added to studio {StudioId} via group {GroupId} join, IsApproved={IsApproved}",
+                                userId, group.StudioId.Value, inviteData.GroupId, isApproved);
+                        }
+                        catch (DbUpdateException ex) when (ex.InnerException?.Message.Contains("IX_StudioParticipants_StudioId_UserId") == true)
+                        {
+                            // User already in studio (duplicate), ignore
+                            _logger.LogWarning(
+                                "User {UserId} already exists in studio {StudioId} when joining group {GroupId}",
+                                userId, group.StudioId.Value, inviteData.GroupId);
+                        }
+                    }
+                }
 
                 _logger.LogInformation(
                     "User {UserId} accepted invite for group {GroupId} with role {Role}, IsApproved={IsApproved}",

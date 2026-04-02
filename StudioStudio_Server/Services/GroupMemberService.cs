@@ -257,7 +257,7 @@ namespace StudioStudio_Server.Services
             if (targetParticipant.IsApproved)
             {
                 throw new AppException(
-                    ErrorCodes.GroupPermissionDenied,
+                    ErrorCodes.GroupMemberNotFound,
                     StatusCodes.Status400BadRequest);
             }
 

@@ -1922,5 +1922,63 @@ style=""max-width:620px;margin:40px auto;background:#ffffff;border-radius:20px;o
 
         #endregion
 
+        #region Member Approved
+
+        public static string MemberApprovedNotification(
+          string name, 
+          string url, 
+          DateTime approvedAt,
+          Language language = Language.Vietnamese)
+        {
+            var title = language == Language.Vietnamese ? "Bạn đã được duyệt" : "Member approved";
+            var detail = language == Language.Vietnamese
+                ? $"<p>Xin chúc mừng! Bạn đã được là thành viên của <strong>{name}</strong> vào lúc {approvedAt:dd/MM/yyyy HH:mm}.</p>"
+                : $"<p>Congratulations! You have been approved as a member of <strong>{name}</strong> at {approvedAt:MM/dd/yyyy HH:mm}.</p>";
+
+            return MemberApprovedNotificationEmail(title, detail, url, language);
+        }
+
+        private static string MemberApprovedNotificationEmail(string title, string detailHtml, string? actionUrl, Language language)
+        {
+          var actionText = language == Language.Vietnamese ? "Xem chi tiết" : "View details";
+            var fallback = language == Language.Vietnamese ? "Đây là email tự động từ Study Studio." : "This is an automated email from Study Studio.";
+            var buttonHtml = string.IsNullOrWhiteSpace(actionUrl)
+                ? string.Empty
+                : $@"<div style=""text-align:center;margin:28px 0;""><a href=""{actionUrl}"" style=""background:#FF5722;color:#fff;padding:12px 28px;text-decoration:none;border-radius:24px;display:inline-block;font-weight:600;"">{actionText}</a></div>";
+
+            return $@"
+<!DOCTYPE html>
+<html lang=""{(language == Language.Vietnamese ? "vi" : "en")}"">
+<head>
+  <meta charset=""UTF-8"" />
+  <meta name=""viewport"" content=""width=device-width, initial-scale=1.0"" />
+  <title>{title}</title>
+</head>
+<body style=""margin:0;padding:0;background:#f5f7fa;font-family:Arial,Helvetica,sans-serif;"">
+  <table align=""center"" width=""100%"" cellpadding=""0"" cellspacing=""0"" style=""max-width:620px;margin:40px auto;background:#ffffff;border-radius:20px;overflow:hidden;box-shadow:0 10px 30px rgba(0,0,0,0.08);"">
+    <tr>
+      <td style=""background:linear-gradient(135deg,#FF7043,#FF5722);padding:38px 30px;text-align:center;color:white;"">
+        <h1 style=""margin:0;font-size:24px;font-weight:700;"">{title}</h1>
+      </td>
+    </tr>
+    <tr>
+      <td style=""padding:34px 30px;color:#333;font-size:15px;line-height:1.7;"">
+        {detailHtml}
+        {buttonHtml}
+        <hr style=""margin:30px 0;border:none;border-top:1px solid #eee;"" />
+        <p style=""font-size:12px;color:#999;"">{fallback}</p>
+      </td>
+    </tr>
+    <tr>
+      <td style=""background:#fafafa;padding:22px;text-align:center;font-size:12px;color:#999;"">
+        © 2026 Study Studio <br/>
+        Made with care for Students
+      </td>
+    </tr>
+  </table>
+</body>
+</html>";
+        }
+        #endregion
     }
 }
