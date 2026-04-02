@@ -186,5 +186,6 @@
 
   "SUBSCRIPTION001": "Không tìm thấy gói đăng ký",
 
-  "SYS001": "Lỗi hệ thống không xác định"
+  "SYS001": "Lỗi hệ thống không xác định",
+  "API001": "Bạn đã vượt quá giới hạn yêu cầu API. Vui lòng thử lại sau."
 }

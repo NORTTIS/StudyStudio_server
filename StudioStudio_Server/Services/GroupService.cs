@@ -35,6 +35,13 @@ namespace StudioStudio_Server.Services
         private readonly IHttpContextAccessor _httpContextAccessor;
         private readonly IConfiguration _configuration;
 
+        private static readonly string[] BrandColors = new[]
+        {
+            "#FF5F3D", "#FF7A54", "#FF4D6A", "#FF3CAC",
+            "#7C3AED", "#4F46E5", "#2563EB", "#06B6D4",
+            "#10B981", "#84CC16", "#F59E0B", "#F43F5E"
+        };
+
         public GroupService(
             ILogger<GroupService> logger,
             IMessageService messageService,
@@ -845,6 +852,7 @@ namespace StudioStudio_Server.Services
             for (int i = currentGroupCount + 1; i <= totalGroupCount; i++)
             {
                 var groupName = request.GroupPrefix + i;
+                var colorIndex = (i - currentGroupCount - 1) % BrandColors.Length;
 
                 var newGroup = new Group
                 {
@@ -856,7 +864,8 @@ namespace StudioStudio_Server.Services
                     IsTemplate = false,
                     IsActive = true,
                     CreatedAt = now,
-                    UpdatedAt = now
+                    UpdatedAt = now,
+                    ColorHex = BrandColors[colorIndex]
                 };
 
                 await _groupRepository.AddAsync(newGroup);

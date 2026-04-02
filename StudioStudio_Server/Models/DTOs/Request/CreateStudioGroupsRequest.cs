@@ -12,7 +12,6 @@ namespace StudioStudio_Server.Models.DTOs.Request
         public string GroupPrefix { get; set; } = string.Empty;
 
         [Required(ErrorMessage = ErrorCodes.ValidationGroupCreationNumber)]
-        [Range(1, 10, ErrorMessage = ErrorCodes.ValidationGroupCreationNumber)]
         public int GroupCount { get; set; }
 
         [StringLength(500, ErrorMessage = ErrorCodes.ValidationRequiredField)]

@@ -239,6 +239,7 @@
 
         // COMMON
         public const string UnexpectedError = "SYS001";
+        public const string ApiRateLimitExceeded = "API001";
 
         // ANALYTICS
         public const string AnalyticsNotFound = "ANALYTICS001";

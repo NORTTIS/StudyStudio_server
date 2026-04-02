@@ -187,5 +187,6 @@
 
   "SUBSCRIPTION001": "Subscription plan not found",
 
-  "SYS001": "Unexpected system error"
+  "SYS001": "Unexpected system error",
+  "API001": "You have exceeded the API rate limit. Please try again later."
 }

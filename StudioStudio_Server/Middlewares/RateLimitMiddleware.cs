@@ -19,7 +19,7 @@ namespace StudioStudio_Server.Middlewares
         private readonly IConnectionMultiplexer _redis;
 
         // Configuration: Max requests per minute per user
-        private const int MAX_REQUESTS_PER_MINUTE = 100;
+        private const int MAX_REQUESTS_PER_MINUTE = 300;
         private const int RATE_LIMIT_WINDOW_SECONDS = 60;
 
         public RateLimitMiddleware(
@@ -121,8 +121,8 @@ namespace StudioStudio_Server.Middlewares
             context.Response.Headers["Retry-After"] = RATE_LIMIT_WINDOW_SECONDS.ToString();
 
             var response = ApiResponse<object>.Error(
-                ErrorCodes.ValidationRateLimitExceeded,
-                localizer.Get(ErrorCodes.ValidationRateLimitExceeded)
+                ErrorCodes.ApiRateLimitExceeded,
+                localizer.Get(ErrorCodes.ApiRateLimitExceeded)
             );
 
             await context.Response.WriteAsJsonAsync(response);
