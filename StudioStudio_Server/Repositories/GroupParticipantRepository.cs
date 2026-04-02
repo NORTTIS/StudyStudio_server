@@ -61,7 +61,7 @@ namespace StudioStudio_Server.Repositories
         public async Task<List<GroupParticipant>> GetAllByGroupIdAsync(Guid groupId)
         {
             return await _context.GroupParticipants
-                .Where(gp => gp.GroupId == groupId &&
+                .Where(gp => gp.GroupId == groupId && gp.IsApproved &&
                     _context.Groups.Any(g => g.GroupId == gp.GroupId && g.IsActive))
                 .OrderBy(gp => gp.CreatedAt)
                 .AsNoTracking()
@@ -77,7 +77,7 @@ namespace StudioStudio_Server.Repositories
         public async Task<List<GroupParticipant>> GetByGroupIdsAsync(List<Guid> groupIds)
         {
             return await _context.GroupParticipants
-                .Where(gp => groupIds.Contains(gp.GroupId) &&
+                .Where(gp => groupIds.Contains(gp.GroupId) && gp.IsApproved &&
                     _context.Groups.Any(g => g.GroupId == gp.GroupId && g.IsActive))
                 .OrderBy(gp => gp.CreatedAt)
                 .AsNoTracking()
@@ -92,7 +92,7 @@ namespace StudioStudio_Server.Repositories
         public async Task<int> GetParticipantCountByGroupIdAsync(Guid groupId)
         {
             return await _context.GroupParticipants
-                .Where(gp => gp.GroupId == groupId)
+                .Where(gp => gp.GroupId == groupId && gp.IsApproved)
                 .CountAsync();
         }
 
@@ -104,7 +104,7 @@ namespace StudioStudio_Server.Repositories
         public async Task<int> GetRoleCountByGroupIdAsync(Guid groupId, GroupRole role)
         {
             return await _context.GroupParticipants
-                .Where(gp => gp.GroupId == groupId && gp.Role == role)
+                .Where(gp => gp.GroupId == groupId && gp.Role == role && gp.IsApproved)
                 .CountAsync();
         }
 

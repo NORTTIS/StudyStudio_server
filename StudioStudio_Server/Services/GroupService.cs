@@ -1,4 +1,4 @@
-using iText.Layout.Renderer;
+﻿using iText.Layout.Renderer;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
