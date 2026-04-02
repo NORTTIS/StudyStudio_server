@@ -70,6 +70,7 @@
         public const string StudioNameAlreadyExist = "STUDIO006";
         public const string StudioNameInvalid = "STUDIO007";
         public const string StudioDescriptionInvalid = "STUDIO008";
+        public const string StudioMemberNotFound = "STUDIO009";
 
         // STATUS
         public const string StatusNotFound = "STATUS001";

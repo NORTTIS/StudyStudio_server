@@ -149,7 +149,8 @@ namespace StudioStudio_Server.Services
                     IconEmoji = g.IconEmoji,
                     BannerUrl = g.BannerUrl,
                     Tagline = g.Tagline,
-                    Alias = g.Alias
+                    Alias = g.Alias,
+                    IsOpen = g.IsOpen
                 };
             }).ToList();
 
@@ -197,9 +198,9 @@ namespace StudioStudio_Server.Services
                 throw new AppException(ErrorCodes.GroupNotFound, StatusCodes.Status404NotFound);
             }
 
-            // Check if user is a member
+            // Check if user is an approved member
             var userParticipant = group.Participants.FirstOrDefault(p => p.UserId == userId);
-            if (userParticipant == null)
+            if (userParticipant == null || !userParticipant.IsApproved)
             {
                 throw new AppException(ErrorCodes.GroupAccessDenied, StatusCodes.Status403Forbidden);
             }
@@ -289,6 +290,7 @@ namespace StudioStudio_Server.Services
                 BannerUrl = group.BannerUrl,
                 Tagline = group.Tagline,
                 Alias = group.Alias,
+                IsOpen = group.IsOpen,
                 TaskStatuses = taskStatuses.Select(ts => new TaskStatusDto
                 {
                     StatusId = ts.StatusId,
@@ -326,14 +328,14 @@ namespace StudioStudio_Server.Services
                 throw new AppException(ErrorCodes.GroupNotFound, StatusCodes.Status404NotFound);
             }
 
-            // Check if user is a member
-            var isUserInGroup = await _groupParticipantRepository.IsUserInGroupAsync(groupId, userId);
+            // Check if user is an approved member
+            var isUserInGroup = await _groupParticipantRepository.IsUserApprovedInGroupAsync(groupId, userId);
             if (!isUserInGroup)
             {
                 throw new AppException(ErrorCodes.GroupPermissionDenied, StatusCodes.Status403Forbidden);
             }
 
-            // Get all participants
+            // Get all participants (including pending for the pending members list API)
             var participants = await _groupParticipantRepository.GetAllByGroupIdAsync(groupId);
 
             // Get user info for all participants
@@ -352,6 +354,7 @@ namespace StudioStudio_Server.Services
                     Email = user?.Email ?? "",
                     AvatarUrl = AvatarUrlHelper.BuildAbsoluteAvatarUrl(user?.AvatarUrl, _httpContextAccessor.HttpContext),
                     Role = p.Role.ToString(),
+                    IsApproved = p.IsApproved,
                     JoinedAt = p.CreatedAt
                 };
             })
@@ -497,6 +500,7 @@ namespace StudioStudio_Server.Services
                 CreatedBy = userId,
                 IsTemplate = false,
                 IsActive = true,
+                IsOpen = request.IsOpen,
                 CreatedAt = now,
                 UpdatedAt = now,
                 AvatarUrl = request.AvatarUrl,
@@ -509,13 +513,14 @@ namespace StudioStudio_Server.Services
 
             await _groupRepository.AddAsync(newGroup);
 
-            // Add creator as Owner participant
+            // Add creator as Owner participant (always approved)
             var ownerParticipant = new GroupParticipant
             {
                 ParticipantId = Guid.NewGuid(),
                 GroupId = newGroup.GroupId,
                 UserId = userId,
                 Role = GroupRole.Owner,
+                IsApproved = true,
                 CreatedAt = now
             };
 
@@ -549,7 +554,8 @@ namespace StudioStudio_Server.Services
                 IconEmoji = newGroup.IconEmoji,
                 BannerUrl = newGroup.BannerUrl,
                 Tagline = newGroup.Tagline,
-                Alias = newGroup.Alias
+                Alias = newGroup.Alias,
+                IsOpen = newGroup.IsOpen
             };
         }
 
@@ -680,6 +686,12 @@ namespace StudioStudio_Server.Services
                 group.Alias = null;
             }
 
+            // 🔹 ADDED: Update IsOpen setting (Owner/Moderator only)
+            if (request.IsOpen.HasValue)
+            {
+                group.IsOpen = request.IsOpen.Value;
+            }
+
             // Handle template creation/deactivation
             var existingTemplate = await _templateRepository.GetByGroupIdAsync(request.GroupId);
             Template? activeTemplate = null;
@@ -750,7 +762,8 @@ namespace StudioStudio_Server.Services
                 IconEmoji = group.IconEmoji,
                 BannerUrl = group.BannerUrl,
                 Tagline = group.Tagline,
-                Alias = group.Alias
+                Alias = group.Alias,
+                IsOpen = group.IsOpen
             };
         }
 
@@ -920,8 +933,9 @@ namespace StudioStudio_Server.Services
                 else
                 {
                     var userGroupParticipants = await _groupParticipantRepository.GetByGroupIdsAsync(groupIds);
+                    // 🔹 MODIFIED: Only show groups where user is an approved member
                     allowedGroupIds = userGroupParticipants
-                        .Where(gp => gp.UserId == userId)
+                        .Where(gp => gp.UserId == userId && gp.IsApproved)
                         .Select(gp => gp.GroupId)
                         .ToList();
                 }
@@ -1047,8 +1061,8 @@ namespace StudioStudio_Server.Services
                 throw new AppException(ErrorCodes.GroupNotFound, StatusCodes.Status404NotFound);
             }
 
-            // Validate user is member of group
-            var isUserInGroup = await _groupParticipantRepository.IsUserInGroupAsync(groupId, userId);
+            // Validate user is an approved member of group
+            var isUserInGroup = await _groupParticipantRepository.IsUserApprovedInGroupAsync(groupId, userId);
             if (!isUserInGroup)
             {
                 throw new AppException(ErrorCodes.GroupPermissionDenied, StatusCodes.Status403Forbidden);
@@ -1154,6 +1168,152 @@ namespace StudioStudio_Server.Services
                 PageSize = pageSize,
                 TotalPages = totalPages,
                 GroupStatuses = statusDtos
+            };
+        }
+
+        // 🔹 ADDED: Toggle IsOpen setting (Owner/Moderator only)
+        public async Task<ToggleIsOpenResponse> ToggleIsOpenAsync(Guid userId, Guid groupId, bool isOpen)
+        {
+            var group = await _groupRepository.GetByIdAsync(groupId);
+            if (group == null)
+            {
+                throw new AppException(ErrorCodes.GroupNotFound, StatusCodes.Status404NotFound);
+            }
+
+            // Check if user is Owner or Moderator
+            var userParticipant = await _groupParticipantRepository.GetByGroupAndUserAsync(groupId, userId);
+            if (userParticipant == null ||
+                (userParticipant.Role != GroupRole.Owner && userParticipant.Role != GroupRole.Moderator))
+            {
+                throw new AppException(ErrorCodes.GroupUpdatePermissionDenied, StatusCodes.Status403Forbidden);
+            }
+
+            group.IsOpen = isOpen;
+            group.UpdatedAt = DateTime.UtcNow;
+            await _groupRepository.UpdateAsync(group);
+
+            _logger.LogInformation(
+                "User {UserId} toggled IsOpen to {IsOpen} for group {GroupId}",
+                userId, isOpen, groupId);
+
+            return new ToggleIsOpenResponse
+            {
+                Id = group.GroupId,
+                Name = group.GroupName,
+                IsOpen = group.IsOpen,
+                UpdatedAt = group.UpdatedAt
+            };
+        }
+
+        // 🔹 ADDED: Get pending members (Owner/Moderator only)
+        public async Task<PendingMemberListResponse> GetPendingMembersAsync(Guid userId, Guid groupId)
+        {
+            var group = await _groupRepository.GetByIdAsync(groupId);
+            if (group == null)
+            {
+                throw new AppException(ErrorCodes.GroupNotFound, StatusCodes.Status404NotFound);
+            }
+
+            // Check if user is Owner or Moderator
+            var userParticipant = await _groupParticipantRepository.GetByGroupAndUserAsync(groupId, userId);
+            if (userParticipant == null ||
+                (userParticipant.Role != GroupRole.Owner && userParticipant.Role != GroupRole.Moderator))
+            {
+                throw new AppException(ErrorCodes.GroupUpdatePermissionDenied, StatusCodes.Status403Forbidden);
+            }
+
+            // Get pending members
+            var pendingParticipants = await _groupParticipantRepository.GetPendingByGroupIdAsync(groupId);
+            var userIds = pendingParticipants.Select(p => p.UserId).ToList();
+            var users = await _userRepository.GetByIdsAsync(userIds);
+
+            var pendingMembers = pendingParticipants.Select(p =>
+            {
+                var user = users.FirstOrDefault(u => u.UserId == p.UserId);
+                return new PendingMemberDto
+                {
+                    UserId = p.UserId,
+                    FirstName = user?.FirstName ?? "",
+                    LastName = user?.LastName ?? "",
+                    Email = user?.Email ?? "",
+                    AvatarUrl = AvatarUrlHelper.BuildAbsoluteAvatarUrl(user?.AvatarUrl, _httpContextAccessor.HttpContext),
+                    Role = p.Role.ToString(),
+                    RequestedAt = p.CreatedAt
+                };
+            }).ToList();
+
+            return new PendingMemberListResponse
+            {
+                GroupId = group.GroupId,
+                GroupName = group.GroupName,
+                TotalPending = pendingMembers.Count,
+                PendingMembers = pendingMembers
+            };
+        }
+
+        // 🔹 ADDED: Approve pending member (Owner/Moderator only)
+        public async Task<ApproveMemberResponse> ApproveMemberAsync(Guid userId, Guid groupId, Guid targetUserId)
+        {
+            var group = await _groupRepository.GetByIdAsync(groupId);
+            if (group == null)
+            {
+                throw new AppException(ErrorCodes.GroupNotFound, StatusCodes.Status404NotFound);
+            }
+
+            // Check if user is Owner or Moderator
+            var userParticipant = await _groupParticipantRepository.GetByGroupAndUserAsync(groupId, userId);
+            if (userParticipant == null ||
+                (userParticipant.Role != GroupRole.Owner && userParticipant.Role != GroupRole.Moderator))
+            {
+                throw new AppException(ErrorCodes.GroupUpdatePermissionDenied, StatusCodes.Status403Forbidden);
+            }
+
+            // Get pending participant
+            var targetParticipant = await _groupParticipantRepository.GetPendingByGroupAndUserAsync(groupId, targetUserId);
+            if (targetParticipant == null)
+            {
+                throw new AppException(ErrorCodes.GroupMemberNotFound, StatusCodes.Status404NotFound);
+            }
+
+            // Cannot approve Owner
+            if (targetParticipant.Role == GroupRole.Owner)
+            {
+                throw new AppException(ErrorCodes.GroupPermissionDenied, StatusCodes.Status403Forbidden);
+            }
+
+            // Cannot approve yourself
+            if (targetUserId == userId)
+            {
+                throw new AppException(ErrorCodes.GroupCannotChangeOwnRole, StatusCodes.Status400BadRequest);
+            }
+
+            // Check member limit
+            var subscriptionPlan = await _userSubscriptionRepository.GetSubscriptionPlanByUserIdAsync(userId);
+            int memberLimit = subscriptionPlan?.MaxMembersPerGroup ?? 10;
+            int currentMemberCount = await _groupParticipantRepository.GetParticipantCountByGroupIdAsync(groupId);
+
+            if (currentMemberCount >= memberLimit)
+            {
+                throw new AppException(ErrorCodes.GroupMemberLimitReached, StatusCodes.Status403Forbidden);
+            }
+
+            targetParticipant.IsApproved = true;
+            await _groupParticipantRepository.UpdateAsync(targetParticipant);
+
+            var targetUser = await _userRepository.GetByIdAsync(targetUserId);
+
+            _logger.LogInformation(
+                "User {UserId} approved member {TargetUserId} in group {GroupId}",
+                userId, targetUserId, groupId);
+
+            return new ApproveMemberResponse
+            {
+                Id = group.GroupId,
+                Name = group.GroupName,
+                UserId = targetUserId,
+                UserName = $"{targetUser?.FirstName} {targetUser?.LastName}",
+                IsApproved = true,
+                UpdatedAt = DateTime.UtcNow
             };
         }
     }

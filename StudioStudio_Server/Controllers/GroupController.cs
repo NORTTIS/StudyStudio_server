@@ -19,13 +19,16 @@ namespace StudioStudio_Server.Controllers
     public class GroupController : ControllerBase
     {
         private readonly IGroupService _groupService;
+        private readonly IGroupMemberService _groupMemberService;
         private readonly IMessageService _messageService;
 
         public GroupController(
             IGroupService groupService,
+            IGroupMemberService groupMemberService,
             IMessageService messageService)
         {
             _groupService = groupService;
+            _groupMemberService = groupMemberService;
             _messageService = messageService;
         }
 
@@ -261,6 +264,88 @@ namespace StudioStudio_Server.Controllers
                 ErrorCodes.SuccessDeleteGroup,
                 message,
                 null));
+        }
+
+        // 🔹 ADDED: Toggle IsOpen setting (Owner/Moderator only)
+        /// <summary>
+        /// [AUTHORIZED] PUT /api/group/{groupId}/toggle-open
+        /// Toggle the IsOpen setting of a group (open vs closed membership)
+        /// Validate: User must be Owner or Moderator
+        /// </summary>
+        [HttpPut("{groupId}/toggle-open")]
+        public async Task<ActionResult<ApiResponse<ToggleIsOpenResponse>>> ToggleIsOpen(
+            Guid groupId,
+            [FromBody] ToggleIsOpenRequest request)
+        {
+            var userId = ValidateAndGetUserId();
+            var result = await _groupService.ToggleIsOpenAsync(userId, groupId, request.IsOpen);
+            var message = _messageService.GetMessage(ErrorCodes.SuccessUpdateGroup);
+
+            return Ok(ApiResponse<ToggleIsOpenResponse>.Success(
+                ErrorCodes.SuccessUpdateGroup,
+                message,
+                result));
+        }
+
+        // 🔹 ADDED: Get pending members (Owner/Moderator only)
+        /// <summary>
+        /// [AUTHORIZED] GET /api/group/{groupId}/pending
+        /// Get list of pending (not yet approved) members
+        /// Validate: User must be Owner or Moderator
+        /// </summary>
+        [HttpGet("{groupId}/pending")]
+        public async Task<ActionResult<ApiResponse<PendingMemberListResponse>>> GetPendingMembers(Guid groupId)
+        {
+            var userId = ValidateAndGetUserId();
+            var result = await _groupService.GetPendingMembersAsync(userId, groupId);
+            var message = _messageService.GetMessage(ErrorCodes.SuccessGetData);
+
+            return Ok(ApiResponse<PendingMemberListResponse>.Success(
+                ErrorCodes.SuccessGetData,
+                message,
+                result));
+        }
+
+        // 🔹 ADDED: Approve pending member (Owner/Moderator only)
+        /// <summary>
+        /// [AUTHORIZED] POST /api/group/{groupId}/approve
+        /// Approve a pending member to join the group
+        /// Validate: User must be Owner or Moderator
+        /// </summary>
+        [HttpPost("{groupId}/approve")]
+        public async Task<ActionResult<ApiResponse<ApproveMemberResponse>>> ApproveMember(
+            Guid groupId,
+            [FromBody] ApproveMemberRequest request)
+        {
+            var userId = ValidateAndGetUserId();
+            var result = await _groupService.ApproveMemberAsync(userId, groupId, request.UserId);
+            var message = _messageService.GetMessage(ErrorCodes.SuccessUpdateData);
+
+            return Ok(ApiResponse<ApproveMemberResponse>.Success(
+                ErrorCodes.SuccessUpdateData,
+                message,
+                result));
+        }
+
+        // 🔹 ADDED: Reject pending member (Owner/Moderator only)
+        /// <summary>
+        /// [AUTHORIZED] DELETE /api/group/{groupId}/pending/{targetUserId}
+        /// Reject (remove) a pending member request
+        /// Validate: User must be Owner or Moderator, target must not be approved yet
+        /// </summary>
+        [HttpDelete("{groupId}/pending/{targetUserId}")]
+        public async Task<ActionResult<ApiResponse<RemoveMemberResponse>>> RejectMember(
+            Guid groupId,
+            Guid targetUserId)
+        {
+            var userId = ValidateAndGetUserId();
+            var result = await _groupMemberService.RejectMemberAsync(userId, groupId, targetUserId);
+            var message = _messageService.GetMessage(ErrorCodes.SuccessRemoveMember);
+
+            return Ok(ApiResponse<RemoveMemberResponse>.Success(
+                ErrorCodes.SuccessRemoveMember,
+                message,
+                result));
         }
     }
 }

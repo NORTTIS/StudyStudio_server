@@ -20,14 +20,14 @@ namespace StudioStudio_Server.Repositories
 
         /// <summary>
         /// Get list of groups user is member of
-        /// Condition: Participants contains {userId} AND IsActive = true
+        /// Condition: Participants contains {userId} AND IsApproved = true AND IsActive = true
         /// Include: Studio, Participants
         /// Order by: UpdatedAt DESC
         /// </summary>
         public async Task<List<Group>> GetUserGroupsAsync(Guid userId)
         {
             return await _db.Groups
-                .Where(g => g.Participants.Any(p => p.UserId == userId) && g.IsActive)
+                .Where(g => g.Participants.Any(p => p.UserId == userId && p.IsApproved) && g.IsActive)
                 .Include(g => g.Participants)
                 .OrderByDescending(g => g.CreatedAt)
                 .AsNoTracking()

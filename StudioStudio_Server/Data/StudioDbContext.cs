@@ -96,8 +96,12 @@ namespace StudioStudio_Server.Data
             {
                 e.HasKey(x => x.ParticipantId);
 
+                // 🔹 MODIFIED: Add filtered unique index for approved participants
+                // Allows one approved record per user per studio
+                // User can have IsApproved=false records (rejected/pending) without conflict
                 e.HasIndex(x => new { x.StudioId, x.UserId })
-                    .IsUnique();
+                    .IsUnique()
+                    .HasFilter(@"""IsApproved"" = true");
 
                 e.HasOne<User>(x => x.User)
                     .WithMany(x => x.StudioParticipants)
@@ -128,8 +132,12 @@ namespace StudioStudio_Server.Data
             {
                 e.HasKey(x => x.ParticipantId);
 
+                // 🔹 MODIFIED: Add filtered unique index for approved participants
+                // Allows one approved record per user per group
+                // User can have IsApproved=false records (rejected/pending) without conflict
                 e.HasIndex(x => new { x.GroupId, x.UserId })
-                    .IsUnique(); // BR-16
+                    .IsUnique()
+                    .HasFilter(@"""IsApproved"" = true");
 
                 e.HasOne<Group>()
                     .WithMany(g => g.Participants)

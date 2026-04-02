@@ -1,14 +1,14 @@
 namespace StudioStudio_Server.Models.DTOs.Response
 {
-    public class GroupMemberListResponse
+    public class PendingMemberListResponse
     {
         public Guid GroupId { get; set; }
         public string GroupName { get; set; } = string.Empty;
-        public int TotalMembers { get; set; }
-        public List<GroupMemberDto> Members { get; set; } = new();
+        public int TotalPending { get; set; }
+        public List<PendingMemberDto> PendingMembers { get; set; } = new();
     }
 
-    public class GroupMemberDto
+    public class PendingMemberDto
     {
         public Guid UserId { get; set; }
         public string FirstName { get; set; } = string.Empty;
@@ -16,7 +16,6 @@ namespace StudioStudio_Server.Models.DTOs.Response
         public string Email { get; set; } = string.Empty;
         public string? AvatarUrl { get; set; }
         public string Role { get; set; } = string.Empty;
-        public bool IsApproved { get; set; } = true;
-        public DateTime JoinedAt { get; set; }
+        public DateTime RequestedAt { get; set; }
     }
 }

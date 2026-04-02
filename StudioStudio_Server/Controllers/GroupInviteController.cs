@@ -428,12 +428,16 @@ namespace StudioStudio_Server.Controllers
                     StatusCodes.Status403Forbidden);
             }
 
+            // 🔹 ADDED: Determine IsApproved based on group's IsOpen setting
+            bool isApproved = group.IsOpen;
+
             var participant = new GroupParticipant
             {
                 ParticipantId = Guid.NewGuid(),
                 GroupId = inviteData.GroupId,
                 UserId = userId,
                 Role = role,
+                IsApproved = isApproved,
                 CreatedAt = DateTime.UtcNow
             };
 
@@ -442,8 +446,8 @@ namespace StudioStudio_Server.Controllers
                 await _groupParticipantRepository.AddAsync(participant);
 
                 _logger.LogInformation(
-                    "User {UserId} accepted invite and joined group {GroupId} with role {Role}",
-                    userId, inviteData.GroupId, role);
+                    "User {UserId} accepted invite for group {GroupId} with role {Role}, IsApproved={IsApproved}",
+                    userId, inviteData.GroupId, role, isApproved);
             }
             catch (DbUpdateException ex) when (ex.InnerException?.Message.Contains("IX_GroupParticipants_GroupId_UserId") == true)
             {
@@ -457,6 +461,7 @@ namespace StudioStudio_Server.Controllers
                 GroupId = group.GroupId,
                 GroupName = group.GroupName,
                 Role = role.ToString(),
+                IsApproved = isApproved,
                 JoinedAt = participant.CreatedAt
             };
 

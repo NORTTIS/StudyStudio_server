@@ -19,5 +19,24 @@ namespace StudioStudio_Server.Repositories.Interfaces
         Task AddRangeAsync(IEnumerable<GroupParticipant> participants);
         Task UpdateRangeAsync(IEnumerable<GroupParticipant> participants);
         Task RemoveRangeAsync(IEnumerable<GroupParticipant> participants);
+
+        // 🔹 ADDED: Pending membership & approval methods
+        /// <summary>
+        /// Get all pending (not yet approved) members of a group
+        /// Condition: GroupId = {groupId} AND IsApproved = false
+        /// </summary>
+        Task<List<GroupParticipant>> GetPendingByGroupIdAsync(Guid groupId);
+
+        /// <summary>
+        /// Check if user is an approved member of a group
+        /// Condition: GroupId+UserId in GroupParticipants AND IsApproved = true AND Group.IsActive = true
+        /// </summary>
+        Task<bool> IsUserApprovedInGroupAsync(Guid groupId, Guid userId);
+
+        /// <summary>
+        /// Get pending participant record for a user in a group (if any)
+        /// Condition: GroupId+UserId in GroupParticipants AND IsApproved = false
+        /// </summary>
+        Task<GroupParticipant?> GetPendingByGroupAndUserAsync(Guid groupId, Guid userId);
     }
 }

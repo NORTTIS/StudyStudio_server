@@ -15,5 +15,12 @@ namespace StudioStudio_Server.Services.Interfaces
         Task<UpdateStudioResponse> UpdateStudioAsync(Guid userId, UpdateStudioRequest studio);
         Task<List<StudioMemberResponse>> GetStudioMembersAsync(Guid userId, Guid studioId);
         Task<LeaveStudioResponse> LeaveStudioAsync(Guid userId, Guid studioId);
+
+        // 🔹 ADDED: IsOpen toggle
+        Task<ToggleIsOpenResponse> ToggleIsOpenAsync(Guid userId, Guid studioId, bool isOpen);
+
+        // 🔹 ADDED: Pending members management
+        Task<StudioPendingMemberListResponse> GetPendingMembersAsync(Guid userId, Guid studioId);
+        Task<ApproveMemberResponse> ApproveMemberAsync(Guid userId, Guid studioId, Guid targetUserId);
     }
 }

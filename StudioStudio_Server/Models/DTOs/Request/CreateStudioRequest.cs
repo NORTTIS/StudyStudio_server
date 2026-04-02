@@ -23,5 +23,8 @@ namespace StudioStudio_Server.Models.DTOs.Request
         public string? BannerUrl { get; set; }
         public string? Tagline { get; set; }
         public string? Alias { get; set; }
+
+        // 🔹 ADDED: Open/Closed studio (true = anyone with invite can join directly)
+        public bool IsOpen { get; set; } = true;
     }
 }

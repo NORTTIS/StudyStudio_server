@@ -282,5 +282,66 @@ namespace StudioStudio_Server.Controllers
                 message,
                 result));
         }
+
+        // 🔹 ADDED: Toggle IsOpen setting (Owner only)
+        /// <summary>
+        /// [AUTHORIZED] PUT /api/studio/{studioId}/toggle-open
+        /// Toggle the IsOpen setting of a studio (open vs closed membership)
+        /// Validate: User must be Owner of studio
+        /// </summary>
+        [HttpPut("{studioId}/toggle-open")]
+        public async Task<ActionResult<ApiResponse<ToggleIsOpenResponse>>> ToggleIsOpen(
+            Guid studioId,
+            [FromBody] ToggleIsOpenRequest request)
+        {
+            var userId = JwtHelper.ValidateAndGetUserId(User);
+            var result = await _studioService.ToggleIsOpenAsync(userId, studioId, request.IsOpen);
+            var message = _messageService.GetMessage(ErrorCodes.SuccessUpdateStudio);
+
+            return Ok(ApiResponse<ToggleIsOpenResponse>.Success(
+                ErrorCodes.SuccessUpdateStudio,
+                message,
+                result));
+        }
+
+        // 🔹 ADDED: Get pending members (Owner only)
+        /// <summary>
+        /// [AUTHORIZED] GET /api/studio/{studioId}/pending
+        /// Get list of pending (not yet approved) members
+        /// Validate: User must be Owner of studio
+        /// </summary>
+        [HttpGet("{studioId}/pending")]
+        public async Task<ActionResult<ApiResponse<StudioPendingMemberListResponse>>> GetPendingMembers(Guid studioId)
+        {
+            var userId = JwtHelper.ValidateAndGetUserId(User);
+            var result = await _studioService.GetPendingMembersAsync(userId, studioId);
+            var message = _messageService.GetMessage(ErrorCodes.SuccessGetData);
+
+            return Ok(ApiResponse<StudioPendingMemberListResponse>.Success(
+                ErrorCodes.SuccessGetData,
+                message,
+                result));
+        }
+
+        // 🔹 ADDED: Approve pending member (Owner only)
+        /// <summary>
+        /// [AUTHORIZED] POST /api/studio/{studioId}/approve
+        /// Approve a pending member to join the studio
+        /// Validate: User must be Owner of studio
+        /// </summary>
+        [HttpPost("{studioId}/approve")]
+        public async Task<ActionResult<ApiResponse<ApproveMemberResponse>>> ApproveMember(
+            Guid studioId,
+            [FromBody] ApproveMemberRequest request)
+        {
+            var userId = JwtHelper.ValidateAndGetUserId(User);
+            var result = await _studioService.ApproveMemberAsync(userId, studioId, request.UserId);
+            var message = _messageService.GetMessage(ErrorCodes.SuccessUpdateData);
+
+            return Ok(ApiResponse<ApproveMemberResponse>.Success(
+                ErrorCodes.SuccessUpdateData,
+                message,
+                result));
+        }
     }
 }

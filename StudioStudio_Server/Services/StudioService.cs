@@ -19,7 +19,9 @@ namespace StudioStudio_Server.Services
         private readonly IUserSubscriptionRepository _userSubscriptionRepository;
         private readonly IStudioParticipantRepository _studioParticipantRepository;
         private readonly IGroupParticipantRepository _groupParticipantRepository;
+        private readonly IUserRepository _userRepository;
         private readonly IHttpContextAccessor _httpContextAccessor;
+        private readonly ILogger<StudioService> _logger;
 
         public StudioService(
             IStudioRepository studioRepository,
@@ -27,14 +29,18 @@ namespace StudioStudio_Server.Services
             IUserSubscriptionRepository userSubscriptionRepository,
             IStudioParticipantRepository studioParticipantRepository,
             IGroupParticipantRepository groupParticipantRepository,
-            IHttpContextAccessor httpContextAccessor)
+            IUserRepository userRepository,
+            IHttpContextAccessor httpContextAccessor,
+            ILogger<StudioService> logger)
         {
             _studioRepository = studioRepository;
             _groupRepository = groupRepository;
             _userSubscriptionRepository = userSubscriptionRepository;
             _studioParticipantRepository = studioParticipantRepository;
             _groupParticipantRepository = groupParticipantRepository;
+            _userRepository = userRepository;
             _httpContextAccessor = httpContextAccessor;
+            _logger = logger;
         }
 
         public async Task<StudioListResponse> GetUserStudiosAsync(Guid userId)
@@ -50,7 +56,6 @@ namespace StudioStudio_Server.Services
             // Get studios where user is a participant (member)
             var participantRecords = await _studioParticipantRepository.GetStudiosByUserIdAsync(userId);
             var participantStudioIds = participantRecords
-                .Where(pr => pr.StudioId != null)
                 .Select(pr => pr.StudioId)
                 .ToList();
 
@@ -100,7 +105,8 @@ namespace StudioStudio_Server.Services
                 ColorHex = studio.ColorHex,
                 BannerUrl = studio.BannerUrl,
                 Tagline = studio.Tagline,
-                Alias = studio.Alias
+                Alias = studio.Alias,
+                IsOpen = studio.IsOpen
             }).ToList();
 
             foreach (var response in studioResponses)
@@ -169,18 +175,21 @@ namespace StudioStudio_Server.Services
                 ColorHex = studio.ColorHex,
                 BannerUrl = studio.BannerUrl,
                 Tagline = studio.Tagline,
-                Alias = studio.Alias
+                Alias = studio.Alias,
+                // 🔹 ADDED: IsOpen setting
+                IsOpen = studio.IsOpen
             };
 
             await _studioRepository.CreateStudioAsync(createStudio);
 
-            // Auto-set creator as Owner in StudioParticipant
+            // Auto-set creator as Owner in StudioParticipant (always approved)
             var studioParticipant = new StudioParticipant
             {
                 ParticipantId = Guid.NewGuid(),
                 StudioId = createStudio.StudioId,
                 UserId = ownerId,
                 Role = StudioRole.Owner,
+                IsApproved = true,
                 CreatedAt = now
             };
             await _studioParticipantRepository.AddAsync(studioParticipant);
@@ -200,7 +209,8 @@ namespace StudioStudio_Server.Services
                 ColorHex = createStudio.ColorHex,
                 BannerUrl = createStudio.BannerUrl,
                 Tagline = createStudio.Tagline,
-                Alias = createStudio.Alias
+                Alias = createStudio.Alias,
+                IsOpen = createStudio.IsOpen
             };
         }
 
@@ -258,7 +268,8 @@ namespace StudioStudio_Server.Services
                 ColorHex = studio.ColorHex,
                 BannerUrl = studio.BannerUrl,
                 Tagline = studio.Tagline,
-                Alias = studio.Alias
+                Alias = studio.Alias,
+                IsOpen = studio.IsOpen
             };
         }
 
@@ -378,6 +389,12 @@ namespace StudioStudio_Server.Services
                 updateStudio.Alias = null;
             }
 
+            // 🔹 ADDED: Update IsOpen setting (Owner only)
+            if (studio.IsOpen.HasValue)
+            {
+                updateStudio.IsOpen = studio.IsOpen.Value;
+            }
+
             await _studioRepository.UpdateStudioAsync(updateStudio);
 
             return new UpdateStudioResponse
@@ -391,7 +408,8 @@ namespace StudioStudio_Server.Services
                 ColorHex = updateStudio.ColorHex,
                 BannerUrl = updateStudio.BannerUrl,
                 Tagline = updateStudio.Tagline,
-                Alias = updateStudio.Alias
+                Alias = updateStudio.Alias,
+                IsOpen = updateStudio.IsOpen
             };
         }
 
@@ -451,6 +469,7 @@ namespace StudioStudio_Server.Services
                     Email = participant.User.Email,
                     AvatarUrl = AvatarUrlHelper.BuildAbsoluteAvatarUrl(participant.User.AvatarUrl, _httpContextAccessor.HttpContext),
                     StudioRole = participant.Role,
+                    IsApproved = participant.IsApproved,
                     GroupInfo = groupInfoList
                 });
             }
@@ -508,6 +527,115 @@ namespace StudioStudio_Server.Services
                 StudioId = studio.StudioId,
                 StudioName = studio.StudioName,
                 LeftAt = DateTime.UtcNow
+            };
+        }
+
+        // 🔹 ADDED: Toggle IsOpen setting (Owner only)
+        public async Task<ToggleIsOpenResponse> ToggleIsOpenAsync(Guid userId, Guid studioId, bool isOpen)
+        {
+            var studio = await _studioRepository.GetByIdAsync(studioId);
+            if (studio == null)
+            {
+                throw new AppException(ErrorCodes.StudioNotFound, StatusCodes.Status404NotFound);
+            }
+
+            if (studio.OwnerId != userId)
+            {
+                throw new AppException(ErrorCodes.AuthForbidden, StatusCodes.Status403Forbidden);
+            }
+
+            studio.IsOpen = isOpen;
+            studio.UpdatedAt = DateTime.UtcNow;
+            await _studioRepository.UpdateStudioAsync(studio);
+
+            _logger.LogInformation(
+                "User {UserId} toggled IsOpen to {IsOpen} for studio {StudioId}",
+                userId, isOpen, studioId);
+
+            return new ToggleIsOpenResponse
+            {
+                Id = studio.StudioId,
+                Name = studio.StudioName,
+                IsOpen = studio.IsOpen,
+                UpdatedAt = studio.UpdatedAt
+            };
+        }
+
+        // 🔹 ADDED: Get pending members (Owner only)
+        public async Task<StudioPendingMemberListResponse> GetPendingMembersAsync(Guid userId, Guid studioId)
+        {
+            var studio = await _studioRepository.GetByIdAsync(studioId);
+            if (studio == null)
+            {
+                throw new AppException(ErrorCodes.StudioNotFound, StatusCodes.Status404NotFound);
+            }
+
+            if (studio.OwnerId != userId)
+            {
+                throw new AppException(ErrorCodes.AuthForbidden, StatusCodes.Status403Forbidden);
+            }
+
+            var pendingParticipants = await _studioParticipantRepository.GetPendingByStudioIdAsync(studioId);
+
+            var pendingMembers = pendingParticipants.Select(p =>
+            {
+                return new StudioPendingMemberDto
+                {
+                    UserId = p.UserId,
+                    FirstName = p.User?.FirstName ?? "",
+                    LastName = p.User?.LastName ?? "",
+                    Email = p.User?.Email ?? "",
+                    AvatarUrl = AvatarUrlHelper.BuildAbsoluteAvatarUrl(p.User?.AvatarUrl, _httpContextAccessor.HttpContext),
+                    RequestedAt = p.CreatedAt
+                };
+            }).ToList();
+
+            return new StudioPendingMemberListResponse
+            {
+                StudioId = studio.StudioId,
+                StudioName = studio.StudioName,
+                TotalPending = pendingMembers.Count,
+                PendingMembers = pendingMembers
+            };
+        }
+
+        // 🔹 ADDED: Approve pending member (Owner only)
+        public async Task<ApproveMemberResponse> ApproveMemberAsync(Guid userId, Guid studioId, Guid targetUserId)
+        {
+            var studio = await _studioRepository.GetByIdAsync(studioId);
+            if (studio == null)
+            {
+                throw new AppException(ErrorCodes.StudioNotFound, StatusCodes.Status404NotFound);
+            }
+
+            if (studio.OwnerId != userId)
+            {
+                throw new AppException(ErrorCodes.AuthForbidden, StatusCodes.Status403Forbidden);
+            }
+
+            var targetParticipant = await _studioParticipantRepository.GetPendingByStudioAndUserAsync(studioId, targetUserId);
+            if (targetParticipant == null)
+            {
+                throw new AppException(ErrorCodes.StudioMemberNotFound, StatusCodes.Status404NotFound);
+            }
+
+            targetParticipant.IsApproved = true;
+            await _studioParticipantRepository.UpdateAsync(targetParticipant);
+
+            var targetUser = await _userRepository.GetByIdAsync(targetUserId);
+
+            _logger.LogInformation(
+                "User {UserId} approved member {TargetUserId} in studio {StudioId}",
+                userId, targetUserId, studioId);
+
+            return new ApproveMemberResponse
+            {
+                Id = studio.StudioId,
+                Name = studio.StudioName,
+                UserId = targetUserId,
+                UserName = $"{targetUser?.FirstName} {targetUser?.LastName}",
+                IsApproved = true,
+                UpdatedAt = DateTime.UtcNow
             };
         }
     }

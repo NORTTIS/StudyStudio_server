@@ -16,6 +16,7 @@ namespace StudioStudio_Server.Models.DTOs.Response
         public string Email { get; set; } = string.Empty;
         public string? AvatarUrl { get; set; }
         public StudioRole StudioRole { get; set; }
+        public bool IsApproved { get; set; } = true;
         public List<GroupInfoItem> GroupInfo { get; set; } = new();
     }
 }

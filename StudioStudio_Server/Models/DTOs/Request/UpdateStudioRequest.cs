@@ -14,5 +14,8 @@
         public string? BannerUrl { get; set; }
         public string? Tagline { get; set; }
         public string? Alias { get; set; }
+
+        // 🔹 ADDED: Open/Closed studio
+        public bool? IsOpen { get; set; }
     }
 }
