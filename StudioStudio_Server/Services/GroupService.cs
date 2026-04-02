@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using StudioStudio_Server.Configurations;
 using StudioStudio_Server.Data;
 using StudioStudio_Server.Exceptions;
 using StudioStudio_Server.Models.DTOs.Request;
@@ -30,7 +31,9 @@ namespace StudioStudio_Server.Services
         private readonly IGroupTaskStatusRepository _groupTaskStatusRepository;
         private readonly ITaskAssignmentRepository _taskAssignmentRepository;
         private readonly IStudioParticipantRepository _studioParticipantRepository;
+        private readonly IEmailService _emailService;
         private readonly IHttpContextAccessor _httpContextAccessor;
+        private readonly IConfiguration _configuration;
 
         public GroupService(
             ILogger<GroupService> logger,
@@ -46,7 +49,9 @@ namespace StudioStudio_Server.Services
             IGroupTaskStatusRepository groupTaskStatusRepository,
             ITaskAssignmentRepository taskAssignmentRepository,
             IStudioParticipantRepository studioParticipantRepository,
-            IHttpContextAccessor httpContextAccessor)
+            IEmailService emailService,
+            IHttpContextAccessor httpContextAccessor,
+            IConfiguration configuration)
         {
             _logger = logger;
             _messageService = messageService;
@@ -61,7 +66,9 @@ namespace StudioStudio_Server.Services
             _groupTaskStatusRepository = groupTaskStatusRepository;
             _taskAssignmentRepository = taskAssignmentRepository;
             _studioParticipantRepository = studioParticipantRepository;
+            _emailService = emailService;
             _httpContextAccessor = httpContextAccessor;
+            _configuration = configuration;
         }
 
         public async Task<GroupListResponse> GetGroupsAsync(Guid userId)
@@ -1278,13 +1285,13 @@ namespace StudioStudio_Server.Services
             // Cannot approve Owner
             if (targetParticipant.Role == GroupRole.Owner)
             {
-                throw new AppException(ErrorCodes.GroupPermissionDenied, StatusCodes.Status403Forbidden);
+                throw new AppException(ErrorCodes.GroupMemberNotFound, StatusCodes.Status404NotFound);
             }
 
             // Cannot approve yourself
             if (targetUserId == userId)
             {
-                throw new AppException(ErrorCodes.GroupCannotChangeOwnRole, StatusCodes.Status400BadRequest);
+                throw new AppException(ErrorCodes.GroupMemberNotFound, StatusCodes.Status404NotFound);
             }
 
             // Check member limit
@@ -1299,8 +1306,9 @@ namespace StudioStudio_Server.Services
 
             targetParticipant.IsApproved = true;
             await _groupParticipantRepository.UpdateAsync(targetParticipant);
+            
 
-            // 🔹 ADDED: Auto-approve user in studio if they were added as pending when joining group
+            // Auto-approve user in studio if they were added as pending when joining group
             if (group.StudioId.HasValue)
             {
                 var existingStudioParticipant = await _studioParticipantRepository
@@ -1356,6 +1364,38 @@ namespace StudioStudio_Server.Services
 
             var targetUser = await _userRepository.GetByIdAsync(targetUserId);
 
+            // Send approval notification email
+            if (targetUser != null && !string.IsNullOrEmpty(targetUser.Email))
+            {
+                try
+                {
+                    var approvalUrl = BuildGroupUrl(groupId);
+                    var language = targetUser?.Language == "vi" ? Language.Vietnamese : Language.English;
+                    string nameToShow = targetUser?.Language == "vi" ? $"nhóm {group.GroupName}" : $"group {group.GroupName}";
+
+                    var emailBody = EmailTemplate.MemberApprovedNotification(
+                        nameToShow,
+                        approvalUrl,
+                        DateTime.UtcNow,
+                        language);
+
+                    await _emailService.SendLinkAsync(
+                        targetUser!.Email,
+                        "Join group request approved",
+                        emailBody);
+
+                    _logger.LogInformation(
+                        "Approval notification email sent to {Email} for group {GroupId}",
+                        targetUser.Email, groupId);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex,
+                        "Failed to send approval notification email to {Email}",
+                        targetUser.Email);
+                }
+            }
+
             _logger.LogInformation(
                 "User {UserId} approved member {TargetUserId} in group {GroupId}",
                 userId, targetUserId, groupId);
@@ -1369,6 +1409,11 @@ namespace StudioStudio_Server.Services
                 IsApproved = true,
                 UpdatedAt = DateTime.UtcNow
             };
+        }
+        private string BuildGroupUrl(Guid groupId)
+        {
+            var baseUrl = _configuration["Frontend:BaseUrl"] ?? "http://localhost:3000";
+            return $"{baseUrl}/group/{groupId}";
         }
     }
 }
