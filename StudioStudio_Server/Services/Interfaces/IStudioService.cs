@@ -19,5 +19,6 @@ namespace StudioStudio_Server.Services.Interfaces
         Task<RemoveStudioMemberResponse> RemoveMemberAsync(Guid currentUserId, RemoveStudioMemberRequest request);
         Task<StudioPendingMemberListResponse> GetPendingMembersAsync(Guid userId, Guid studioId);
         Task<ApproveMemberResponse> ApproveMemberAsync(Guid userId, Guid studioId, Guid targetUserId);
+        Task<ArchiveStudioResponse> ToggleArchiveStudioAsync(Guid userId, Guid studioId, bool isArchived);
     }
 }

@@ -20,10 +20,10 @@ namespace StudioStudio_Server.Services
         private readonly ITaskCommentRepository _commentRepository;
         private readonly ITaskRepository _taskRepository;
         private readonly IGroupParticipantRepository _groupParticipantRepository;
+        private readonly IGroupRepository _groupRepository;
         private readonly IUserRepository _userRepository;
         private readonly IAnnouncementRepository _announcementRepository;
         private readonly IUserAnnouncementService _userAnnouncementService;
-        private readonly IGroupRepository _groupRepository;
         private readonly IMessageService _messageService;
         private readonly INotificationService _notificationService;
         private readonly ILogger<TaskCommentService> _logger;
@@ -213,6 +213,21 @@ namespace StudioStudio_Server.Services
 
             var task = await ValidateTaskExistsAsync(comment.TaskId);
 
+            // Check if group is archived (non-owner cannot delete comments)
+            if (task.GroupId.HasValue)
+            {
+                var group = await _groupRepository.GetByIdAsync(task.GroupId.Value);
+                if (group != null && group.IsArchived)
+                {
+                    var userRole = await _groupParticipantRepository
+                        .GetGroupRoleByUserIdAsync(userId, task.GroupId.Value);
+                    if (userRole != GroupRole.Owner)
+                    {
+                        throw new AppException(ErrorCodes.GroupIsArchived, StatusCodes.Status403Forbidden);
+                    }
+                }
+            }
+
             var hasPermission = await ValidateDeletePermissionAsync(comment, task, userId);
             if (!hasPermission)
             {
@@ -351,6 +366,13 @@ namespace StudioStudio_Server.Services
                         ErrorCodes.GroupPermissionDenied,
                         StatusCodes.Status403Forbidden);
                 }
+
+                //  Check if group is archived (non-owner cannot interact)
+                var group = await _groupRepository.GetByIdAsync(task.GroupId.Value);
+                if (group != null && group.IsArchived && userRole != GroupRole.Owner)
+                {
+                    throw new AppException(ErrorCodes.GroupIsArchived, StatusCodes.Status403Forbidden);
+                }
             }
             else
             {
@@ -408,6 +430,17 @@ namespace StudioStudio_Server.Services
                     throw new AppException(
                         ErrorCodes.GroupPermissionDenied,
                         StatusCodes.Status403Forbidden);
+                }
+
+                var group = await _groupRepository.GetByIdAsync(task.GroupId.Value);
+                if (group != null && group.IsArchived)
+                {
+                    var userRole = await _groupParticipantRepository
+                        .GetGroupRoleByUserIdAsync(userId, task.GroupId.Value);
+                    if (userRole != GroupRole.Owner)
+                    {
+                        throw new AppException(ErrorCodes.GroupIsArchived, StatusCodes.Status403Forbidden);
+                    }
                 }
             }
             else

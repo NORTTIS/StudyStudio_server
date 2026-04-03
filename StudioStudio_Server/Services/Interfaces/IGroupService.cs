@@ -31,11 +31,9 @@ namespace StudioStudio_Server.Services.Interfaces
             string? sortBy = "createdAt",
             bool sortAscending = true);
 
-        // 🔹 ADDED: IsOpen toggle
         Task<ToggleIsOpenResponse> ToggleIsOpenAsync(Guid userId, Guid groupId, bool isOpen);
-
-        // 🔹 ADDED: Pending members management
         Task<PendingMemberListResponse> GetPendingMembersAsync(Guid userId, Guid groupId);
         Task<ApproveMemberResponse> ApproveMemberAsync(Guid userId, Guid groupId, Guid targetUserId);
+        Task<ArchiveGroupResponse> ToggleArchiveGroupAsync(Guid userId, Guid groupId, bool isArchived);
     }
 }

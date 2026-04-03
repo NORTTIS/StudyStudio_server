@@ -11,6 +11,8 @@
         
         public bool IsOpen { get; set; } = true;
 
+        public bool IsArchived { get; set; } = false;
+
         public Guid OwnerId { get; set; }
 
         public DateTime CreatedAt { get; set; }

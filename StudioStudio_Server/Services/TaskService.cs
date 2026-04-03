@@ -16,6 +16,7 @@ namespace StudioStudio_Server.Services
         private readonly ILogger<TaskService> _logger;
         private readonly IMessageService _messageService;
         private readonly ITaskRepository _taskRepository;
+        private readonly IGroupRepository _groupRepository;
         private readonly IGroupParticipantRepository _participantRepository;
         private readonly IGroupTaskStatusRepository _groupTaskStatusRepository;
         private readonly ITaskAssignmentRepository _taskAssignmentRepository;
@@ -29,6 +30,7 @@ namespace StudioStudio_Server.Services
             ITaskRepository taskRepository,
             ILogger<TaskService> logger,
             IMessageService message,
+            IGroupRepository groupRepository,
             IGroupParticipantRepository participantRepository,
             IGroupTaskStatusRepository groupTaskStatusRepository,
             ITaskAssignmentRepository taskAssignmentRepository,
@@ -41,6 +43,7 @@ namespace StudioStudio_Server.Services
             _taskRepository = taskRepository;
             _logger = logger;
             _messageService = message;
+            _groupRepository = groupRepository;
             _participantRepository = participantRepository;
             _groupTaskStatusRepository = groupTaskStatusRepository;
             _taskAssignmentRepository = taskAssignmentRepository;
@@ -102,6 +105,13 @@ namespace StudioStudio_Server.Services
             if (userRole.Equals(GroupRole.Viewer) || userRole.Equals(GroupRole.Commenter))
             {
                 throw new AppException(ErrorCodes.GroupCreateTaskDenied, StatusCodes.Status403Forbidden);
+            }
+
+            // Check if group is archived (non-owner cannot interact)
+            var group = await _groupRepository.GetByIdAsync(request.GroupId);
+            if (group != null && group.IsArchived && userRole != GroupRole.Owner)
+            {
+                throw new AppException(ErrorCodes.GroupIsArchived, StatusCodes.Status403Forbidden);
             }
 
             if (!request.GroupStatusId.HasValue)
@@ -242,6 +252,13 @@ namespace StudioStudio_Server.Services
             if (userRole.Equals(GroupRole.Viewer) || userRole.Equals(GroupRole.Commenter))
             {
                 throw new AppException(ErrorCodes.GroupUpdatePermissionDenied, StatusCodes.Status403Forbidden);
+            }
+
+            // Check if group is archived (non-owner cannot interact)
+            var group = await _groupRepository.GetByIdAsync(groupId);
+            if (group != null && group.IsArchived && userRole != GroupRole.Owner)
+            {
+                throw new AppException(ErrorCodes.GroupIsArchived, StatusCodes.Status403Forbidden);
             }
 
             var task = await _taskRepository.GetByIdAsync(taskId);
@@ -578,6 +595,12 @@ namespace StudioStudio_Server.Services
                 throw new AppException(ErrorCodes.GroupDeleteTaskDenined, StatusCodes.Status403Forbidden);
             }
 
+            var group = await _groupRepository.GetByIdAsync(groupId);
+            if (group != null && group.IsArchived && userRole != GroupRole.Owner)
+            {
+                throw new AppException(ErrorCodes.GroupIsArchived, StatusCodes.Status403Forbidden);
+            }
+
             var task = await _taskRepository.GetByIdAsync(taskId);
             if (task == null)
             {
@@ -632,6 +655,12 @@ namespace StudioStudio_Server.Services
             if (!userRole.Equals(GroupRole.Owner) && !userRole.Equals(GroupRole.Moderator))
             {
                 throw new AppException(ErrorCodes.GroupRestoreTaskDenined, StatusCodes.Status401Unauthorized);
+            }
+
+            var group = await _groupRepository.GetByIdAsync(groupId);
+            if (group != null && group.IsArchived && userRole != GroupRole.Owner)
+            {
+                throw new AppException(ErrorCodes.GroupIsArchived, StatusCodes.Status403Forbidden);
             }
 
             var task = await _taskRepository.GetDeletedByIdAsync(taskId);

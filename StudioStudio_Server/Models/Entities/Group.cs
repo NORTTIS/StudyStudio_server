@@ -19,6 +19,8 @@
 
         public bool IsOpen { get; set; } = true;
 
+        public bool IsArchived { get; set; } = false;
+
         // Group personalization
         public string? AvatarUrl { get; set; }
         public string? ColorHex { get; set; }

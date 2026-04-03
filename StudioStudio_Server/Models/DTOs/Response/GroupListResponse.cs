@@ -26,6 +26,7 @@
         public int FavoriteCount { get; set; }
         public int StudioGroupCount { get; set; }
         public int IndependentGroupCount { get; set; }
+        public int ArchivedCount { get; set; }
     }
 
     public class GroupSections
@@ -33,6 +34,7 @@
         public List<GroupCardDto> Favorites { get; set; } = new();
         public List<GroupCardDto> StudioGroups { get; set; } = new();
         public List<GroupCardDto> IndependentGroups { get; set; } = new();
+        public List<GroupCardDto> ArchivedGroups { get; set; } = new();
     }
 
     public class GroupCardDto
@@ -56,9 +58,9 @@
         public string? BannerUrl { get; set; }
         public string? Tagline { get; set; }
         public string? Alias { get; set; }
-
-        // 🔹 ADDED: Open/Closed group
         public bool IsOpen { get; set; }
+        public bool IsArchived { get; set; }
+        public bool IsMember { get; set; }
     }
 
     public class StudioDto

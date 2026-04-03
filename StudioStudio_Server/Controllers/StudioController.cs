@@ -364,5 +364,27 @@ namespace StudioStudio_Server.Controllers
                 message,
                 result));
         }
+
+        //  Toggle archive status (Owner only)
+        /// <summary>
+        /// [AUTHORIZED] PUT /api/studio/{studioId}/archive
+        /// Archive or unarchive a studio and all its groups
+        /// Validate: User must be Owner of studio
+        /// Effect: When archived, non-owner members cannot interact with any groups in the studio
+        /// </summary>
+        [HttpPut("{studioId}/archive")]
+        public async Task<ActionResult<ApiResponse<ArchiveStudioResponse>>> ToggleArchive(
+            Guid studioId,
+            [FromBody] ToggleArchiveRequest request)
+        {
+            var userId = JwtHelper.ValidateAndGetUserId(User);
+            var result = await _studioService.ToggleArchiveStudioAsync(userId, studioId, request.IsArchived);
+            var message = _messageService.GetMessage(ErrorCodes.SuccessUpdateStudio);
+
+            return Ok(ApiResponse<ArchiveStudioResponse>.Success(
+                ErrorCodes.SuccessUpdateStudio,
+                message,
+                result));
+        }
     }
 }

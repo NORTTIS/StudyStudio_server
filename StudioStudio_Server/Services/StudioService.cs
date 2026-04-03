@@ -115,7 +115,8 @@ namespace StudioStudio_Server.Services
                 BannerUrl = studio.BannerUrl,
                 Tagline = studio.Tagline,
                 Alias = studio.Alias,
-                IsOpen = studio.IsOpen
+                IsOpen = studio.IsOpen,
+                IsArchived = studio.IsArchived
             }).ToList();
 
             foreach (var response in studioResponses)
@@ -180,13 +181,13 @@ namespace StudioStudio_Server.Services
                 // Normalize to UTC for PostgreSQL timestamp with time zone compatibility
                 StartDate = studio.StartDate.HasValue ? DateTime.SpecifyKind(studio.StartDate.Value, DateTimeKind.Utc) : null,
                 EndDate = studio.EndDate.HasValue ? DateTime.SpecifyKind(studio.EndDate.Value, DateTimeKind.Utc) : null,
-                // 🔹 FIX + ADD: Studio personalization
+                // Studio personalization
                 AvatarUrl = studio.AvatarUrl,
                 ColorHex = studio.ColorHex,
                 BannerUrl = studio.BannerUrl,
                 Tagline = studio.Tagline,
                 Alias = studio.Alias,
-                // 🔹 ADDED: IsOpen setting
+                // IsOpen setting
                 IsOpen = studio.IsOpen
             };
 
@@ -221,7 +222,8 @@ namespace StudioStudio_Server.Services
                 BannerUrl = createStudio.BannerUrl,
                 Tagline = createStudio.Tagline,
                 Alias = createStudio.Alias,
-                IsOpen = createStudio.IsOpen
+                IsOpen = createStudio.IsOpen,
+                IsArchived = createStudio.IsArchived
             };
         }
 
@@ -281,7 +283,8 @@ namespace StudioStudio_Server.Services
                 BannerUrl = studio.BannerUrl,
                 Tagline = studio.Tagline,
                 Alias = studio.Alias,
-                IsOpen = studio.IsOpen
+                IsOpen = studio.IsOpen,
+                IsArchived = studio.IsArchived
             };
         }
 
@@ -352,7 +355,7 @@ namespace StudioStudio_Server.Services
             updateStudio.StartDate = studio.StartDate.HasValue ? DateTime.SpecifyKind(studio.StartDate.Value, DateTimeKind.Utc) : null;
             updateStudio.EndDate = studio.EndDate.HasValue ? DateTime.SpecifyKind(studio.EndDate.Value, DateTimeKind.Utc) : null;
 
-            // 🔹 ADDED: Validate and update personalization fields
+            //  Validate and update personalization fields
             if (!string.IsNullOrEmpty(studio.ColorHex))
             {
                 if (!System.Text.RegularExpressions.Regex.IsMatch(studio.ColorHex, @"^#[0-9A-Fa-f]{6}$", System.Text.RegularExpressions.RegexOptions.None, TimeSpan.FromMilliseconds(200)))
@@ -369,21 +372,21 @@ namespace StudioStudio_Server.Services
             updateStudio.AvatarUrl = studio.AvatarUrl;
             updateStudio.UpdatedAt = DateTime.UtcNow;
 
-            // 🔹 ADDED: Validate and update BannerUrl
+            //  Validate and update BannerUrl
             if (!string.IsNullOrEmpty(studio.BannerUrl) && !Uri.TryCreate(studio.BannerUrl, UriKind.Absolute, out _))
             {
                 throw new AppException(ErrorCodes.ValidationInvalidBannerUrl, StatusCodes.Status400BadRequest);
             }
             updateStudio.BannerUrl = studio.BannerUrl;
 
-            // 🔹 ADDED: Validate and update Tagline
+            // Validate and update Tagline
             if (!string.IsNullOrEmpty(studio.Tagline) && studio.Tagline.Length > 200)
             {
                 throw new AppException(ErrorCodes.ValidationStringLength, StatusCodes.Status400BadRequest);
             }
             updateStudio.Tagline = studio.Tagline;
 
-            // 🔹 ADDED: Validate and update Alias
+            // Validate and update Alias
             if (!string.IsNullOrEmpty(studio.Alias))
             {
                 if (studio.Alias.Length > 50)
@@ -401,7 +404,6 @@ namespace StudioStudio_Server.Services
                 updateStudio.Alias = null;
             }
 
-            // 🔹 ADDED: Update IsOpen setting (Owner only)
             if (studio.IsOpen.HasValue)
             {
                 updateStudio.IsOpen = studio.IsOpen.Value;
@@ -421,7 +423,8 @@ namespace StudioStudio_Server.Services
                 BannerUrl = updateStudio.BannerUrl,
                 Tagline = updateStudio.Tagline,
                 Alias = updateStudio.Alias,
-                IsOpen = updateStudio.IsOpen
+                IsOpen = updateStudio.IsOpen,
+                IsArchived = updateStudio.IsArchived
             };
         }
 
@@ -541,8 +544,6 @@ namespace StudioStudio_Server.Services
                 LeftAt = DateTime.UtcNow
             };
         }
-
-        // 🔹 ADDED: Toggle IsOpen setting (Owner only)
         public async Task<ToggleIsOpenResponse> ToggleIsOpenAsync(Guid userId, Guid studioId, bool isOpen)
         {
             var studio = await _studioRepository.GetByIdAsync(studioId);
@@ -573,7 +574,6 @@ namespace StudioStudio_Server.Services
             };
         }
 
-        // 🔹 ADDED: Get pending members (Owner only)
         public async Task<StudioPendingMemberListResponse> GetPendingMembersAsync(Guid userId, Guid studioId)
         {
             var studio = await _studioRepository.GetByIdAsync(studioId);
@@ -841,6 +841,49 @@ namespace StudioStudio_Server.Services
         {
             var baseUrl = _configuration["Frontend:BaseUrl"] ?? "http://localhost:3000";
             return $"{baseUrl}/master/{studioId}";
+        }
+
+        public async Task<ArchiveStudioResponse> ToggleArchiveStudioAsync(Guid userId, Guid studioId, bool isArchived)
+        {
+            var studio = await _studioRepository.GetByIdAsync(studioId);
+            if (studio == null)
+            {
+                throw new AppException(ErrorCodes.StudioNotFound, StatusCodes.Status404NotFound);
+            }
+
+            // Only Owner can archive/unarchive
+            if (studio.OwnerId != userId)
+            {
+                throw new AppException(ErrorCodes.AuthForbidden, StatusCodes.Status403Forbidden);
+            }
+
+            studio.IsArchived = isArchived;
+            studio.UpdatedAt = DateTime.UtcNow;
+            await _studioRepository.UpdateStudioAsync(studio);
+
+            // If studio is archived, archive all groups inside it
+            // If studio is unarchived, unarchive all groups inside it
+            var studioGroups = await _groupRepository.GetStudioGroupsAsync(studioId);
+            if (studioGroups.Any())
+            {
+                foreach (var group in studioGroups)
+                {
+                    group.IsArchived = isArchived;
+                    group.UpdatedAt = DateTime.UtcNow;
+                }
+                await _groupRepository.SaveChangesAsync();
+            }
+
+            _logger.LogInformation(
+                "User {UserId} set IsArchived to {IsArchived} for studio {StudioId} (affected {GroupCount} groups)",
+                userId, isArchived, studioId, studioGroups.Count);
+
+            return new ArchiveStudioResponse
+            {
+                StudioId = studio.StudioId,
+                IsArchived = studio.IsArchived,
+                UpdatedAt = studio.UpdatedAt
+            };
         }
     }
 }

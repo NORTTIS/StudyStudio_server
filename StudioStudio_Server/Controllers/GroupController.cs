@@ -266,7 +266,7 @@ namespace StudioStudio_Server.Controllers
                 null));
         }
 
-        // 🔹 ADDED: Toggle IsOpen setting (Owner/Moderator only)
+        // Toggle IsOpen setting (Owner/Moderator only)
         /// <summary>
         /// [AUTHORIZED] PUT /api/group/{groupId}/toggle-open
         /// Toggle the IsOpen setting of a group (open vs closed membership)
@@ -287,7 +287,7 @@ namespace StudioStudio_Server.Controllers
                 result));
         }
 
-        // 🔹 ADDED: Get pending members (Owner/Moderator only)
+        // Get pending members (Owner/Moderator only)
         /// <summary>
         /// [AUTHORIZED] GET /api/group/{groupId}/pending
         /// Get list of pending (not yet approved) members
@@ -306,7 +306,7 @@ namespace StudioStudio_Server.Controllers
                 result));
         }
 
-        // 🔹 ADDED: Approve pending member (Owner/Moderator only)
+        // Approve pending member (Owner/Moderator only)
         /// <summary>
         /// [AUTHORIZED] POST /api/group/{groupId}/approve
         /// Approve a pending member to join the group
@@ -326,6 +326,27 @@ namespace StudioStudio_Server.Controllers
                 message,
                 result));
         }
-        
+
+        // Toggle archive status (Owner only)
+        /// <summary>
+        /// [AUTHORIZED] PUT /api/group/{groupId}/archive
+        /// Archive or unarchive a group
+        /// Validate: User must be Owner of group
+        /// Effect: When archived, non-owner members cannot interact (CRUD tasks, task statuses, comments, uploads)
+        /// </summary>
+        [HttpPut("{groupId}/archive")]
+        public async Task<ActionResult<ApiResponse<ArchiveGroupResponse>>> ToggleArchive(
+            Guid groupId,
+            [FromBody] ToggleArchiveRequest request)
+        {
+            var userId = ValidateAndGetUserId();
+            var result = await _groupService.ToggleArchiveGroupAsync(userId, groupId, request.IsArchived);
+            var message = _messageService.GetMessage(ErrorCodes.SuccessUpdateGroup);
+
+            return Ok(ApiResponse<ArchiveGroupResponse>.Success(
+                ErrorCodes.SuccessUpdateGroup,
+                message,
+                result));
+        }
     }
 }

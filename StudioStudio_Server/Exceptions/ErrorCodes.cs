@@ -61,6 +61,7 @@
         public const string GroupCannotLeaveAsOwner = "GROUP028";
         public const string GroupNameInvalid = "GROUP029";
         public const string GroupDescriptionInvalid = "GROUP030";
+        public const string GroupIsArchived = "GROUP031";
 
         // STUDIO
         public const string StudioLimitReached = "STUDIO001";
@@ -73,6 +74,7 @@
         public const string StudioMemberNotFound = "STUDIO009";
         public const string StudioCannotRemoveSelf = "STUDIO010";
         public const string StudioCannotRemoveOwner = "STUDIO011";
+        public const string StudioIsArchived = "STUDIO012";
 
         // STATUS
         public const string StatusNotFound = "STATUS001";
