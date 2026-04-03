@@ -109,6 +109,16 @@ namespace StudioStudio_Server.Services
                     StatusCodes.Status403Forbidden);
             }
 
+            var group = await _groupRepository.GetByIdAsync(request.GroupId);
+            if (group != null && group.IsArchived)
+            {
+                var userRole = await _groupParticipantRepository.GetGroupRoleByUserIdAsync(userId, request.GroupId);
+                if (userRole != GroupRole.Owner)
+                {
+                    throw new AppException(ErrorCodes.GroupIsArchived, StatusCodes.Status403Forbidden);
+                }
+            }
+
             // Validate file extension
             string extension = Path.GetExtension(request.FileName).ToLower();
             if (!AllowedExtensions.Contains(extension))

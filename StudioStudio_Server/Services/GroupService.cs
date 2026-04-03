@@ -164,14 +164,19 @@ namespace StudioStudio_Server.Services
                     BannerUrl = g.BannerUrl,
                     Tagline = g.Tagline,
                     Alias = g.Alias,
-                    IsOpen = g.IsOpen
+                    IsOpen = g.IsOpen,
+                    IsArchived = g.IsArchived,
+                    IsMember = groupParticipants.Any(p => p.UserId == userId && p.IsApproved)
                 };
             }).ToList();
 
             // Categorize groups
-            var favoriteGroups = groupCards.Where(g => g.IsFavorite).ToList();
-            var studioGroups = groupCards.Where(g => g.Studio != null).ToList();
-            var independentGroups = groupCards.Where(g => g.Studio == null).ToList();
+            var archivedGroups = groupCards.Where(g => g.IsArchived).ToList();
+            var activeGroups = groupCards.Where(g => !g.IsArchived).ToList();
+
+            var favoriteGroups = activeGroups.Where(g => g.IsFavorite).ToList();
+            var studioGroups = activeGroups.Where(g => g.Studio != null).ToList();
+            var independentGroups = activeGroups.Where(g => g.Studio == null).ToList();
 
             // Count groups created by user (where user is Owner)
             var groupsCreatedByUser = groups.Count(g =>
@@ -190,13 +195,15 @@ namespace StudioStudio_Server.Services
                     TotalGroups = groups.Count,
                     FavoriteCount = favoriteGroups.Count,
                     StudioGroupCount = studioGroups.Count,
-                    IndependentGroupCount = independentGroups.Count
+                    IndependentGroupCount = independentGroups.Count,
+                    ArchivedCount = archivedGroups.Count
                 },
                 Sections = new GroupSections
                 {
                     Favorites = favoriteGroups,
                     StudioGroups = studioGroups,
-                    IndependentGroups = independentGroups
+                    IndependentGroups = independentGroups,
+                    ArchivedGroups = archivedGroups
                 }
             };
 
@@ -305,6 +312,7 @@ namespace StudioStudio_Server.Services
                 Tagline = group.Tagline,
                 Alias = group.Alias,
                 IsOpen = group.IsOpen,
+                IsArchived = group.IsArchived,
                 TaskStatuses = taskStatuses.Select(ts => new TaskStatusDto
                 {
                     StatusId = ts.StatusId,
@@ -522,7 +530,8 @@ namespace StudioStudio_Server.Services
                 IconEmoji = request.IconEmoji,
                 BannerUrl = request.BannerUrl,
                 Tagline = request.Tagline,
-                Alias = request.Alias
+                Alias = request.Alias,
+                IsArchived = false
             };
 
             await _groupRepository.AddAsync(newGroup);
@@ -569,7 +578,8 @@ namespace StudioStudio_Server.Services
                 BannerUrl = newGroup.BannerUrl,
                 Tagline = newGroup.Tagline,
                 Alias = newGroup.Alias,
-                IsOpen = newGroup.IsOpen
+                IsOpen = newGroup.IsOpen,
+                IsArchived = newGroup.IsArchived
             };
         }
 
@@ -777,7 +787,8 @@ namespace StudioStudio_Server.Services
                 BannerUrl = group.BannerUrl,
                 Tagline = group.Tagline,
                 Alias = group.Alias,
-                IsOpen = group.IsOpen
+                IsOpen = group.IsOpen,
+                IsArchived = group.IsArchived
             };
         }
 
@@ -1423,6 +1434,37 @@ namespace StudioStudio_Server.Services
         {
             var baseUrl = _configuration["Frontend:BaseUrl"] ?? "http://localhost:3000";
             return $"{baseUrl}/group/{groupId}";
+        }
+
+        public async Task<ArchiveGroupResponse> ToggleArchiveGroupAsync(Guid userId, Guid groupId, bool isArchived)
+        {
+            var group = await _groupRepository.GetByIdAsync(groupId);
+            if (group == null)
+            {
+                throw new AppException(ErrorCodes.GroupNotFound, StatusCodes.Status404NotFound);
+            }
+
+            // Only Owner can archive/unarchive
+            var isOwner = await _groupRepository.IsUserGroupOwnerAsync(groupId, userId);
+            if (!isOwner)
+            {
+                throw new AppException(ErrorCodes.GroupPermissionDenied, StatusCodes.Status403Forbidden);
+            }
+
+            group.IsArchived = isArchived;
+            group.UpdatedAt = DateTime.UtcNow;
+            await _groupRepository.UpdateAsync(group);
+
+            _logger.LogInformation(
+                "User {UserId} set IsArchived to {IsArchived} for group {GroupId}",
+                userId, isArchived, groupId);
+
+            return new ArchiveGroupResponse
+            {
+                GroupId = group.GroupId,
+                IsArchived = group.IsArchived,
+                UpdatedAt = group.UpdatedAt
+            };
         }
     }
 }
