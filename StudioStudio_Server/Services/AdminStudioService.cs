@@ -76,6 +76,8 @@ namespace StudioStudio_Server.Services
 
         /// <summary>
         /// Update studio status (activate/inactivate)
+        /// Khi active lại: kiểm tra trùng tên với studio active khác cùng owner
+        /// Nếu trùng → thêm "_restored" vào tên (lặp lại nếu vẫn trùng)
         /// </summary>
         public async Task UpdateStudioStatusAsync(Guid studioId, bool isActive)
         {
@@ -84,6 +86,21 @@ namespace StudioStudio_Server.Services
             if (studio == null)
             {
                 throw new AppException(ErrorCodes.StudioNotFound, StatusCodes.Status404NotFound);
+            }
+
+            // Nếu đang active studio đã bị inactive trước đó
+            if (isActive)
+            {
+                var currentName = studio.StudioName;
+                var candidateName = currentName;
+
+                // Lặp kiểm tra trùng tên, thêm "_restored" cho đến khi không trùng
+                while (await _studioRepository.HasActiveStudioWithNameAsync(studio.OwnerId, candidateName, studio.StudioId))
+                {
+                    candidateName += "_restored";
+                }
+
+                studio.StudioName = candidateName;
             }
 
             studio.IsDeleted = !isActive;

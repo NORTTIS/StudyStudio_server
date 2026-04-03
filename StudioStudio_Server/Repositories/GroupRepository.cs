@@ -473,5 +473,22 @@ namespace StudioStudio_Server.Repositories
 
             return studios;
         }
+
+        /// <summary>
+        /// Kiểm tra xem đã có group active nào của cùng owner và cùng studio có tên trùng không
+        /// Chỉ kiểm tra group đang active (IsActive = true)
+        /// </summary>
+        public async Task<bool> HasActiveGroupWithNameAsync(Guid ownerId, Guid? studioId, string groupName, Guid excludeGroupId)
+        {
+            var trimmedName = groupName.Trim();
+
+            return await _db.Groups
+                .AnyAsync(g =>
+                    g.GroupId != excludeGroupId &&
+                    g.CreatedBy == ownerId &&
+                    g.StudioId == studioId &&
+                    g.GroupName.Trim() == trimmedName &&
+                    g.IsActive);
+        }
     }
 }

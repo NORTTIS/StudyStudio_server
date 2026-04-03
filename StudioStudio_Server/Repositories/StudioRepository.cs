@@ -391,5 +391,21 @@ namespace StudioStudio_Server.Repositories
 
             return users;
         }
+
+        /// <summary>
+        /// Kiểm tra xem đã có studio active nào của cùng owner có tên trùng không
+        /// Chỉ kiểm tra studio đang active (IsDeleted = false)
+        /// </summary>
+        public async Task<bool> HasActiveStudioWithNameAsync(Guid ownerId, string studioName, Guid excludeStudioId)
+        {
+            var trimmedName = studioName.Trim();
+
+            return await _context.Studios
+                .AnyAsync(s =>
+                    s.StudioId != excludeStudioId &&
+                    s.OwnerId == ownerId &&
+                    s.StudioName.Trim() == trimmedName &&
+                    !s.IsDeleted);
+        }
     }
 }

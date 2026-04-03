@@ -52,5 +52,11 @@ namespace StudioStudio_Server.Repositories.Interfaces
         /// Get owner info (name + email) for a list of owner IDs
         /// </summary>
         Task<Dictionary<Guid, (string Name, string Email)>> GetOwnerInfosAsync(List<Guid> ownerIds);
+
+        /// <summary>
+        /// Kiểm tra xem đã có studio active nào của cùng owner có tên trùng không
+        /// Chỉ kiểm tra studio đang active (IsDeleted = false)
+        /// </summary>
+        Task<bool> HasActiveStudioWithNameAsync(Guid ownerId, string studioName, Guid excludeStudioId);
     }
 }
