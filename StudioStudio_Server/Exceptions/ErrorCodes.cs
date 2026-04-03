@@ -71,6 +71,8 @@
         public const string StudioNameInvalid = "STUDIO007";
         public const string StudioDescriptionInvalid = "STUDIO008";
         public const string StudioMemberNotFound = "STUDIO009";
+        public const string StudioCannotRemoveSelf = "STUDIO010";
+        public const string StudioCannotRemoveOwner = "STUDIO011";
 
         // STATUS
         public const string StatusNotFound = "STATUS001";

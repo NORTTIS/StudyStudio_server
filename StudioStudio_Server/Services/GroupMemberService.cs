@@ -111,7 +111,7 @@ namespace StudioStudio_Server.Services
             var participant = await _groupParticipantRepository
                 .GetByGroupAndUserAsync(groupId, userId);
 
-            if (participant == null || !participant.IsApproved)
+            if (participant == null)
             {
                 throw new AppException(
                     ErrorCodes.GroupNotFound,
@@ -222,77 +222,6 @@ namespace StudioStudio_Server.Services
                 OldRole = oldRole.ToString(),
                 NewRole = newRole.ToString(),
                 UpdatedAt = DateTime.UtcNow
-            };
-        }
-
-        // 🔹 ADDED: Reject pending member (kick without approval - for closed groups)
-        /// <summary>
-        /// Reject a pending member request (Owner/Moderator only)
-        /// Validates: current user is Owner/Moderator, target is pending (not yet approved)
-        /// </summary>
-        public async Task<RemoveMemberResponse> RejectMemberAsync(Guid currentUserId, Guid groupId, Guid targetUserId)
-        {
-            var group = await ValidateGroupExistsAsync(groupId);
-
-            var currentUserParticipant = await ValidateUserIsModeratorOrOwnerAsync(groupId, currentUserId);
-
-            if (targetUserId == currentUserId)
-            {
-                throw new AppException(
-                    ErrorCodes.GroupCannotRemoveSelf,
-                    StatusCodes.Status400BadRequest);
-            }
-
-            var targetParticipant = await _groupParticipantRepository
-                .GetByGroupAndUserTrackedAsync(groupId, targetUserId);
-
-            if (targetParticipant == null)
-            {
-                throw new AppException(
-                    ErrorCodes.GroupMemberNotFound,
-                    StatusCodes.Status404NotFound);
-            }
-
-            // Can only reject non-approved (pending) members
-            if (targetParticipant.IsApproved)
-            {
-                throw new AppException(
-                    ErrorCodes.GroupMemberNotFound,
-                    StatusCodes.Status400BadRequest);
-            }
-
-            // Cannot reject Owner
-            if (targetParticipant.Role == GroupRole.Owner)
-            {
-                throw new AppException(
-                    ErrorCodes.GroupCannotRemoveOwner,
-                    StatusCodes.Status400BadRequest);
-            }
-
-            // Moderator cannot reject another Moderator
-            if (currentUserParticipant.Role == GroupRole.Moderator &&
-                targetParticipant.Role == GroupRole.Moderator)
-            {
-                throw new AppException(
-                    ErrorCodes.GroupPermissionDenied,
-                    StatusCodes.Status403Forbidden);
-            }
-
-            var removedUser = await GetUserOrThrowAsync(targetUserId);
-
-            await _groupParticipantRepository.RemoveAsync(targetParticipant);
-
-            _logger.LogInformation(
-                "User {UserId} rejected member {TargetUserId} from group {GroupId}",
-                currentUserId, targetUserId, groupId);
-
-            return new RemoveMemberResponse
-            {
-                GroupId = group.GroupId,
-                GroupName = group.GroupName,
-                RemovedUserId = targetUserId,
-                RemovedUserName = $"{removedUser.FirstName} {removedUser.LastName}",
-                RemovedAt = DateTime.UtcNow
             };
         }
 

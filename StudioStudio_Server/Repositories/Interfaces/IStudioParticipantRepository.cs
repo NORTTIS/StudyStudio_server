@@ -13,30 +13,17 @@ namespace StudioStudio_Server.Repositories.Interfaces
         Task RemoveAsync(StudioParticipant participant);
         Task UpdateAsync(StudioParticipant participant);
 
-        /// <summary>
-        /// Get all studio participant records for a user
-        /// Condition: UserId = {userId}
-        /// Use case: Get all studios where user is a participant (member)
-        /// </summary>
         Task<List<StudioParticipant>> GetStudiosByUserIdAsync(Guid userId);
-
-        // 🔹 ADDED: Pending membership & approval methods
-        /// <summary>
-        /// Get all pending (not yet approved) members of a studio
-        /// Condition: StudioId = {studioId} AND IsApproved = false
-        /// </summary>
         Task<List<StudioParticipant>> GetPendingByStudioIdAsync(Guid studioId);
-
-        /// <summary>
-        /// Check if user is an approved member of a studio
-        /// Condition: StudioId+UserId in StudioParticipants AND IsApproved = true AND Studio.IsDeleted = false
-        /// </summary>
         Task<bool> IsUserApprovedInStudioAsync(Guid studioId, Guid userId);
+        Task<StudioParticipant?> GetPendingByStudioAndUserAsync(Guid studioId, Guid userId);
+        Task<StudioParticipant?> GetByStudioAndUserIncludeNonApprovedAsync(Guid studioId, Guid userId);
 
         /// <summary>
-        /// Get pending participant record for a user in a studio (if any)
-        /// Condition: StudioId+UserId in StudioParticipants AND IsApproved = false
+        /// Get participant record by StudioId and UserId (tracked for update/delete)
+        /// Condition: StudioId = {studioId} AND UserId = {userId} AND Studio.IsDeleted = false
+        /// Use case: Remove member from studio
         /// </summary>
-        Task<StudioParticipant?> GetPendingByStudioAndUserAsync(Guid studioId, Guid userId);
+        Task<StudioParticipant?> GetByStudioAndUserTrackedAsync(Guid studioId, Guid userId);
     }
 }

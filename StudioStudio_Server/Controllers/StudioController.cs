@@ -283,7 +283,7 @@ namespace StudioStudio_Server.Controllers
                 result));
         }
 
-        // 🔹 ADDED: Toggle IsOpen setting (Owner only)
+        // Toggle IsOpen setting (Owner only)
         /// <summary>
         /// [AUTHORIZED] PUT /api/studio/{studioId}/toggle-open
         /// Toggle the IsOpen setting of a studio (open vs closed membership)
@@ -304,7 +304,7 @@ namespace StudioStudio_Server.Controllers
                 result));
         }
 
-        // 🔹 ADDED: Get pending members (Owner only)
+        // Get pending members (Owner only)
         /// <summary>
         /// [AUTHORIZED] GET /api/studio/{studioId}/pending
         /// Get list of pending (not yet approved) members
@@ -323,7 +323,7 @@ namespace StudioStudio_Server.Controllers
                 result));
         }
 
-        // 🔹 ADDED: Approve pending member (Owner only)
+        // Approve pending member (Owner only)
         /// <summary>
         /// [AUTHORIZED] POST /api/studio/{studioId}/approve
         /// Approve a pending member to join the studio
@@ -340,6 +340,27 @@ namespace StudioStudio_Server.Controllers
 
             return Ok(ApiResponse<ApproveMemberResponse>.Success(
                 ErrorCodes.SuccessUpdateData,
+                message,
+                result));
+        }
+        /// <summary>
+        /// [AUTHORIZED] DELETE /api/studio/member/remove
+        /// Remove member from studio
+        /// Validate:
+        /// - Current user must be Owner
+        /// - Cannot remove yourself
+        /// - Cannot remove Owner
+        /// </summary>
+        [HttpDelete("remove")]
+            public async Task<ActionResult<ApiResponse<RemoveStudioMemberResponse>>> RemoveMember(
+            [FromBody] RemoveStudioMemberRequest request)
+        {
+            var userId = JwtHelper.ValidateAndGetUserId(User);
+            var result = await _studioService.RemoveMemberAsync(userId, request);
+            var message = _messageService.GetMessage(ErrorCodes.SuccessRemoveMember);
+
+            return Ok(ApiResponse<RemoveStudioMemberResponse>.Success(
+                ErrorCodes.SuccessRemoveMember,
                 message,
                 result));
         }

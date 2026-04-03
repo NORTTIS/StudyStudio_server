@@ -326,26 +326,6 @@ namespace StudioStudio_Server.Controllers
                 message,
                 result));
         }
-
-        // 🔹 ADDED: Reject pending member (Owner/Moderator only)
-        /// <summary>
-        /// [AUTHORIZED] DELETE /api/group/{groupId}/pending/{targetUserId}
-        /// Reject (remove) a pending member request
-        /// Validate: User must be Owner or Moderator, target must not be approved yet
-        /// </summary>
-        [HttpDelete("{groupId}/pending/{targetUserId}")]
-        public async Task<ActionResult<ApiResponse<RemoveMemberResponse>>> RejectMember(
-            Guid groupId,
-            Guid targetUserId)
-        {
-            var userId = ValidateAndGetUserId();
-            var result = await _groupMemberService.RejectMemberAsync(userId, groupId, targetUserId);
-            var message = _messageService.GetMessage(ErrorCodes.SuccessRemoveMember);
-
-            return Ok(ApiResponse<RemoveMemberResponse>.Success(
-                ErrorCodes.SuccessRemoveMember,
-                message,
-                result));
-        }
+        
     }
 }
