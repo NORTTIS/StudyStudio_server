@@ -17,17 +17,11 @@ namespace StudioStudio_Server.Repositories.Interfaces
         Task<List<Group>> GetGroupsByStudioIdAsync(Guid studioId);
         Task<bool> IsStudioNameExistByOwnerIdAsync(string studioName, Guid ownerId);
         Task<bool> IsStudioNameExistExcludingStudioAsync(string studioName, Guid ownerId, Guid excludeStudioId);
-
-        // ========== Admin Methods ==========
-
-        /// <summary>
-        /// Get paginated studios with search filter for admin
-        /// </summary>
         Task<(List<Studio> Studios, int TotalCount)> GetStudiosAsync(
             string? searchTerm,
             int pageNumber,
             int pageSize);
-
+        Task<Studio?> GetByIdAdminAsync(Guid studioId);
         /// <summary>
         /// Get summary statistics for studios (raw values, not DTO)
         /// </summary>

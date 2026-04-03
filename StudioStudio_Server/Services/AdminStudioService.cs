@@ -79,7 +79,7 @@ namespace StudioStudio_Server.Services
         /// </summary>
         public async Task UpdateStudioStatusAsync(Guid studioId, bool isActive)
         {
-            var studio = await _studioRepository.GetByIdForUpdateAsync(studioId);
+            var studio = await _studioRepository.GetByIdAdminAsync(studioId);
 
             if (studio == null)
             {

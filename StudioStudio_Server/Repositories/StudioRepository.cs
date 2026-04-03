@@ -150,8 +150,15 @@ namespace StudioStudio_Server.Repositories
             return await _context.Studios
                 .AnyAsync(s => s.StudioName.Trim() == trimmedName && s.OwnerId == ownerId && !s.IsDeleted && s.StudioId != excludeStudioId);
         }
-
-        // ========== Admin Methods ==========
+        
+        /// <summary>
+        /// Get group by ID (including deleted studio for admin)
+        /// </summary>
+        public async Task<Studio?> GetByIdAdminAsync(Guid studioId)
+        {
+            return await _context.Studios
+                .FirstOrDefaultAsync(g => g.StudioId == studioId);
+        }
 
         /// <summary>
         /// Get paginated studios with search filter for admin
@@ -161,9 +168,7 @@ namespace StudioStudio_Server.Repositories
             int pageNumber,
             int pageSize)
         {
-            var query = _context.Studios
-                .Where(s => !s.IsDeleted)
-                .AsQueryable();
+            var query = _context.Studios.AsQueryable();
 
             // Apply search filter
             if (!string.IsNullOrWhiteSpace(searchTerm))
