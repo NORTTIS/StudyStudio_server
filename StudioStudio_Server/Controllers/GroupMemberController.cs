@@ -123,5 +123,20 @@ namespace StudioStudio_Server.Controllers
                 message,
                 result));
         }
+
+        
+        [HttpDelete("{groupId}/cancel-request")]
+        public async Task<ActionResult<ApiResponse<RemoveMemberResponse>>> RejectMember(
+            Guid groupId)
+        {
+            var userId = ValidateAndGetUserId();
+            var result = await _groupMemberService.CancelRequestAsync(groupId, userId);
+            var message = _messageService.GetMessage(ErrorCodes.SuccessRemoveMember);
+
+            return Ok(ApiResponse<RemoveMemberResponse>.Success(
+                ErrorCodes.SuccessRemoveMember,
+                message,
+                result));
+        }
     }
 }
