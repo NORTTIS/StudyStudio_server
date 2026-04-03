@@ -495,7 +495,7 @@ namespace StudioStudio_Server.Services
         /// Validate:
         /// - Studio must exist
         /// - User must be a member of the studio
-        /// - Owner cannot leave (must transfer ownership or delete studio)
+        /// - Owner cannot leave
         /// </summary>
         public async Task<LeaveStudioResponse> LeaveStudioAsync(Guid userId, Guid studioId)
         {
