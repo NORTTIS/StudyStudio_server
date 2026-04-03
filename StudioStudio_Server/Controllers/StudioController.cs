@@ -343,5 +343,26 @@ namespace StudioStudio_Server.Controllers
                 message,
                 result));
         }
+        /// <summary>
+        /// [AUTHORIZED] DELETE /api/studio/member/remove
+        /// Remove member from studio
+        /// Validate:
+        /// - Current user must be Owner
+        /// - Cannot remove yourself
+        /// - Cannot remove Owner
+        /// </summary>
+        [HttpDelete("remove")]
+            public async Task<ActionResult<ApiResponse<RemoveStudioMemberResponse>>> RemoveMember(
+            [FromBody] RemoveStudioMemberRequest request)
+        {
+            var userId = JwtHelper.ValidateAndGetUserId(User);
+            var result = await _studioService.RemoveMemberAsync(userId, request);
+            var message = _messageService.GetMessage(ErrorCodes.SuccessRemoveMember);
+
+            return Ok(ApiResponse<RemoveStudioMemberResponse>.Success(
+                ErrorCodes.SuccessRemoveMember,
+                message,
+                result));
+        }
     }
 }

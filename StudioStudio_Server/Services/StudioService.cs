@@ -611,6 +611,95 @@ namespace StudioStudio_Server.Services
             };
         }
 
+        /// <summary>
+        /// Remove member from studio
+        /// Validate:
+        /// - Studio must exist
+        /// - Current user must be Owner
+        /// - Cannot remove yourself
+        /// - Cannot remove Owner
+        /// </summary>
+        public async Task<RemoveStudioMemberResponse> RemoveMemberAsync(
+            Guid currentUserId,
+            RemoveStudioMemberRequest request)
+        {
+            // Validate: Studio must exist
+            var studio = await _studioRepository.GetByIdAsync(request.StudioId);
+            if (studio == null)
+            {
+                throw new AppException(ErrorCodes.StudioNotFound, StatusCodes.Status404NotFound);
+            }
+
+            // Validate: Current user must be Owner of the studio
+            if (studio.OwnerId != currentUserId)
+            {
+                throw new AppException(ErrorCodes.AuthForbidden, StatusCodes.Status403Forbidden);
+            }
+
+            // Cannot remove yourself
+            if (request.UserId == currentUserId)
+            {
+                throw new AppException(
+                    ErrorCodes.StudioCannotRemoveSelf,
+                    StatusCodes.Status400BadRequest);
+            }
+
+            // Get target member record (tracked)
+            var targetMember = await _studioParticipantRepository
+                .GetByStudioAndUserTrackedAsync(request.StudioId, request.UserId);
+
+            if (targetMember == null)
+            {
+                throw new AppException(
+                    ErrorCodes.StudioMemberNotFound,
+                    StatusCodes.Status404NotFound);
+            }
+
+            // Cannot remove Owner
+            if (targetMember.Role == StudioRole.Owner)
+            {
+                throw new AppException(
+                    ErrorCodes.StudioCannotRemoveOwner,
+                    StatusCodes.Status400BadRequest);
+            }
+
+            // Remove user from all groups in this studio first
+            var studioGroups = await _groupRepository.GetStudioGroupsAsync(request.StudioId);
+            if (studioGroups.Count > 0)
+            {
+                var groupIds = studioGroups.Select(g => g.GroupId).ToList();
+                var groupParticipants = await _groupParticipantRepository.GetByGroupIdsAsync(groupIds);
+                var userGroupParticipants = groupParticipants
+                    .Where(gp => gp.UserId == request.UserId)
+                    .ToList();
+
+                if (userGroupParticipants.Count > 0)
+                {
+                    await _groupParticipantRepository.RemoveRangeAsync(userGroupParticipants);
+                }
+            }
+
+            // Get removed user info before deletion
+            var removedUser = await _userRepository.GetByIdAsync(request.UserId);
+
+            // Remove member from studio
+            await _studioParticipantRepository.RemoveAsync(targetMember);
+
+            _logger.LogInformation(
+                "User {UserId} removed user {RemovedUserId} from studio {StudioId}",
+                currentUserId, request.UserId, request.StudioId);
+
+            return new RemoveStudioMemberResponse
+            {
+                StudioId = request.StudioId,
+                StudioName = studio.StudioName,
+                RemovedUserId = request.UserId,
+                RemovedUserName = removedUser != null
+                    ? $"{removedUser.FirstName} {removedUser.LastName}"
+                    : "Unknown User",
+                RemovedAt = DateTime.UtcNow
+            };
+        }
         // Approve pending member (Owner only)
         public async Task<ApproveMemberResponse> ApproveMemberAsync(Guid userId, Guid studioId, Guid targetUserId)
         {

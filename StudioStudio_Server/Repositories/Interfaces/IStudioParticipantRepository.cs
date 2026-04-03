@@ -18,5 +18,12 @@ namespace StudioStudio_Server.Repositories.Interfaces
         Task<bool> IsUserApprovedInStudioAsync(Guid studioId, Guid userId);
         Task<StudioParticipant?> GetPendingByStudioAndUserAsync(Guid studioId, Guid userId);
         Task<StudioParticipant?> GetByStudioAndUserIncludeNonApprovedAsync(Guid studioId, Guid userId);
+
+        /// <summary>
+        /// Get participant record by StudioId and UserId (tracked for update/delete)
+        /// Condition: StudioId = {studioId} AND UserId = {userId} AND Studio.IsDeleted = false
+        /// Use case: Remove member from studio
+        /// </summary>
+        Task<StudioParticipant?> GetByStudioAndUserTrackedAsync(Guid studioId, Guid userId);
     }
 }

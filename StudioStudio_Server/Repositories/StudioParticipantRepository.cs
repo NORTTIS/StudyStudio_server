@@ -133,7 +133,7 @@ namespace StudioStudio_Server.Repositories
             await _context.SaveChangesAsync();
         }
 
-        // 🔹 ADDED: Pending membership & approval methods
+        // Pending membership & approval methods
 
         /// <summary>
         /// Get all pending (not yet approved) members of a studio
@@ -170,6 +170,18 @@ namespace StudioStudio_Server.Repositories
             return await _context.StudioParticipants
                 .AsNoTracking()
                 .FirstOrDefaultAsync(sp => sp.StudioId == studioId && sp.UserId == userId && !sp.IsApproved);
+        }
+
+        /// <summary>
+        /// Get participant record by StudioId and UserId (tracked for update/delete)
+        /// Condition: StudioId = {studioId} AND UserId = {userId} AND Studio.IsDeleted = false
+        /// Use case: Remove member from studio
+        /// </summary>
+        public async Task<StudioParticipant?> GetByStudioAndUserTrackedAsync(Guid studioId, Guid userId)
+        {
+            return await _context.StudioParticipants
+                .Include(sp => sp.Studio)
+                .FirstOrDefaultAsync(sp => sp.StudioId == studioId && sp.UserId == userId && sp.Studio != null && !sp.Studio.IsDeleted);
         }
     }
 }
