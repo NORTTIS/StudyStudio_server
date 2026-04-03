@@ -235,14 +235,14 @@ namespace StudioStudio_Server.Services
         /// </summary>
         private List<Guid> ExtractTaggedUserIds(string content)
         {
-            var matches = Regex.Matches(content, @"@([a-fA-F0-9\-]{36})");
+            var matches = Regex.Matches(content, @"@([a-fA-F0-9\-]{36})", RegexOptions.None, TimeSpan.FromMilliseconds(200));
             return matches.Select(m => Guid.Parse(m.Groups[1].Value)).ToList();
         }
 
         private string ExtractPlainText(string content)
         {
-            var text = Regex.Replace(content, @"@[a-fA-F0-9\-]{36}", "");
-            return Regex.Replace(text, @"\s+", " ").Trim();
+            var text = Regex.Replace(content, @"@[a-fA-F0-9\-]{36}", "", RegexOptions.None, TimeSpan.FromMilliseconds(200));
+            return Regex.Replace(text, @"\s+", " ", RegexOptions.None, TimeSpan.FromMilliseconds(200)).Trim();
         }
 
         /// <summary>

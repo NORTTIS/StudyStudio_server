@@ -469,7 +469,7 @@ namespace StudioStudio_Server.Services
             // 🔹 ADDED: Validate personalization fields
             if (!string.IsNullOrEmpty(request.ColorHex))
             {
-                if (!System.Text.RegularExpressions.Regex.IsMatch(request.ColorHex, @"^#[0-9A-Fa-f]{6}$"))
+                if (!System.Text.RegularExpressions.Regex.IsMatch(request.ColorHex, @"^#[0-9A-Fa-f]{6}$", System.Text.RegularExpressions.RegexOptions.None, TimeSpan.FromMilliseconds(200)))
                 {
                     throw new AppException(ErrorCodes.ValidationInvalidColor, StatusCodes.Status400BadRequest);
                 }
@@ -499,7 +499,7 @@ namespace StudioStudio_Server.Services
                 {
                     throw new AppException(ErrorCodes.ValidationStringLength, StatusCodes.Status400BadRequest);
                 }
-                if (!System.Text.RegularExpressions.Regex.IsMatch(request.Alias, @"^[a-zA-Z0-9\sÀ-ỹ_\-]+$"))
+                if (!System.Text.RegularExpressions.Regex.IsMatch(request.Alias, @"^[a-zA-Z0-9\sÀ-ỹ_\-]+$", System.Text.RegularExpressions.RegexOptions.None, TimeSpan.FromMilliseconds(200)))
                 {
                     throw new AppException(ErrorCodes.ValidationInvalidAlias, StatusCodes.Status400BadRequest);
                 }
@@ -643,7 +643,7 @@ namespace StudioStudio_Server.Services
             // 🔹 ADDED: Validate and update personalization fields
             if (!string.IsNullOrEmpty(request.ColorHex))
             {
-                if (!System.Text.RegularExpressions.Regex.IsMatch(request.ColorHex, @"^#[0-9A-Fa-f]{6}$"))
+                if (!System.Text.RegularExpressions.Regex.IsMatch(request.ColorHex, @"^#[0-9A-Fa-f]{6}$", System.Text.RegularExpressions.RegexOptions.None, TimeSpan.FromMilliseconds(200)))
                 {
                     throw new AppException(ErrorCodes.ValidationInvalidColor, StatusCodes.Status400BadRequest);
                 }
@@ -689,7 +689,7 @@ namespace StudioStudio_Server.Services
                 {
                     throw new AppException(ErrorCodes.ValidationStringLength, StatusCodes.Status400BadRequest);
                 }
-                if (!System.Text.RegularExpressions.Regex.IsMatch(request.Alias, @"^[a-zA-Z0-9\sÀ-ỹ_\-]+$"))
+                if (!System.Text.RegularExpressions.Regex.IsMatch(request.Alias, @"^[a-zA-Z0-9\sÀ-ỹ_\-]+$", System.Text.RegularExpressions.RegexOptions.None, TimeSpan.FromMilliseconds(200)))
                 {
                     throw new AppException(ErrorCodes.ValidationInvalidAlias, StatusCodes.Status400BadRequest);
                 }
