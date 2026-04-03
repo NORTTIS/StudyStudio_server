@@ -10,8 +10,8 @@
   "USER001": "Không tìm thấy người dùng",
   "USER002": "Email đã được sử dụng",
   "USER003": "Tài khoản đã bị xóa",
-  "USER004": "Trạng thái không hợp lệ",
-  "USER005": "Không thể thay đổi trạng thái của người dùng quản trị",
+  "USER004": "Trạng thái người dùng không hợp lệ",
+  "USER005": "Bạn không thể thay đổi admin",
 
   "REPORT001": "Dữ liệu báo cáo không hợp lệ",
   "REPORT002": "Chưa cấu hình email nhận báo cáo",
@@ -52,10 +52,21 @@
   "GROUP026": "Trạng thái công việc cần phải trống để có thể xóa",
   "GROUP027": "Không tìm thấy trạng thái công việc",
   "GROUP028": "Chủ nhóm không thể rời khỏi nhóm.",
+  "GROUP029": "Tên nhóm không hợp lệ. Nó phải ít hơn 255 ký tự.",
+  "GROUP030": "Mô tả nhóm không hợp lệ. Nó phải ít hơn 500 ký tự",
+  "GROUP031": "Nhóm này đã được lưu trữ và không thể chỉnh sửa",
 
   "STUDIO001": "Bạn đã đạt giới hạn số lượng studio có thể tạo",
-  "STUDIO004": "Bạn đã là thành viên của studio này",
+  "STUDIO002": "Bạn đã là thành viên của studio này",
+  "STUDIO003": "Ngày giờ không hợp lệ cho studio",
   "STUDIO005": "Chủ studio không thể rời khỏi studio.",
+  "STUDIO006": "Tên studio đã tồn tại",
+  "STUDIO007": "Tên studio không hợp lệ. Nó phải ít hơn 255 ký tự.",
+  "STUDIO008": "Mô tả studio không hợp lệ. Nó phải ít hơn 500 ký tự.",
+  "STUDIO009": "Không tìm thấy thành viên trong studio này",
+  "STUDIO010": "Bạn không thể tự xóa mình khỏi studio",
+  "STUDIO011": "Bạn không thể xóa chủ sở hữu studio",
+  "STUDIO012": "Studio này đã được lưu trữ và không thể chỉnh sửa",
 
   "STATUS001": "Không tìm thấy trạng thái",
   "STATUS002": "Trạng thái này đã tồn tại",
@@ -120,6 +131,9 @@
 
   "STORAGE001": "Dung lượng lưu trữ của nhóm đã đầy. Vui lòng xóa bớt tài liệu hoặc nâng cấp gói",
   "AI001": "Bạn đã vượt quá giới hạn số lượng câu hỏi AI trong ngày. Vui lòng thử lại vào ngày mai hoặc nâng cấp gói Premium",
+  "CONFIG001": "Không tìm thấy cấu hình",
+  "EXTERNAL001": "Lỗi dịch vụ bên ngoài",
+
 
   "ANNOUNCEMENTTAGTITLE": "Bạn đã được nhắc đến",
   "ANNOUNCEMENTTAGCONTENT": "đã nhắc đến bạn từ nhóm",
@@ -170,9 +184,6 @@
   "SUCCESS042": "Hủy thanh toán thành công",
   "SUCCESS043": "Cập nhật báo cáo thành công",
   "SUCCESS044": "Cập nhật gói đăng ký thành công",
-  "SUCCESS045": "Cập nhật dữ liệu thành công",
-  "SUCCESS046": "Gán thành viên hàng loạt thành công",
-  "SUCCESS047": "Phân ngẫu nhiên thành công",
   "SUCCESS048": "Rời nhóm thành công",
   "SUCCESS049": "Rời studio thành công",
 
@@ -187,5 +198,18 @@
   "SUBSCRIPTION001": "Không tìm thấy gói đăng ký",
 
   "SYS001": "Lỗi hệ thống không xác định",
-  "API001": "Bạn đã vượt quá giới hạn yêu cầu API. Vui lòng thử lại sau."
+  "API001": "Bạn đã vượt quá giới hạn yêu cầu API. Vui lòng thử lại sau.",
+
+  "REVENUE001": "Dữ liệu doanh thu không hợp lệ",
+  "REVENUE002": "Khoảng thời gian doanh thu không hợp lệ",
+  "REVENUE003": "Khoảng thời gian tùy chỉnh không hợp lệ",
+  "REVENUE004": "Giới hạn doanh thu không hợp lệ",
+
+  "ANALYTICS001": "Dữ liệu phân tích không tìm thấy",
+  "ANALYTICS002": "Khoảng thời gian phân tích không hợp lệ",
+  "ANALYTICS003": "Khoảng thời gian tùy chỉnh phân tích không hợp lệ",
+  "ANALYTICS004": "Giới hạn phân tích không hợp lệ",
+  
+  "ANALYTICSP001": "Không có nhóm nào cho phân tích"
+
 }
