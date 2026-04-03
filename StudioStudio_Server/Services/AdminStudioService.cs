@@ -54,8 +54,7 @@ namespace StudioStudio_Server.Services
                 TaskCount = taskCounts.GetValueOrDefault(s.StudioId),
                 CreatedAt = s.CreatedAt,
                 LastActivityAt = lastActivities.GetValueOrDefault(s.StudioId),
-                IsActive = !s.IsDeleted,
-                IsOpen = s.IsOpen
+                IsActive = !s.IsDeleted
             }).ToList();
 
             return new AdminStudioListResponse

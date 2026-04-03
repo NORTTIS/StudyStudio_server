@@ -14,7 +14,6 @@ namespace StudioStudio_Server.Models.DTOs.Response
 
         public DateTime? LastActivityAt { get; set; }
         public bool IsActive { get; set; }
-        public bool IsOpen { get; set; }
     }
     public class StudioListSummary
     {
