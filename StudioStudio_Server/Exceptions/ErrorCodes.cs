@@ -15,6 +15,8 @@
         public const string UserNotFound = "USER001";
         public const string UserAlreadyExist = "USER002";
         public const string UserAccountAlreadyDeleted = "USER003";
+        public const string UserInvalidStatus = "USER004";
+        public const string UserCannotModifyAdmin = "USER005";
 
         // REPORT
         public const string ReportInvalidRequest = "REPORT001";
@@ -28,7 +30,6 @@
         public const string TaskInvalidPriority = "TASK004";
         public const string TaskInvalidSeverity = "TASK005";
         public const string TaskNotPendingDeleted = "TASK006";
-        public const string TaskHoursExceedDuration = "TASK007";
 
         // GROUP
         public const string GroupNotFound = "GROUP001";
@@ -205,6 +206,9 @@
         public const string SuccessPaymentCancelled = "SUCCESS042";
         public const string SuccessUpdateReport = "SUCCESS043";
         public const string SuccessUpdateSubscriptionPlan = "SUCCESS044";
+        public const string SuccessUpdateData = "SUCCESS045";
+        public const string SuccessBatchAssign = "SUCCESS046";
+        public const string SuccessRandomAssign = "SUCCESS047";
         public const string SuccessLeaveGroup = "SUCCESS048";
         public const string SuccessLeaveStudio = "SUCCESS049";
 
@@ -231,15 +235,6 @@
         public const string RevenueInvalidPeriod = "REVENUE002";
         public const string RevenueInvalidCustomPeriod = "REVENUE003";
         public const string RevenueInvalidLimit = "REVENUE004";
-
-        // USER
-        public const string UserInvalidStatus = "USER004";
-        public const string UserCannotModifyAdmin = "USER005";
-
-        // SUCCESS
-        public const string SuccessUpdateData = "SUCCESS045";
-        public const string SuccessBatchAssign = "SUCCESS046";
-        public const string SuccessRandomAssign = "SUCCESS047";
 
         // COMMON
         public const string UnexpectedError = "SYS001";

@@ -10,8 +10,8 @@
   "USER001": "User not found",
   "USER002": "User already exists",
   "USER003": "Account has already been deleted",
-  "USER004": "Invalid status",
-  "USER005": "Cannot modify admin user status",
+  "USER004": "User account is not active",
+  "USER005": "You cannot modify an admin account",
 
   "REPORT001": "Report data is invalid",
   "REPORT002": "Report email is not configured",
@@ -52,10 +52,21 @@
   "GROUP026": "Task status must empty to able to delete it",
   "GROUP027": "Status not found",
   "GROUP028": "Group owners cannot leave the group.",
+  "GROUP029": "Group name is invalid. It must be less than 255 characters",
+  "GROUP030": "Group description is invalid. It must be less than 500 characters",
+  "GROUP031": "This group is archived and cannot be modified",
 
   "STUDIO001": "You have reached the limit of studios you can create",
-  "STUDIO004": "You are already a member of this studio",
+  "STUDIO002": "You are already a member of this studio",
+  "STUDIO003": "Invalid date time for studio",
   "STUDIO005": "Studio owners cannot leave the studio.",
+  "STUDIO006": "This studio name already exists",
+  "STUDIO007": "Studio name is invalid. It must be less than 255 characters",
+  "STUDIO008": "Studio description is invalid. It must be less than 500 characters",
+  "STUDIO009": "Studio member not found",
+  "STUDIO010": "You cannot remove yourself from the studio",
+  "STUDIO011": "You cannot remove the studio owner",
+  "STUDIO012": "This studio is archived and cannot be modified",
 
   "STATUS001": "Status not found",
   "STATUS002": "This status name already exist",
@@ -121,6 +132,9 @@
   "STORAGE001": "Group storage quota exceeded. Please delete some documents or upgrade your plan",
 
   "AI001": "You have exceeded your daily AI request limit. Please try again tomorrow or upgrade to Premium plan",
+
+  "CONFIG001": "Configuration not found",
+  "EXTERNAL001": "External service error",
 
   "ANNOUNCEMENTTAGTITLE": "You have been mentioned",
   "ANNOUNCEMENTTAGCONTENT": "have mentioned you at group",
@@ -188,5 +202,17 @@
   "SUBSCRIPTION001": "Subscription plan not found",
 
   "SYS001": "Unexpected system error",
-  "API001": "You have exceeded the API rate limit. Please try again later."
+  "API001": "You have exceeded the API rate limit. Please try again later.",
+
+  "REVENUE001": "Revenue data invalid",
+  "REVENUE002": "Invalid revenue period",
+  "REVENUE003": "Invalid custom revenue period",
+  "REVENUE004": "Invalid revenue limit",
+
+  "ANALYTICS001": "Analytics data not found",
+  "ANALYTICS002": "Invalid analytics period",
+  "ANALYTICS003": "Invalid custom analytics period",
+  
+  "ANALYTICSP001": "No group for analytics"
+
 }
