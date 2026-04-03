@@ -85,7 +85,8 @@ namespace StudioStudio_Server.Services
         /// </summary>
         public async Task<GroupTaskStatusResponse> GetGroupTaskStatusDetail(Guid taskStatusId)
         {
-            var taskStatus = await _groupTaskStatusRepository.GetDetailAsync(taskStatusId);
+            var taskStatus = await _groupTaskStatusRepository.GetDetailAsync(taskStatusId)
+                ?? throw new InvalidOperationException($"Task status {taskStatusId} not found");
             return new GroupTaskStatusResponse
             {
                 GroupId = taskStatus.GroupId,

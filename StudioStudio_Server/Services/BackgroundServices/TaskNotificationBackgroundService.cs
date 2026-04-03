@@ -6,8 +6,8 @@ using StudioStudio_Server.Services.Interfaces;
 namespace StudioStudio_Server.Services.BackgroundServices
 {
     /// <summary>
-    /// Background job to send deadline reminder and overdue notifications for assigned tasks.
-    /// Runs every hour with Redis deduplication keys (24h TTL) to avoid spam.
+    /// Background job to send daily deadline reminder and overdue notifications for assigned tasks.
+    /// Runs once daily at 7:00 AM UTC+7 (0:00 UTC) with Redis deduplication keys (24h TTL).
     /// </summary>
     public class TaskNotificationBackgroundService : BackgroundService
     {
@@ -15,8 +15,8 @@ namespace StudioStudio_Server.Services.BackgroundServices
         private readonly ILogger<TaskNotificationBackgroundService> _logger;
         private readonly IConnectionMultiplexer _redis;
 
-        private static readonly TimeSpan Interval = TimeSpan.FromHours(1);
-        private static readonly TimeSpan DedupTtl = TimeSpan.FromHours(24);
+        // 7:00 AM UTC+7 = 0:00 UTC (Vietnam is UTC+7)
+        private static readonly TimeSpan TargetTimeUtc = TimeSpan.Zero;
 
         public TaskNotificationBackgroundService(
             IServiceProvider serviceProvider,
@@ -30,23 +30,52 @@ namespace StudioStudio_Server.Services.BackgroundServices
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            _logger.LogInformation("Task Notification Background Service started");
+            _logger.LogInformation("Task Notification Background Service started. Runs daily at 07:00 UTC+7 (00:00 UTC)");
 
             while (!stoppingToken.IsCancellationRequested)
             {
                 try
                 {
+                    var delay = CalculateDelayUntilTargetTimeUtc();
+                    _logger.LogInformation(
+                        "Next notification run in {Hours:F1} hours ({TargetTime})",
+                        delay.TotalHours,
+                        DateTime.UtcNow.Add(delay).ToString("yyyy-MM-dd HH:mm:ss 'UTC'"));
+
+                    await Task.Delay(delay, stoppingToken);
+
                     await ProcessNotificationsAsync(stoppingToken);
+                }
+                catch (OperationCanceledException)
+                {
+                    break;
                 }
                 catch (Exception ex)
                 {
                     _logger.LogError(ex, "Error while processing task notifications");
+                    // Wait 1 hour before retrying to avoid tight loop on persistent errors
+                    await Task.Delay(TimeSpan.FromHours(1), stoppingToken);
                 }
-
-                await Task.Delay(Interval, stoppingToken);
             }
 
             _logger.LogInformation("Task Notification Background Service stopped");
+        }
+
+        /// <summary>
+        /// Calculate delay until next 00:00 UTC (07:00 UTC+7)
+        /// </summary>
+        private static TimeSpan CalculateDelayUntilTargetTimeUtc()
+        {
+            var now = DateTime.UtcNow;
+            var todayTarget = now.Date + TargetTimeUtc;
+
+            // If we've already passed today's target, wait until tomorrow
+            if (now.TimeOfDay >= TargetTimeUtc)
+            {
+                todayTarget = todayTarget.AddDays(1);
+            }
+
+            return todayTarget - now;
         }
 
         private async Task ProcessNotificationsAsync(CancellationToken stoppingToken)
@@ -56,16 +85,19 @@ namespace StudioStudio_Server.Services.BackgroundServices
             var notificationService = scope.ServiceProvider.GetRequiredService<INotificationService>();
             var redisDb = _redis.GetDatabase();
 
-            var now = DateTime.UtcNow;
-            var upcomingThreshold = now.AddHours(24);
+            var nowUtc = DateTime.UtcNow;
+            var todayDate = DateOnly.FromDateTime(nowUtc);
 
-            // Query assigned tasks with due date in next 24h and not completed
+            _logger.LogInformation("Processing daily task notifications for date: {Date}", todayDate);
+
+            // Query all active task assignments
             var assignments = await db.TaskAssignments
                 .AsNoTracking()
                 .ToListAsync(stoppingToken);
 
             if (!assignments.Any())
             {
+                _logger.LogInformation("No task assignments found");
                 return;
             }
 
@@ -86,37 +118,37 @@ namespace StudioStudio_Server.Services.BackgroundServices
                     continue;
 
                 var dueDate = task.DueDate.Value;
+                var dueDateOnly = DateOnly.FromDateTime(dueDate);
 
-                // Reminder: due within 24h
-                if (dueDate > now && dueDate <= upcomingThreshold)
+                // Reminder: task is due TODAY (7 AM notification for today's deadline)
+                if (dueDateOnly == todayDate)
                 {
-                    var reminderKey = BuildDedupKey(assignment.AssignedTo, task.TaskId, "reminder");
-                    var alreadySent = await redisDb.KeyExistsAsync(reminderKey);
+                    var dedupKey = BuildDedupKey(assignment.AssignedTo, task.TaskId, "reminder");
+                    var alreadySent = await redisDb.KeyExistsAsync(dedupKey);
 
                     if (!alreadySent)
                     {
-                        var hoursUntilDeadline = Math.Max(1, (int)Math.Ceiling((dueDate - now).TotalHours));
                         await notificationService.NotifyTaskReminderAsync(
                             assignment.AssignedTo,
                             task.TaskId,
                             task.Title,
                             dueDate,
-                            hoursUntilDeadline);
+                            hoursUntilDeadline: 0);
 
-                        await redisDb.StringSetAsync(reminderKey, "1", DedupTtl);
+                        await redisDb.StringSetAsync(dedupKey, "1", TimeSpan.FromHours(24));
                         reminderCount++;
                     }
                 }
 
-                // Overdue: due passed and not completed
-                if (dueDate < now)
+                // Overdue: task is past due date and not completed
+                if (dueDateOnly < todayDate)
                 {
-                    var overdueKey = BuildDedupKey(assignment.AssignedTo, task.TaskId, "overdue");
-                    var alreadySent = await redisDb.KeyExistsAsync(overdueKey);
+                    var dedupKey = BuildDedupKey(assignment.AssignedTo, task.TaskId, "overdue");
+                    var alreadySent = await redisDb.KeyExistsAsync(dedupKey);
 
                     if (!alreadySent)
                     {
-                        var overdueDays = Math.Max(1, (now.Date - dueDate.Date).Days);
+                        var overdueDays = (todayDate.ToDateTime(TimeOnly.MinValue) - dueDate).Days;
                         await notificationService.NotifyTaskOverdueAsync(
                             assignment.AssignedTo,
                             task.TaskId,
@@ -124,14 +156,15 @@ namespace StudioStudio_Server.Services.BackgroundServices
                             dueDate,
                             overdueDays);
 
-                        await redisDb.StringSetAsync(overdueKey, "1", DedupTtl);
+                        await redisDb.StringSetAsync(dedupKey, "1", TimeSpan.FromHours(24));
                         overdueCount++;
                     }
                 }
             }
 
             _logger.LogInformation(
-                "Task notifications processed. Reminders sent: {ReminderCount}, Overdue sent: {OverdueCount}",
+                "Daily task notifications completed. Date: {Date}. Reminders sent: {ReminderCount}, Overdue sent: {OverdueCount}",
+                todayDate,
                 reminderCount,
                 overdueCount);
         }

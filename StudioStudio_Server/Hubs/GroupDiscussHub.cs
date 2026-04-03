@@ -92,9 +92,10 @@ namespace StudioStudio_Server.Hubs
 
                 if (user != null && !string.IsNullOrEmpty(user.Language))
                 {
-                    if (Context.GetHttpContext() != null)
+                    var httpContext = Context.GetHttpContext();
+                    if (httpContext != null)
                     {
-                        Context.GetHttpContext().Request.Headers["Accept-Language"] = user.Language;
+                        httpContext.Request.Headers["Accept-Language"] = user.Language;
                     }
                 }
 
@@ -163,6 +164,14 @@ namespace StudioStudio_Server.Hubs
             var now = DateTime.UtcNow;
             var sender = await _userRepository.GetByIdAsync(senderId);
             var group = await _groupRepository.GetByIdAsync(groupId);
+
+            if (sender == null || group == null)
+            {
+                _logger.LogWarning("Cannot send mention notification: sender={SenderId} or group={GroupId} not found",
+                    senderId, groupId);
+                return;
+            }
+
             var senderName = $"{sender.FirstName} {sender.LastName}";
 
             var announcement = new Announcement

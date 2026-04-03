@@ -46,11 +46,13 @@ builder.Services.AddSingleton<IConnectionMultiplexer>(r =>
 builder.Services.AddSingleton(sp =>
 {
     var config = sp.GetRequiredService<IConfiguration>();
-    return new PayOSClient(
-       config["PayOS:ClientId"],
-       config["PayOS:ApiKey"],
-       config["PayOS:ChecksumKey"]
-   );
+    var clientId = config["PayOS:ClientId"]
+        ?? throw new InvalidOperationException("PayOS:ClientId is not configured");
+    var apiKey = config["PayOS:ApiKey"]
+        ?? throw new InvalidOperationException("PayOS:ApiKey is not configured");
+    var checksumKey = config["PayOS:ChecksumKey"]
+        ?? throw new InvalidOperationException("PayOS:ChecksumKey is not configured");
+    return new PayOSClient(clientId, apiKey, checksumKey);
 });
 
 builder.Services.AddHttpContextAccessor();
@@ -215,7 +217,8 @@ builder.Services.AddAuthentication("Bearer").AddJwtBearer("Bearer", options =>
         ValidIssuer = builder.Configuration["JWT:Issuer"],
         ValidAudience = builder.Configuration["JWT:Audience"],
         IssuerSigningKey = new SymmetricSecurityKey(
-            Encoding.UTF8.GetBytes(builder.Configuration["JWT:Key"]))
+            Encoding.UTF8.GetBytes(builder.Configuration["JWT:Key"]
+                ?? throw new InvalidOperationException("JWT:Key is not configured")))
     };
 
     // SignalR authentication configuration
@@ -322,7 +325,9 @@ app.UseStaticFiles();
 app.UseStaticFiles(new StaticFileOptions
 {
     FileProvider = new PhysicalFileProvider(
-        Path.Combine(app.Environment.WebRootPath, "uploads")),
+        Path.Combine(
+            app.Environment.WebRootPath ?? throw new InvalidOperationException("WebRootPath is not configured"),
+            "uploads")),
     RequestPath = "/uploads"
 });
 

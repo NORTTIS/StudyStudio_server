@@ -43,8 +43,9 @@ namespace StudioStudio_Server.Services.BackgroundServices
                     var from = to.AddMinutes(-10);
                     var today = DateOnly.FromDateTime(DateTime.UtcNow);
 
-                    // Get all active groups
+                    // Get all active groups (IsActive = true only)
                     var groups = await context.Groups
+                        .Where(g => g.IsActive)
                         .Select(g => g.GroupId)
                         .ToListAsync();
 

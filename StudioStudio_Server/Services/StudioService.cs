@@ -706,9 +706,10 @@ namespace StudioStudio_Server.Services
             {
                 try
                 {
+                    var targetEmail = targetUser.Email;
                     var approvalUrl = BuildStudioUrl(studioId);
-                    var language = targetUser?.Language == "vi" ? Language.Vietnamese : Language.English;
-                    string nameToShow = targetUser?.Language == "vi" ? $"quản lý {studio.StudioName}" : $"studio {studio.StudioName}";
+                    var language = targetUser.Language == "vi" ? Language.Vietnamese : Language.English;
+                    string nameToShow = targetUser.Language == "vi" ? $"quản lý {studio.StudioName}" : $"studio {studio.StudioName}";
 
                     var emailBody = EmailTemplate.MemberApprovedNotification(
                         nameToShow,
@@ -717,7 +718,7 @@ namespace StudioStudio_Server.Services
                         language);
 
                     await _emailService.SendLinkAsync(
-                        targetUser.Email,
+                        targetEmail,
                         "Join studio request approved",
                         emailBody);
 

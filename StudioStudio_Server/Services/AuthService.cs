@@ -225,7 +225,7 @@ namespace StudioStudio_Server.Services
             }
 
             //check user password has match
-            var result = _passwordHasher.VerifyHashedPassword(user, user.PasswordHash, loginRequest.Password);
+            var result = _passwordHasher.VerifyHashedPassword(user, user.PasswordHash!, loginRequest.Password);
 
             if (result != PasswordVerificationResult.Success)
             {
@@ -394,7 +394,12 @@ namespace StudioStudio_Server.Services
                 var imgURL = payload.Picture;
 
                 var user = await _userRepository.GetByEmailAsync(email);
-                var passwordHash = _passwordHasher.HashPassword(user, Guid.NewGuid().ToString());
+
+                // Hash random password (used when creating new user via Google OAuth)
+                var tempPassword = Guid.NewGuid().ToString();
+                var passwordHash = user != null
+                    ? _passwordHasher.HashPassword(user, tempPassword)
+                    : null;
 
                 if (user == null)
                 {
@@ -402,7 +407,7 @@ namespace StudioStudio_Server.Services
                     {
                         UserId = Guid.NewGuid(),
                         Email = email,
-                        PasswordHash = passwordHash,
+                        PasswordHash = passwordHash!,
                         GoogleId = googleId,
                         FirstName = firstName,
                         LastName = lastName,
@@ -680,7 +685,9 @@ namespace StudioStudio_Server.Services
                 new Claim("IsAdmin", user.IsAdmin.ToString())
             };
 
-            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_configuration["JWT:Key"]));
+            var jwtKey = _configuration["JWT:Key"]
+                ?? throw new InvalidOperationException("JWT:Key is not configured");
+            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey));
 
             var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 

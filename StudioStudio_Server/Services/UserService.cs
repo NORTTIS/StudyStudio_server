@@ -153,7 +153,7 @@ namespace StudioStudio_Server.Services
             }
 
             // Verify current password
-            var verifyResult = _passwordHasher.VerifyHashedPassword(user, user.PasswordHash, request.CurrentPassword);
+            var verifyResult = _passwordHasher.VerifyHashedPassword(user, user.PasswordHash!, request.CurrentPassword);
             if (verifyResult != PasswordVerificationResult.Success)
             {
                 throw new AppException(ErrorCodes.AuthIncorrectCurrentPassword, StatusCodes.Status400BadRequest);
