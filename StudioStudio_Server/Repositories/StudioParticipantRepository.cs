@@ -51,6 +51,19 @@ namespace StudioStudio_Server.Repositories
         }
 
         /// <summary>
+        /// Get participant record by StudioId and UserId
+        /// Condition: StudioId = {studioId} AND UserId = {userId} AND Studio.IsDeleted = false
+        /// Use case: Check role, permissions
+        /// </summary>
+        public async Task<StudioParticipant?> GetByStudioAndUserIncludeNonApprovedAsync(Guid studioId, Guid userId)
+        {
+            return await _context.StudioParticipants
+                .Include(sp => sp.Studio)
+                .AsNoTracking()
+                .FirstOrDefaultAsync(sp => sp.StudioId == studioId && sp.UserId == userId && sp.Studio != null && !sp.Studio.IsDeleted);
+        }
+
+        /// <summary>
         /// Count participants in studio
         /// Condition: StudioId = {studioId}
         /// Use case: Check member limit

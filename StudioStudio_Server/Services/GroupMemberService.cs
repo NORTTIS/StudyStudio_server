@@ -111,7 +111,7 @@ namespace StudioStudio_Server.Services
             var participant = await _groupParticipantRepository
                 .GetByGroupAndUserAsync(groupId, userId);
 
-            if (participant == null || !participant.IsApproved)
+            if (participant == null)
             {
                 throw new AppException(
                     ErrorCodes.GroupNotFound,
@@ -222,51 +222,6 @@ namespace StudioStudio_Server.Services
                 OldRole = oldRole.ToString(),
                 NewRole = newRole.ToString(),
                 UpdatedAt = DateTime.UtcNow
-            };
-        }
-
-        // Pending user cancel request (self-cancel)
-        /// <summary>
-        /// Cancel a pending member request (self-cancel)
-        /// Validates: current user is Owner/Moderator, target is pending (not yet approved)
-        /// </summary>
-        public async Task<RemoveMemberResponse> CancelRequestAsync(Guid groupId, Guid userId)
-        {
-            var group = await ValidateGroupExistsAsync(groupId);
-
-            var targetParticipant = await _groupParticipantRepository
-                .GetByGroupAndUserTrackedAsync(groupId, userId);
-
-            if (targetParticipant == null)
-            {
-                throw new AppException(
-                    ErrorCodes.GroupMemberNotFound,
-                    StatusCodes.Status404NotFound);
-            }
-
-            // Can only reject non-approved (pending) members
-            if (targetParticipant.IsApproved)
-            {
-                throw new AppException(
-                    ErrorCodes.GroupMemberNotFound,
-                    StatusCodes.Status400BadRequest);
-            }
-
-            var removedUser = await GetUserOrThrowAsync(userId);
-
-            await _groupParticipantRepository.RemoveAsync(targetParticipant);
-
-            _logger.LogInformation(
-                "User {UserId} cancelled request from group {GroupId}",
-                userId, groupId);
-
-            return new RemoveMemberResponse
-            {
-                GroupId = group.GroupId,
-                GroupName = group.GroupName,
-                RemovedUserId = userId,
-                RemovedUserName = $"{removedUser.FirstName} {removedUser.LastName}",
-                RemovedAt = DateTime.UtcNow
             };
         }
 

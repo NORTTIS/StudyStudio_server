@@ -505,7 +505,7 @@ namespace StudioStudio_Server.Services
                 throw new AppException(ErrorCodes.StudioNotFound, StatusCodes.Status404NotFound);
             }
 
-            var participant = await _studioParticipantRepository.GetByStudioAndUserAsync(studioId, userId);
+            var participant = await _studioParticipantRepository.GetByStudioAndUserIncludeNonApprovedAsync(studioId, userId);
             if (participant == null)
             {
                 throw new AppException(ErrorCodes.StudioNotFound, StatusCodes.Status404NotFound);

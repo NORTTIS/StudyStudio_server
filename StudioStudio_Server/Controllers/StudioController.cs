@@ -283,7 +283,7 @@ namespace StudioStudio_Server.Controllers
                 result));
         }
 
-        // 🔹 ADDED: Toggle IsOpen setting (Owner only)
+        // Toggle IsOpen setting (Owner only)
         /// <summary>
         /// [AUTHORIZED] PUT /api/studio/{studioId}/toggle-open
         /// Toggle the IsOpen setting of a studio (open vs closed membership)
@@ -304,7 +304,7 @@ namespace StudioStudio_Server.Controllers
                 result));
         }
 
-        // 🔹 ADDED: Get pending members (Owner only)
+        // Get pending members (Owner only)
         /// <summary>
         /// [AUTHORIZED] GET /api/studio/{studioId}/pending
         /// Get list of pending (not yet approved) members
@@ -323,7 +323,7 @@ namespace StudioStudio_Server.Controllers
                 result));
         }
 
-        // 🔹 ADDED: Approve pending member (Owner only)
+        // Approve pending member (Owner only)
         /// <summary>
         /// [AUTHORIZED] POST /api/studio/{studioId}/approve
         /// Approve a pending member to join the studio
