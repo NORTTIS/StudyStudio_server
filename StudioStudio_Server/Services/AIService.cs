@@ -120,6 +120,7 @@ namespace StudioStudio_Server.Services
                         questionEmbedding,
                         topK: 3,
                         groupId: request.GroupId,
+                        documentId: null,
                         cancellationToken);
 
                 _logger.LogInformation("Found {Count} relevant document chunks", searchResults.Count);
@@ -274,6 +275,7 @@ namespace StudioStudio_Server.Services
                         questionEmbedding,
                         topK: 3,
                         groupId: request.GroupId,
+                        documentId: null,
                         cancellationToken);
 
                 _logger.LogInformation("Found {Count} relevant document chunks", searchResults.Count);

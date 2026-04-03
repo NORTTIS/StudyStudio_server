@@ -173,13 +173,14 @@ namespace StudioStudio_Server.Services
         }
 
         /// <summary>
-        /// Search vectors with groupId filter (for AI Q&A)
+        /// Search vectors with groupId filter (for AI Q&amp;A)
         /// Only returns documents belonging to specific group
         /// </summary>
         public async Task<List<VectorSearchResponse.SearchResult>> SearchVectorsAsync(
             float[] queryVector,
             int topK,
             Guid groupId,
+            Guid? documentId = null,
             CancellationToken cancellationToken = default)
         {
             if (_httpClient == null)
@@ -190,15 +191,23 @@ namespace StudioStudio_Server.Services
 
             if (queryVector.Length != _config.VectorSize)
             {
-                _logger.LogError("Query vector size mismatch. Expected: {Expected}, Got: {Actual}", 
+                _logger.LogError("Query vector size mismatch. Expected: {Expected}, Got: {Actual}",
                     _config.VectorSize, queryVector.Length);
                 return new List<VectorSearchResponse.SearchResult>();
             }
 
             string url = $"/collections/{_config.CollectionName}/points/search";
 
-            // Build filter for groupId
-            // Qdrant filter format: { "must": [{ "key": "groupId", "match": { "value": "guid" }}]}
+            // Build filter: must=groupId [+documentId], must_not=deleted:true
+            var mustClauses = new List<object>
+            {
+                new { key = "groupId", match = new { value = groupId.ToString() } }
+            };
+            if (documentId.HasValue)
+            {
+                mustClauses.Add(new { key = "documentId", match = new { value = documentId.Value.ToString() } });
+            }
+
             object requestBody = new
             {
                 vector = queryVector,
@@ -207,16 +216,10 @@ namespace StudioStudio_Server.Services
                 with_vector = false,
                 filter = new
                 {
-                    must = new[]
+                    must = mustClauses.ToArray(),
+                    must_not = new[]
                     {
-                        new
-                        {
-                            key = "groupId",
-                            match = new
-                            {
-                                value = groupId.ToString()
-                            }
-                        }
+                        new { key = "deleted", match = new { value = true } }
                     }
                 }
             };
@@ -314,6 +317,7 @@ namespace StudioStudio_Server.Services
             float[] queryVector,
             int topK,
             List<Guid> groupIds,
+            Guid? documentId = null,
             CancellationToken cancellationToken = default)
         {
             if (_httpClient == null)
@@ -331,7 +335,20 @@ namespace StudioStudio_Server.Services
 
             string url = $"/collections/{_config.CollectionName}/points/search";
 
-            // Build MatchAny filter for multiple groupIds (studio-level search)
+            // Build filter: must=groupId(MatchAny) [+documentId], must_not=deleted:true
+            var mustClauses = new List<object>
+            {
+                new
+                {
+                    key = "groupId",
+                    match = new { any = groupIds.Select(g => g.ToString()).ToArray() }
+                }
+            };
+            if (documentId.HasValue)
+            {
+                mustClauses.Add(new { key = "documentId", match = new { value = documentId.Value.ToString() } });
+            }
+
             object requestBody = new
             {
                 vector = queryVector,
@@ -340,16 +357,10 @@ namespace StudioStudio_Server.Services
                 with_vector = false,
                 filter = new
                 {
-                    must = new[]
+                    must = mustClauses.ToArray(),
+                    must_not = new[]
                     {
-                        new
-                        {
-                            key = "groupId",
-                            match = new
-                            {
-                                any = groupIds.Select(g => g.ToString()).ToArray()
-                            }
-                        }
+                        new { key = "deleted", match = new { value = true } }
                     }
                 }
             };
@@ -359,8 +370,8 @@ namespace StudioStudio_Server.Services
                 Encoding.UTF8,
                 "application/json");
 
-            _logger.LogInformation("Searching Qdrant across {Count} groups, topK: {TopK}",
-                groupIds.Count, topK);
+            _logger.LogInformation("Searching Qdrant across {Count} groups, topK: {TopK}, documentId: {DocumentId}",
+                groupIds.Count, topK, documentId);
 
             HttpResponseMessage response = await _httpClient.PostAsync(url, content, cancellationToken);
 

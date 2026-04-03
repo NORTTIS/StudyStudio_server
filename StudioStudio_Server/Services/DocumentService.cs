@@ -1184,9 +1184,11 @@ namespace StudioStudio_Server.Services
         }
 
         /// <summary>
-        /// Delete document (soft delete + queue-based vector deletion)
-        /// - Set IsDeleted = true in database
+        /// Delete document permanently
+        /// - Delete B2 blob file
         /// - Enqueue background job to delete vectors from Qdrant
+        /// - Hard-delete DB record
+        /// - Decrement group storage used
         /// </summary>
         public async Task DeleteDocumentAsync(Guid userId, Guid attachmentId)
         {
@@ -1211,9 +1213,20 @@ namespace StudioStudio_Server.Services
                     StatusCodes.Status403Forbidden);
             }
 
-            // Soft delete in database
-            attachment.IsDeleted = true;
-            await _attachmentRepository.UpdateAsync(attachment);
+            // Delete B2 blob file
+            try
+            {
+                await _fileStorageService.DeleteFileAsync(attachment.FileUrl);
+                _logger.LogInformation(
+                    "B2 blob deleted: AttachmentId={AttachmentId}, FileKey={FileKey}",
+                    attachmentId, attachment.FileUrl);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex,
+                    "Failed to delete B2 blob for AttachmentId={AttachmentId}. Continuing with deletion.",
+                    attachmentId);
+            }
 
             // Enqueue delete job for background processing (if document was processed)
             if (attachment.ChunkCount.HasValue && attachment.ChunkCount.Value > 0)
@@ -1237,13 +1250,16 @@ namespace StudioStudio_Server.Services
                     "ChunkCount={ChunkCount}, Queue depth={Depth}",
                     attachmentId, attachment.ChunkCount, _deleteQueue.GetQueueDepth());
             }
-            else
-            {
-                _logger.LogInformation(
-                    "Document soft-deleted without vector cleanup: AttachmentId={AttachmentId} " +
-                    "(not yet processed or no chunks)",
-                    attachmentId);
-            }
+
+            // Hard-delete DB record
+            await _attachmentRepository.HardDeleteAsync(attachmentId);
+
+            // Decrement group storage used
+            await _attachmentRepository.DecrementStorageUsedAsync(attachment.GroupId, attachment.FileSize);
+
+            _logger.LogInformation(
+                "Document hard-deleted: AttachmentId={AttachmentId}, FileSize={FileSize}",
+                attachmentId, attachment.FileSize);
         }
 
         /// <summary>

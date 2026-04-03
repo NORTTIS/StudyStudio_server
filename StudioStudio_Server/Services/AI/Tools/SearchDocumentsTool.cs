@@ -32,7 +32,8 @@ public class SearchDocumentsTool : IAITool
         ["properties"] = new JsonObject
         {
             ["query"] = new JsonObject { ["type"] = "string", ["description"] = "Cau hoi/tu khoa tim kiem (bat buoc)" },
-            ["top_k"] = new JsonObject { ["type"] = "number", ["description"] = "So ket qua toi da (default 3)" }
+            ["top_k"] = new JsonObject { ["type"] = "number", ["description"] = "So ket qua toi da (default 3)" },
+            ["document_id"] = new JsonObject { ["type"] = "string", ["description"] = "Tim kiem trong tai lieu cu the (optional)" }
         },
         ["required"] = new JsonArray { "query" }
     };
@@ -51,6 +52,8 @@ public class SearchDocumentsTool : IAITool
 
     private static string? Js(JsonNode? n) => n?.GetValue<string>();
     private static int Ji(JsonNode? n) => n == null ? 0 : n.GetValue<int>();
+    private static Guid? Jg(JsonNode? n) =>
+        string.IsNullOrWhiteSpace(Js(n)) ? null : Guid.TryParse(Js(n), out var g) ? g : null;
 
     public bool ValidateParameters(JsonObject p) =>
         !string.IsNullOrWhiteSpace(Js(p["query"]));
@@ -67,6 +70,7 @@ public class SearchDocumentsTool : IAITool
             var query = Js(parameters["query"])!;
             var groupId = context.GroupId.Value;
             var topK = Ji(parameters["top_k"]);
+            var documentId = Jg(parameters["document_id"]);
             if (topK <= 0) topK = 3;
 
             _logger.LogInformation("[TOOL-START] search_documents | query={Query} groupId={GroupId} topK={TopK}",
@@ -81,7 +85,7 @@ public class SearchDocumentsTool : IAITool
 
             // Search Qdrant
             var results = await _qdrantService.SearchVectorsAsync(
-                queryVector, topK, groupId, cancellationToken);
+                queryVector, topK, groupId, documentId, cancellationToken);
 
             _logger.LogInformation("[TOOL-QDRANT] search_documents | resultsCount={Count} elapsedMs={Ms}",
                 results.Count, sw.ElapsedMilliseconds);

@@ -86,7 +86,7 @@ public class AIServiceTests
             .ReturnsAsync(true);
         _embeddingService.Setup(x => x.GenerateEmbeddingAsync(request.Question, It.IsAny<CancellationToken>()))
             .ReturnsAsync(embedding);
-        _vectorDbService.Setup(x => x.SearchVectorsAsync(embedding, 3, _groupId, It.IsAny<CancellationToken>()))
+        _vectorDbService.Setup(x => x.SearchVectorsAsync(embedding, 3, _groupId, It.IsAny<Guid?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(searchResults);
         _taskRepo.Setup(x => x.GetGroupTaskStatisticsAsync(_groupId))
             .ReturnsAsync(taskSummary);
@@ -137,7 +137,7 @@ public class AIServiceTests
             .ReturnsAsync(true);
         _embeddingService.Setup(x => x.GenerateEmbeddingAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(FakeEmbedding());
-        _vectorDbService.Setup(x => x.SearchVectorsAsync(It.IsAny<float[]>(), 3, _groupId, It.IsAny<CancellationToken>()))
+        _vectorDbService.Setup(x => x.SearchVectorsAsync(It.IsAny<float[]>(), 3, _groupId, It.IsAny<Guid?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(FakeSearchResults(0));
         _taskRepo.Setup(x => x.GetGroupTaskStatisticsAsync(_groupId))
             .ReturnsAsync(new TaskSummaryResponse());
@@ -195,7 +195,7 @@ public class AIServiceTests
             .ReturnsAsync(true);
         _embeddingService.Setup(x => x.GenerateEmbeddingAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(FakeEmbedding());
-        _vectorDbService.Setup(x => x.SearchVectorsAsync(It.IsAny<float[]>(), It.IsAny<int>(), _groupId, It.IsAny<CancellationToken>()))
+        _vectorDbService.Setup(x => x.SearchVectorsAsync(It.IsAny<float[]>(), It.IsAny<int>(), _groupId, It.IsAny<Guid?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<VectorSearchResponse.SearchResult>()); // Empty
         _taskRepo.Setup(x => x.GetGroupTaskStatisticsAsync(_groupId))
             .ReturnsAsync(new TaskSummaryResponse());
@@ -227,7 +227,7 @@ public class AIServiceTests
             .ReturnsAsync(true);
         _embeddingService.Setup(x => x.GenerateEmbeddingAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(FakeEmbedding());
-        _vectorDbService.Setup(x => x.SearchVectorsAsync(It.IsAny<float[]>(), It.IsAny<int>(), _groupId, It.IsAny<CancellationToken>()))
+        _vectorDbService.Setup(x => x.SearchVectorsAsync(It.IsAny<float[]>(), It.IsAny<int>(), _groupId, It.IsAny<Guid?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(FakeSearchResults(5)); // 5 results, service passes topK=3 to Qdrant
         _taskRepo.Setup(x => x.GetGroupTaskStatisticsAsync(_groupId))
             .ReturnsAsync(new TaskSummaryResponse());
@@ -240,7 +240,7 @@ public class AIServiceTests
 
         // Assert — verify service called Qdrant with topK=3 (returns whatever Qdrant gives)
         _vectorDbService.Verify(x => x.SearchVectorsAsync(
-            It.IsAny<float[]>(), 3, _groupId, It.IsAny<CancellationToken>()), Times.Once);
+            It.IsAny<float[]>(), 3, _groupId, It.IsAny<Guid?>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     #endregion
@@ -268,7 +268,7 @@ public class AIServiceTests
             .ReturnsAsync(true);
         _embeddingService.Setup(x => x.GenerateEmbeddingAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(FakeEmbedding());
-        _vectorDbService.Setup(x => x.SearchVectorsAsync(It.IsAny<float[]>(), 3, _groupId, It.IsAny<CancellationToken>()))
+        _vectorDbService.Setup(x => x.SearchVectorsAsync(It.IsAny<float[]>(), 3, _groupId, It.IsAny<Guid?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<VectorSearchResponse.SearchResult>());
         _taskRepo.Setup(x => x.GetGroupTaskStatisticsAsync(_groupId))
             .ReturnsAsync(taskSummary);
@@ -306,7 +306,7 @@ public class AIServiceTests
             .ReturnsAsync(true);
         _embeddingService.Setup(x => x.GenerateEmbeddingAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(FakeEmbedding());
-        _vectorDbService.Setup(x => x.SearchVectorsAsync(It.IsAny<float[]>(), 3, _groupId, It.IsAny<CancellationToken>()))
+        _vectorDbService.Setup(x => x.SearchVectorsAsync(It.IsAny<float[]>(), 3, _groupId, It.IsAny<Guid?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<VectorSearchResponse.SearchResult>());
         _taskRepo.Setup(x => x.GetGroupTaskStatisticsAsync(_groupId))
             .ReturnsAsync(new TaskSummaryResponse());
@@ -343,7 +343,7 @@ public class AIServiceTests
             .ReturnsAsync(true);
         _embeddingService.Setup(x => x.GenerateEmbeddingAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(FakeEmbedding());
-        _vectorDbService.Setup(x => x.SearchVectorsAsync(It.IsAny<float[]>(), 3, _groupId, It.IsAny<CancellationToken>()))
+        _vectorDbService.Setup(x => x.SearchVectorsAsync(It.IsAny<float[]>(), 3, _groupId, It.IsAny<Guid?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(FakeSearchResults(1));
         _taskRepo.Setup(x => x.GetGroupTaskStatisticsAsync(_groupId))
             .ReturnsAsync(new TaskSummaryResponse { TotalTasks = 5, CompletedTasks = 3 });

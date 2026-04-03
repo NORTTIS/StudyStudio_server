@@ -32,12 +32,14 @@ namespace StudioStudio_Server.Services.Interfaces
         /// <param name="queryVector">Query vector for search</param>
         /// <param name="topK">Number of results to return</param>
         /// <param name="groupId">Group ID to filter</param>
+        /// <param name="documentId">Optional document ID to filter within a specific document</param>
         /// <param name="cancellationToken">Cancellation token</param>
         /// <returns>List of search results</returns>
         Task<List<VectorSearchResponse.SearchResult>> SearchVectorsAsync(
             float[] queryVector,
             int topK,
             Guid groupId,
+            Guid? documentId = null,
             CancellationToken cancellationToken = default);
 
         /// <summary>
@@ -83,12 +85,14 @@ namespace StudioStudio_Server.Services.Interfaces
         /// <param name="queryVector">Query vector for search</param>
         /// <param name="topK">Number of results to return</param>
         /// <param name="groupIds">List of group IDs to search across</param>
+        /// <param name="documentId">Optional document ID to filter within a specific document</param>
         /// <param name="cancellationToken">Cancellation token</param>
         /// <returns>List of search results from all specified groups</returns>
         Task<List<VectorSearchResponse.SearchResult>> SearchVectorsMultiGroupAsync(
             float[] queryVector,
             int topK,
             List<Guid> groupIds,
+            Guid? documentId = null,
             CancellationToken cancellationToken = default);
 
         /// <summary>

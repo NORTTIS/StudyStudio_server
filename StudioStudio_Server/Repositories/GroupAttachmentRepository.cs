@@ -73,5 +73,39 @@ namespace StudioStudio_Server.Repositories
                 .Where(a => a.GroupId == groupId && !a.IsDeleted)
                 .SumAsync(a => (long?)a.FileSize) ?? 0L;
         }
+
+        public async Task HardDeleteAsync(Guid attachmentId)
+        {
+            await _context.GroupAttachments
+                .Where(a => a.GroupAttachmentId == attachmentId)
+                .ExecuteDeleteAsync();
+        }
+
+        public async Task HardDeleteManyAsync(List<Guid> attachmentIds)
+        {
+            if (attachmentIds.Count == 0) return;
+            await _context.GroupAttachments
+                .Where(a => attachmentIds.Contains(a.GroupAttachmentId))
+                .ExecuteDeleteAsync();
+        }
+
+        public async Task DecrementStorageUsedAsync(Guid groupId, long fileSize)
+        {
+            // Update StorageUsedBytes of the group (not the attachment)
+            await _context.Database
+                .ExecuteSqlRawAsync(
+                    @"UPDATE ""Groups"" SET ""StorageUsedBytes"" = GREATEST(0, ""StorageUsedBytes"" - {0})
+                      WHERE ""GroupId"" = {1}",
+                    fileSize, groupId);
+        }
+
+        public async Task<List<GroupAttachment>> GetStuckUploadsAsync(TimeSpan olderThan)
+        {
+            var cutoff = DateTime.UtcNow - olderThan;
+            return await _context.GroupAttachments
+                .Where(a => a.ProcessingStatus == DocumentStatus.Uploading && a.UploadedAt < cutoff)
+                .AsNoTracking()
+                .ToListAsync();
+        }
     }
 }

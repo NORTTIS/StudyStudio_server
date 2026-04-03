@@ -23,7 +23,7 @@ public class SearchStudioDocumentsTool : IAITool
 
     public string Name => "search_studio_documents";
     public string Description => "Tim kiem tai lieu tren toan bo studio (tat ca cac nhom). "
-        + "Parameters: query (bat buoc), studio_id (bat buoc), top_k (optional, mac dinh 5)";
+        + "Parameters: query (bat buoc), studio_id (bat buoc), top_k (optional, mac dinh 5), document_id (optional)";
 
     public JsonObject ParametersSchema => new JsonObject
     {
@@ -32,7 +32,8 @@ public class SearchStudioDocumentsTool : IAITool
         {
             ["query"] = new JsonObject { ["type"] = "string" },
             ["studio_id"] = new JsonObject { ["type"] = "string" },
-            ["top_k"] = new JsonObject { ["type"] = "number" }
+            ["top_k"] = new JsonObject { ["type"] = "number" },
+            ["document_id"] = new JsonObject { ["type"] = "string", ["description"] = "Tim kiem trong tai lieu cu the (optional)" }
         },
         ["required"] = new JsonArray { "query", "studio_id" }
     };
@@ -51,6 +52,8 @@ public class SearchStudioDocumentsTool : IAITool
 
     private static string? Js(JsonNode? n) => n?.GetValue<string>();
     private static int Ji(JsonNode? n) => n == null ? 0 : n.GetValue<int>();
+    private static Guid? Jg(JsonNode? n) =>
+        string.IsNullOrWhiteSpace(Js(n)) ? null : Guid.TryParse(Js(n), out var g) ? g : null;
 
     public bool ValidateParameters(JsonObject p) =>
         !string.IsNullOrWhiteSpace(Js(p["query"])) &&
@@ -65,6 +68,7 @@ public class SearchStudioDocumentsTool : IAITool
             var query = Js(parameters["query"])!;
             var studioId = Guid.Parse(Js(parameters["studio_id"])!);
             var topK = Ji(parameters["top_k"]);
+            var documentId = Jg(parameters["document_id"]);
             if (topK <= 0) topK = 5;
 
             _logger.LogInformation("[TOOL-START] search_studio_documents | query={Query} studioId={StudioId} topK={TopK}",
@@ -99,7 +103,7 @@ public class SearchStudioDocumentsTool : IAITool
 
             // Search across all studio groups
             var results = await _qdrantService.SearchVectorsMultiGroupAsync(
-                queryVector, topK, groupIds, cancellationToken);
+                queryVector, topK, groupIds, documentId, cancellationToken);
 
             _logger.LogInformation("[TOOL-QDRANT] search_studio_documents | resultsCount={Count} elapsedMs={Ms}",
                 results.Count, sw.ElapsedMilliseconds);

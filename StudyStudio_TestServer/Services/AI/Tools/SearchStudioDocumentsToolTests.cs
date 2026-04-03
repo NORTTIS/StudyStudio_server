@@ -124,7 +124,7 @@ public class SearchStudioDocumentsToolTests
         _embeddingService.Setup(x => x.GenerateEmbeddingAsync("machine learning", It.IsAny<CancellationToken>()))
             .ReturnsAsync(FakeEmbedding());
         _qdrantService.Setup(x => x.SearchVectorsMultiGroupAsync(
-            It.IsAny<float[]>(), 5, It.Is<List<Guid>>(g => g.Count == 2), It.IsAny<CancellationToken>()))
+            It.IsAny<float[]>(), 5, It.Is<List<Guid>>(g => g.Count == 2), It.IsAny<Guid?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(searchResults);
 
         // Act
@@ -183,7 +183,7 @@ public class SearchStudioDocumentsToolTests
         _embeddingService.Setup(x => x.GenerateEmbeddingAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(FakeEmbedding());
         _qdrantService.Setup(x => x.SearchVectorsMultiGroupAsync(
-            It.IsAny<float[]>(), It.IsAny<int>(), It.IsAny<List<Guid>>(), It.IsAny<CancellationToken>()))
+            It.IsAny<float[]>(), It.IsAny<int>(), It.IsAny<List<Guid>>(), It.IsAny<Guid?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(searchResults);
 
         // Act
@@ -216,7 +216,7 @@ public class SearchStudioDocumentsToolTests
         _embeddingService.Setup(x => x.GenerateEmbeddingAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(FakeEmbedding());
         _qdrantService.Setup(x => x.SearchVectorsMultiGroupAsync(
-            It.IsAny<float[]>(), It.IsAny<int>(), It.IsAny<List<Guid>>(), It.IsAny<CancellationToken>()))
+            It.IsAny<float[]>(), It.IsAny<int>(), It.IsAny<List<Guid>>(), It.IsAny<Guid?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<VectorSearchResponse.SearchResult>());
 
         // Act
@@ -227,6 +227,7 @@ public class SearchStudioDocumentsToolTests
             It.IsAny<float[]>(),
             It.IsAny<int>(),
             It.Is<List<Guid>>(ids => ids.Contains(_groupId1) && ids.Contains(_groupId2)),
+            It.IsAny<Guid?>(),
             It.IsAny<CancellationToken>()), Times.Once);
     }
 
@@ -250,7 +251,7 @@ public class SearchStudioDocumentsToolTests
         _embeddingService.Setup(x => x.GenerateEmbeddingAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(FakeEmbedding());
         _qdrantService.Setup(x => x.SearchVectorsMultiGroupAsync(
-            It.IsAny<float[]>(), It.IsAny<int>(), It.IsAny<List<Guid>>(), It.IsAny<CancellationToken>()))
+            It.IsAny<float[]>(), It.IsAny<int>(), It.IsAny<List<Guid>>(), It.IsAny<Guid?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(FakeSearchResultsFromGroups(groups));
 
         // Act
@@ -283,7 +284,7 @@ public class SearchStudioDocumentsToolTests
         _embeddingService.Setup(x => x.GenerateEmbeddingAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(FakeEmbedding());
         _qdrantService.Setup(x => x.SearchVectorsMultiGroupAsync(
-            It.IsAny<float[]>(), 5, It.IsAny<List<Guid>>(), It.IsAny<CancellationToken>()))
+            It.IsAny<float[]>(), 5, It.IsAny<List<Guid>>(), It.IsAny<Guid?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<VectorSearchResponse.SearchResult>());
 
         // Act
@@ -291,7 +292,7 @@ public class SearchStudioDocumentsToolTests
 
         // Assert
         _qdrantService.Verify(x => x.SearchVectorsMultiGroupAsync(
-            It.IsAny<float[]>(), 5, It.IsAny<List<Guid>>(), It.IsAny<CancellationToken>()), Times.Once);
+            It.IsAny<float[]>(), 5, It.IsAny<List<Guid>>(), It.IsAny<Guid?>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     #endregion

@@ -161,6 +161,10 @@ builder.Services.AddHostedService<StudioStudio_Server.Services.EmbeddingQueue.Em
 builder.Services.AddSingleton<StudioStudio_Server.Services.DeleteQueue.IDeleteQueue, StudioStudio_Server.Services.DeleteQueue.DeleteQueue>();
 builder.Services.AddHostedService<StudioStudio_Server.Services.DeleteQueue.DeleteBackgroundService>();
 
+// Stuck Upload Cleanup Background Service (runs every 15 minutes)
+builder.Services.AddSingleton<StudioStudio_Server.Services.CleanupQueue.ICleanupQueue, StudioStudio_Server.Services.CleanupQueue.CleanupQueue>();
+builder.Services.AddHostedService<StudioStudio_Server.Services.CleanupQueue.CleanupBackgroundService>();
+
 // Refresh Token Cleanup Background Service (runs every 24 hours)
 builder.Services.AddHostedService<StudioStudio_Server.Services.BackgroundServices.RefreshTokenCleanupService>();
 
