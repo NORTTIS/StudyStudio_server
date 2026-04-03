@@ -14,13 +14,12 @@
         public DateTime CreatedAt { get; set; }
         public DateTime UpdatedAt { get; set; }
 
-        // 🔹 ADDED: Admin deactivate
+        // Admin deactivate
         public bool IsActive { get; set; } = true;
 
-        // 🔹 ADDED: Open/Closed group membership
         public bool IsOpen { get; set; } = true;
 
-        // 🔹 ADDED: Group personalization
+        // Group personalization
         public string? AvatarUrl { get; set; }
         public string? ColorHex { get; set; }
         public string? IconEmoji { get; set; }

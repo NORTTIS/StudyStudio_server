@@ -466,7 +466,7 @@ namespace StudioStudio_Server.Services
             // Create new group
             var now = DateTime.UtcNow;
 
-            // 🔹 ADDED: Validate personalization fields
+            // validate personalization fields
             if (!string.IsNullOrEmpty(request.ColorHex))
             {
                 if (!System.Text.RegularExpressions.Regex.IsMatch(request.ColorHex, @"^#[0-9A-Fa-f]{6}$", System.Text.RegularExpressions.RegexOptions.None, TimeSpan.FromMilliseconds(200)))
@@ -480,19 +480,19 @@ namespace StudioStudio_Server.Services
                 throw new AppException(ErrorCodes.ValidationInvalidEmoji, StatusCodes.Status400BadRequest);
             }
 
-            // 🔹 ADDED: Validate BannerUrl
+            // validate BannerUrl
             if (!string.IsNullOrEmpty(request.BannerUrl) && !Uri.TryCreate(request.BannerUrl, UriKind.Absolute, out _))
             {
                 throw new AppException(ErrorCodes.ValidationInvalidBannerUrl, StatusCodes.Status400BadRequest);
             }
 
-            // 🔹 ADDED: Validate Tagline
+            // validate Tagline
             if (!string.IsNullOrEmpty(request.Tagline) && request.Tagline.Length > 200)
             {
                 throw new AppException(ErrorCodes.ValidationStringLength, StatusCodes.Status400BadRequest);
             }
 
-            // 🔹 ADDED: Validate Alias pattern
+            // validate Alias pattern
             if (!string.IsNullOrEmpty(request.Alias))
             {
                 if (request.Alias.Length > 50)
@@ -640,7 +640,7 @@ namespace StudioStudio_Server.Services
             // Update description
             group.Description = request.Description;
 
-            // 🔹 ADDED: Validate and update personalization fields
+            // validate and update personalization fields
             if (!string.IsNullOrEmpty(request.ColorHex))
             {
                 if (!System.Text.RegularExpressions.Regex.IsMatch(request.ColorHex, @"^#[0-9A-Fa-f]{6}$", System.Text.RegularExpressions.RegexOptions.None, TimeSpan.FromMilliseconds(200)))
@@ -668,21 +668,21 @@ namespace StudioStudio_Server.Services
                 group.IconEmoji = null;
             }
 
-            // 🔹 ADDED: Validate and update BannerUrl
+            // validate and update BannerUrl
             if (!string.IsNullOrEmpty(request.BannerUrl) && !Uri.TryCreate(request.BannerUrl, UriKind.Absolute, out _))
             {
                 throw new AppException(ErrorCodes.ValidationInvalidBannerUrl, StatusCodes.Status400BadRequest);
             }
             group.BannerUrl = request.BannerUrl;
 
-            // 🔹 ADDED: Validate and update Tagline
+            // Validate and update Tagline
             if (!string.IsNullOrEmpty(request.Tagline) && request.Tagline.Length > 200)
             {
                 throw new AppException(ErrorCodes.ValidationStringLength, StatusCodes.Status400BadRequest);
             }
             group.Tagline = request.Tagline;
 
-            // 🔹 ADDED: Validate and update Alias
+            // Validate and update Alias
             if (!string.IsNullOrEmpty(request.Alias))
             {
                 if (request.Alias.Length > 50)
@@ -700,7 +700,7 @@ namespace StudioStudio_Server.Services
                 group.Alias = null;
             }
 
-            // 🔹 ADDED: Update IsOpen setting (Owner/Moderator only)
+            // validate and update IsOpen setting (Owner/Moderator only)
             if (request.IsOpen.HasValue)
             {
                 group.IsOpen = request.IsOpen.Value;
@@ -1187,7 +1187,7 @@ namespace StudioStudio_Server.Services
             };
         }
 
-        // 🔹 ADDED: Toggle IsOpen setting (Owner/Moderator only)
+        // Toggle IsOpen setting (Owner/Moderator only)
         public async Task<ToggleIsOpenResponse> ToggleIsOpenAsync(Guid userId, Guid groupId, bool isOpen)
         {
             var group = await _groupRepository.GetByIdAsync(groupId);
@@ -1221,7 +1221,7 @@ namespace StudioStudio_Server.Services
             };
         }
 
-        // 🔹 ADDED: Get pending members (Owner/Moderator only)
+        //  Get pending members (Owner/Moderator only)
         public async Task<PendingMemberListResponse> GetPendingMembersAsync(Guid userId, Guid groupId)
         {
             var group = await _groupRepository.GetByIdAsync(groupId);
@@ -1267,7 +1267,7 @@ namespace StudioStudio_Server.Services
             };
         }
 
-        // 🔹 ADDED: Approve pending member (Owner/Moderator only)
+        // Approve pending member (Owner/Moderator only)
         public async Task<ApproveMemberResponse> ApproveMemberAsync(Guid userId, Guid groupId, Guid targetUserId)
         {
             var group = await _groupRepository.GetByIdAsync(groupId);

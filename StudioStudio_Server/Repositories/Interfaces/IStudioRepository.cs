@@ -1,3 +1,4 @@
+using StudioStudio_Server.Models.DTOs.Response;
 using StudioStudio_Server.Models.Entities;
 
 namespace StudioStudio_Server.Repositories.Interfaces
@@ -16,5 +17,46 @@ namespace StudioStudio_Server.Repositories.Interfaces
         Task<List<Group>> GetGroupsByStudioIdAsync(Guid studioId);
         Task<bool> IsStudioNameExistByOwnerIdAsync(string studioName, Guid ownerId);
         Task<bool> IsStudioNameExistExcludingStudioAsync(string studioName, Guid ownerId, Guid excludeStudioId);
+        Task<(List<Studio> Studios, int TotalCount)> GetStudiosAsync(
+            string? searchTerm,
+            int pageNumber,
+            int pageSize);
+        Task<Studio?> GetByIdAdminAsync(Guid studioId);
+        /// <summary>
+        /// Get summary statistics for studios (raw values, not DTO)
+        /// </summary>
+        Task<(int TotalStudios, int ActiveStudios, int InactiveStudios, int TotalMembers, int TotalGroups)> GetStudioSummaryAsync();
+
+        /// <summary>
+        /// Get member counts for a list of studios (approved members only)
+        /// </summary>
+        Task<Dictionary<Guid, int>> GetMemberCountsAsync(List<Guid> studioIds);
+
+        /// <summary>
+        /// Get group counts for a list of studios
+        /// </summary>
+        Task<Dictionary<Guid, int>> GetGroupCountsAsync(List<Guid> studioIds);
+
+        /// <summary>
+        /// Get task counts for a list of studios (via groups in studio)
+        /// </summary>
+        Task<Dictionary<Guid, int>> GetTaskCountsAsync(List<Guid> studioIds);
+
+        /// <summary>
+        /// Get last activity for a list of studios
+        /// Last activity = MAX(Studio.UpdatedAt, MAX(Group.UpdatedAt), MAX(Task.UpdatedAt), MAX(GroupMessage.CreatedAt))
+        /// </summary>
+        Task<Dictionary<Guid, DateTime?>> GetLastActivityAsync(List<Guid> studioIds);
+
+        /// <summary>
+        /// Get owner info (name + email) for a list of owner IDs
+        /// </summary>
+        Task<Dictionary<Guid, (string Name, string Email)>> GetOwnerInfosAsync(List<Guid> ownerIds);
+
+        /// <summary>
+        /// Kiểm tra xem đã có studio active nào của cùng owner có tên trùng không
+        /// Chỉ kiểm tra studio đang active (IsDeleted = false)
+        /// </summary>
+        Task<bool> HasActiveStudioWithNameAsync(Guid ownerId, string studioName, Guid excludeStudioId);
     }
 }

@@ -8,8 +8,7 @@
         public string? Description { get; set; }
 
         public bool IsDeleted { get; set; } = false;
-
-        // 🔹 ADDED: Open/Closed studio membership
+        
         public bool IsOpen { get; set; } = true;
 
         public Guid OwnerId { get; set; }
@@ -20,7 +19,7 @@
         public DateTime? StartDate { get; set; }
         public DateTime? EndDate { get; set; }
 
-        // 🔹 ADDED: Studio personalization
+        // Studio personalization
         public string? AvatarUrl { get; set; }
         public string? ColorHex { get; set; }
         public string? BannerUrl { get; set; }

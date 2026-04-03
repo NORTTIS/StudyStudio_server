@@ -69,6 +69,8 @@ namespace StudioStudio_Server.Services
 
         /// <summary>
         /// Update group status (activate/inactivate)
+        /// Khi active lại: kiểm tra trùng tên với group active khác cùng owner/studio
+        /// Nếu trùng → thêm "_restored" vào tên (lặp lại nếu vẫn trùng)
         /// </summary>
         public async Task UpdateGroupStatusAsync(Guid groupId, bool isActive)
         {
@@ -77,6 +79,21 @@ namespace StudioStudio_Server.Services
             if (group == null)
             {
                 throw new AppException(ErrorCodes.GroupNotFound, StatusCodes.Status404NotFound);
+            }
+
+            // Nếu đang active group đã bị inactive trước đó
+            if (isActive)
+            {
+                var currentName = group.GroupName;
+                var candidateName = currentName;
+
+                // Lặp kiểm tra trùng tên, thêm "_restored" cho đến khi không trùng
+                while (await _groupRepository.HasActiveGroupWithNameAsync(group.CreatedBy, group.StudioId, candidateName, group.GroupId))
+                {
+                    candidateName += "_restored";
+                }
+
+                group.GroupName = candidateName;
             }
 
             group.IsActive = isActive;

@@ -46,5 +46,11 @@ namespace StudioStudio_Server.Repositories.Interfaces
         /// Get studio names for a list of studio IDs
         /// </summary>
         Task<Dictionary<Guid, string>> GetStudioNamesAsync(List<Guid?> studioIds);
+
+        /// <summary>
+        /// Kiểm tra xem đã có group active nào của cùng owner và cùng studio có tên trùng không
+        /// Chỉ kiểm tra group đang active (IsActive = true)
+        /// </summary>
+        Task<bool> HasActiveGroupWithNameAsync(Guid ownerId, Guid? studioId, string groupName, Guid excludeGroupId);
     }
 }
