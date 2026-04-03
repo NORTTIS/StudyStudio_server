@@ -26,9 +26,9 @@ namespace StudioStudio_Server.Repositories
         /// </summary>
         public async Task<List<Group>> GetUserGroupsAsync(Guid userId)
         {
-            // First get group IDs where user is approved
+            // First get group IDs 
             var approvedGroupIds = await _db.GroupParticipants
-                .Where(p => p.UserId == userId && p.IsApproved)
+                .Where(p => p.UserId == userId)
                 .Select(p => p.GroupId)
                 .ToListAsync();
 
