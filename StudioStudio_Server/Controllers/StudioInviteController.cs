@@ -145,6 +145,13 @@ namespace StudioStudio_Server.Controllers
                     StatusCodes.Status404NotFound);
             }
 
+            if (studio.IsArchived)
+            {
+                throw new AppException(
+                    ErrorCodes.StudioIsArchived,
+                    StatusCodes.Status403Forbidden);
+            }
+
             await ValidateInvitePermissionAsync(request.StudioId, userId);
 
             bool canCreate = await _studioInviteService
@@ -220,6 +227,13 @@ namespace StudioStudio_Server.Controllers
                 throw new AppException(
                     ErrorCodes.StudioNotFound,
                     StatusCodes.Status404NotFound);
+            }
+
+            if (studio.IsArchived)
+            {
+                throw new AppException(
+                    ErrorCodes.StudioIsArchived,
+                    StatusCodes.Status403Forbidden);
             }
 
             await ValidateInvitePermissionAsync(request.StudioId, userId);
@@ -329,6 +343,13 @@ namespace StudioStudio_Server.Controllers
                 throw new AppException(
                     ErrorCodes.StudioNotFound,
                     StatusCodes.Status404NotFound);
+            }
+
+            if (studio.IsArchived)
+            {
+                throw new AppException(
+                    ErrorCodes.StudioIsArchived,
+                    StatusCodes.Status403Forbidden);
             }
 
             bool isAlreadyMember = await _studioParticipantRepository
