@@ -269,7 +269,9 @@ namespace StudioStudio_Server.Services
                 AccessToken = accessToken,
                 AccessExpireIn = accessTokenExpireMs,
                 RefreshToken = refreshToken.Token,
-                RefreshExpireIn = refreshTokenExpireMs
+                RefreshExpireIn = refreshTokenExpireMs,
+                IsAdmin = user.IsAdmin,
+                AvatarUrl = user.AvatarUrl
             };
         }
 
@@ -331,7 +333,9 @@ namespace StudioStudio_Server.Services
                 AccessToken = newAccessToken,
                 AccessExpireIn = accessTokenExpireMs,
                 RefreshToken = newRefreshToken.Token,
-                RefreshExpireIn = refreshTokenExpireMs
+                RefreshExpireIn = refreshTokenExpireMs,
+                IsAdmin = user.IsAdmin,
+                AvatarUrl = user.AvatarUrl
             };
         }
 
@@ -456,7 +460,9 @@ namespace StudioStudio_Server.Services
                     AccessToken = accessToken,
                     AccessExpireIn = accessTokenExpireMs,
                     RefreshToken = refreshToken.Token,
-                    RefreshExpireIn = refreshTokenExpireMs
+                    RefreshExpireIn = refreshTokenExpireMs,
+                    IsAdmin = user.IsAdmin,
+                    AvatarUrl = user.AvatarUrl
                 };
             }
             catch (Exception ex)

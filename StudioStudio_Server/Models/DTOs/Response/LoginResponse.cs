@@ -11,5 +11,7 @@ namespace StudioStudio_Server.Models.DTOs.Response
         public long AccessExpireIn { get; set; }
         public string RefreshToken { get; set; } = string.Empty;
         public long RefreshExpireIn { get; set; }
+        public bool IsAdmin { get; set; }
+        public string? AvatarUrl { get; set; }
     }
 }
