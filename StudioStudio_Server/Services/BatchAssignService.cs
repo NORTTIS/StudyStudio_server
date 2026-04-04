@@ -155,6 +155,11 @@ namespace StudioStudio_Server.Services
                 throw new AppException(ErrorCodes.BatchStudioNotFound, StatusCodes.Status404NotFound);
             }
 
+            if (studio.IsArchived)
+            {
+                throw new AppException(ErrorCodes.StudioIsArchived, StatusCodes.Status403Forbidden);
+            }
+
             // 2. Validate user is studio owner
             if (studio.OwnerId != userId)
             {
@@ -453,6 +458,11 @@ namespace StudioStudio_Server.Services
                 throw new AppException(ErrorCodes.BatchStudioNotFound, StatusCodes.Status404NotFound);
             }
 
+            if (studio.IsArchived)
+            {
+                throw new AppException(ErrorCodes.StudioIsArchived, StatusCodes.Status403Forbidden);
+            }
+
             // 2. Validate user is studio owner
             if (studio.OwnerId != userId)
             {
@@ -654,6 +664,11 @@ namespace StudioStudio_Server.Services
             if (studio == null)
             {
                 throw new AppException(ErrorCodes.BatchStudioNotFound, StatusCodes.Status404NotFound);
+            }
+
+            if (studio.IsArchived)
+            {
+                throw new AppException(ErrorCodes.StudioIsArchived, StatusCodes.Status403Forbidden);
             }
 
             // Validate user is studio owner

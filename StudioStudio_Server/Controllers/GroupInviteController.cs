@@ -178,6 +178,13 @@ namespace StudioStudio_Server.Controllers
                     StatusCodes.Status404NotFound);
             }
 
+            if (group.IsArchived)
+            {
+                throw new AppException(
+                    ErrorCodes.GroupIsArchived,
+                    StatusCodes.Status403Forbidden);
+            }
+
             await ValidateInvitePermissionAsync(request.GroupId, userId);
             await ValidateModeratorRoleAsync(request.GroupId, role);
 
@@ -254,6 +261,13 @@ namespace StudioStudio_Server.Controllers
                 throw new AppException(
                     ErrorCodes.GroupNotFound,
                     StatusCodes.Status404NotFound);
+            }
+
+            if (group.IsArchived)
+            {
+                throw new AppException(
+                    ErrorCodes.GroupIsArchived,
+                    StatusCodes.Status403Forbidden);
             }
 
             await ValidateInvitePermissionAsync(request.GroupId, userId);
@@ -368,6 +382,13 @@ namespace StudioStudio_Server.Controllers
                     StatusCodes.Status404NotFound);
             }
 
+            if (group.IsArchived)
+            {
+                throw new AppException(
+                    ErrorCodes.GroupIsArchived,
+                    StatusCodes.Status403Forbidden);
+            }
+
             bool isAlreadyMember = await _groupParticipantRepository
                 .IsUserInGroupAsync(inviteData.GroupId, userId);
 
@@ -449,7 +470,6 @@ namespace StudioStudio_Server.Controllers
             {
                 await _groupParticipantRepository.AddAsync(participant);
 
-                // 🔹 ADDED: Auto-add user to studio if group belongs to a studio and user is not already a member
                 if (group.StudioId.HasValue)
                 {
                     var isAlreadyStudioMember = await _studioParticipantRepository

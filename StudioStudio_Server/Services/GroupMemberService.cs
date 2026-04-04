@@ -161,6 +161,13 @@ namespace StudioStudio_Server.Services
 
             var group = await ValidateGroupExistsAsync(request.GroupId);
 
+            if (group.IsArchived)
+            {
+                throw new AppException(
+                    ErrorCodes.GroupIsArchived,
+                    StatusCodes.Status403Forbidden);
+            }
+
             var currentUserParticipant = await ValidateUserIsOwnerAsync(
                 request.GroupId,
                 currentUserId);
