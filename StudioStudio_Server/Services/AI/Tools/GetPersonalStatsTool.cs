@@ -5,6 +5,7 @@ using StudioStudio_Server.Repositories.Interfaces;
 using StudioStudio_Server.Services.AI.Models;
 using StudioStudio_Server.Services.AI.Tools.Interfaces;
 using StudioStudio_Server.Models.Entities;
+using StudioStudio_Server.Models.Enums;
 
 namespace StudioStudio_Server.Services.AI.Tools;
 
@@ -106,6 +107,19 @@ public class GetPersonalStatsTool : IAITool
                     ["week_start"] = weekStart.ToString("yyyy-MM-dd"),
                     ["week_end"] = weekStart.AddDays(6).ToString("yyyy-MM-dd"),
                     ["today"] = DateOnly.FromDateTime(now).ToString("yyyy-MM-dd")
+                },
+                ["priority_breakdown"] = new JsonObject
+                {
+                    ["high"] = allTasks.Count(t => t.Priority == TaskPriority.High),
+                    ["medium"] = allTasks.Count(t => t.Priority == TaskPriority.Medium),
+                    ["low"] = allTasks.Count(t => t.Priority == TaskPriority.Low)
+                },
+                ["severity_breakdown"] = new JsonObject
+                {
+                    ["critical"] = allTasks.Count(t => t.Severity == TaskSeverity.Critical),
+                    ["major"] = allTasks.Count(t => t.Severity == TaskSeverity.Major),
+                    ["moderate"] = allTasks.Count(t => t.Severity == TaskSeverity.Moderate),
+                    ["minor"] = allTasks.Count(t => t.Severity == TaskSeverity.Minor)
                 },
                 ["summary"] = $"Ban co {allTasks.Count} cong viec, {completedTasks.Count} da hoan thanh ({completionRate}%), " +
                     $"{overdueTasks.Count} qua han, {upcomingTasks.Count} deadline trong 7 ngay toi."

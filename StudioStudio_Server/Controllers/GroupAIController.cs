@@ -87,7 +87,8 @@ public class GroupAIController : ControllerBase
             {
                 UserId = userId.Value,
                 Language = language,
-                GroupId = request.GroupId
+                GroupId = request.GroupId,
+                SessionId = request.SessionId
             };
 
             // Process với AIAgent
@@ -178,7 +179,8 @@ public class GroupAIController : ControllerBase
             {
                 UserId = userId.Value,
                 Language = language,
-                GroupId = request.GroupId
+                GroupId = request.GroupId,
+                SessionId = request.SessionId
             };
 
             var result = await _aiAgent.ProcessAsync(request.Question, context, cancellationToken);
@@ -322,4 +324,5 @@ public class GroupAIRequest
 {
     public Guid GroupId { get; set; }
     public string Question { get; set; } = "";
+    public string? SessionId { get; set; }
 }

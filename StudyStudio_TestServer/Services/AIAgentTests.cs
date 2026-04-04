@@ -1,6 +1,8 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Moq;
+using StudioStudio_Server.Configurations;
 using StudioStudio_Server.Exceptions;
 using StudioStudio_Server.Services.AI;
 using StudioStudio_Server.Services.AI.Models;
@@ -46,7 +48,16 @@ public class AIAgentTests
             .Setup(x => x.GetService(typeof(IServiceScopeFactory)))
             .Returns(_scopeFactory.Object);
 
-        _sut = new AIAgent(_toolRegistry.Object, _serviceProvider, _llmService.Object, _logger.Object);
+        // Create mock IOptions<AIAgentConfig>
+        var configMock = new Mock<IOptions<AIAgentConfig>>();
+        configMock.Setup(x => x.Value).Returns(new AIAgentConfig
+        {
+            MaxToolCalls = 5,
+            MaxContextTokens = 10000,
+            TokensPerCharacter = 0.28
+        });
+
+        _sut = new AIAgent(_toolRegistry.Object, _serviceProvider, _llmService.Object, _logger.Object, configMock.Object);
 
         // Default: GetToolsManifestForContext returns empty manifest (no tools available)
         _toolRegistry.Setup(x => x.GetToolsManifestForContext(It.IsAny<AIQueryContext>()))

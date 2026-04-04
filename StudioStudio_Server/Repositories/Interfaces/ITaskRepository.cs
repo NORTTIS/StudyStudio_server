@@ -50,7 +50,11 @@ namespace StudioStudio_Server.Repositories.Interfaces
             DateTime? dueDateFrom = null,
             DateTime? dueDateTo = null,
             string? sortBy = "createdAt",
-            bool sortAscending = true);
+            bool sortAscending = true,
+            string? statusKeyword = null,
+            string? statusCategory = null,
+            TaskPriority? minPriority = null,
+            TaskSeverity? minSeverity = null);
         Task PermanentDeleteAsync(Guid taskId);
     }
 }

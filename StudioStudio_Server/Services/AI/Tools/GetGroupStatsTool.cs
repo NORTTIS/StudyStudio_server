@@ -79,7 +79,20 @@ public class GetGroupStatsTool : IAITool
                     ["completion_percentage"] = taskSummary.CompletionPercentage,
                     ["pending_tasks"] = taskSummary.InProgressTasks + taskSummary.NotStartedTasks,
                     ["overdue_tasks"] = taskSummary.OverdueTasks,
-                    ["nearest_deadline"] = taskSummary.NearestDeadline?.ToString("yyyy-MM-dd HH:mm")
+                    ["nearest_deadline"] = taskSummary.NearestDeadline?.ToString("yyyy-MM-dd HH:mm"),
+                    ["priority_breakdown"] = new JsonObject
+                    {
+                        ["high"] = taskSummary.HighPriorityTasks,
+                        ["medium"] = taskSummary.MediumPriorityTasks,
+                        ["low"] = taskSummary.LowPriorityTasks
+                    },
+                    ["severity_breakdown"] = new JsonObject
+                    {
+                        ["critical"] = taskSummary.CriticalSeverityTasks,
+                        ["major"] = taskSummary.MajorSeverityTasks,
+                        ["moderate"] = taskSummary.ModerateSeverityTasks,
+                        ["minor"] = taskSummary.MinorSeverityTasks
+                    }
                 },
                 ["generated_at"] = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss")
             }, sw.ElapsedMilliseconds);

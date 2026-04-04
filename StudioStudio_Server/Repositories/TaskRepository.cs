@@ -110,6 +110,17 @@ namespace StudioStudio_Server.Repositories
                 riskFlags.Add($"⏰ Nearest deadline: {nearestDeadline:dd/MM/yyyy HH:mm}");
             }
 
+            // Priority breakdown
+            int highPriority = tasks.Count(t => t.Priority == TaskPriority.High);
+            int mediumPriority = tasks.Count(t => t.Priority == TaskPriority.Medium);
+            int lowPriority = tasks.Count(t => t.Priority == TaskPriority.Low);
+
+            // Severity breakdown
+            int criticalSeverity = tasks.Count(t => t.Severity == TaskSeverity.Critical);
+            int majorSeverity = tasks.Count(t => t.Severity == TaskSeverity.Major);
+            int moderateSeverity = tasks.Count(t => t.Severity == TaskSeverity.Moderate);
+            int minorSeverity = tasks.Count(t => t.Severity == TaskSeverity.Minor);
+
             return new TaskSummaryResponse
             {
                 TotalTasks = totalTasks,
@@ -119,7 +130,14 @@ namespace StudioStudio_Server.Repositories
                 CompletionPercentage = completionPercentage,
                 OverdueTasks = overdueTasks,
                 NearestDeadline = nearestDeadline,
-                RiskFlags = riskFlags
+                RiskFlags = riskFlags,
+                HighPriorityTasks = highPriority,
+                MediumPriorityTasks = mediumPriority,
+                LowPriorityTasks = lowPriority,
+                CriticalSeverityTasks = criticalSeverity,
+                MajorSeverityTasks = majorSeverity,
+                ModerateSeverityTasks = moderateSeverity,
+                MinorSeverityTasks = minorSeverity
             };
         }
 
@@ -412,7 +430,11 @@ namespace StudioStudio_Server.Repositories
             DateTime? dueDateFrom = null,
             DateTime? dueDateTo = null,
             string? sortBy = "createdAt",
-            bool sortAscending = true)
+            bool sortAscending = true,
+            string? statusKeyword = null,
+            string? statusCategory = null,
+            TaskPriority? minPriority = null,
+            TaskSeverity? minSeverity = null)
         {
             // Convert DateTime parameters to UTC to avoid PostgreSQL timezone issues
             if (startDateFrom.HasValue && startDateFrom.Value.Kind == DateTimeKind.Unspecified)
@@ -465,16 +487,50 @@ namespace StudioStudio_Server.Repositories
                 query = query.Where(t => t.GroupStatusId == statusId.Value);
             }
 
+            // Apply status keyword filter (by status name)
+            if (!string.IsNullOrWhiteSpace(statusKeyword))
+            {
+                var keyword = statusKeyword.Trim().ToLower();
+                query = query.Where(t =>
+                    t.GroupStatus != null
+                    && t.GroupStatus.StatusName.ToLower().Contains(keyword));
+            }
+
+            // Apply status category filter based on progress
+            if (!string.IsNullOrWhiteSpace(statusCategory))
+            {
+                var normalizedStatusCategory = statusCategory.Trim().ToLower();
+                query = normalizedStatusCategory switch
+                {
+                    "completed" => query.Where(t => t.Progress >= 100),
+                    "inprogress" => query.Where(t => t.Progress > 0 && t.Progress < 100),
+                    "notstarted" => query.Where(t => t.Progress <= 0),
+                    _ => query
+                };
+            }
+
             // Apply priority filter
             if (priority.HasValue)
             {
                 query = query.Where(t => t.Priority == priority.Value);
             }
 
+            // Apply minimum priority filter (>=)
+            if (minPriority.HasValue)
+            {
+                query = query.Where(t => t.Priority >= minPriority.Value);
+            }
+
             // Apply severity filter
             if (severity.HasValue)
             {
                 query = query.Where(t => t.Severity == severity.Value);
+            }
+
+            // Apply minimum severity filter (>=)
+            if (minSeverity.HasValue)
+            {
+                query = query.Where(t => t.Severity >= minSeverity.Value);
             }
 
             // Apply start date range filter

@@ -94,7 +94,8 @@ public class MasterAIController : ControllerBase
             {
                 UserId = userId.Value,
                 Language = language,
-                StudioId = request.StudioId
+                StudioId = request.StudioId,
+                StudioOwnerId = userId.Value  // Studio Owner được quyền gọi Group tools với group_id tuỳ ý
             };
 
             // Process với AIAgent

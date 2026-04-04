@@ -10,6 +10,9 @@ namespace StudioStudio_Server.Services.AI.Tools;
 
 public class GetDeadlinesTool : IAITool
 {
+    private const int DefaultDaysAhead = 30;
+    private const int DefaultLimit = 10;
+
     private readonly ITaskRepository _taskRepository;
     private readonly IGroupParticipantRepository _participantRepository;
     private readonly IUserRepository _userRepository;
@@ -18,7 +21,7 @@ public class GetDeadlinesTool : IAITool
     public string Name => "get_deadlines";
     public string Description => "Lay danh sach deadline sap toi cua nhom. "
         + "Owner/Moderator: thay tat ca deadline. Member: chi deadline cua task duoc assign. "
-        + "Parameters: days_ahead (so ngay, default 7), limit (default 10). "
+        + $"Parameters: days_ahead (so ngay, default {DefaultDaysAhead}), limit (default {DefaultLimit}). "
         + "group_id tu dong lay tu he thong. Da hoan thanh (Progress=100) khong hien thi trong danh sach.";
 
     public JsonObject ParametersSchema => new JsonObject
@@ -26,8 +29,8 @@ public class GetDeadlinesTool : IAITool
         ["type"] = "object",
         ["properties"] = new JsonObject
         {
-            ["days_ahead"] = new JsonObject { ["type"] = "number", ["description"] = "So ngay (default 7)" },
-            ["limit"] = new JsonObject { ["type"] = "number", ["description"] = "So luong toi da (default 10)" }
+            ["days_ahead"] = new JsonObject { ["type"] = "number", ["description"] = $"So ngay (default {DefaultDaysAhead})" },
+            ["limit"] = new JsonObject { ["type"] = "number", ["description"] = $"So luong toi da (default {DefaultLimit})" }
         },
         ["required"] = new JsonArray()
     };
@@ -68,10 +71,10 @@ public class GetDeadlinesTool : IAITool
                 return AIQueryResult.Error("Ban khong co quyen su dung AI nhom nay");
 
             var daysAhead = Ji(parameters["days_ahead"]);
-            if (daysAhead <= 0) daysAhead = 7;
+            if (daysAhead <= 0) daysAhead = DefaultDaysAhead;
 
             var limit = Ji(parameters["limit"]);
-            if (limit <= 0) limit = 10;
+            if (limit <= 0) limit = DefaultLimit;
 
             var now = DateTime.UtcNow;
             var endDate = now.AddDays(daysAhead);
@@ -92,7 +95,18 @@ public class GetDeadlinesTool : IAITool
                 .Take(limit)
                 .ToList();
 
-            var ownerIds = deadlineTasks.Select(t => t.OwnerId).Distinct().ToList();
+            var overdueTasks = tasks
+                .Where(t => t.DueDate.HasValue
+                         && t.DueDate.Value < now
+                         && t.Progress < 100)
+                .OrderBy(t => t.DueDate)
+                .Take(5)
+                .ToList();
+
+            var ownerIds = deadlineTasks.Select(t => t.OwnerId)
+                .Concat(overdueTasks.Select(t => t.OwnerId))
+                .Distinct()
+                .ToList();
             var owners = await _userRepository.GetByIdsAsync(ownerIds);
             var ownerDict = owners.ToDictionary(o => o.UserId);
 
@@ -117,12 +131,32 @@ public class GetDeadlinesTool : IAITool
                 };
             }).ToList();
 
+            var overdue = overdueTasks.Select(t =>
+            {
+                var owner = ownerDict.GetValueOrDefault(t.OwnerId);
+                return new JsonObject
+                {
+                    ["task_id"] = t.TaskId.ToString(),
+                    ["title"] = t.Title ?? "",
+                    ["due_date"] = t.DueDate!.Value.ToString("yyyy-MM-dd HH:mm"),
+                    ["days_overdue"] = (int)(now - t.DueDate.Value).TotalDays,
+                    ["status"] = t.GroupStatus?.StatusName ?? "Khong co trang thai",
+                    ["progress"] = t.Progress,
+                    ["assignee_name"] = owner != null
+                        ? owner.FirstName + " " + owner.LastName
+                        : "Unassigned",
+                    ["priority"] = t.Priority.ToString()
+                };
+            }).ToList();
+
             sw.Stop();
             bool isEnglish = context.Language.ToLower() == "en";
             return AIQueryResult.Success(new JsonObject
             {
                 ["deadlines"] = new JsonArray(deadlines.ToArray()),
+                ["overdue_tasks"] = new JsonArray(overdue.ToArray()),
                 ["total"] = deadlines.Count,
+                ["total_overdue"] = overdue.Count,
                 ["date_range"] = new JsonObject
                 {
                     ["from"] = now.ToString("yyyy-MM-dd"),
@@ -130,8 +164,8 @@ public class GetDeadlinesTool : IAITool
                 },
                 ["scope"] = (role == GroupRole.Owner || role == GroupRole.Moderator) ? "all_tasks" : "assigned_only",
                 ["summary"] = isEnglish
-                    ? "Found " + deadlines.Count + " upcoming deadlines"
-                    : "Co " + deadlines.Count + " deadline sap toi"
+                    ? "Found " + deadlines.Count + " upcoming deadlines and " + overdue.Count + " overdue tasks"
+                    : "Co " + deadlines.Count + " deadline sap toi va " + overdue.Count + " cong viec qua han"
             }, sw.ElapsedMilliseconds);
         }
         catch (Exception ex)

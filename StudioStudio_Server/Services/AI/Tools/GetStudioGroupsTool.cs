@@ -16,16 +16,15 @@ public class GetStudioGroupsTool : IAITool
     private readonly ILogger<GetStudioGroupsTool> _logger;
 
     public string Name => "get_studio_groups";
-    public string Description => "Lay danh sach tat ca cac nhom trong Studio. Parameters: studio_id (required), include_stats (optional, default true)";
+    public string Description => "Lay danh sach tat ca cac nhom trong Studio. Khong can tham so (studio_id tu dong lay tu context).";
     public JsonObject ParametersSchema => new JsonObject
     {
         ["type"] = "object",
         ["properties"] = new JsonObject
         {
-            ["studio_id"] = new JsonObject { ["type"] = "string" },
             ["include_stats"] = new JsonObject { ["type"] = "boolean" }
         },
-        ["required"] = new JsonArray { "studio_id" }
+        ["required"] = new JsonArray()
     };
 
     public GetStudioGroupsTool(
@@ -42,25 +41,17 @@ public class GetStudioGroupsTool : IAITool
 
     private static string? Js(JsonNode? n) => n?.GetValue<string>();
 
-    public bool ValidateParameters(JsonObject p) =>
-        Guid.TryParse(Js(p["studio_id"]), out _);
+    public bool ValidateParameters(JsonObject p) => true;
 
     public async Task<AIQueryResult> ExecuteAsync(AIQueryContext context, JsonObject parameters, CancellationToken cancellationToken = default)
     {
         var sw = Stopwatch.StartNew();
         try
         {
-            // Auto-inject studio_id from context if LLM didn't provide it
-            if (!parameters.ContainsKey("studio_id") && context.StudioId.HasValue)
-            {
-                parameters["studio_id"] = JsonValue.Create(context.StudioId.Value.ToString());
-            }
+            if (!context.StudioId.HasValue)
+                return AIQueryResult.Error("Khong co studio_id trong context");
 
-            if (!Guid.TryParse(Js(parameters["studio_id"]), out var studioId))
-                return AIQueryResult.Error("Invalid studio_id");
-
-            if (context.StudioId.HasValue && context.StudioId.Value != studioId)
-                return AIQueryResult.Error("Ban khong co quyen truy cap Studio nay");
+            var studioId = context.StudioId.Value;
 
             var includeStats = parameters["include_stats"]?.GetValue<bool>() ?? true;
 

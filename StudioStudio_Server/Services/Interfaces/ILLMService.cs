@@ -21,6 +21,21 @@ namespace StudioStudio_Server.Services.Interfaces
             CancellationToken cancellationToken = default);
 
         /// <summary>
+        /// Goi LLM API va tra ve raw text khong ap response schema co dinh.
+        /// Dung cho cac tac vu phan tich noi bo nhu parameter review.
+        /// </summary>
+        /// <param name="systemPrompt">System prompt cho tac vu cap nhat</param>
+        /// <param name="userMessage">Noi dung can xu ly</param>
+        /// <param name="context">Context bo sung</param>
+        /// <param name="cancellationToken">Cancellation token</param>
+        /// <returns>Raw text response tu LLM</returns>
+        Task<string> GenerateTextResponseAsync(
+            string systemPrompt,
+            string userMessage,
+            string context,
+            CancellationToken cancellationToken = default);
+
+        /// <summary>
         /// Goi LLM API de generate cau tra loi dang streaming
         /// </summary>
         /// <param name="systemPrompt">System prompt de dinh nghia behavior cua AI</param>

@@ -17,17 +17,16 @@ public class GetGroupComparisonTool : IAITool
     private readonly ILogger<GetGroupComparisonTool> _logger;
 
     public string Name => "get_group_comparison";
-    public string Description => "So sanh nhieu nhom voi nhau. Parameters: studio_id (required), group_ids (optional array), metrics (optional array: completion_rate/overdue/activity)";
+    public string Description => "So sanh nhieu nhom voi nhau. Khong can tham so (studio_id tu dong lay tu context).";
     public JsonObject ParametersSchema => new JsonObject
     {
         ["type"] = "object",
         ["properties"] = new JsonObject
         {
-            ["studio_id"] = new JsonObject { ["type"] = "string" },
             ["group_ids"] = new JsonObject { ["type"] = "array", ["items"] = new JsonObject { ["type"] = "string" } },
             ["metrics"] = new JsonObject { ["type"] = "array", ["items"] = new JsonObject { ["type"] = "string" } }
         },
-        ["required"] = new JsonArray { "studio_id" }
+        ["required"] = new JsonArray()
     };
 
     public GetGroupComparisonTool(
@@ -58,25 +57,17 @@ public class GetGroupComparisonTool : IAITool
         return result;
     }
 
-    public bool ValidateParameters(JsonObject p) =>
-        Guid.TryParse(Js(p["studio_id"]), out _);
+    public bool ValidateParameters(JsonObject p) => true;
 
     public async Task<AIQueryResult> ExecuteAsync(AIQueryContext context, JsonObject parameters, CancellationToken cancellationToken = default)
     {
         var sw = Stopwatch.StartNew();
         try
         {
-            // Auto-inject studio_id from context if LLM didn't provide it
-            if (!parameters.ContainsKey("studio_id") && context.StudioId.HasValue)
-            {
-                parameters["studio_id"] = JsonValue.Create(context.StudioId.Value.ToString());
-            }
+            if (!context.StudioId.HasValue)
+                return AIQueryResult.Error("Khong co studio_id trong context");
 
-            if (!Guid.TryParse(Js(parameters["studio_id"]), out var studioId))
-                return AIQueryResult.Error("Invalid studio_id");
-
-            if (context.StudioId.HasValue && context.StudioId.Value != studioId)
-                return AIQueryResult.Error("Ban khong co quyen truy cap Studio nay");
+            var studioId = context.StudioId.Value;
 
             var requestedGroupIds = ParseGuidArray(parameters["group_ids"]);
             var requestedMetrics = ParseStringArray(parameters["metrics"]);

@@ -33,6 +33,8 @@ builder.Services.Configure<QdrantConfig>(
     builder.Configuration.GetSection("Qdrant"));
 builder.Services.Configure<GeminiConfig>(
     builder.Configuration.GetSection("Gemini"));
+builder.Services.Configure<AIAgentConfig>(
+    builder.Configuration.GetSection(AIAgentConfig.SectionName));
 
 //redis connection
 builder.Services.AddSingleton<IConnectionMultiplexer>(r =>

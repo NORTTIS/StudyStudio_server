@@ -48,19 +48,17 @@ public class CompareGroupsTool : IAITool
     private static string? Js(JsonNode? n) => n?.GetValue<string>();
     private static int Ji(JsonNode? n) => n?.GetValue<int>() ?? 0;
 
-    public bool ValidateParameters(JsonObject p) =>
-        Guid.TryParse(Js(p["studio_id"]), out _);
+    public bool ValidateParameters(JsonObject p) => true;
 
     public async Task<AIQueryResult> ExecuteAsync(AIQueryContext context, JsonObject parameters, CancellationToken cancellationToken = default)
     {
         var sw = Stopwatch.StartNew();
         try
         {
-            if (!Guid.TryParse(Js(parameters["studio_id"]), out var studioId))
-                return AIQueryResult.Error("Invalid studio_id");
+            if (!context.StudioId.HasValue)
+                return AIQueryResult.Error("Khong co studio_id trong context");
 
-            if (context.StudioId != studioId)
-                return AIQueryResult.Error("Ban khong co quyen truy cap studio nay");
+            var studioId = context.StudioId.Value;
 
             var studio = await _studioRepository.GetByIdAsync(studioId);
             if (studio == null)

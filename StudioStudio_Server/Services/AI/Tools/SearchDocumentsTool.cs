@@ -114,7 +114,7 @@ public class SearchDocumentsTool : IAITool
                     docs.Count, sw.ElapsedMilliseconds);
             }
 
-            return AIQueryResult.Success(new JsonObject
+            var result = AIQueryResult.Success(new JsonObject
             {
                 ["query"] = query,
                 ["documents"] = new JsonArray(docs.ToArray()),
@@ -124,6 +124,15 @@ public class SearchDocumentsTool : IAITool
                     ? $"Found {docs.Count} relevant document chunks"
                     : $"Tim thay {docs.Count} doan noi dung lien quan"
             }, sw.ElapsedMilliseconds);
+            
+            // Log data size info for context tracking
+            var resultJson = result.ToJson();
+            
+            _logger.LogInformation(
+                "[SEARCH-RESULT] query={Query} docsFound={Total} contextSize={CharCount} (full data included)",
+                query, docs.Count, resultJson.Length);
+            
+            return result;
         }
         catch (Exception ex)
         {

@@ -15,16 +15,15 @@ public class GetMemberPermissionsTool : IAITool
     private readonly ILogger<GetMemberPermissionsTool> _logger;
 
     public string Name => "get_member_permissions";
-    public string Description => "Kiem tra quyen cua thanh vien trong Studio. Parameters: studio_id (required), user_id (optional - defaults to current user)";
+    public string Description => "Kiem tra quyen cua thanh vien trong Studio. Khong can tham so (studio_id tu dong lay tu context).";
     public JsonObject ParametersSchema => new JsonObject
     {
         ["type"] = "object",
         ["properties"] = new JsonObject
         {
-            ["studio_id"] = new JsonObject { ["type"] = "string" },
             ["user_id"] = new JsonObject { ["type"] = "string" }
         },
-        ["required"] = new JsonArray { "studio_id" }
+        ["required"] = new JsonArray()
     };
 
     public GetMemberPermissionsTool(
@@ -39,25 +38,17 @@ public class GetMemberPermissionsTool : IAITool
 
     private static string? Js(JsonNode? n) => n?.GetValue<string>();
 
-    public bool ValidateParameters(JsonObject p) =>
-        Guid.TryParse(Js(p["studio_id"]), out _);
+    public bool ValidateParameters(JsonObject p) => true;
 
     public async Task<AIQueryResult> ExecuteAsync(AIQueryContext context, JsonObject parameters, CancellationToken cancellationToken = default)
     {
         var sw = Stopwatch.StartNew();
         try
         {
-            // Auto-inject studio_id from context if LLM didn't provide it
-            if (!parameters.ContainsKey("studio_id") && context.StudioId.HasValue)
-            {
-                parameters["studio_id"] = JsonValue.Create(context.StudioId.Value.ToString());
-            }
+            if (!context.StudioId.HasValue)
+                return AIQueryResult.Error("Khong co studio_id trong context");
 
-            if (!Guid.TryParse(Js(parameters["studio_id"]), out var studioId))
-                return AIQueryResult.Error("Invalid studio_id");
-
-            if (context.StudioId.HasValue && context.StudioId.Value != studioId)
-                return AIQueryResult.Error("Ban khong co quyen truy cap Studio nay");
+            var studioId = context.StudioId.Value;
 
             var targetUserId = !string.IsNullOrEmpty(Js(parameters["user_id"]))
                 ? Guid.Parse(Js(parameters["user_id"])! )

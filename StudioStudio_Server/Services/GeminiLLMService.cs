@@ -147,7 +147,8 @@ namespace StudioStudio_Server.Services
                     systemPrompt,
                     userMessage,
                     context,
-                    cancellationToken);
+                    cancellationToken,
+                    BuildAgentResponseSchema());
             }
             catch (HttpRequestException ex) when (IsRateLimitError(ex))
             {
@@ -163,7 +164,8 @@ namespace StudioStudio_Server.Services
                         systemPrompt,
                         userMessage,
                         context,
-                        cancellationToken);
+                        cancellationToken,
+                        BuildAgentResponseSchema());
                 }
                 catch (Exception fallbackEx)
                 {
@@ -179,6 +181,48 @@ namespace StudioStudio_Server.Services
         }
 
         /// <summary>
+        /// Generates a raw text response without forcing the agent response schema.
+        /// </summary>
+        public async Task<string> GenerateTextResponseAsync(
+            string systemPrompt,
+            string userMessage,
+            string context,
+            CancellationToken cancellationToken = default)
+        {
+            if (string.IsNullOrEmpty(_config.ApiKey))
+            {
+                _logger.LogError("Gemini API Key not configured. Cannot generate text response.");
+                throw new InvalidOperationException("Gemini API Key is not configured");
+            }
+
+            try
+            {
+                _logger.LogInformation("Attempting raw text generation with PRIMARY model: {Model}", PRIMARY_MODEL);
+                return await GenerateAnswerInternalAsync(
+                    PRIMARY_MODEL,
+                    systemPrompt,
+                    userMessage,
+                    context,
+                    cancellationToken,
+                    null);
+            }
+            catch (HttpRequestException ex) when (IsRateLimitError(ex))
+            {
+                _logger.LogWarning(
+                    "Rate limit hit on PRIMARY model ({Model}) for raw text. Falling back to FALLBACK model ({Fallback})",
+                    PRIMARY_MODEL, FALLBACK_MODEL);
+
+                return await GenerateAnswerInternalAsync(
+                    FALLBACK_MODEL,
+                    systemPrompt,
+                    userMessage,
+                    context,
+                    cancellationToken,
+                    null);
+            }
+        }
+
+        /// <summary>
         /// Internal method to call Gemini API with specified model
         /// </summary>
         private async Task<string> GenerateAnswerInternalAsync(
@@ -186,7 +230,8 @@ namespace StudioStudio_Server.Services
             string systemPrompt,
             string userMessage,
             string context,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken,
+            JsonObject? responseSchema = null)
         {
             try
             {
@@ -223,8 +268,8 @@ namespace StudioStudio_Server.Services
                         topK = _config.TopK,
                         topP = _config.TopP,
                         maxOutputTokens = _config.MaxTokens,
-                        responseMimeType = "application/json",
-                        responseSchema = BuildAgentResponseSchema()
+                        responseMimeType = responseSchema != null ? "application/json" : null,
+                        responseSchema = responseSchema
                     }
                 };
 

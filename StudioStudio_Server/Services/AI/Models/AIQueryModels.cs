@@ -39,6 +39,25 @@ public class AIQueryResult
             WriteIndented = true
         });
     }
+
+    /// <summary>
+    /// Trả về mô tả ngắn về data để log: loại collection + số lượng items
+    /// VD: "tasks:5 items", "members:0 items", "null"
+    /// </summary>
+    public string GetDataSummary()
+    {
+        if (!IsSuccess || Data == null)
+            return "null";
+
+        foreach (var prop in Data)
+        {
+            if (prop.Value is JsonArray arr)
+                return $"{prop.Key}:{arr.Count} items";
+            if (prop.Value is JsonValue val && val.TryGetValue<int>(out _))
+                return $"{prop.Key}:{val}";
+        }
+        return Data.ToString() ?? "empty";
+    }
 }
 
 /// <summary>
@@ -72,9 +91,30 @@ public class AIQueryContext
     public string SubscriptionPlan { get; set; } = "Free";
 
     /// <summary>
+    /// Studio Owner ID — để Group tools verify Studio Owner được quyền gọi với group_id tuỳ ý
+    /// </summary>
+    public Guid? StudioOwnerId { get; set; }
+
+    /// <summary>
     /// Timestamp khi bắt đầu query
     /// </summary>
     public DateTime StartTime { get; set; } = DateTime.UtcNow;
+
+    /// <summary>
+    /// Client-provided session id de duy tri context giua cac turn hoi dap
+    /// </summary>
+    public string? SessionId { get; set; }
+}
+
+/// <summary>
+/// Session state cho auto-followup phan trang task
+/// </summary>
+public class AITaskPaginationSessionState
+{
+    public int LastPage { get; set; }
+    public int LastPageSize { get; set; } = 20;
+    public int LastTotalPages { get; set; } = 1;
+    public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 }
 
 /// <summary>

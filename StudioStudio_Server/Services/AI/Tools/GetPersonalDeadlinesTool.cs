@@ -15,16 +15,17 @@ public class GetPersonalDeadlinesTool : IAITool
 {
     private readonly ITaskRepository _taskRepository;
     private readonly ILogger<GetPersonalDeadlinesTool> _logger;
+    private const int DefaultDaysAhead = 30;
 
     public string Name => "get_personal_deadlines";
-    public string Description => "Lay danh sach deadline cua cong viec ca nhan. Parameters: days_ahead (so ngay, default 7), limit (default 10). Khong can group_id.";
+    public string Description => $"Lay danh sach deadline cua cong viec ca nhan. Parameters: days_ahead (so ngay, default {DefaultDaysAhead}), limit (default 10). Khong can group_id.";
 
     public JsonObject ParametersSchema => new JsonObject
     {
         ["type"] = "object",
         ["properties"] = new JsonObject
         {
-            ["days_ahead"] = new JsonObject { ["type"] = "number", ["description"] = "So ngay de xem deadline (default 7)" },
+            ["days_ahead"] = new JsonObject { ["type"] = "number", ["description"] = $"So ngay de xem deadline (default {DefaultDaysAhead})" },
             ["limit"] = new JsonObject { ["type"] = "number", ["description"] = "So luong toi da (default 10)" }
         },
         ["required"] = new JsonArray()
@@ -47,7 +48,7 @@ public class GetPersonalDeadlinesTool : IAITool
         try
         {
             var daysAhead = Ji(parameters["days_ahead"]);
-            if (daysAhead <= 0) daysAhead = 7;
+            if (daysAhead <= 0) daysAhead = DefaultDaysAhead;
 
             var limit = Ji(parameters["limit"]);
             if (limit <= 0) limit = 10;

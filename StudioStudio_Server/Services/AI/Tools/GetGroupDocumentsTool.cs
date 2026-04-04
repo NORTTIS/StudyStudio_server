@@ -16,16 +16,15 @@ public class GetGroupDocumentsTool : IAITool
     private readonly ILogger<GetGroupDocumentsTool> _logger;
 
     public string Name => "get_group_documents";
-    public string Description => "Lay danh sach tai lieu da tai len mot nhom. Parameters: group_id (required), limit (optional, default 20)";
+    public string Description => "Lay danh sach tai lieu da tai len cua nhom. Khong can tham so (group_id tu dong lay tu context).";
     public JsonObject ParametersSchema => new JsonObject
     {
         ["type"] = "object",
         ["properties"] = new JsonObject
         {
-            ["group_id"] = new JsonObject { ["type"] = "string" },
             ["limit"] = new JsonObject { ["type"] = "integer", ["default"] = 20 }
         },
-        ["required"] = new JsonArray { "group_id" }
+        ["required"] = new JsonArray()
     };
 
     public GetGroupDocumentsTool(
@@ -43,16 +42,17 @@ public class GetGroupDocumentsTool : IAITool
     private static string? Js(JsonNode? n) => n?.GetValue<string>();
     private static int Ji(JsonNode? n) => n?.GetValue<int>() ?? 0;
 
-    public bool ValidateParameters(JsonObject p) =>
-        Guid.TryParse(Js(p["group_id"]), out _);
+    public bool ValidateParameters(JsonObject p) => true;
 
     public async Task<AIQueryResult> ExecuteAsync(AIQueryContext context, JsonObject parameters, CancellationToken cancellationToken = default)
     {
         var sw = Stopwatch.StartNew();
         try
         {
-            if (!Guid.TryParse(Js(parameters["group_id"]), out var groupId))
-                return AIQueryResult.Error("Invalid group_id");
+            if (!context.GroupId.HasValue)
+                return AIQueryResult.Error("Khong co group_id trong context");
+
+            var groupId = context.GroupId.Value;
 
             if (!await _participantRepository.IsUserInGroupAsync(groupId, context.UserId))
                 return AIQueryResult.Error("Ban khong co quyen truy cap tai lieu nhom nay");
@@ -69,6 +69,7 @@ public class GetGroupDocumentsTool : IAITool
                 .Take(limit)
                 .Select(a => new JsonObject
                 {
+                    ["document_id"] = a.GroupAttachmentId.ToString(),
                     ["file_name"] = a.FileName,
                     ["content_type"] = a.FileType,
                     ["file_size"] = a.FileSize,
@@ -78,7 +79,8 @@ public class GetGroupDocumentsTool : IAITool
                 .ToList();
 
             sw.Stop();
-            return AIQueryResult.Success(new JsonObject
+            
+            var result = AIQueryResult.Success(new JsonObject
             {
                 ["group_id"] = groupId.ToString(),
                 ["documents"] = new JsonArray(shownAttachments.ToArray()),
@@ -88,6 +90,15 @@ public class GetGroupDocumentsTool : IAITool
                     ? $"Tim thay {totalCount} tai lieu trong nhom '{group.GroupName}'. Hien thi {shownAttachments.Count} tai lieu."
                     : "Khong co tai lieu nao duoc tai len nhom nay."
             }, sw.ElapsedMilliseconds);
+            
+            // Log data size info for context tracking
+            var resultJson = result.ToJson();
+            
+            _logger.LogInformation(
+                "[DOCS-RESULT] totalCount={Total} shownCount={Shown} contextSize={CharCount} (full data included)",
+                totalCount, shownAttachments.Count, resultJson.Length);
+            
+            return result;
         }
         catch (Exception ex)
         {
