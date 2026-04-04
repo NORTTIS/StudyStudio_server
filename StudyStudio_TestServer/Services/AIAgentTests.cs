@@ -18,6 +18,7 @@ public class AIAgentTests
 {
     private readonly Mock<IAIToolRegistry> _toolRegistry;
     private readonly Mock<ILLMService> _llmService;
+    private readonly Mock<ICacheService> _cacheService;
     private readonly Mock<ILogger<AIAgent>> _logger;
     private readonly IServiceProvider _serviceProvider;
     private readonly Mock<IServiceScopeFactory> _scopeFactory;
@@ -33,6 +34,7 @@ public class AIAgentTests
     {
         _toolRegistry = new Mock<IAIToolRegistry>();
         _llmService = new Mock<ILLMService>();
+        _cacheService = new Mock<ICacheService>();
         _logger = new Mock<ILogger<AIAgent>>();
 
         // Setup IServiceScope chain for CreateScope() extension method
@@ -57,7 +59,21 @@ public class AIAgentTests
             TokensPerCharacter = 0.28
         });
 
-        _sut = new AIAgent(_toolRegistry.Object, _serviceProvider, _llmService.Object, _logger.Object, configMock.Object);
+        _cacheService
+            .Setup(x => x.GetAsync<AITaskPaginationSessionState>(It.IsAny<string>()))
+            .ReturnsAsync((AITaskPaginationSessionState?)null);
+
+        _cacheService
+            .Setup(x => x.SetAsync(It.IsAny<string>(), It.IsAny<AITaskPaginationSessionState>(), It.IsAny<TimeSpan?>()))
+            .Returns(Task.CompletedTask);
+
+        _sut = new AIAgent(
+            _toolRegistry.Object,
+            _serviceProvider,
+            _llmService.Object,
+            _cacheService.Object,
+            _logger.Object,
+            configMock.Object);
 
         // Default: GetToolsManifestForContext returns empty manifest (no tools available)
         _toolRegistry.Setup(x => x.GetToolsManifestForContext(It.IsAny<AIQueryContext>()))
