@@ -453,7 +453,7 @@ namespace StudioStudio_Server.Controllers
                     StatusCodes.Status403Forbidden);
             }
 
-            // 🔹 ADDED: Determine IsApproved based on group's IsOpen setting
+            // Determine IsApproved based on group's IsOpen setting
             bool isApproved = group.IsOpen;
 
             var participant = new GroupParticipant
@@ -473,9 +473,9 @@ namespace StudioStudio_Server.Controllers
                 if (group.StudioId.HasValue)
                 {
                     var isAlreadyStudioMember = await _studioParticipantRepository
-                        .IsUserApprovedInStudioAsync(group.StudioId.Value, userId);
+                        .IsUserInStudioAsync(group.StudioId.Value, userId);
 
-                    if (!isAlreadyStudioMember)
+                    if (!isAlreadyStudioMember && isApproved)
                     {
                         var studioParticipant = new StudioParticipant
                         {

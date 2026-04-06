@@ -38,5 +38,11 @@ namespace StudioStudio_Server.Repositories.Interfaces
         /// Condition: GroupId+UserId in GroupParticipants AND IsApproved = false
         /// </summary>
         Task<GroupParticipant?> GetPendingByGroupAndUserAsync(Guid groupId, Guid userId);
+
+        /// <summary>
+        /// Get all pending (not yet approved) participants for multiple groups
+        /// Condition: GroupId IN {groupIds} AND IsApproved = false AND Group.IsActive = true
+        /// </summary>
+        Task<List<GroupParticipant>> GetPendingByGroupIdsAsync(List<Guid> groupIds);
     }
 }

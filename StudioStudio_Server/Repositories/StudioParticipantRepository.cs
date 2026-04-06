@@ -28,13 +28,13 @@ namespace StudioStudio_Server.Repositories
 
         /// <summary>
         /// Check if user is an approved member of studio
-        /// Condition: StudioId = {studioId} AND UserId = {userId} AND IsApproved = true AND Studio.IsDeleted = false
+        /// Condition: StudioId = {studioId} AND UserId = {userId} AND Studio.IsDeleted = false
         /// </summary>
         public async Task<bool> IsUserInStudioAsync(Guid studioId, Guid userId)
         {
             return await _context.StudioParticipants
                 .Include(sp => sp.Studio)
-                .AnyAsync(sp => sp.StudioId == studioId && sp.UserId == userId && sp.IsApproved && sp.Studio != null && !sp.Studio.IsDeleted);
+                .AnyAsync(sp => sp.StudioId == studioId && sp.UserId == userId && sp.Studio != null && !sp.Studio.IsDeleted);
         }
 
         /// <summary>
