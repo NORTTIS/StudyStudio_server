@@ -25,5 +25,6 @@ namespace StudioStudio_Server.Models.DTOs.Response
         public string? Alias { get; set; }
         public bool IsOpen { get; set; } = true;
         public bool IsArchived { get; set; } = false;
+        public bool IsMember { get; set; }
     }
 }

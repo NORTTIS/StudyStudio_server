@@ -1,14 +1,9 @@
-﻿D:\Code\StudyStudio\StudyStudio_server\StudyStudio_TestServer\Controllers\AIControllerTests.cs
-D:\Code\StudyStudio\StudyStudio_server\StudyStudio_TestServer\Controllers\AuthControllerTests.cs
+﻿D:\Code\StudyStudio\StudyStudio_server\StudyStudio_TestServer\Controllers\AuthControllerTests.cs
 D:\Code\StudyStudio\StudyStudio_server\StudyStudio_TestServer\Controllers\GroupControllerTests.cs
 D:\Code\StudyStudio\StudyStudio_server\StudyStudio_TestServer\Controllers\PaymentControllerTests.cs
 D:\Code\StudyStudio\StudyStudio_server\StudyStudio_TestServer\Controllers\StudioControllerTests.cs
 D:\Code\StudyStudio\StudyStudio_server\StudyStudio_TestServer\Controllers\TaskControllerTests.cs
 D:\Code\StudyStudio\StudyStudio_server\StudyStudio_TestServer\Helpers\DbContextFactory.cs
-D:\Code\StudyStudio\StudyStudio_server\StudyStudio_TestServer\Services\AIAgentTests.cs
-D:\Code\StudyStudio\StudyStudio_server\StudyStudio_TestServer\Services\AIServiceTests.cs
-D:\Code\StudyStudio\StudyStudio_server\StudyStudio_TestServer\Services\AI\Tools\SearchDocumentsToolTests.cs
-D:\Code\StudyStudio\StudyStudio_server\StudyStudio_TestServer\Services\AI\Tools\SearchStudioDocumentsToolTests.cs
 D:\Code\StudyStudio\StudyStudio_server\StudyStudio_TestServer\Services\AuthServiceTests.cs
 D:\Code\StudyStudio\StudyStudio_server\StudyStudio_TestServer\Services\GroupServiceTests.cs
 D:\Code\StudyStudio\StudyStudio_server\StudyStudio_TestServer\Services\NotificationScenarioIdTests.cs

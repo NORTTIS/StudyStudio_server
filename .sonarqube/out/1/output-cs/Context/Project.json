@@ -1,0 +1,7 @@
+{
+  "language": "C#",
+  "targetFramework": "net8.0",
+  "assemblyName": "StudyStudio_TestServer",
+  "projectType": "Test",
+  "projectPath": "D:\\Code\\StudyStudio\\StudyStudio_server\\StudyStudio_TestServer\\StudyStudio_TestServer.csproj"
+}
