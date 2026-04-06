@@ -473,9 +473,9 @@ namespace StudioStudio_Server.Controllers
                 if (group.StudioId.HasValue)
                 {
                     var isAlreadyStudioMember = await _studioParticipantRepository
-                        .IsUserApprovedInStudioAsync(group.StudioId.Value, userId);
+                        .IsUserInStudioAsync(group.StudioId.Value, userId);
 
-                    if (!isAlreadyStudioMember)
+                    if (!isAlreadyStudioMember && isApproved)
                     {
                         var studioParticipant = new StudioParticipant
                         {
