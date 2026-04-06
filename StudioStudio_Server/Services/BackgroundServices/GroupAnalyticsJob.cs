@@ -43,9 +43,9 @@ namespace StudioStudio_Server.Services.BackgroundServices
                     var from = to.AddMinutes(-10);
                     var today = DateOnly.FromDateTime(DateTime.UtcNow);
 
-                    // Get all active groups (IsActive = true only)
+                    // Get all active, non-archived groups and studios
                     var groups = await context.Groups
-                        .Where(g => g.IsActive)
+                        .Where(g => g.IsActive && !g.IsArchived && (g.StudioId == null || !g.Studio!.IsArchived))
                         .Select(g => g.GroupId)
                         .ToListAsync();
 

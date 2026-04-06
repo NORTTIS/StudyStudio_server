@@ -119,9 +119,10 @@ namespace StudioStudio_Server.Data
 
                 e.Property(x => x.GroupName).IsRequired();
 
-                e.HasOne<Studio>()
+                e.HasOne(x => x.Studio)
                     .WithMany(s => s.Groups)
                     .HasForeignKey(x => x.StudioId)
+                    .IsRequired(false)
                     .OnDelete(DeleteBehavior.Cascade);
 
                 e.HasIndex(x => new { x.StudioId, x.GroupName });

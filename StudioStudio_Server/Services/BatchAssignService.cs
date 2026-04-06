@@ -264,6 +264,13 @@ namespace StudioStudio_Server.Services
                     }
                 }
 
+                // Ngăn không cho assign thành viên vào archived group
+                if (targetGroup.IsArchived)
+                {
+                    errors.Add(CreateErrorRow(row.RowNumber, row.Email, row.GroupName, ErrorCodes.GroupIsArchived));
+                    continue;
+                }
+
                 // Validate role
                 if (string.IsNullOrWhiteSpace(row.Role))
                 {
@@ -287,17 +294,6 @@ namespace StudioStudio_Server.Services
                 if (!emailToUserId.TryGetValue(row.Email.ToLowerInvariant(), out var targetUserId))
                 {
                     errors.Add(CreateErrorRow(row.RowNumber, row.Email, row.GroupName, ErrorCodes.ValidationUserNotInStudio));
-                    continue;
-                }
-
-                // Check if user is already in ANY OTHER group in the studio (one member per group rule)
-                // Only for new assignments (not existing participants in the target group)
-                var userInOtherGroup = existingByGroupAndUser.Keys
-                    .Any(k => k.UserId == targetUserId && k.GroupId != targetGroup.GroupId);
-
-                if (userInOtherGroup)
-                {
-                    errors.Add(CreateErrorRow(row.RowNumber, row.Email, row.GroupName, ErrorCodes.BatchMemberAlreadyInAnotherGroup));
                     continue;
                 }
 

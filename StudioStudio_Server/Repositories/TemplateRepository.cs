@@ -168,6 +168,7 @@ namespace StudioStudio_Server.Repositories
         /// </summary>
         public async Task HardDeleteAsync(Template template)
         {
+            _context.Templates.Attach(template);
             _context.Templates.Remove(template);
             await _context.SaveChangesAsync();
         }

@@ -21,6 +21,8 @@
 
         public bool IsArchived { get; set; } = false;
 
+        public Studio? Studio { get; set; }
+
         // Group personalization
         public string? AvatarUrl { get; set; }
         public string? ColorHex { get; set; }

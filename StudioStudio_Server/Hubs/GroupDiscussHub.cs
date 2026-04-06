@@ -146,6 +146,15 @@ namespace StudioStudio_Server.Hubs
         }
 
         /// <summary>
+        /// Check if a group is archived
+        /// </summary>
+        private async Task<bool> IsGroupArchivedAsync(Guid groupId)
+        {
+            var group = await _groupRepository.GetByIdAsync(groupId);
+            return group?.IsArchived ?? false;
+        }
+
+        /// <summary>
         /// Handle @mention notifications
         /// Create UserAnnouncement for tagged users
         /// </summary>
@@ -234,6 +243,13 @@ namespace StudioStudio_Server.Hubs
                     return;
                 }
 
+                if (await IsGroupArchivedAsync(groupId))
+                {
+                    var errorMsg = await GetLocalizedMessageAsync(ErrorCodes.GroupIsArchived);
+                    await Clients.Caller.SendAsync("Error", errorMsg);
+                    return;
+                }
+
                 await Groups.AddToGroupAsync(Context.ConnectionId, groupId.ToString());
                 _logger.LogInformation("User {UserId} joined group {GroupId}", userId, groupId);
 
@@ -296,6 +312,13 @@ namespace StudioStudio_Server.Hubs
                 if (!isUserInGroup)
                 {
                     var errorMsg = await GetLocalizedMessageAsync(ErrorCodes.GroupPermissionDenied);
+                    await Clients.Caller.SendAsync("Error", errorMsg);
+                    return;
+                }
+
+                if (await IsGroupArchivedAsync(request.GroupId))
+                {
+                    var errorMsg = await GetLocalizedMessageAsync(ErrorCodes.GroupIsArchived);
                     await Clients.Caller.SendAsync("Error", errorMsg);
                     return;
                 }
@@ -380,6 +403,13 @@ namespace StudioStudio_Server.Hubs
                 {
                     _logger.LogWarning("User {UserId} not authorized for group {GroupId}", userId, request.GroupId);
                     var errorMsg = await GetLocalizedMessageAsync(ErrorCodes.GroupPermissionDenied);
+                    await Clients.Caller.SendAsync("Error", errorMsg);
+                    return;
+                }
+
+                if (await IsGroupArchivedAsync(request.GroupId))
+                {
+                    var errorMsg = await GetLocalizedMessageAsync(ErrorCodes.GroupIsArchived);
                     await Clients.Caller.SendAsync("Error", errorMsg);
                     return;
                 }
@@ -501,6 +531,13 @@ namespace StudioStudio_Server.Hubs
                 if (!hasPermission)
                 {
                     var errorMsg = await GetLocalizedMessageAsync(ErrorCodes.MessagePermissionDenied);
+                    await Clients.Caller.SendAsync("Error", errorMsg);
+                    return;
+                }
+
+                if (await IsGroupArchivedAsync(message.GroupId))
+                {
+                    var errorMsg = await GetLocalizedMessageAsync(ErrorCodes.GroupIsArchived);
                     await Clients.Caller.SendAsync("Error", errorMsg);
                     return;
                 }
