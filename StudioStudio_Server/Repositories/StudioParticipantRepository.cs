@@ -99,7 +99,7 @@ namespace StudioStudio_Server.Repositories
         {
             return await _context.StudioParticipants
                 .Include(sp => sp.Studio)
-                .Where(sp => sp.UserId == userId && sp.IsApproved && sp.Studio != null && !sp.Studio.IsDeleted)
+                .Where(sp => sp.UserId == userId && sp.Studio != null && !sp.Studio.IsDeleted)
                 .AsNoTracking()
                 .ToListAsync();
         }

@@ -117,7 +117,7 @@ namespace StudioStudio_Server.Services
                 Alias = studio.Alias,
                 IsOpen = studio.IsOpen,
                 IsArchived = studio.IsArchived,
-                IsMember = _studioParticipantRepository.IsUserInStudioAsync(studio.StudioId, userId).Result
+                IsMember = participantRecords.Any(p => p.StudioId == studio.StudioId && p.IsApproved)
             }).ToList();
 
             foreach (var response in studioResponses)
