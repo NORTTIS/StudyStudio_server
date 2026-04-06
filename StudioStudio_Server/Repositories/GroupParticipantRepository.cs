@@ -20,7 +20,7 @@ namespace StudioStudio_Server.Repositories
         /// <summary>
         /// Get participant record by GroupId and UserId
         /// Condition: GroupId = {groupId} AND UserId = {userId} AND Group.IsActive = true
-        /// Use case: Check role, permissions
+        /// Use case: Check role, permissio ns
         /// </summary>
         public async Task<GroupParticipant?> GetByGroupAndUserAsync(Guid groupId, Guid userId)
         {

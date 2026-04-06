@@ -453,7 +453,7 @@ namespace StudioStudio_Server.Controllers
                     StatusCodes.Status403Forbidden);
             }
 
-            // 🔹 ADDED: Determine IsApproved based on group's IsOpen setting
+            // Determine IsApproved based on group's IsOpen setting
             bool isApproved = group.IsOpen;
 
             var participant = new GroupParticipant
