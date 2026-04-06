@@ -278,4 +278,4 @@ knowledge_base:
 # ==============================================================================
 code_generation:
   docstrings:
-    language: "csharp"              # Ngôn ngữ để generate docstring (XML doc comments)
+    language: "vi-VN"              # Ngôn ngữ để generate docstring (XML doc comments)
