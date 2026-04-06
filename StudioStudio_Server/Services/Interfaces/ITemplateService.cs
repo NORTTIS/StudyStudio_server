@@ -9,7 +9,10 @@ namespace StudioStudio_Server.Services.Interfaces
         Task<TemplateResponse> UpdateTemplateAsync(Guid userId, Guid templateId, UpdateTemplateRequest request);
         Task DeleteTemplateAsync(Guid userId, Guid templateId);
         Task<TemplateResponse> GetTemplateByIdAsync(Guid templateId);
+        Task<TemplateResponse> GetTemplateByIdIncludingInactiveAsync(Guid templateId);
+        Task HardDeleteTemplateAsync(Guid templateId);
         Task<List<TemplateResponse>> GetAllTemplatesAsync();
+        Task<List<TemplateResponse>> GetAllSystemTemplatesAsync();
         Task<List<TemplateResponse>> GetAvailableTemplatesForUserAsync(Guid userId);
     }
 }

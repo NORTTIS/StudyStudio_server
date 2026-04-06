@@ -55,15 +55,15 @@ namespace StudioStudio_Server.Middlewares
             // Check if user is authenticated
             if (context.User?.Identity?.IsAuthenticated == true)
             {
+                // Admin traffic is bypassed entirely and should not be wrapped by rate-limit error logging.
+                if (JwtHelper.IsAdmin(context.User))
+                {
+                    await _next(context);
+                    return;
+                }
+
                 try
                 {
-                    // Skip rate limiting for admin users
-                    if (JwtHelper.IsAdmin(context.User))
-                    {
-                        await _next(context);
-                        return;
-                    }
-
                     var userId = JwtHelper.TryGetUserId(context.User);
 
                     if (userId.HasValue)

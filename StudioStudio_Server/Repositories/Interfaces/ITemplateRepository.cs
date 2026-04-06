@@ -9,10 +9,13 @@ namespace StudioStudio_Server.Repositories.Interfaces
         Task<List<Template>> GetByUserIdAsync(Guid userId);
         Task<Template?> GetByGroupIdAsync(Guid groupId);
         Task<List<Template>> GetSystemTemplatesAsync();
+        Task<List<Template>> GetAllSystemTemplatesAsync();
         Task<List<Template>> GetUserTemplatesAsync(Guid userId);
         Task AddAsync(Template template);
         Task UpdateAsync(Template template);
         Task DeleteAsync(Template template);
+        Task HardDeleteAsync(Template template);
+        Task<Template?> GetByIdIncludingInactiveAsync(Guid templateId);
         Task<bool> ExistsAsync(Guid templateId);
     }
 }

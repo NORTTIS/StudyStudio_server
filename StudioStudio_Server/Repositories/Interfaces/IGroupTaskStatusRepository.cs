@@ -9,6 +9,7 @@ namespace StudioStudio_Server.Repositories.Interfaces
         Task AddRangeAsync(List<GroupTaskStatus> statuses);
         Task<bool> ExistsAsync(Guid statusId);
         Task DeleteAsync(GroupTaskStatus status);
+        Task RemoveRangeAsync(List<GroupTaskStatus> statuses);
         Task UpdateAsync(GroupTaskStatus status);
         Task<GroupTaskStatus?> GetDetailAsync(Guid statusId);
         Task<List<GroupTaskStatus>> GetByIdsAndGroupIdAsync(List<Guid> statusIds, Guid groupId);

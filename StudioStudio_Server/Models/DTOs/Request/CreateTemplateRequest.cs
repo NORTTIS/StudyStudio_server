@@ -15,5 +15,11 @@ namespace StudioStudio_Server.Models.DTOs.Request
         [Required(ErrorMessage = ErrorCodes.ValidationRequiredField)]
         [MinLength(1, ErrorMessage = ErrorCodes.ValidationRequiredField)]
         public List<TemplateTaskStatusRequest> GroupTaskStatuses { get; set; } = new List<TemplateTaskStatusRequest>();
+
+        /// <summary>
+        /// Optional: set initial IsActive state.
+        /// Defaults to false (admin-created templates start inactive).
+        /// </summary>
+        public bool IsActive { get; set; } = false;
     }
 }

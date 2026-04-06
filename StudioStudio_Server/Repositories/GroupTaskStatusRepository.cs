@@ -70,6 +70,15 @@ namespace StudioStudio_Server.Repositories
             await _context.SaveChangesAsync();
         }
 
+        /// <summary>
+        /// Hard-delete multiple task statuses at once (used when replacing groupStatuses on template update)
+        /// </summary>
+        public async Task RemoveRangeAsync(List<GroupTaskStatus> statuses)
+        {
+            _context.GroupTaskStatuses.RemoveRange(statuses);
+            await _context.SaveChangesAsync();
+        }
+
         public async Task UpdateAsync(GroupTaskStatus status)
         {
             _context.GroupTaskStatuses.Update(status);

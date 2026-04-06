@@ -8,8 +8,14 @@ namespace StudioStudio_Server.Models.DTOs.Response
         public string GroupName { get; set; } = string.Empty;
         public string? GroupDescription { get; set; }
         public bool IsSystemTemplate { get; set; }
+        public bool IsActive { get; set; }
         public DateTime CreatedAt { get; set; }
         public DateTime UpdatedAt { get; set; }
+        public List<GroupTaskStatusResponse> GroupTaskStatuses { get; set; } = new();
+
+        // Group personalization fields (relevant for templates)
+        public string? BannerUrl { get; set; }
+        public string? ColorHex { get; set; }
     }
 
     /// <summary>

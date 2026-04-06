@@ -92,6 +92,21 @@ namespace StudioStudio_Server.Repositories
         }
 
         /// <summary>
+        /// Get all system templates including inactive ones (for admin)
+        /// Condition: IsSystemTemplate = true (no IsActive filter)
+        /// Include: Group, User
+        /// </summary>
+        public async Task<List<Template>> GetAllSystemTemplatesAsync()
+        {
+            return await _context.Templates
+                .Where(t => t.IsSystemTemplate)
+                .Include(t => t.Group)
+                .Include(t => t.User)
+                .AsNoTracking()
+                .ToListAsync();
+        }
+
+        /// <summary>
         /// Get user-created templates (not system templates)
         /// Condition: UserId = {userId} AND IsSystemTemplate = false AND IsActive = true
         /// Include: Group, User
@@ -130,7 +145,9 @@ namespace StudioStudio_Server.Repositories
         /// </summary>
         public async Task UpdateAsync(Template template)
         {
-            _context.Templates.Update(template);
+            // Mark only the root Template as modified to avoid attaching navigation graph
+            // (can conflict when Group/User with same keys are already tracked in this DbContext).
+            _context.Entry(template).State = EntityState.Modified;
             await _context.SaveChangesAsync();
         }
 
@@ -144,6 +161,27 @@ namespace StudioStudio_Server.Repositories
             template.UpdatedAt = DateTime.UtcNow;
             _context.Templates.Update(template);
             await _context.SaveChangesAsync();
+        }
+
+        /// <summary>
+        /// Hard-delete template permanently (admin only)
+        /// </summary>
+        public async Task HardDeleteAsync(Template template)
+        {
+            _context.Templates.Remove(template);
+            await _context.SaveChangesAsync();
+        }
+
+        /// <summary>
+        /// Get template by ID including inactive ones (for admin detail view)
+        /// </summary>
+        public async Task<Template?> GetByIdIncludingInactiveAsync(Guid templateId)
+        {
+            return await _context.Templates
+                .Include(t => t.Group)
+                .Include(t => t.User)
+                .AsNoTracking()
+                .FirstOrDefaultAsync(t => t.TemplateId == templateId);
         }
     }
 }

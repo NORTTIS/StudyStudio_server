@@ -60,15 +60,14 @@ namespace StudioStudio_Server.Controllers.Admin
 
         /// <summary>
         /// [ADMIN] GET /api/admin/templates
-        /// Get all templates (system + user-created)
-        /// Order by: System templates first, then CreatedAt DESC
+        /// Get all system templates (including inactive) for admin management
         /// </summary>
         [HttpGet]
         public async Task<ActionResult<ApiResponse<List<TemplateResponse>>>> GetAllTemplates()
         {
             ValidateAdminUser();
 
-            var templates = await _templateService.GetAllTemplatesAsync();
+            var templates = await _templateService.GetAllSystemTemplatesAsync();
             var message = _messageService.GetMessage(ErrorCodes.SuccessGetData);
 
             return Ok(ApiResponse<List<TemplateResponse>>.Success(
@@ -79,15 +78,14 @@ namespace StudioStudio_Server.Controllers.Admin
 
         /// <summary>
         /// [ADMIN] GET /api/admin/templates/{templateId}
-        /// Get template details
-        /// Validate: Template must exist
+        /// Get template details (including inactive)
         /// </summary>
         [HttpGet("{templateId}")]
         public async Task<ActionResult<ApiResponse<TemplateResponse>>> GetTemplateById(Guid templateId)
         {
             ValidateAdminUser();
 
-            var template = await _templateService.GetTemplateByIdAsync(templateId);
+            var template = await _templateService.GetTemplateByIdIncludingInactiveAsync(templateId);
             var message = _messageService.GetMessage(ErrorCodes.SuccessGetData);
 
             return Ok(ApiResponse<TemplateResponse>.Success(
@@ -143,10 +141,7 @@ namespace StudioStudio_Server.Controllers.Admin
 
         /// <summary>
         /// [ADMIN] DELETE /api/admin/templates/{templateId}
-        /// Delete system template
-        /// Validate:
-        /// - Template must exist
-        /// - Template must not be in use by groups
+        /// Inactive (soft-delete) system template
         /// </summary>
         [HttpDelete("{templateId}")]
         public async Task<ActionResult<ApiResponse<object>>> DeleteTemplate(Guid templateId)
@@ -154,6 +149,24 @@ namespace StudioStudio_Server.Controllers.Admin
             var userId = ValidateAdminUser();
 
             await _templateService.DeleteTemplateAsync(userId, templateId);
+            var message = _messageService.GetMessage(ErrorCodes.SuccessDeleteTemplate);
+
+            return Ok(ApiResponse<object>.Success(
+                ErrorCodes.SuccessDeleteTemplate,
+                message,
+                null));
+        }
+
+        /// <summary>
+        /// [ADMIN] DELETE /api/admin/templates/{templateId}/hard
+        /// Hard-delete template permanently (xóa cứng: template + group + groupTaskStatuses)
+        /// </summary>
+        [HttpDelete("{templateId}/hard")]
+        public async Task<ActionResult<ApiResponse<object>>> HardDeleteTemplate(Guid templateId)
+        {
+            ValidateAdminUser();
+
+            await _templateService.HardDeleteTemplateAsync(templateId);
             var message = _messageService.GetMessage(ErrorCodes.SuccessDeleteTemplate);
 
             return Ok(ApiResponse<object>.Success(
