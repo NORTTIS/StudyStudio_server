@@ -116,7 +116,8 @@ namespace StudioStudio_Server.Services
                 Tagline = studio.Tagline,
                 Alias = studio.Alias,
                 IsOpen = studio.IsOpen,
-                IsArchived = studio.IsArchived
+                IsArchived = studio.IsArchived,
+                IsMember = _studioParticipantRepository.IsUserInStudioAsync(studio.StudioId, userId).Result
             }).ToList();
 
             foreach (var response in studioResponses)
