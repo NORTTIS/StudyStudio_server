@@ -497,11 +497,15 @@ namespace StudioStudio_Server.Services
                 throw new AppException(ErrorCodes.BatchNoGroupsInStudio, StatusCodes.Status400BadRequest);
             }
 
-            // 6. Get existing participants for target groups
+            // 6. Get existing participants for target groups (approved only)
             var groupIds = targetGroups.Select(g => g.GroupId).ToList();
             var existingParticipants = await _groupParticipantRepository.GetByGroupIdsAsync(groupIds);
             var existingByGroupAndUser = existingParticipants
                 .ToDictionary(p => (p.GroupId, p.UserId), p => p);
+
+            // 6b. Also load pending (unapproved) records for these groups
+            // These will be removed when users are assigned to the same group
+            var pendingParticipants = await _groupParticipantRepository.GetPendingByGroupIdsAsync(groupIds);
 
             // 7. Check moderator conflicts BEFORE any DB write
             var conflicts = new List<GroupConflictInfo>();
@@ -636,7 +640,19 @@ namespace StudioStudio_Server.Services
                 groupSummaries[group.GroupId].MemberCount++;
             }
 
-            // 13. Save to database
+            // 13. Remove pending approval records BEFORE assigning members
+            // Only remove pending requests for users who are actually being assigned
+            var usersBeingAssigned = newParticipants.Select(np => np.UserId).ToHashSet();
+            var pendingToRemove = pendingParticipants
+                .Where(p => usersBeingAssigned.Contains(p.UserId))
+                .ToList();
+
+            if (pendingToRemove.Count > 0)
+            {
+                await _groupParticipantRepository.RemoveRangeAsync(pendingToRemove);
+            }
+
+            // 14. Save to database
             if (newParticipants.Count > 0)
             {
                 await _groupParticipantRepository.AddRangeAsync(newParticipants);

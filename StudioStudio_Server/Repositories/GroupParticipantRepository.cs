@@ -245,5 +245,18 @@ namespace StudioStudio_Server.Repositories
                 .AsNoTracking()
                 .FirstOrDefaultAsync(gp => gp.GroupId == groupId && gp.UserId == userId && !gp.IsApproved);
         }
+
+        /// <summary>
+        /// Get all pending (not yet approved) participants for multiple groups
+        /// Condition: GroupId IN {groupIds} AND IsApproved = false AND Group.IsActive = true
+        /// </summary>
+        public async Task<List<GroupParticipant>> GetPendingByGroupIdsAsync(List<Guid> groupIds)
+        {
+            return await _context.GroupParticipants
+                .Where(gp => groupIds.Contains(gp.GroupId) && !gp.IsApproved &&
+                    _context.Groups.Any(g => g.GroupId == gp.GroupId && g.IsActive))
+                .AsNoTracking()
+                .ToListAsync();
+        }
     }
 }
