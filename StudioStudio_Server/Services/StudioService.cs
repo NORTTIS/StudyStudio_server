@@ -116,7 +116,8 @@ namespace StudioStudio_Server.Services
                 Tagline = studio.Tagline,
                 Alias = studio.Alias,
                 IsOpen = studio.IsOpen,
-                IsArchived = studio.IsArchived
+                IsArchived = studio.IsArchived,
+                IsMember = participantRecords.Any(p => p.StudioId == studio.StudioId && p.IsApproved)
             }).ToList();
 
             foreach (var response in studioResponses)
@@ -722,71 +723,6 @@ namespace StudioStudio_Server.Services
 
             targetParticipant.IsApproved = true;
             await _studioParticipantRepository.UpdateAsync(targetParticipant);
-
-            // Auto-approve user in all studio groups if they were added as pending
-            var studioGroups = await _groupRepository.GetStudioGroupsAsync(studioId);
-            var groupIds = studioGroups.Select(g => g.GroupId).ToList();
-
-            if (groupIds.Any())
-            {
-                var existingGroupParticipants = await _groupParticipantRepository.GetByGroupIdsAsync(groupIds);
-
-                foreach (var group in studioGroups)
-                {
-                    var pendingInGroup = existingGroupParticipants
-                        .FirstOrDefault(p => p.GroupId == group.GroupId && p.UserId == targetUserId && !p.IsApproved);
-
-                    if (pendingInGroup != null)
-                    {
-                        // User was added as pending when joining the group - now approve them
-                        pendingInGroup.IsApproved = true;
-                        await _groupParticipantRepository.UpdateAsync(pendingInGroup);
-
-                        _logger.LogInformation(
-                            "User {TargetUserId} auto-approved in group {GroupId} after studio {StudioId} approval",
-                            targetUserId, group.GroupId, studioId);
-                    }
-                    else
-                    {
-                        // Check if user is already an approved member or doesn't exist
-                        var isGroupMember = await _groupParticipantRepository
-                            .IsUserApprovedInGroupAsync(group.GroupId, targetUserId);
-
-                        if (!isGroupMember && !existingGroupParticipants.Any(p => p.GroupId == group.GroupId && p.UserId == targetUserId))
-                        {
-                            // User not in group at all - add them if group is open (auto-join groups)
-                            if (group.IsOpen)
-                            {
-                                var groupParticipant = new GroupParticipant
-                                {
-                                    ParticipantId = Guid.NewGuid(),
-                                    GroupId = group.GroupId,
-                                    UserId = targetUserId,
-                                    Role = GroupRole.Member,
-                                    IsApproved = true,
-                                    CreatedAt = DateTime.UtcNow
-                                };
-
-                                try
-                                {
-                                    await _groupParticipantRepository.AddAsync(groupParticipant);
-
-                                    _logger.LogInformation(
-                                        "User {TargetUserId} auto-added to group {GroupId} after studio {StudioId} approval",
-                                        targetUserId, group.GroupId, studioId);
-                                }
-                                catch (DbUpdateException)
-                                {
-                                    // User already in group (race condition), ignore
-                                    _logger.LogWarning(
-                                        "User {TargetUserId} already in group {GroupId} when approving studio {StudioId}",
-                                        targetUserId, group.GroupId, studioId);
-                                }
-                            }
-                        }
-                    }
-                }
-            }
 
             var targetUser = await _userRepository.GetByIdAsync(targetUserId);
 

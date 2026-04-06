@@ -1,6 +1,7 @@
-projectKey=SEP490_G62_NET
-serverUrl=http://localhost
-serverVersion=26.3.0.120487
-dashboardUrl=http://localhost/dashboard?id=SEP490_G62_NET
-ceTaskId=ec1a5fc9-c03d-4cdd-a184-f7812e1ecacb
-ceTaskUrl=http://localhost/api/ce/task?id=ec1a5fc9-c03d-4cdd-a184-f7812e1ecacb
+organization=justming
+projectKey=justming_sep490-g62-net
+serverUrl=https://sonarcloud.io
+serverVersion=8.0.0.84764
+dashboardUrl=https://sonarcloud.io/dashboard?id=justming_sep490-g62-net
+ceTaskId=AZ1erWyohmR2SgYRd018
+ceTaskUrl=https://sonarcloud.io/api/ce/task?id=AZ1erWyohmR2SgYRd018

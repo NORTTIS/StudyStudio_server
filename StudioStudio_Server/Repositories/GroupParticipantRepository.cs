@@ -20,7 +20,7 @@ namespace StudioStudio_Server.Repositories
         /// <summary>
         /// Get participant record by GroupId and UserId
         /// Condition: GroupId = {groupId} AND UserId = {userId} AND Group.IsActive = true
-        /// Use case: Check role, permissions
+        /// Use case: Check role, permissio ns
         /// </summary>
         public async Task<GroupParticipant?> GetByGroupAndUserAsync(Guid groupId, Guid userId)
         {
@@ -244,6 +244,19 @@ namespace StudioStudio_Server.Repositories
             return await _context.GroupParticipants
                 .AsNoTracking()
                 .FirstOrDefaultAsync(gp => gp.GroupId == groupId && gp.UserId == userId && !gp.IsApproved);
+        }
+
+        /// <summary>
+        /// Get all pending (not yet approved) participants for multiple groups
+        /// Condition: GroupId IN {groupIds} AND IsApproved = false AND Group.IsActive = true
+        /// </summary>
+        public async Task<List<GroupParticipant>> GetPendingByGroupIdsAsync(List<Guid> groupIds)
+        {
+            return await _context.GroupParticipants
+                .Where(gp => groupIds.Contains(gp.GroupId) && !gp.IsApproved &&
+                    _context.Groups.Any(g => g.GroupId == gp.GroupId && g.IsActive))
+                .AsNoTracking()
+                .ToListAsync();
         }
     }
 }
