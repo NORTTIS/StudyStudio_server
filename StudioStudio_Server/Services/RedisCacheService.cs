@@ -1,6 +1,7 @@
 using StackExchange.Redis;
 using StudioStudio_Server.Services.Interfaces;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace StudioStudio_Server.Services
 {
@@ -19,9 +20,15 @@ namespace StudioStudio_Server.Services
         private readonly IConnectionMultiplexer _redis;
         private readonly IDatabase _database;
         private readonly ILogger<RedisCacheService> _logger;
-        
+
         // Instance name for all cache keys (same as existing Redis usage)
         private const string INSTANCE_PREFIX = "StudyStudio:Cache:";
+
+        // JSON serializer options that handle circular references (e.g. User ↔ RefreshToken)
+        private static readonly JsonSerializerOptions JsonOptions = new()
+        {
+            ReferenceHandler = ReferenceHandler.IgnoreCycles,
+        };
         
         // Default cache durations (same as MemoryCacheService)
         private static readonly TimeSpan DefaultExpiration = TimeSpan.FromMinutes(10);
@@ -57,7 +64,7 @@ namespace StudioStudio_Server.Services
                 
                 if (cachedValue.HasValue)
                 {
-                    var deserialized = JsonSerializer.Deserialize<T>(cachedValue!);
+                    var deserialized = JsonSerializer.Deserialize<T>(cachedValue!, JsonOptions);
                     if (deserialized != null)
                     {
                         _logger.LogDebug("Redis Cache HIT: {Key}", key);
@@ -119,7 +126,7 @@ namespace StudioStudio_Server.Services
             
             try
             {
-                var json = JsonSerializer.Serialize(value);
+                var json = JsonSerializer.Serialize(value, JsonOptions);
                 await _database.StringSetAsync(redisKey, json, expiration ?? DefaultExpiration);
                 
                 _logger.LogDebug("Redis Cache SET: {Key} (Expiration: {Expiration})", key, expiration ?? DefaultExpiration);
