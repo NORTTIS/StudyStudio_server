@@ -155,9 +155,6 @@ namespace StudioStudio_Server.Services.CleanupQueue
                     // Hard-delete DB record
                     await attachmentRepository.HardDeleteAsync(job.AttachmentId);
 
-                    // Decrement storage used
-                    await attachmentRepository.DecrementStorageUsedAsync(job.GroupId, job.FileSize);
-
                     _logger.LogInformation(
                         "Stuck upload cleaned up: AttachmentId={AttachmentId}, FileSize={FileSize}",
                         job.AttachmentId, job.FileSize);

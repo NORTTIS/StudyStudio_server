@@ -1264,9 +1264,6 @@ namespace StudioStudio_Server.Services
             // Hard-delete DB record
             await _attachmentRepository.HardDeleteAsync(attachmentId);
 
-            // Decrement group storage used
-            await _attachmentRepository.DecrementStorageUsedAsync(attachment.GroupId, attachment.FileSize);
-
             _logger.LogInformation(
                 "Document hard-deleted: AttachmentId={AttachmentId}, FileSize={FileSize}",
                 attachmentId, attachment.FileSize);

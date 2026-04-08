@@ -55,7 +55,8 @@ wwwroot/uploads
 # Environment files
 ############################
 .env
-.env.*
+.env.docker
+.env.local
 
 ############################
 # Docker

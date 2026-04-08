@@ -89,16 +89,6 @@ namespace StudioStudio_Server.Repositories
                 .ExecuteDeleteAsync();
         }
 
-        public async Task DecrementStorageUsedAsync(Guid groupId, long fileSize)
-        {
-            // Update StorageUsedBytes of the group (not the attachment)
-            await _context.Database
-                .ExecuteSqlRawAsync(
-                    @"UPDATE ""Groups"" SET ""StorageUsedBytes"" = GREATEST(0, ""StorageUsedBytes"" - {0})
-                      WHERE ""GroupId"" = {1}",
-                    fileSize, groupId);
-        }
-
         public async Task<List<GroupAttachment>> GetStuckUploadsAsync(TimeSpan olderThan)
         {
             var cutoff = DateTime.UtcNow - olderThan;

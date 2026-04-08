@@ -28,11 +28,6 @@ namespace StudioStudio_Server.Repositories.Interfaces
         Task HardDeleteManyAsync(List<Guid> attachmentIds);
 
         /// <summary>
-        /// Decrement group storage used after document deletion
-        /// </summary>
-        Task DecrementStorageUsedAsync(Guid groupId, long fileSize);
-
-        /// <summary>
         /// Get stuck uploads (Uploading status older than threshold)
         /// </summary>
         Task<List<GroupAttachment>> GetStuckUploadsAsync(TimeSpan olderThan);
