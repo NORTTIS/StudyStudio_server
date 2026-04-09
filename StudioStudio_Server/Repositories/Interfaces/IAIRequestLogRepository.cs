@@ -15,8 +15,8 @@ namespace StudioStudio_Server.Repositories.Interfaces
         Task AddAsync(AIRequestLog log);
 
         /// <summary>
-        /// �?m s? l�?ng AI requests c?a user trong 1 ng�y
-        /// �i?u ki?n: UserId = {userId} AND CreatedAt >= startOfDay
+        /// Đếm số lượng AI requests của user trong 1 ngày
+        /// Điều kiện: UserId = {userId} AND CreatedAt >= startOfDay
         /// Use case: Check rate limiting (Free: 20/day, Premium: 100/day)
         /// </summary>
         /// <param name="userId">User ID</param>
@@ -25,12 +25,22 @@ namespace StudioStudio_Server.Repositories.Interfaces
         Task<int> CountTodayRequestsAsync(Guid userId, DateTime startOfDay);
 
         /// <summary>
-        /// L?y t?ng tokens �? s? d?ng trong ng�y
+        /// Lấy tổng tokens đã sử dụng trong ngày (Input + Output + Cached + Thinking)
         /// Use case: Usage analytics, billing
         /// </summary>
         /// <param name="userId">User ID</param>
         /// <param name="startOfDay">Start of current day (UTC)</param>
         /// <returns>Total tokens used today</returns>
         Task<int> GetTodayTokenUsageAsync(Guid userId, DateTime startOfDay);
+
+        /// <summary>
+        /// Lấy chi tiết token usage trong ngày
+        /// Use case: Detailed analytics dashboard
+        /// </summary>
+        /// <param name="userId">User ID</param>
+        /// <param name="startOfDay">Start of current day (UTC)</param>
+        /// <returns>Tuple of (InputTokens, OutputTokens, CachedTokens, ThinkingTokens, ToolCalls)</returns>
+        Task<(int InputTokens, int OutputTokens, int CachedTokens, int ThinkingTokens, int ToolCalls)>
+            GetTodayTokenUsageDetailAsync(Guid userId, DateTime startOfDay);
     }
 }

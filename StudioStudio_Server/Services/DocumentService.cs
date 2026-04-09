@@ -42,6 +42,7 @@ namespace StudioStudio_Server.Services
         private readonly IGroupRepository _groupRepository;
         private readonly IUserSubscriptionRepository _userSubscriptionRepository;
         private readonly IHttpContextAccessor _httpContextAccessor;
+        private readonly ICacheService _cacheService;
 
         // Allowed file extensions for upload
         private static readonly HashSet<string> AllowedExtensions = new()
@@ -72,7 +73,8 @@ namespace StudioStudio_Server.Services
             ILogger<DocumentService> logger,
             IGroupRepository groupRepository,
             IUserSubscriptionRepository userSubscriptionRepository,
-            IHttpContextAccessor httpContextAccessor)
+            IHttpContextAccessor httpContextAccessor,
+            ICacheService cacheService)
         {
             _attachmentRepository = attachmentRepository;
             _groupParticipantRepository = groupParticipantRepository;
@@ -87,6 +89,7 @@ namespace StudioStudio_Server.Services
             _groupRepository = groupRepository;
             _userSubscriptionRepository = userSubscriptionRepository;
             _httpContextAccessor = httpContextAccessor;
+            _cacheService = cacheService;
         }
 
         /// <summary>
@@ -1263,6 +1266,19 @@ namespace StudioStudio_Server.Services
 
             // Hard-delete DB record
             await _attachmentRepository.HardDeleteAsync(attachmentId);
+
+            // Invalidate AI document cache so AI sees fresh document data immediately
+            try
+            {
+                await _cacheService.InvalidateAIDocumentCacheAsync(userId, attachment.GroupId, null);
+                await _cacheService.InvalidateAIDocumentCacheForGroupAsync(attachment.GroupId, null);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex,
+                    "Failed to invalidate AI document cache after hard delete: AttachmentId={AttachmentId}, GroupId={GroupId}",
+                    attachmentId, attachment.GroupId);
+            }
 
             _logger.LogInformation(
                 "Document hard-deleted: AttachmentId={AttachmentId}, FileSize={FileSize}",

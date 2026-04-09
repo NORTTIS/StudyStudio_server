@@ -17,6 +17,13 @@ public class AIAgentConfig
     /// 1 token ≈ 3.5 ký tự (mixed VN/EN/JSON)
     /// </summary>
     public int MaxContextTokens { get; set; } = 10000;
+
+    /// <summary>
+    /// Soft limit buffer (phần trăm của MaxContextTokens)
+    /// Khi prompt vượt soft limit, trim để giảm tokens
+    /// Đặt 65% để cho phép context lớn hơn trước khi trim
+    /// </summary>
+    public double SoftLimitRatio { get; set; } = 0.65;
     
     /// <summary>
     /// Hệ số chuyển đổi từ ký tự sang tokens

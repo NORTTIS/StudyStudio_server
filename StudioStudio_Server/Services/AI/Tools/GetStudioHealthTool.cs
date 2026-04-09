@@ -64,12 +64,19 @@ public class GetStudioHealthTool : IAITool
             var contributingFactors = new List<string>();
             var topRisks = new List<JsonObject>();
 
+            // Batch: all task stats in 1 query
+            var groupIds = groups.Select(g => g.GroupId).ToList();
+            var taskStatsMap = await _taskRepository.GetGroupTaskStatisticsBatchAsync(groupIds);
+            var participantCountsMap = await _participantRepository.GetParticipantCountsBatchAsync(groupIds);
+
             var groupStats = new List<(Guid groupId, string name, int total, int completed, int overdue, int members)>();
             foreach (var group in groups)
             {
-                var taskStats = await _taskRepository.GetGroupTaskStatisticsAsync(group.GroupId);
-                var members = await _participantRepository.GetAllByGroupIdAsync(group.GroupId);
-                groupStats.Add((group.GroupId, group.GroupName, taskStats.TotalTasks, taskStats.CompletedTasks, taskStats.OverdueTasks, members.Count));
+                if (taskStatsMap.TryGetValue(group.GroupId, out var taskStats))
+                {
+                    var members = participantCountsMap.TryGetValue(group.GroupId, out var count) ? count : 0;
+                    groupStats.Add((group.GroupId, group.GroupName, taskStats.TotalTasks, taskStats.CompletedTasks, taskStats.OverdueTasks, members));
+                }
             }
 
             var totalTasksAll = groupStats.Sum(g => g.total);

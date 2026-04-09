@@ -117,6 +117,23 @@ namespace StudioStudio_Server.Services
         
         public string GetUserGroupsKey(Guid userId) => $"user_groups:{userId}";
 
+        // AI Tool cache key format: ai:tool:{userId}:{scope}:{toolName}:{paramsHash}
+        // scope: group:{groupId} | studio:{studioId} | personal
+        public string GetAIToolCacheKey(Guid userId, Guid? groupId, Guid? studioId, string toolName, string paramsHash)
+        {
+            var scope = groupId.HasValue
+                ? $"group:{groupId.Value}"
+                : studioId.HasValue
+                    ? $"studio:{studioId.Value}"
+                    : "personal";
+
+            return $"ai:tool:{userId}:{scope}:{toolName}:{paramsHash}";
+        }
+
+        public string GetAIGroupToolPattern(Guid groupId) => $"ai:tool:*:group:{groupId}:*";
+        public string GetAIUserToolPattern(Guid userId) => $"ai:tool:{userId}:*";
+        public string GetAIStudioToolPattern(Guid studioId) => $"ai:tool:*:studio:{studioId}:*";
+
         /// <summary>
         /// Get appropriate cache expiration for a given cache key
         /// Returns the predefined expiration time based on key pattern
@@ -186,8 +203,56 @@ namespace StudioStudio_Server.Services
             await RemoveAsync(GetAnnouncementsKey());
             // User-specific announcement caches remain until expiration
             // If immediate invalidation needed, track all user announcement keys
-            
+
             _logger.LogInformation("Invalidated announcement caches");
+        }
+
+        // ==================== AI TOOL CACHE INVALIDATION ====================
+        // Note: IMemoryCache doesn't support pattern matching.
+        // For AI tool caching, consider using Redis which supports RemoveByPatternAsync.
+
+        public Task InvalidateAITaskCacheAsync(Guid userId, Guid? groupId)
+        {
+            // In production with Redis, this would use RemoveByPatternAsync
+            // With IMemoryCache, we rely on short TTL (30s) for AI tool caches
+            _logger.LogWarning("AI task cache invalidation requires Redis for pattern-based deletion");
+            return Task.CompletedTask;
+        }
+
+        public Task InvalidateAIGroupCacheAsync(Guid groupId)
+        {
+            _logger.LogWarning("AI group cache invalidation requires Redis for pattern-based deletion");
+            return Task.CompletedTask;
+        }
+
+        public Task InvalidateAIStudioCacheAsync(Guid studioId)
+        {
+            _logger.LogWarning("AI studio cache invalidation requires Redis for pattern-based deletion");
+            return Task.CompletedTask;
+        }
+
+        public Task InvalidateAIDocumentCacheAsync(Guid userId, Guid? groupId, Guid? studioId)
+        {
+            _logger.LogWarning("AI document cache invalidation requires Redis for pattern-based deletion");
+            return Task.CompletedTask;
+        }
+
+        public Task InvalidateAIDocumentCacheForGroupAsync(Guid groupId, Guid? studioId = null)
+        {
+            _logger.LogWarning("AI group document cache invalidation requires Redis for pattern-based deletion");
+            return Task.CompletedTask;
+        }
+
+        public Task InvalidateAIMemberCacheAsync(Guid groupId)
+        {
+            _logger.LogWarning("AI member cache invalidation requires Redis for pattern-based deletion");
+            return Task.CompletedTask;
+        }
+
+        public Task InvalidateAIUserCacheAsync(Guid userId)
+        {
+            _logger.LogWarning("AI user cache invalidation requires Redis for pattern-based deletion");
+            return Task.CompletedTask;
         }
     }
 }

@@ -82,8 +82,16 @@ public class PersonalAIController : ControllerBase
             // Process với AIAgent
             var result = await _aiAgent.ProcessAsync(request.Question, context, cancellationToken);
 
-            // Log AI request (1 per user prompt, regardless of tool calls)
-            await LogAIRequestAsync(userId.Value, 1);
+            // Log AI request with actual token usage from Gemini
+            var tokenUsage = result.TokenUsage;
+            await LogAIRequestAsync(
+                userId.Value,
+                result.ToolCallCount,
+                tokenUsage?.InputTokens ?? 0,
+                tokenUsage?.OutputTokens ?? 0,
+                tokenUsage?.CachedTokens ?? 0,
+                tokenUsage?.ThinkingTokens ?? 0,
+                result.ProcessingTimeMs);
 
             return Ok(new AIResponse
             {
@@ -114,7 +122,8 @@ public class PersonalAIController : ControllerBase
     }
 
     /// <summary>
-    /// Ask Personal AI (Streaming) - Trả lời theo stream
+    /// Ask Personal AI (Streaming) - Trả lời theo stream với progressive display
+    /// Sử dụng ProcessStreamAsync để stream từng phần của LLM response
     /// </summary>
     [HttpPost("ask/stream")]
     public async Task AskPersonalAIStream(
@@ -127,6 +136,7 @@ public class PersonalAIController : ControllerBase
         {
             Response.StatusCode = StatusCodes.Status401Unauthorized;
             await Response.WriteAsync("Unauthorized");
+            await Response.Body.FlushAsync();
             return;
         }
 
@@ -136,12 +146,18 @@ public class PersonalAIController : ControllerBase
         {
             Response.StatusCode = StatusCodes.Status429TooManyRequests;
             await Response.WriteAsync("Rate limit exceeded");
+            await Response.Body.FlushAsync();
             return;
         }
 
         _logger.LogInformation(
             "Personal AI Stream: UserId={UserId}, Question={Question}",
             userId, request.Question.Length > 100 ? request.Question[..100] + "..." : request.Question);
+
+        // Token usage will be extracted from metadata chunk after processing
+        int toolCount = 0;
+        long processingTimeMs = 0;
+        int inputTokens = 0, outputTokens = 0, cachedTokens = 0, thinkingTokens = 0;
 
         try
         {
@@ -155,38 +171,80 @@ public class PersonalAIController : ControllerBase
                 Language = language
             };
 
-            var result = await _aiAgent.ProcessAsync(request.Question, context, cancellationToken);
-
-            // Log AI request (1 per user prompt)
-            await LogAIRequestAsync(userId.Value, 1);
-
-            // Send metadata first
-            var metadata = JsonConvert.SerializeObject(new
+            // Stream chunks from AIAgent
+            await foreach (var chunk in _aiAgent.ProcessStreamAsync(request.Question, context, cancellationToken))
             {
-                type = "metadata",
-                remainingRequests = rateLimitResult.RemainingRequests - 1,
-                dailyLimit = rateLimitResult.DailyLimit,
-                toolCount = result.ToolCallCount,
-                processingTime = result.ProcessingTimeMs
-            });
-            await Response.WriteAsync($"data: {metadata}\n\n");
+                switch (chunk.Type)
+                {
+                    case "metadata":
+                        // Extract token usage from metadata for logging
+                        toolCount = chunk.ToolCount ?? 0;
+                        processingTimeMs = chunk.ProcessingTimeMs ?? 0;
+                        inputTokens = chunk.InputTokens ?? 0;
+                        outputTokens = chunk.OutputTokens ?? 0;
+                        cachedTokens = chunk.CachedTokens ?? 0;
+                        thinkingTokens = chunk.ThinkingTokens ?? 0;
 
-            // Send full answer as one chunk to avoid losing text due to sentence splitting
-            if (!string.IsNullOrWhiteSpace(result.Answer))
-            {
-                var chunk = JsonConvert.SerializeObject(new { type = "chunk", content = result.Answer });
-                await Response.WriteAsync($"data: {chunk}\n\n");
+                        var metadata = JsonConvert.SerializeObject(new
+                        {
+                            type = "metadata",
+                            remainingRequests = rateLimitResult.RemainingRequests - 1,
+                            dailyLimit = rateLimitResult.DailyLimit,
+                            toolCount = chunk.ToolCount,
+                            processingTime = chunk.ProcessingTimeMs,
+                            inputTokens = chunk.InputTokens,
+                            outputTokens = chunk.OutputTokens,
+                            cachedTokens = chunk.CachedTokens,
+                            thinkingTokens = chunk.ThinkingTokens
+                        });
+                        await Response.WriteAsync($"data: {metadata}\n\n");
+                        await Response.Body.FlushAsync();
+                        break;
+
+                    case "chunk":
+                        if (!string.IsNullOrWhiteSpace(chunk.Content))
+                        {
+                            var chunkData = JsonConvert.SerializeObject(new { type = "chunk", content = chunk.Content });
+                            await Response.WriteAsync($"data: {chunkData}\n\n");
+                            await Response.Body.FlushAsync();
+                        }
+                        break;
+
+                    case "done":
+                        await Response.WriteAsync("data: {\"type\":\"done\"}\n\n");
+                        await Response.Body.FlushAsync();
+                        break;
+
+                    case "error":
+                        var error = JsonConvert.SerializeObject(new { type = "error", message = chunk.ErrorMessage });
+                        await Response.WriteAsync($"data: {error}\n\n");
+                        await Response.Body.FlushAsync();
+                        break;
+                }
             }
-            await Response.WriteAsync("data: {\"type\":\"done\"}\n\n");
+        }
+        catch (OperationCanceledException)
+        {
+            _logger.LogInformation("Personal AI stream cancelled by client");
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Personal AI stream error");
-            var error = JsonConvert.SerializeObject(new { type = "error", message = "Đã xảy ra lỗi khi xử lý yêu cầu." });
+            var error = JsonConvert.SerializeObject(new { type = "error", message = "Đã xảy ra lỗi khi xử lý yêu cầu. Vui lòng thử lại sau." });
             await Response.WriteAsync($"data: {error}\n\n");
+            await Response.Body.FlushAsync();
         }
         finally
         {
+            // Log AI request with actual token usage extracted from streaming metadata
+            await LogAIRequestAsync(
+                userId.Value,
+                toolCount,
+                inputTokens,
+                outputTokens,
+                cachedTokens,
+                thinkingTokens,
+                processingTimeMs);
             await Response.CompleteAsync();
         }
     }
@@ -212,7 +270,7 @@ public class PersonalAIController : ControllerBase
         };
     }
 
-    private async Task LogAIRequestAsync(Guid userId, int toolCallCount)
+    private async Task LogAIRequestAsync(Guid userId, int toolCallCount, int inputTokens, int outputTokens, int cachedTokens, int thinkingTokens, long processingTimeMs)
     {
         try
         {
@@ -220,7 +278,16 @@ public class PersonalAIController : ControllerBase
             {
                 RequestId = Guid.NewGuid(),
                 UserId = userId,
-                TokenUsed = toolCallCount * 100, // Estimate: 1 per user prompt
+                // Legacy field for backward compatibility (Input + Output + Cached)
+                TokenUsed = inputTokens + outputTokens + cachedTokens,
+                // New detailed token tracking
+                InputTokens = inputTokens,
+                OutputTokens = outputTokens,
+                CachedTokens = cachedTokens,
+                ThinkingTokens = thinkingTokens,
+                ToolCallCount = toolCallCount,
+                ProcessingTimeMs = processingTimeMs,
+                AILayer = "Personal",
                 CreatedAt = DateTime.UtcNow
             });
         }

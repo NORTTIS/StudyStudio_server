@@ -83,19 +83,33 @@ public class GetDeadlinesTool : IAITool
             Guid? assigneeId = (role == GroupRole.Owner || role == GroupRole.Moderator) ? null : context.UserId;
 
             var (tasks, _) = await _taskRepository.GetGroupTasksWithFiltersAsync(
-                groupId, 1, 200, null, assigneeId, null, null, null, null, null, null, null, "dueDate", true);
+                groupId, 1, 200, null, assigneeId, null, null, null, null, null,
+                now,                   // dueDateFrom
+                endDate,               // dueDateTo
+                "dueDate", true,      // sortBy, sortAscending
+                null, null,           // statusKeyword, statusCategory
+                null, null);          // minPriority, minSeverity
 
             // Filter: co deadline, trong khoang thoi gian, chua hoan thanh
             var deadlineTasks = tasks
                 .Where(t => t.DueDate.HasValue
                          && t.DueDate.Value >= now
                          && t.DueDate.Value <= endDate
-                         && t.Progress < 100)  // Loai bo task da hoan thanh
+                         && t.Progress < 100)
                 .OrderBy(t => t.DueDate)
                 .Take(limit)
                 .ToList();
 
-            var overdueTasks = tasks
+            // Overdue: load separately with a bounded look-back window
+            var (allOverdue, _) = await _taskRepository.GetGroupTasksWithFiltersAsync(
+                groupId, 1, 50, null, assigneeId, null, null, null, null, null,
+                now.AddDays(-30),     // look back 30 days max
+                null,                  // no upper bound
+                "dueDate", true,
+                null, null,
+                null, null);
+
+            var overdueTasks = allOverdue
                 .Where(t => t.DueDate.HasValue
                          && t.DueDate.Value < now
                          && t.Progress < 100)

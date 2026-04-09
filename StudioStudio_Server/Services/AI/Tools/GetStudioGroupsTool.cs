@@ -57,6 +57,11 @@ public class GetStudioGroupsTool : IAITool
 
             var groups = await _studioRepository.GetGroupsByStudioIdAsync(studioId);
 
+            var groupIds = groups.Select(g => g.GroupId).ToList();
+            var taskStatsMap = groupIds.Count > 0
+                ? await _taskRepository.GetGroupTaskStatisticsBatchAsync(groupIds)
+                : new Dictionary<Guid, global::StudioStudio_Server.Models.DTOs.Response.TaskSummaryResponse>();
+
             var groupsArray = new JsonArray();
             foreach (var g in groups)
             {
@@ -68,12 +73,9 @@ public class GetStudioGroupsTool : IAITool
                     ["created_at"] = g.CreatedAt.ToString("yyyy-MM-dd")
                 };
 
-                var members = await _participantRepository.GetAllByGroupIdAsync(g.GroupId);
-                groupJson["member_count"] = members.Count;
-
-                if (includeStats)
+                if (includeStats && taskStatsMap.TryGetValue(g.GroupId, out var taskStats))
                 {
-                    var taskStats = await _taskRepository.GetGroupTaskStatisticsAsync(g.GroupId);
+                    groupJson["member_count"] = taskStats.HighPriorityTasks + taskStats.MediumPriorityTasks + taskStats.LowPriorityTasks;
                     groupJson["task_stats"] = new JsonObject
                     {
                         ["total_tasks"] = taskStats.TotalTasks,

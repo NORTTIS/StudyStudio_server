@@ -61,12 +61,12 @@ public class GetGroupDocumentsTool : IAITool
             if (group == null)
                 return AIQueryResult.Error("Khong tim thay nhom");
 
-            var limit = Math.Clamp(Ji(parameters["limit"]), 1, 100);
-            var allAttachments = await _attachmentRepository.GetByGroupIdAsync(groupId);
-            var totalCount = allAttachments.Count;
-            var shownAttachments = allAttachments
-                .OrderByDescending(a => a.UploadedAt)
-                .Take(limit)
+            var rawLimit = Ji(parameters["limit"]);
+            var limit = rawLimit > 0 ? Math.Clamp(rawLimit, 1, 100) : 20;
+            var totalCount = await _attachmentRepository.CountByGroupIdAsync(groupId);
+            var shownAttachments = await _attachmentRepository.GetByGroupIdPagedAsync(groupId, 0, limit);
+
+            var shownList = shownAttachments
                 .Select(a => new JsonObject
                 {
                     ["document_id"] = a.GroupAttachmentId.ToString(),
@@ -79,24 +79,23 @@ public class GetGroupDocumentsTool : IAITool
                 .ToList();
 
             sw.Stop();
-            
+
             var result = AIQueryResult.Success(new JsonObject
             {
                 ["group_id"] = groupId.ToString(),
-                ["documents"] = new JsonArray(shownAttachments.ToArray()),
+                ["documents"] = new JsonArray(shownList.ToArray()),
                 ["total_count"] = totalCount,
-                ["shown_count"] = shownAttachments.Count,
+                ["shown_count"] = shownList.Count,
                 ["summary"] = totalCount > 0
-                    ? $"Tim thay {totalCount} tai lieu trong nhom '{group.GroupName}'. Hien thi {shownAttachments.Count} tai lieu."
+                    ? $"Tim thay {totalCount} tai lieu trong nhom '{group.GroupName}'. Hien thi {shownList.Count} tai lieu."
                     : "Khong co tai lieu nao duoc tai len nhom nay."
             }, sw.ElapsedMilliseconds);
-            
-            // Log data size info for context tracking
+
             var resultJson = result.ToJson();
-            
+
             _logger.LogInformation(
                 "[DOCS-RESULT] totalCount={Total} shownCount={Shown} contextSize={CharCount} (full data included)",
-                totalCount, shownAttachments.Count, resultJson.Length);
+                totalCount, shownList.Count, resultJson.Length);
             
             return result;
         }

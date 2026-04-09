@@ -26,6 +26,7 @@ namespace StudioStudio_Server.Services
         private readonly IHttpContextAccessor _httpContextAccessor;
         private readonly ILogger<StudioService> _logger;
         private readonly IConfiguration _configuration;
+        private readonly ICacheService _cacheService;
 
         public StudioService(
             IStudioRepository studioRepository,
@@ -37,7 +38,8 @@ namespace StudioStudio_Server.Services
             IEmailService emailService,
             IHttpContextAccessor httpContextAccessor,
             ILogger<StudioService> logger,
-            IConfiguration configuration)
+            IConfiguration configuration,
+            ICacheService cacheService)
         {
             _studioRepository = studioRepository;
             _groupRepository = groupRepository;
@@ -49,6 +51,7 @@ namespace StudioStudio_Server.Services
             _httpContextAccessor = httpContextAccessor;
             _logger = logger;
             _configuration = configuration;
+            _cacheService = cacheService;
         }
 
         public async Task<StudioListResponse> GetUserStudiosAsync(Guid userId)
@@ -412,6 +415,9 @@ namespace StudioStudio_Server.Services
 
             await _studioRepository.UpdateStudioAsync(updateStudio);
 
+            // Invalidate AI studio cache so AI sees fresh studio data immediately
+            await _cacheService.InvalidateAIStudioCacheAsync(updateStudio.StudioId);
+
             return new UpdateStudioResponse
             {
                 StudioName = updateStudio.StudioName,
@@ -561,6 +567,9 @@ namespace StudioStudio_Server.Services
             studio.IsOpen = isOpen;
             studio.UpdatedAt = DateTime.UtcNow;
             await _studioRepository.UpdateStudioAsync(studio);
+
+            // Invalidate AI studio cache so AI sees fresh studio data immediately
+            await _cacheService.InvalidateAIStudioCacheAsync(studioId);
 
             _logger.LogInformation(
                 "User {UserId} toggled IsOpen to {IsOpen} for studio {StudioId}",

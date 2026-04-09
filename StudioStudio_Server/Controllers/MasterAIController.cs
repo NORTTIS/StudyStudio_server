@@ -101,8 +101,16 @@ public class MasterAIController : ControllerBase
             // Process với AIAgent
             var result = await _aiAgent.ProcessAsync(request.Question, context, cancellationToken);
 
-            // Log AI request (1 per user prompt, regardless of internal tool calls)
-            await LogAIRequestAsync(userId.Value, 1);
+            // Log AI request with actual token usage from Gemini
+            var tokenUsage = result.TokenUsage;
+            await LogAIRequestAsync(
+                userId.Value,
+                result.ToolCallCount,
+                tokenUsage?.InputTokens ?? 0,
+                tokenUsage?.OutputTokens ?? 0,
+                tokenUsage?.CachedTokens ?? 0,
+                tokenUsage?.ThinkingTokens ?? 0,
+                result.ProcessingTimeMs);
 
             return Ok(new AIResponse
             {
@@ -133,7 +141,8 @@ public class MasterAIController : ControllerBase
     }
 
     /// <summary>
-    /// Ask Master AI (Streaming) - Trả lời theo stream
+    /// Ask Master AI (Streaming) - Trả lời theo stream với progressive display
+    /// Sử dụng ProcessStreamAsync để stream từng phần của LLM response
     /// </summary>
     [HttpPost("ask/stream")]
     public async Task AskMasterAIStream(
@@ -146,6 +155,7 @@ public class MasterAIController : ControllerBase
         {
             Response.StatusCode = StatusCodes.Status401Unauthorized;
             await Response.WriteAsync("Unauthorized");
+            await Response.Body.FlushAsync();
             return;
         }
 
@@ -155,6 +165,7 @@ public class MasterAIController : ControllerBase
         {
             Response.StatusCode = StatusCodes.Status404NotFound;
             await Response.WriteAsync("Studio not found");
+            await Response.Body.FlushAsync();
             return;
         }
 
@@ -162,6 +173,7 @@ public class MasterAIController : ControllerBase
         {
             Response.StatusCode = StatusCodes.Status403Forbidden;
             await Response.WriteAsync("Forbidden: Only Studio Owner can use Master AI");
+            await Response.Body.FlushAsync();
             return;
         }
 
@@ -171,12 +183,19 @@ public class MasterAIController : ControllerBase
         {
             Response.StatusCode = StatusCodes.Status429TooManyRequests;
             await Response.WriteAsync("Rate limit exceeded");
+            await Response.Body.FlushAsync();
             return;
         }
 
         _logger.LogInformation(
-            "Master AI Stream: UserId={UserId}, StudioId={StudioId}",
-            userId, request.StudioId);
+            "Master AI Stream: UserId={UserId}, StudioId={StudioId}, Question={Question}",
+            userId, request.StudioId,
+            request.Question.Length > 100 ? request.Question[..100] + "..." : request.Question);
+
+        // Token usage will be extracted from metadata chunk after processing
+        int toolCount = 0;
+        long processingTimeMs = 0;
+        int inputTokens = 0, outputTokens = 0, cachedTokens = 0, thinkingTokens = 0;
 
         try
         {
@@ -190,34 +209,70 @@ public class MasterAIController : ControllerBase
                 StudioId = request.StudioId
             };
 
-            var result = await _aiAgent.ProcessAsync(request.Question, context, cancellationToken);
-
-            // Log AI request (1 per user prompt)
-            await LogAIRequestAsync(userId.Value, 1);
-
-            // Send metadata
-            await SendSSEvent(new
+            // Stream chunks from AIAgent
+            await foreach (var chunk in _aiAgent.ProcessStreamAsync(request.Question, context, cancellationToken))
             {
-                type = "metadata",
-                remainingRequests = rateLimitResult.RemainingRequests - 1,
-                dailyLimit = rateLimitResult.DailyLimit,
-                toolCount = result.ToolCallCount
-            });
+                switch (chunk.Type)
+                {
+                    case "metadata":
+                        toolCount = chunk.ToolCount ?? 0;
+                        processingTimeMs = chunk.ProcessingTimeMs ?? 0;
+                        inputTokens = chunk.InputTokens ?? 0;
+                        outputTokens = chunk.OutputTokens ?? 0;
+                        cachedTokens = chunk.CachedTokens ?? 0;
+                        thinkingTokens = chunk.ThinkingTokens ?? 0;
 
-            // Send full answer as one chunk to avoid losing text due to sentence splitting
-            if (!string.IsNullOrWhiteSpace(result.Answer))
-            {
-                await SendSSEvent(new { type = "chunk", content = result.Answer });
+                        await SendSSEvent(new
+                        {
+                            type = "metadata",
+                            remainingRequests = rateLimitResult.RemainingRequests - 1,
+                            dailyLimit = rateLimitResult.DailyLimit,
+                            toolCount = chunk.ToolCount,
+                            processingTime = chunk.ProcessingTimeMs,
+                            inputTokens = chunk.InputTokens,
+                            outputTokens = chunk.OutputTokens,
+                            cachedTokens = chunk.CachedTokens,
+                            thinkingTokens = chunk.ThinkingTokens
+                        });
+                        break;
+
+                    case "chunk":
+                        if (!string.IsNullOrWhiteSpace(chunk.Content))
+                        {
+                            await SendSSEvent(new { type = "chunk", content = chunk.Content });
+                        }
+                        break;
+
+                    case "done":
+                        await SendSSEvent(new { type = "done" });
+                        break;
+
+                    case "error":
+                        await SendSSEvent(new { type = "error", message = chunk.ErrorMessage });
+                        break;
+                }
             }
-            await SendSSEvent(new { type = "done" });
+        }
+        catch (OperationCanceledException)
+        {
+            _logger.LogInformation("Master AI stream cancelled by client");
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Master AI stream error");
-            await SendSSEvent(new { type = "error", message = ex.Message });
+            await SendSSEvent(new { type = "error", message = "Đã xảy ra lỗi khi xử lý yêu cầu. Vui lòng thử lại sau." });
         }
         finally
         {
+            // Log AI request with actual token usage extracted from streaming metadata
+            await LogAIRequestAsync(
+                userId.Value,
+                toolCount,
+                inputTokens,
+                outputTokens,
+                cachedTokens,
+                thinkingTokens,
+                processingTimeMs);
             await Response.CompleteAsync();
         }
     }
@@ -351,7 +406,7 @@ public class MasterAIController : ControllerBase
         };
     }
 
-    private async Task LogAIRequestAsync(Guid userId, int toolCallCount)
+    private async Task LogAIRequestAsync(Guid userId, int toolCallCount, int inputTokens, int outputTokens, int cachedTokens, int thinkingTokens, long processingTimeMs)
     {
         try
         {
@@ -359,7 +414,14 @@ public class MasterAIController : ControllerBase
             {
                 RequestId = Guid.NewGuid(),
                 UserId = userId,
-                TokenUsed = toolCallCount * 100,
+                TokenUsed = inputTokens + outputTokens + cachedTokens,
+                InputTokens = inputTokens,
+                OutputTokens = outputTokens,
+                CachedTokens = cachedTokens,
+                ThinkingTokens = thinkingTokens,
+                ToolCallCount = toolCallCount,
+                ProcessingTimeMs = processingTimeMs,
+                AILayer = "Master",
                 CreatedAt = DateTime.UtcNow
             });
         }
@@ -378,6 +440,7 @@ public class MasterAIController : ControllerBase
     private async Task SendSSEvent(object data)
     {
         await Response.WriteAsync($"data: {JsonConvert.SerializeObject(data)}\n\n");
+        await Response.Body.FlushAsync();
     }
 
 }

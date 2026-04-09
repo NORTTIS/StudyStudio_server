@@ -87,6 +87,7 @@ namespace StudioStudio_Server.Services.EmbeddingQueue
                     var embeddingService = scope.ServiceProvider.GetRequiredService<IEmbeddingService>();
                     var vectorDbService = scope.ServiceProvider.GetRequiredService<IVectorDatabaseService>();
                     var documentService = scope.ServiceProvider.GetRequiredService<IDocumentService>();
+                    var cacheService = scope.ServiceProvider.GetRequiredService<ICacheService>();
 
                     try
                     {
@@ -98,6 +99,19 @@ namespace StudioStudio_Server.Services.EmbeddingQueue
                             embeddingService,
                             vectorDbService,
                             _logger);
+
+                        // Invalidate AI document cache so AI sees the newly indexed document immediately
+                        try
+                        {
+                            await cacheService.InvalidateAIDocumentCacheAsync(job.UserId, job.GroupId, null);
+                            await cacheService.InvalidateAIDocumentCacheForGroupAsync(job.GroupId, null);
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogWarning(ex,
+                                "Non-critical cache invalidation failed after embedding: AttachmentId={AttachmentId}, GroupId={GroupId}",
+                                job.AttachmentId, job.GroupId);
+                        }
 
                         _queue.UpdateJobStatus(job.AttachmentId, EmbeddingJobStatus.Completed);
                         

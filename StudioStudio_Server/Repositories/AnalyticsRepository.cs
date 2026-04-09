@@ -56,6 +56,17 @@ namespace StudioStudio_Server.Repositories
                 .ToListAsync();
         }
 
+        public async Task<Dictionary<Guid, List<GroupAnalytics>>> GetGroupAnalyticsRangeBatchAsync(List<Guid> groupIds, DateOnly startDate, DateOnly endDate)
+        {
+            var all = await _context.GroupAnalytics
+                .AsNoTracking()
+                .Where(x => groupIds.Contains(x.GroupId) && x.Date >= startDate && x.Date <= endDate)
+                .OrderBy(x => x.Date)
+                .ToListAsync();
+
+            return all.GroupBy(x => x.GroupId).ToDictionary(g => g.Key, g => g.ToList());
+        }
+
         public async Task UpsertGroupAnalyticsAsync(GroupAnalytics analytics)
         {
             var existing = await _context.GroupAnalytics

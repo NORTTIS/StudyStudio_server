@@ -56,11 +56,11 @@ public class GetPersonalTasksTool : IAITool
 
             var now = DateTime.UtcNow;
 
-            // 1. Personal tasks (OwnerId = userId, GroupId = null)
-            var personalTasks = await _taskRepository.GetPersonalTasksByOwnerAsync(context.UserId);
+            // 1. Personal tasks with limit (OwnerId = userId, GroupId = null)
+            var personalTasks = await _taskRepository.GetPersonalTasksByOwnerAsync(context.UserId, limit);
 
-            // 2. Assigned group tasks from active groups only
-            var assignedTasks = await _taskRepository.GetAssignedGroupTasksByUserAsync(context.UserId);
+            // 2. Assigned group tasks from active groups with limit
+            var assignedTasks = await _taskRepository.GetAssignedGroupTasksByUserAsync(context.UserId, limit);
             var userGroups = await _groupRepository.GetUserGroupsAsync(context.UserId);
             var activeGroupIds = userGroups.Where(g => g.IsActive).Select(g => g.GroupId).ToHashSet();
 

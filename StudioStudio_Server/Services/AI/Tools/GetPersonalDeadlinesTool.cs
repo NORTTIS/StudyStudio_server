@@ -53,24 +53,17 @@ public class GetPersonalDeadlinesTool : IAITool
             var limit = Ji(parameters["limit"]);
             if (limit <= 0) limit = 10;
 
-            var tasks = await _taskRepository.GetPersonalTasksByOwnerAsync(context.UserId);
-
             var now = DateTime.UtcNow;
             var endDate = now.AddDays(daysAhead);
 
-            // Loc: co deadline, trong khoang, chua hoan thanh (Progress<100)
-            var deadlineTasks = tasks
-                .Where(t => t.DueDate.HasValue && t.DueDate.Value >= now && t.DueDate.Value <= endDate && t.Progress < 100)
-                .OrderBy(t => t.DueDate)
-                .Take(limit)
-                .ToList();
+            // Upcoming deadlines: filter at DB layer to avoid loading all tasks
+            var deadlineTasks = await _taskRepository.GetPersonalTasksByOwnerWithDeadlineAsync(
+                context.UserId, now, endDate, limit);
 
-            // Qua han: da qua han VA chua hoan thanh
-            var overdueTasks = tasks
-                .Where(t => t.DueDate.HasValue && t.DueDate.Value < now && t.Progress < 100)
-                .OrderBy(t => t.DueDate)
-                .Take(5)
-                .ToList();
+            // Overdue: bounded look-back to avoid loading all history
+            // Note: Progress < 100 is already filtered in the repo query
+            var overdueTasks = await _taskRepository.GetPersonalTasksByOwnerWithDeadlineAsync(
+                context.UserId, now.AddDays(-30), now, 5);
 
             var deadlines = deadlineTasks.Select(t => new JsonObject
             {

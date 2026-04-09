@@ -5,6 +5,7 @@ namespace StudioStudio_Server.Repositories.Interfaces
     public interface IGroupParticipantRepository
     {
         Task<List<GroupParticipant>> GetByGroupIdsAsync(List<Guid> groupIds);
+        Task<Dictionary<Guid, int>> GetParticipantCountsBatchAsync(List<Guid> groupIds);
         Task AddAsync(GroupParticipant participant);
         Task<int> GetParticipantCountByGroupIdAsync(Guid groupId);
         Task<bool> IsUserInGroupAsync(Guid groupId, Guid userId);

@@ -25,6 +25,7 @@ namespace StudioStudio_Server.Services
         private readonly IHttpContextAccessor _httpContextAccessor;
         private readonly IActivityLogService _activityLogService;
         private readonly INotificationService _notificationService;
+        private readonly ICacheService _cacheService;
 
         public TaskService(
             ITaskRepository taskRepository,
@@ -38,7 +39,8 @@ namespace StudioStudio_Server.Services
             IPersonalTaskStatusRepository personalTaskStatusRepository,
             IHttpContextAccessor httpContextAccessor,
             IActivityLogService activityLogService,
-            INotificationService notificationService)
+            INotificationService notificationService,
+            ICacheService cacheService)
         {
             _taskRepository = taskRepository;
             _logger = logger;
@@ -52,6 +54,7 @@ namespace StudioStudio_Server.Services
             _httpContextAccessor = httpContextAccessor;
             _activityLogService = activityLogService;
             _notificationService = notificationService;
+            _cacheService = cacheService;
         }
 
         /// <summary>
@@ -178,6 +181,9 @@ namespace StudioStudio_Server.Services
             };
 
             await _taskRepository.AddAsync(taskItem);
+
+            // Invalidate AI task cache so AI sees fresh data immediately
+            await _cacheService.InvalidateAITaskCacheAsync(userId, request.GroupId);
 
             // Log task creation activity with priority/severity for weighted contribution scoring
             await _activityLogService.LogTaskCreateAsync(
@@ -409,6 +415,9 @@ namespace StudioStudio_Server.Services
 
             await _taskRepository.UpdateAsync(task);
 
+            // Invalidate AI task cache so AI sees fresh data immediately
+            await _cacheService.InvalidateAITaskCacheAsync(userId, groupId);
+
             // ============================================================
             // PHASE 2 OPTIMIZATION: Get existing assignments ONCE and reuse
             // ============================================================
@@ -612,6 +621,10 @@ namespace StudioStudio_Server.Services
             var taskSeverity = (int)task.Severity;
 
             await _taskRepository.SoftDeleteAsync(taskId);
+
+            // Invalidate AI task cache so AI sees fresh data immediately
+            await _cacheService.InvalidateAITaskCacheAsync(userId, groupId);
+
             await _activityLogService.LogTaskDeleteAsync(userId, taskId, groupId, taskPriority, taskSeverity);
 
             // Only notify Owner/Moderator of the group for soft-delete review workflow
@@ -840,6 +853,9 @@ namespace StudioStudio_Server.Services
 
             await _taskRepository.AddAsync(taskItem);
 
+            // Invalidate AI task cache so AI sees fresh data immediately
+            await _cacheService.InvalidateAITaskCacheAsync(userId, null);
+
             // Log task creation activity with priority/severity for weighted contribution scoring
             await _activityLogService.LogTaskCreateAsync(
                 userId, taskItem.TaskId, null, null,
@@ -998,6 +1014,9 @@ namespace StudioStudio_Server.Services
 
             await _taskRepository.UpdateAsync(task);
 
+            // Invalidate AI task cache so AI sees fresh data immediately
+            await _cacheService.InvalidateAITaskCacheAsync(userId, null);
+
             // Prepare response
             var personalStatus = task.PersonalStatusId.HasValue
                 ? await _personalTaskStatusRepository.GetDetailAsync(task.PersonalStatusId.Value)
@@ -1098,6 +1117,9 @@ namespace StudioStudio_Server.Services
             }
 
             await _taskRepository.PermanentDeleteAsync(taskId);
+
+            // Invalidate group AI task cache so AI sees fresh data immediately
+            await _cacheService.InvalidateAITaskCacheAsync(userId, groupId);
         }
     }
 }

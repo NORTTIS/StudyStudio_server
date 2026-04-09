@@ -204,8 +204,6 @@ StudioStudio_Server/
 │   │   ├── Interfaces/IAITool.cs     # Tool contract
 │   │   ├── GetStudioGroupsTool.cs
 │   │   ├── GetStudioAnalyticsTool.cs
-│   │   ├── GetGroupComparisonTool.cs
-│   │   ├── GetStorageUsageTool.cs
 │   │   ├── GetMemberPermissionsTool.cs
 │   │   ├── GetGroupDocumentsTool.cs
 │   │   ├── GetGroupPerformanceTool.cs

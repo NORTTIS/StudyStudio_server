@@ -6,6 +6,9 @@ using StudioStudio_Server.Services.Interfaces;
 using System.Runtime.CompilerServices;
 using System.Text;
 using Microsoft.Extensions.DependencyInjection;
+using Polly;
+using Polly.CircuitBreaker;
+using Polly.Retry;
 
 namespace StudioStudio_Server.Services
 {
@@ -13,6 +16,7 @@ namespace StudioStudio_Server.Services
     /// Service implementation for Gemini LLM API with automatic fallback
     /// Primary: gemini-2.5-flash (fast and efficient)
     /// Fallback: gemini-2.5-pro (more capable, when rate limited or primary fails)
+    /// Includes Polly resilience policies for circuit breaker and retry.
     /// </summary>
     public class GeminiLLMService : ILLMService
     {
@@ -23,6 +27,31 @@ namespace StudioStudio_Server.Services
         private const string GEMINI_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models";
         private const string PRIMARY_MODEL = "gemini-2.5-flash";
         private const string FALLBACK_MODEL = "gemini-2.5-pro";
+
+        // Polly resilience pipeline for circuit breaker + retry
+        private readonly ResiliencePipeline<HttpResponseMessage> _resiliencePipeline;
+
+        // Context caching for system instructions (saves ~60% input token costs)
+        // Cached content name from Gemini API
+        private string? _cachedContentName;
+        private DateTime _cachedContentExpiry = DateTime.MinValue;
+        private readonly TimeSpan _cacheDuration = TimeSpan.FromMinutes(55); // Gemini max TTL is 60min, use 55 for safety
+        private bool _isContextCachingDisabled;
+        private readonly SemaphoreSlim _cacheLock = new(1, 1);
+
+        // Keywords that indicate simple queries (no complex reasoning needed)
+        private static readonly string[] SimpleQueryKeywords = new[]
+        {
+            "thống kê", "statistic", "stats", "tổng quan", "overview", "summary",
+            "bao nhiêu", "how many", "count", "đếm",
+            "liệt kê", "list", "danh sách", "show me", "hiển thị",
+            "cho biết", "tell me", "cho tôi biết",
+            "công việc của tôi", "my tasks", "task của",
+            "thành viên", "members", "người dùng",
+            "deadline", "hạn chót", "ngày đến hạn",
+            "tiến độ", "progress", "đã làm", "chưa làm",
+            "hoàn thành", "completed", "done", "xong"
+        };
 
         public GeminiLLMService(
             HttpClient httpClient,
@@ -38,9 +67,364 @@ namespace StudioStudio_Server.Services
             // Configure HTTP client with LLM-specific timeout
             _httpClient.Timeout = TimeSpan.FromSeconds(_config.LLMTimeoutSeconds);
 
+            // Build Polly resilience pipeline: Retry (3x with exponential backoff) + Circuit Breaker
+            _resiliencePipeline = new ResiliencePipelineBuilder<HttpResponseMessage>()
+                // Retry 3 times with exponential backoff (2s, 4s, 8s) for transient errors
+                .AddRetry(new RetryStrategyOptions<HttpResponseMessage>
+                {
+                    ShouldHandle = new PredicateBuilder<HttpResponseMessage>()
+                        .Handle<HttpRequestException>()
+                        .Handle<TaskCanceledException>()
+                        .HandleResult(r => (int)r.StatusCode >= 500 || (int)r.StatusCode == 429),
+                    MaxRetryAttempts = 3,
+                    Delay = TimeSpan.FromSeconds(2),
+                    BackoffType = DelayBackoffType.Exponential,
+                    OnRetry = args =>
+                    {
+                        _logger.LogWarning(
+                            "Gemini API retry attempt {AttemptNumber} after {Delay}ms. Error: {Exception}",
+                            args.AttemptNumber, args.RetryDelay.TotalMilliseconds, args.Outcome.Exception?.Message ?? args.Outcome.Result?.StatusCode.ToString());
+                        return ValueTask.CompletedTask;
+                    }
+                })
+                // Circuit breaker: open after 5 failures, stay open for 30s, then half-open
+                .AddCircuitBreaker(new CircuitBreakerStrategyOptions<HttpResponseMessage>
+                {
+                    FailureRatio = 0.5,
+                    SamplingDuration = TimeSpan.FromSeconds(30),
+                    MinimumThroughput = 5,
+                    BreakDuration = TimeSpan.FromSeconds(30),
+                    OnOpened = args =>
+                    {
+                        _logger.LogWarning("Gemini API circuit breaker OPENED. Will retry after {Duration}s", args.BreakDuration.TotalSeconds);
+                        return ValueTask.CompletedTask;
+                    },
+                    OnClosed = args =>
+                    {
+                        _logger.LogInformation("Gemini API circuit breaker CLOSED. Normal operation resumed.");
+                        return ValueTask.CompletedTask;
+                    },
+                    OnHalfOpened = args =>
+                    {
+                        _logger.LogInformation("Gemini API circuit breaker HALF-OPEN. Testing with next request...");
+                        return ValueTask.CompletedTask;
+                    }
+                })
+                .Build();
+
             if (string.IsNullOrEmpty(_config.ApiKey))
             {
                 _logger.LogWarning("Gemini API Key not configured. LLM operations will fail at runtime.");
+            }
+        }
+
+        /// <summary>
+        /// Determines if a query is simple (factual retrieval, classification, listing)
+        /// and doesn't need extended thinking. Simple queries can save ~80% output tokens.
+        /// </summary>
+        private bool IsSimpleQuery(string question)
+        {
+            if (string.IsNullOrWhiteSpace(question))
+                return false;
+
+            var lowerQuestion = question.ToLowerInvariant();
+
+            // Check for simple query keywords
+            foreach (var keyword in SimpleQueryKeywords)
+            {
+                if (lowerQuestion.Contains(keyword))
+                    return true;
+            }
+
+            // Check for simple patterns
+            // - Questions starting with what/how/which (not "why" or "explain")
+            // - Requests for lists, counts, summaries
+            // - Questions with no complex reasoning indicators
+            var simplePatterns = new[]
+            {
+                "what is", "what are", "how many", "how much",
+                "which", "list", "show", "get", "give me",
+                "công việc", "task", "deadline", "thành viên"
+            };
+
+            foreach (var pattern in simplePatterns)
+            {
+                if (lowerQuestion.StartsWith(pattern) || lowerQuestion.Contains($" {pattern}"))
+                    return true;
+            }
+
+            // Complex queries that need thinking: why, explain, analyze, compare deeply, recommend
+            var complexIndicators = new[] { "tại sao", "why", "giải thích", "explain", "phân tích", "analyze", "so sánh chi tiết", "đề xuất", "recommend" };
+            foreach (var indicator in complexIndicators)
+            {
+                if (lowerQuestion.Contains(indicator))
+                    return false; // Explicitly complex
+            }
+
+            // Default: use thinking (safer)
+            return false;
+        }
+
+        /// <summary>
+        /// Builds request body for streaming with optional cached content.
+        /// Streaming version doesn't use responseSchema (causes JSON issues with streaming).
+        /// </summary>
+        private object BuildRequestBodyForStreaming(
+            string modelName,
+            string systemPrompt,
+            string userMessage,
+            string userQuestion,
+            string? cachedContent,
+            bool forceTextMode = false)
+        {
+            // Base generation config — responseMimeType only set for JSON mode (tool-calling decisions)
+            object jsonGenConfig = new
+            {
+                temperature = _config.Temperature,
+                topK = _config.TopK,
+                topP = _config.TopP,
+                maxOutputTokens = _config.MaxTokens,
+                responseMimeType = "application/json"
+            };
+
+            object textGenConfig = new
+            {
+                temperature = _config.Temperature,
+                topK = _config.TopK,
+                topP = _config.TopP,
+                maxOutputTokens = _config.MaxTokens
+            };
+
+            if (string.IsNullOrEmpty(cachedContent))
+            {
+                return new
+                {
+                    system_instruction = new
+                    {
+                        parts = new[]
+                        {
+                            new { text = systemPrompt }
+                        }
+                    },
+                    contents = new[]
+                    {
+                        new
+                        {
+                            role = "user",
+                            parts = new[]
+                            {
+                                new { text = userMessage }
+                            }
+                        }
+                    },
+                    generationConfig = forceTextMode ? textGenConfig : jsonGenConfig
+                };
+            }
+            else
+            {
+                return new
+                {
+                    cachedContent = cachedContent,
+                    contents = new[]
+                    {
+                        new
+                        {
+                            role = "user",
+                            parts = new[]
+                            {
+                                new { text = userMessage }
+                            }
+                        }
+                    },
+                    generationConfig = forceTextMode ? textGenConfig : jsonGenConfig
+                };
+            }
+        }
+
+        /// <summary>
+        /// Gets or creates cached content for system instructions.
+        /// Context Caching saves ~60% input token costs by caching repetitive system prompts.
+        /// </summary>
+        private async Task<string?> GetOrCreateCachedContentAsync(string systemPrompt, CancellationToken cancellationToken)
+        {
+            var lockAcquired = false;
+
+            // Create new cache
+            try
+            {
+                if (_isContextCachingDisabled)
+                {
+                    return null;
+                }
+
+                // Check if we have a valid cached content
+                if (!string.IsNullOrEmpty(_cachedContentName) && DateTime.UtcNow < _cachedContentExpiry)
+                {
+                    _logger.LogDebug("Using cached content: {CacheName}", _cachedContentName);
+                    return _cachedContentName;
+                }
+
+                await _cacheLock.WaitAsync(cancellationToken);
+                lockAcquired = true;
+
+                if (_isContextCachingDisabled)
+                {
+                    return null;
+                }
+
+                // Double-check after lock to avoid duplicate cache creation.
+                if (!string.IsNullOrEmpty(_cachedContentName) && DateTime.UtcNow < _cachedContentExpiry)
+                {
+                    _logger.LogDebug("Using cached content after lock: {CacheName}", _cachedContentName);
+                    return _cachedContentName;
+                }
+
+                var cacheRequest = new
+                {
+                    contents = new[]
+                    {
+                        new
+                        {
+                            parts = new[]
+                            {
+                                new { text = systemPrompt }
+                            }
+                        }
+                    }
+                };
+
+                string jsonRequest = JsonSerializer.Serialize(cacheRequest, new JsonSerializerOptions
+                {
+                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+                });
+
+                var content = new StringContent(jsonRequest, Encoding.UTF8, "application/json");
+                var url = $"{GEMINI_ENDPOINT}/{PRIMARY_MODEL}:saveContext?key={_config.ApiKey}";
+
+                _logger.LogInformation("Creating new context cache for system prompt...");
+
+                // Cache creation doesn't use resilience pipeline (single request, simple operation)
+                HttpResponseMessage response = await _httpClient.PostAsync(url, content, cancellationToken);
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    string errorContent = await response.Content.ReadAsStringAsync(cancellationToken);
+                    _logger.LogWarning("Failed to create context cache: {Status} - {Error}", response.StatusCode, errorContent);
+
+                    if ((int)response.StatusCode == 404 || (int)response.StatusCode == 400)
+                    {
+                        _isContextCachingDisabled = true;
+                        _logger.LogWarning(
+                            "Context caching appears unsupported for this model/API key. Disabling saveContext attempts for subsequent requests.");
+                    }
+
+                    return null;
+                }
+
+                string jsonResponse = await response.Content.ReadAsStringAsync(cancellationToken);
+                using var doc = JsonDocument.Parse(jsonResponse);
+                var root = doc.RootElement;
+
+                // Extract cached content name
+                if (root.TryGetProperty("cachedContent", out JsonElement cachedContent) &&
+                    cachedContent.TryGetProperty("name", out JsonElement cacheName))
+                {
+                    _cachedContentName = cacheName.GetString();
+                    _cachedContentExpiry = DateTime.UtcNow.Add(_cacheDuration);
+                    _logger.LogInformation("Context cache created: {CacheName}, expires at {Expiry}",
+                        _cachedContentName, _cachedContentExpiry);
+                    return _cachedContentName;
+                }
+
+                _logger.LogWarning("Could not extract cached content name from response");
+                return null;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Error creating context cache");
+                return null;
+            }
+            finally
+            {
+                if (lockAcquired)
+                {
+                    _cacheLock.Release();
+                }
+            }
+        }
+
+        /// <summary>
+        /// Builds request body with optional cached content for system instructions.
+        /// </summary>
+        private object BuildRequestBody(
+            string modelName,
+            string systemPrompt,
+            string userMessage,
+            JsonObject? responseSchema,
+            string userQuestion,
+            string? cachedContent)
+        {
+            if (string.IsNullOrEmpty(cachedContent))
+            {
+                // No cache available, use system_instruction directly
+                return new
+                {
+                    system_instruction = new
+                    {
+                        parts = new[]
+                        {
+                            new { text = systemPrompt }
+                        }
+                    },
+                    contents = new[]
+                    {
+                        new
+                        {
+                            role = "user",
+                            parts = new[]
+                            {
+                                new { text = userMessage }
+                            }
+                        }
+                    },
+                    generationConfig = new
+                    {
+                        temperature = _config.Temperature,
+                        topK = _config.TopK,
+                        topP = _config.TopP,
+                        maxOutputTokens = _config.MaxTokens,
+                        responseMimeType = responseSchema != null ? "application/json" : null,
+                        responseSchema = responseSchema
+                    }
+                };
+            }
+            else
+            {
+                // Use cached content for system instructions
+                return new
+                {
+                    cachedContent = cachedContent,
+                    contents = new[]
+                    {
+                        new
+                        {
+                            role = "user",
+                            parts = new[]
+                            {
+                                new { text = userMessage }
+                            }
+                        }
+                    },
+                    generationConfig = new
+                    {
+                        temperature = _config.Temperature,
+                        topK = _config.TopK,
+                        topP = _config.TopP,
+                        maxOutputTokens = _config.MaxTokens,
+                        responseMimeType = responseSchema != null ? "application/json" : null,
+                        responseSchema = responseSchema
+                    }
+                };
             }
         }
 
@@ -142,6 +526,65 @@ namespace StudioStudio_Server.Services
             try
             {
                 _logger.LogInformation("Attempting answer generation with PRIMARY model: {Model}", PRIMARY_MODEL);
+                var result = await GenerateAnswerInternalAsync(
+                    PRIMARY_MODEL,
+                    systemPrompt,
+                    userMessage,
+                    context,
+                    cancellationToken,
+                    BuildAgentResponseSchema());
+                return result.Answer;
+            }
+            catch (HttpRequestException ex) when (IsRateLimitError(ex))
+            {
+                _logger.LogWarning(
+                    "Rate limit hit on PRIMARY model ({Model}). Falling back to FALLBACK model ({Fallback})",
+                    PRIMARY_MODEL, FALLBACK_MODEL);
+
+                // Fallback to alternative model
+                try
+                {
+                    var result = await GenerateAnswerInternalAsync(
+                        FALLBACK_MODEL,
+                        systemPrompt,
+                        userMessage,
+                        context,
+                        cancellationToken,
+                        BuildAgentResponseSchema());
+                    return result.Answer;
+                }
+                catch (Exception fallbackEx)
+                {
+                    _logger.LogError(fallbackEx, "FALLBACK model ({Model}) also failed", FALLBACK_MODEL);
+                    throw new Exception($"Both PRIMARY and FALLBACK models failed. Last error: {fallbackEx.Message}", fallbackEx);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error calling PRIMARY model: {Model}", PRIMARY_MODEL);
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// Generates answer using Gemini LLM with token usage tracking.
+        /// Extracts usage_metadata from Gemini response for accurate billing and analytics.
+        /// </summary>
+        public async Task<(string Answer, TokenUsage Usage)> GenerateAnswerWithUsageAsync(
+            string systemPrompt,
+            string userMessage,
+            string context,
+            CancellationToken cancellationToken = default)
+        {
+            if (string.IsNullOrEmpty(_config.ApiKey))
+            {
+                _logger.LogError("Gemini API Key not configured. Cannot generate answer.");
+                throw new InvalidOperationException("Gemini API Key is not configured");
+            }
+
+            try
+            {
+                _logger.LogInformation("Attempting answer generation with token tracking: {Model}", PRIMARY_MODEL);
                 return await GenerateAnswerInternalAsync(
                     PRIMARY_MODEL,
                     systemPrompt,
@@ -156,7 +599,6 @@ namespace StudioStudio_Server.Services
                     "Rate limit hit on PRIMARY model ({Model}). Falling back to FALLBACK model ({Fallback})",
                     PRIMARY_MODEL, FALLBACK_MODEL);
 
-                // Fallback to alternative model
                 try
                 {
                     return await GenerateAnswerInternalAsync(
@@ -169,14 +611,17 @@ namespace StudioStudio_Server.Services
                 }
                 catch (Exception fallbackEx)
                 {
-                    _logger.LogError(fallbackEx, "FALLBACK model ({Model}) also failed", FALLBACK_MODEL);
-                    throw new Exception($"Both PRIMARY and FALLBACK models failed. Last error: {fallbackEx.Message}", fallbackEx);
+                    _logger.LogError(
+                        fallbackEx,
+                        "Fallback model also failed. Primary={Primary}, Fallback={Fallback}",
+                        PRIMARY_MODEL,
+                        FALLBACK_MODEL);
+
+                    throw new Exception(
+                        $"Both PRIMARY ({PRIMARY_MODEL}) and FALLBACK ({FALLBACK_MODEL}) models failed. "
+                        + $"Primary error: {ex.Message}. Fallback error: {fallbackEx.Message}",
+                        fallbackEx);
                 }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error calling PRIMARY model: {Model}", PRIMARY_MODEL);
-                throw;
             }
         }
 
@@ -198,13 +643,14 @@ namespace StudioStudio_Server.Services
             try
             {
                 _logger.LogInformation("Attempting raw text generation with PRIMARY model: {Model}", PRIMARY_MODEL);
-                return await GenerateAnswerInternalAsync(
+                var result = await GenerateAnswerInternalAsync(
                     PRIMARY_MODEL,
                     systemPrompt,
                     userMessage,
                     context,
                     cancellationToken,
                     null);
+                return result.Answer;
             }
             catch (HttpRequestException ex) when (IsRateLimitError(ex))
             {
@@ -212,20 +658,22 @@ namespace StudioStudio_Server.Services
                     "Rate limit hit on PRIMARY model ({Model}) for raw text. Falling back to FALLBACK model ({Fallback})",
                     PRIMARY_MODEL, FALLBACK_MODEL);
 
-                return await GenerateAnswerInternalAsync(
+                var result = await GenerateAnswerInternalAsync(
                     FALLBACK_MODEL,
                     systemPrompt,
                     userMessage,
                     context,
                     cancellationToken,
                     null);
+                return result.Answer;
             }
         }
 
         /// <summary>
-        /// Internal method to call Gemini API with specified model
+        /// Internal method to call Gemini API with specified model.
+        /// Returns both the answer and token usage extracted from usage_metadata.
         /// </summary>
-        private async Task<string> GenerateAnswerInternalAsync(
+        private async Task<(string Answer, TokenUsage Usage)> GenerateAnswerInternalAsync(
             string modelName,
             string systemPrompt,
             string userMessage,
@@ -241,37 +689,17 @@ namespace StudioStudio_Server.Services
                 // Build request URL
                 string url = $"{GEMINI_ENDPOINT}/{modelName}:generateContent?key={_config.ApiKey}";
 
+                // Get or create cached content for system instructions (saves ~60% input tokens)
+                var cachedContent = await GetOrCreateCachedContentAsync(systemPrompt, cancellationToken);
+
                 // Build request body according to Gemini API format
-                var requestBody = new
-                {
-                    system_instruction = new
-                    {
-                        parts = new[]
-                        {
-                            new { text = systemPrompt }
-                        }
-                    },
-                    contents = new[]
-                    {
-                        new
-                        {
-                            role = "user",
-                            parts = new[]
-                            {
-                                new { text = fullMessage }
-                            }
-                        }
-                    },
-                    generationConfig = new
-                    {
-                        temperature = _config.Temperature,
-                        topK = _config.TopK,
-                        topP = _config.TopP,
-                        maxOutputTokens = _config.MaxTokens,
-                        responseMimeType = responseSchema != null ? "application/json" : null,
-                        responseSchema = responseSchema
-                    }
-                };
+                var requestBody = BuildRequestBody(
+                    modelName,
+                    systemPrompt,
+                    fullMessage,
+                    responseSchema,
+                    userMessage,
+                    cachedContent);
 
                 string jsonRequest = JsonSerializer.Serialize(requestBody, new JsonSerializerOptions
                 {
@@ -282,14 +710,23 @@ namespace StudioStudio_Server.Services
 
                 _logger.LogInformation("Calling Gemini API with model: {Model}", modelName);
 
-                // Call API
-                HttpResponseMessage response = await _httpClient.PostAsync(url, content, cancellationToken);
+                // Call API with Polly resilience pipeline (retry + circuit breaker)
+                HttpResponseMessage response = await _resiliencePipeline.ExecuteAsync(
+                    async token =>
+                    {
+                        var request = new HttpRequestMessage(HttpMethod.Post, url)
+                        {
+                            Content = content
+                        };
+                        return await _httpClient.SendAsync(request, token);
+                    },
+                    cancellationToken);
 
                 // Handle error responses
                 if (!response.IsSuccessStatusCode)
                 {
                     string errorContent = await response.Content.ReadAsStringAsync(cancellationToken);
-                    
+
                     _logger.LogError(
                         "Gemini API error. Status: {Status}, Model: {Model}, Error: {Error}",
                         response.StatusCode, modelName, errorContent);
@@ -312,6 +749,9 @@ namespace StudioStudio_Server.Services
                 using JsonDocument doc = JsonDocument.Parse(jsonResponse);
                 JsonElement root = doc.RootElement;
 
+                // Extract token usage from usage_metadata
+                TokenUsage tokenUsage = ExtractTokenUsage(root);
+
                 // Extract text from response
                 // Response format: { "candidates": [{ "content": { "parts": [{ "text": "..." }] } }] }
                 if (root.TryGetProperty("candidates", out JsonElement candidates) &&
@@ -328,10 +768,10 @@ namespace StudioStudio_Server.Services
                             string answer = textElement.GetString() ?? string.Empty;
 
                             _logger.LogInformation(
-                                "Gemini API response received from {Model}. Length: {Length} chars",
-                                modelName, answer.Length);
+                                "Gemini API response received from {Model}. Length: {Length} chars, Tokens: In={Input} Out={Output} Cached={Cached}",
+                                modelName, answer.Length, tokenUsage.InputTokens, tokenUsage.OutputTokens, tokenUsage.CachedTokens);
 
-                            return answer;
+                            return (answer, tokenUsage);
                         }
                     }
                 }
@@ -361,6 +801,42 @@ namespace StudioStudio_Server.Services
         }
 
         /// <summary>
+        /// Extracts token usage from Gemini API usage_metadata.
+        /// usage_metadata structure:
+        /// - prompt_token_count: input tokens
+        /// - candidates_token_count: output tokens
+        /// - cached_content_token_count: cached tokens (from context caching)
+        /// - thoughts_token_count: thinking tokens (from thinking mode)
+        /// </summary>
+        private TokenUsage ExtractTokenUsage(JsonElement root)
+        {
+            try
+            {
+                if (!root.TryGetProperty("usageMetadata", out JsonElement usageMetadata))
+                {
+                    _logger.LogDebug("No usage_metadata found in response, using zero tokens");
+                    return new TokenUsage(0, 0);
+                }
+
+                int inputTokens = usageMetadata.TryGetProperty("promptTokenCount", out JsonElement promptEl)
+                    ? promptEl.GetInt32() : 0;
+                int outputTokens = usageMetadata.TryGetProperty("candidatesTokenCount", out JsonElement outputEl)
+                    ? outputEl.GetInt32() : 0;
+                int cachedTokens = usageMetadata.TryGetProperty("cachedContentTokenCount", out JsonElement cachedEl)
+                    ? cachedEl.GetInt32() : 0;
+                int thinkingTokens = usageMetadata.TryGetProperty("thoughtsTokenCount", out JsonElement thoughtsEl)
+                    ? thoughtsEl.GetInt32() : 0;
+
+                return new TokenUsage(inputTokens, outputTokens, cachedTokens, thinkingTokens);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to extract token usage from response");
+                return new TokenUsage(0, 0);
+            }
+        }
+
+        /// <summary>
         /// Generates answer using Gemini LLM with automatic fallback on rate limit (streaming version)
         /// Flow:
         /// 1. Try PRIMARY_MODEL (gemini-2.5-flash)
@@ -372,7 +848,8 @@ namespace StudioStudio_Server.Services
             string systemPrompt,
             string userMessage,
             string context,
-            [EnumeratorCancellation] CancellationToken cancellationToken = default)
+            [EnumeratorCancellation] CancellationToken cancellationToken = default,
+            bool forceTextMode = false)
         {
             // Validate API key
             if (string.IsNullOrEmpty(_config.ApiKey))
@@ -389,7 +866,8 @@ namespace StudioStudio_Server.Services
                 systemPrompt,
                 userMessage,
                 context,
-                cancellationToken);
+                cancellationToken,
+                forceTextMode);
 
             IAsyncEnumerator<string> primaryEnumerator = primaryStream.GetAsyncEnumerator(cancellationToken);
             
@@ -430,7 +908,8 @@ namespace StudioStudio_Server.Services
                     systemPrompt,
                     userMessage,
                     context,
-                    cancellationToken);
+                    cancellationToken,
+                    forceTextMode);
 
                 await foreach (var chunk in fallbackStream.WithCancellation(cancellationToken))
                 {
@@ -463,7 +942,8 @@ namespace StudioStudio_Server.Services
             string systemPrompt,
             string userMessage,
             string context,
-            [EnumeratorCancellation] CancellationToken cancellationToken)
+            [EnumeratorCancellation] CancellationToken cancellationToken,
+            bool forceTextMode = false)
         {
             // Combine context with user message
             string fullMessage = $"{context}\n\nQuestion: {userMessage}";
@@ -471,40 +951,17 @@ namespace StudioStudio_Server.Services
             // Build request URL with streaming
             string url = $"{GEMINI_ENDPOINT}/{modelName}:streamGenerateContent?key={_config.ApiKey}&alt=sse";
 
+            // Get or create cached content for system instructions (saves ~60% input tokens)
+            var cachedContent = await GetOrCreateCachedContentAsync(systemPrompt, cancellationToken);
+
             // Build request body according to Gemini API format
-            var requestBody = new
-            {
-                system_instruction = new
-                {
-                    parts = new[]
-                    {
-                        new { text = systemPrompt }
-                    }
-                },
-                contents = new[]
-                {
-                    new
-                    {
-                        role = "user",
-                        parts = new[]
-                        {
-                            new { text = fullMessage }
-                        }
-                    }
-                },
-                generationConfig = new
-                {
-                    temperature = _config.Temperature,
-                    topK = _config.TopK,
-                    topP = _config.TopP,
-                    maxOutputTokens = _config.MaxTokens,
-                    responseMimeType = "application/json"
-                    // NOTE: responseSchema removed from streaming path.
-                    // When set, Gemini enforces strict JSON output - if final_answer
-                    // contains unescaped newlines/quotes, JSON becomes malformed and
-                    // ParseDecision falls back to empty string.
-                }
-            };
+            var requestBody = BuildRequestBodyForStreaming(
+                modelName,
+                systemPrompt,
+                fullMessage,
+                userMessage,
+                cachedContent,
+                forceTextMode);
 
             string jsonRequest = JsonSerializer.Serialize(requestBody, new JsonSerializerOptions
             {
@@ -515,26 +972,52 @@ namespace StudioStudio_Server.Services
 
             _logger.LogInformation("Calling Gemini Streaming API with model: {Model}", modelName);
 
-            // Call API
-            HttpResponseMessage response = await _httpClient.PostAsync(url, content, cancellationToken);
+            // For streaming, use simple retry without circuit breaker (circuit breaker can cause issues with streaming)
+            HttpResponseMessage? response = null;
+            int retryCount = 0;
+            const int maxRetries = 3;
+
+            while (retryCount < maxRetries)
+            {
+                try
+                {
+                    var request = new HttpRequestMessage(HttpMethod.Post, url)
+                    {
+                        Content = content
+                    };
+                    response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+                    break;
+                }
+                catch (Exception ex) when (retryCount < maxRetries - 1)
+                {
+                    retryCount++;
+                    var delay = TimeSpan.FromSeconds(Math.Pow(2, retryCount));
+                    _logger.LogWarning("Gemini streaming retry {Retry}/{Max} after {Delay}s. Error: {Error}",
+                        retryCount, maxRetries, delay.TotalSeconds, ex.Message);
+                    await Task.Delay(delay, cancellationToken);
+                }
+            }
 
             // Handle error responses
-            if (!response.IsSuccessStatusCode)
+            if (response == null || !response.IsSuccessStatusCode)
             {
-                string errorContent = await response.Content.ReadAsStringAsync(cancellationToken);
+                var statusCode = response?.StatusCode ?? System.Net.HttpStatusCode.ServiceUnavailable;
+                string errorContent = response != null
+                    ? await response.Content.ReadAsStringAsync(cancellationToken)
+                    : "All retries failed";
 
                 _logger.LogError(
                     "Gemini Streaming API error. Status: {Status}, Model: {Model}, Error: {Error}",
-                    response.StatusCode, modelName, errorContent);
+                    statusCode, modelName, errorContent);
 
-                if ((int)response.StatusCode == 429 || (int)response.StatusCode == 402)
+                if ((int)statusCode == 429 || (int)statusCode == 402)
                 {
-                    throw new HttpRequestException($"Retryable error ({response.StatusCode}) for model {modelName}");
+                    throw new HttpRequestException($"Retryable error ({statusCode}) for model {modelName}");
                 }
 
                 // Extract clean error message - don't leak raw JSON
-                string cleanMessage = ExtractCleanErrorMessage(response.StatusCode, errorContent);
-                throw new Exception($"Gemini Streaming API error ({response.StatusCode}): {cleanMessage}");
+                string cleanMessage = ExtractCleanErrorMessage(statusCode, errorContent);
+                throw new Exception($"Gemini Streaming API error ({(int)statusCode}): {cleanMessage}");
             }
 
             // Read stream

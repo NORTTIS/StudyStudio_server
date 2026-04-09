@@ -1,6 +1,15 @@
 namespace StudioStudio_Server.Services.Interfaces
 {
     /// <summary>
+    /// Tracks token usage from LLM API responses for accurate billing and analytics.
+    /// </summary>
+    public record TokenUsage(
+        int InputTokens,
+        int OutputTokens,
+        int CachedTokens = 0,
+        int ThinkingTokens = 0);
+
+    /// <summary>
     /// Service interface cho LLM (Large Language Model) inference
     /// Implementation: GeminiLLMService su dung Gemini 2.5 Flash (primary) voi fallback sang Gemini 1.5 Flash
     /// </summary>
@@ -15,6 +24,20 @@ namespace StudioStudio_Server.Services.Interfaces
         /// <param name="cancellationToken">Cancellation token</param>
         /// <returns>Cau tra loi tu LLM</returns>
         Task<string> GenerateAnswerAsync(
+            string systemPrompt,
+            string userMessage,
+            string context,
+            CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// Goi LLM API de generate cau tra loi + token usage
+        /// </summary>
+        /// <param name="systemPrompt">System prompt de dinh nghia behavior cua AI</param>
+        /// <param name="userMessage">Cau hoi tu user</param>
+        /// <param name="context">Context tu documents va tasks</param>
+        /// <param name="cancellationToken">Cancellation token</param>
+        /// <returns>Tuple of (answer, tokenUsage) tu LLM</returns>
+        Task<(string Answer, TokenUsage Usage)> GenerateAnswerWithUsageAsync(
             string systemPrompt,
             string userMessage,
             string context,
@@ -42,11 +65,12 @@ namespace StudioStudio_Server.Services.Interfaces
         /// <param name="userMessage">Cau hoi tu user</param>
         /// <param name="context">Context tu documents va tasks</param>
         /// <param name="cancellationToken">Cancellation token</param>
-        /// <returns>Stream cua cau tra loi tu LLM</returns>
+        /// <returns>Stream of text chunks from LLM</returns>
         IAsyncEnumerable<string> GenerateAnswerStreamAsync(
             string systemPrompt,
             string userMessage,
             string context,
-            CancellationToken cancellationToken = default);
+            CancellationToken cancellationToken = default,
+            bool forceTextMode = false);
     }
 }

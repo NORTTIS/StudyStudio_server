@@ -212,6 +212,23 @@ namespace StudioStudio_Server.Services
         
         public string GetUserGroupsKey(Guid userId) => $"user_groups:{userId}";
 
+        // AI Tool cache key format: ai:tool:{userId}:{scope}:{toolName}:{paramsHash}
+        // scope: group:{groupId} | studio:{studioId} | personal
+        public string GetAIToolCacheKey(Guid userId, Guid? groupId, Guid? studioId, string toolName, string paramsHash)
+        {
+            var scope = groupId.HasValue
+                ? $"group:{groupId.Value}"
+                : studioId.HasValue
+                    ? $"studio:{studioId.Value}"
+                    : "personal";
+
+            return $"ai:tool:{userId}:{scope}:{toolName}:{paramsHash}";
+        }
+
+        public string GetAIGroupToolPattern(Guid groupId) => $"ai:tool:*:group:{groupId}:*";
+        public string GetAIUserToolPattern(Guid userId) => $"ai:tool:{userId}:*";
+        public string GetAIStudioToolPattern(Guid studioId) => $"ai:tool:*:studio:{studioId}:*";
+
         /// <summary>
         /// Get appropriate cache expiration for a given cache key
         /// Returns the predefined expiration time based on key pattern
@@ -308,12 +325,159 @@ namespace StudioStudio_Server.Services
                 await RemoveAsync(GetAnnouncementsKey());
                 // Could also invalidate all user_announcements:* keys if needed:
                 // await RemoveByPatternAsync("user_announcements:*");
-                
+
                 _logger.LogInformation("Redis: Invalidated announcement caches");
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Redis error invalidating announcement caches");
+            }
+        }
+
+        // ==================== AI TOOL CACHE INVALIDATION ====================
+
+        /// <summary>
+        /// Invalidate AI tool caches related to task changes (create/update/delete task)
+        /// Call this from TaskService when task data changes so AI sees fresh data
+        /// </summary>
+        public async Task InvalidateAITaskCacheAsync(Guid userId, Guid? groupId)
+        {
+            try
+            {
+                var tasks = new List<Task>();
+
+                // Invalidate task tools for this user
+                tasks.Add(RemoveByPatternAsync($"ai:tool:{userId}:*task*"));
+                tasks.Add(RemoveByPatternAsync($"ai:tool:{userId}:*deadline*"));
+
+                // If group context, invalidate group task caches too
+                if (groupId.HasValue)
+                {
+                    tasks.Add(RemoveByPatternAsync($"ai:tool:*:group:{groupId}:*task*"));
+                    tasks.Add(RemoveByPatternAsync($"ai:tool:*:group:{groupId}:*deadline*"));
+                }
+
+                await Task.WhenAll(tasks);
+                _logger.LogInformation("AI Task cache invalidated for user {UserId}, group {GroupId}", userId, groupId);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to invalidate AI task cache");
+            }
+        }
+
+        /// <summary>
+        /// Invalidate all AI tool caches for a group (member changes, group settings)
+        /// </summary>
+        public async Task InvalidateAIGroupCacheAsync(Guid groupId)
+        {
+            try
+            {
+                await RemoveByPatternAsync($"ai:tool:*:{groupId}:*");
+                _logger.LogInformation("AI Group cache invalidated for group {GroupId}", groupId);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to invalidate AI group cache for {GroupId}", groupId);
+            }
+        }
+
+        /// <summary>
+        /// Invalidate all AI tool caches for a studio (studio settings, owner actions)
+        /// </summary>
+        public async Task InvalidateAIStudioCacheAsync(Guid studioId)
+        {
+            try
+            {
+                await RemoveByPatternAsync(GetAIStudioToolPattern(studioId));
+                _logger.LogInformation("AI Studio cache invalidated for studio {StudioId}", studioId);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to invalidate AI studio cache for {StudioId}", studioId);
+            }
+        }
+
+        /// <summary>
+        /// Invalidate AI document search caches
+        /// </summary>
+        public async Task InvalidateAIDocumentCacheAsync(Guid userId, Guid? groupId, Guid? studioId)
+        {
+            try
+            {
+                var tasks = new List<Task>
+                {
+                    RemoveByPatternAsync($"ai:tool:{userId}:*search*document*")
+                };
+
+                if (groupId.HasValue)
+                    tasks.Add(RemoveByPatternAsync($"ai:tool:*:group:{groupId}:*search*document*"));
+
+                if (studioId.HasValue)
+                    tasks.Add(RemoveByPatternAsync($"ai:tool:*:studio:{studioId}:*search*document*"));
+
+                await Task.WhenAll(tasks);
+                _logger.LogInformation("AI Document cache invalidated");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to invalidate AI document cache");
+            }
+        }
+
+        /// <summary>
+        /// Invalidate AI member-related caches (permissions, member list)
+        /// </summary>
+        public async Task InvalidateAIMemberCacheAsync(Guid groupId)
+        {
+            try
+            {
+                await RemoveByPatternAsync($"ai:tool:*:group:{groupId}:*member*");
+                await RemoveByPatternAsync($"ai:tool:*:group:{groupId}:*permission*");
+                _logger.LogInformation("AI Member cache invalidated for group {GroupId}", groupId);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to invalidate AI member cache for {GroupId}", groupId);
+            }
+        }
+
+        public async Task InvalidateAIDocumentCacheForGroupAsync(Guid groupId, Guid? studioId = null)
+        {
+            try
+            {
+                var tasks = new List<Task>
+                {
+                    RemoveByPatternAsync($"ai:tool:*:group:{groupId}:*document*")
+                };
+
+                if (studioId.HasValue)
+                {
+                    tasks.Add(RemoveByPatternAsync($"ai:tool:*:studio:{studioId}:*document*"));
+                }
+
+                await Task.WhenAll(tasks);
+                _logger.LogInformation("AI group document cache invalidated for group {GroupId}", groupId);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to invalidate AI group document cache for {GroupId}", groupId);
+            }
+        }
+
+        /// <summary>
+        /// Invalidate all AI caches for a user (personal AI, all groups)
+        /// </summary>
+        public async Task InvalidateAIUserCacheAsync(Guid userId)
+        {
+            try
+            {
+                await RemoveByPatternAsync($"ai:tool:{userId}:*");
+                _logger.LogInformation("AI User cache invalidated for user {UserId}", userId);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to invalidate AI user cache for {UserId}", userId);
             }
         }
     }

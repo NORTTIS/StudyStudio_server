@@ -84,6 +84,24 @@ namespace StudioStudio_Server.Repositories
                 .ToListAsync();
         }
 
+        public async Task<Dictionary<Guid, int>> GetParticipantCountsBatchAsync(List<Guid> groupIds)
+        {
+            if (groupIds.Count == 0)
+            {
+                return new Dictionary<Guid, int>();
+            }
+
+            var counts = await _context.GroupParticipants
+                .Where(gp => groupIds.Contains(gp.GroupId)
+                             && gp.IsApproved
+                             && _context.Groups.Any(g => g.GroupId == gp.GroupId && g.IsActive))
+                .GroupBy(gp => gp.GroupId)
+                .Select(g => new { GroupId = g.Key, Count = g.Count() })
+                .ToListAsync();
+
+            return counts.ToDictionary(x => x.GroupId, x => x.Count);
+        }
+
         /// <summary>
         /// Count participants in group
         /// Condition: GroupId = {groupId}
@@ -92,7 +110,9 @@ namespace StudioStudio_Server.Repositories
         public async Task<int> GetParticipantCountByGroupIdAsync(Guid groupId)
         {
             return await _context.GroupParticipants
-                .Where(gp => gp.GroupId == groupId && gp.IsApproved)
+                .Where(gp => gp.GroupId == groupId
+                             && gp.IsApproved
+                             && _context.Groups.Any(g => g.GroupId == gp.GroupId && g.IsActive))
                 .CountAsync();
         }
 
@@ -104,7 +124,10 @@ namespace StudioStudio_Server.Repositories
         public async Task<int> GetRoleCountByGroupIdAsync(Guid groupId, GroupRole role)
         {
             return await _context.GroupParticipants
-                .Where(gp => gp.GroupId == groupId && gp.Role == role && gp.IsApproved)
+                .Where(gp => gp.GroupId == groupId
+                             && gp.Role == role
+                             && gp.IsApproved
+                             && _context.Groups.Any(g => g.GroupId == gp.GroupId && g.IsActive))
                 .CountAsync();
         }
 

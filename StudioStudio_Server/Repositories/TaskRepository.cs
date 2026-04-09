@@ -142,6 +142,71 @@ namespace StudioStudio_Server.Repositories
         }
 
         /// <summary>
+        /// Batch version of GetGroupTaskStatisticsAsync — avoids N+1 when processing multiple groups.
+        /// </summary>
+        public async Task<Dictionary<Guid, TaskSummaryResponse>> GetGroupTaskStatisticsBatchAsync(List<Guid> groupIds)
+        {
+            if (groupIds.Count == 0)
+                return new Dictionary<Guid, TaskSummaryResponse>();
+
+            DateTime now = DateTime.UtcNow;
+
+            // Single query: load all tasks for all groups
+            var allTasks = await _context.Tasks
+                .Where(t => groupIds.Contains(t.GroupId ?? Guid.Empty) && !t.IsPendingDeleted)
+                .AsNoTracking()
+                .ToListAsync();
+
+            var result = new Dictionary<Guid, TaskSummaryResponse>();
+
+            foreach (var groupId in groupIds)
+            {
+                var tasks = allTasks.Where(t => t.GroupId == groupId).ToList();
+
+                int totalTasks = tasks.Count;
+                int completedTasks = tasks.Count(t => t.Progress >= 100);
+                int inProgressTasks = tasks.Count(t => t.Progress > 0 && t.Progress < 100);
+                int notStartedTasks = tasks.Count(t => t.Progress == 0);
+                int overdueTasks = tasks.Count(t => t.DueDate.HasValue && t.DueDate.Value < now && t.Progress < 100);
+                DateTime? nearestDeadline = tasks
+                    .Where(t => t.DueDate.HasValue && t.DueDate.Value > now)
+                    .OrderBy(t => t.DueDate)
+                    .FirstOrDefault()?.DueDate;
+
+                int completionPercentage = totalTasks > 0
+                    ? (int)Math.Round((double)completedTasks / totalTasks * 100)
+                    : 0;
+
+                var riskFlags = new List<string>();
+                if (overdueTasks > 0)
+                    riskFlags.Add($"⚠️ {overdueTasks} overdue task(s)");
+                if (nearestDeadline.HasValue && nearestDeadline.Value <= now.AddDays(2))
+                    riskFlags.Add($"⏰ Nearest deadline: {nearestDeadline:dd/MM/yyyy HH:mm}");
+
+                result[groupId] = new TaskSummaryResponse
+                {
+                    TotalTasks = totalTasks,
+                    CompletedTasks = completedTasks,
+                    InProgressTasks = inProgressTasks,
+                    NotStartedTasks = notStartedTasks,
+                    CompletionPercentage = completionPercentage,
+                    OverdueTasks = overdueTasks,
+                    NearestDeadline = nearestDeadline,
+                    RiskFlags = riskFlags,
+                    HighPriorityTasks = tasks.Count(t => t.Priority == TaskPriority.High),
+                    MediumPriorityTasks = tasks.Count(t => t.Priority == TaskPriority.Medium),
+                    LowPriorityTasks = tasks.Count(t => t.Priority == TaskPriority.Low),
+                    CriticalSeverityTasks = tasks.Count(t => t.Severity == TaskSeverity.Critical),
+                    MajorSeverityTasks = tasks.Count(t => t.Severity == TaskSeverity.Major),
+                    ModerateSeverityTasks = tasks.Count(t => t.Severity == TaskSeverity.Moderate),
+                    MinorSeverityTasks = tasks.Count(t => t.Severity == TaskSeverity.Minor)
+                };
+            }
+
+            return result;
+        }
+
+        /// <summary>
         /// Add task to database
         /// </summary>
         public async Task AddAsync(TaskItem task)
@@ -308,6 +373,74 @@ namespace StudioStudio_Server.Repositories
                 .OrderBy(t => t.DueDate.HasValue ? 0 : 1)
                 .ThenBy(t => t.DueDate)
                 .ThenByDescending(t => t.CreatedAt)
+                .ToListAsync();
+        }
+
+        /// <summary>
+        /// Get personal tasks with a hard limit — prevents loading all tasks into memory.
+        /// </summary>
+        public async Task<List<TaskItem>> GetPersonalTasksByOwnerAsync(Guid userId, int limit)
+        {
+            return await _context.Tasks
+                .Where(t => t.OwnerId == userId
+                         && !t.GroupId.HasValue
+                         && t.PersonalStatusId.HasValue
+                         && !t.IsPendingDeleted)
+                .Include(t => t.PersonalStatus)
+                .AsNoTracking()
+                .OrderBy(t => t.DueDate.HasValue ? 0 : 1)
+                .ThenBy(t => t.DueDate)
+                .ThenByDescending(t => t.CreatedAt)
+                .Take(limit)
+                .ToListAsync();
+        }
+
+        /// <summary>
+        /// Get personal tasks with deadline filter and optional limit — prevents loading all tasks into memory.
+        /// </summary>
+        public async Task<List<TaskItem>> GetPersonalTasksByOwnerWithDeadlineAsync(
+            Guid userId, DateTime fromDate, DateTime toDate, int? limit = null)
+        {
+            var baseQuery = _context.Tasks
+                .Where(t => t.OwnerId == userId
+                         && !t.GroupId.HasValue
+                         && t.PersonalStatusId.HasValue
+                         && !t.IsPendingDeleted
+                         && t.DueDate.HasValue
+                         && t.DueDate.Value >= fromDate
+                         && t.DueDate.Value <= toDate
+                         && t.Progress < 100)
+                .AsNoTracking()
+                .OrderBy(t => t.DueDate);
+
+            if (limit.HasValue)
+                return await baseQuery.Take(limit.Value).Include(t => t.PersonalStatus).ToListAsync();
+
+            return await baseQuery.Include(t => t.PersonalStatus).ToListAsync();
+        }
+
+        /// <summary>
+        /// Get group tasks assigned to the user with a hard limit — prevents loading all tasks into memory.
+        /// </summary>
+        public async Task<List<TaskItem>> GetAssignedGroupTasksByUserAsync(Guid userId, int limit)
+        {
+            var taskIds = await _context.TaskAssignments
+                .Where(a => a.AssignedTo == userId)
+                .Select(a => a.TaskId)
+                .ToListAsync();
+
+            if (!taskIds.Any())
+                return new List<TaskItem>();
+
+            return await _context.Tasks
+                .Where(t => taskIds.Contains(t.TaskId) && t.GroupId.HasValue && !t.IsPendingDeleted)
+                .Include(t => t.Group)
+                .Include(t => t.GroupStatus)
+                .AsNoTracking()
+                .OrderBy(t => t.DueDate.HasValue ? 0 : 1)
+                .ThenBy(t => t.DueDate)
+                .ThenByDescending(t => t.CreatedAt)
+                .Take(limit)
                 .ToListAsync();
         }
 

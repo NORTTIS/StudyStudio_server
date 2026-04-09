@@ -7,6 +7,7 @@ namespace StudioStudio_Server.Repositories.Interfaces
     public interface ITaskRepository
     {
         Task<Dictionary<Guid, int>> GetTaskCountByGroupIdsAsync(List<Guid> groupIds);
+        Task<Dictionary<Guid, TaskSummaryResponse>> GetGroupTaskStatisticsBatchAsync(List<Guid> groupIds);
         Task<int> GetTaskCountByGroupIdAsync(Guid groupId);
         Task<TaskItem?> GetByIdAsync(Guid taskId);
         Task<TaskItem?> GetDeletedByIdAsync(Guid taskId);
@@ -28,7 +29,10 @@ namespace StudioStudio_Server.Repositories.Interfaces
         Task<Dictionary<Guid, List<TaskItem>>> GetPersonalListTasksByListStatusId(List<Guid> listStatusIds);
         Task<TaskItem?> PersonalFindNextAfterAsync(Guid statusId, long position);
         Task<List<TaskItem>> GetPersonalTasksByOwnerAsync(Guid userId);
+        Task<List<TaskItem>> GetPersonalTasksByOwnerAsync(Guid userId, int limit);
+        Task<List<TaskItem>> GetPersonalTasksByOwnerWithDeadlineAsync(Guid userId, DateTime fromDate, DateTime toDate, int? limit = null);
         Task<List<TaskItem>> GetAssignedGroupTasksByUserAsync(Guid userId);
+        Task<List<TaskItem>> GetAssignedGroupTasksByUserAsync(Guid userId, int limit);
         Task<(List<TaskItem> Tasks, int TotalCount)> GetAssignedGroupTasksWithPaginationAsync(
             Guid userId,
             int page,

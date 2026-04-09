@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Globalization;
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -18,11 +19,16 @@ namespace StudioStudio_Server.Services.AI;
 public class AIAgent
 {
     private const int HardMaxToolCalls = 5;
+    private const int MaxConsecutiveDecideWithoutExecution = 3;
+    private const int MaxToolResultCharsForPrompt = 2500;
+    private const int MaxArrayItemsForPrompt = 6;
+    private const int MaxStringCharsForPrompt = 300;
 
     private readonly IAIToolRegistry _toolRegistry;
     private readonly IServiceProvider _serviceProvider;  // Resolve fresh tool instances per request
     private readonly ILLMService _llmService;
     private readonly ICacheService _cacheService;
+    private readonly AIToolCacheService _toolCacheService;
     private readonly ILogger<AIAgent> _logger;
     private readonly AIAgentConfig _config;  // Configuration from appsettings
 
@@ -35,6 +41,9 @@ public class AIAgent
     private readonly string _personalSystemPromptEn;
     private readonly string _ownerSystemPromptVi;
     private readonly string _ownerSystemPromptEn;
+
+    // Token usage tracking across all LLM calls in a request
+    private TokenUsage? _currentTokenUsage;
 
     /// <summary>
     /// Kiem tra xem parameters co query rong hoac null khong
@@ -206,6 +215,7 @@ public class AIAgent
         IServiceProvider serviceProvider,
         ILLMService llmService,
         ICacheService cacheService,
+        AIToolCacheService toolCacheService,
         ILogger<AIAgent> logger,
         IOptions<AIAgentConfig> configOptions)
     {
@@ -213,6 +223,7 @@ public class AIAgent
         _serviceProvider = serviceProvider;
         _llmService = llmService;
         _cacheService = cacheService;
+        _toolCacheService = toolCacheService;
         _logger = logger;
         _config = configOptions.Value;
 
@@ -296,12 +307,15 @@ public class AIAgent
 
         var toolName = decision.ToolName;
 
-        if (intent.IsDocumentIntent && IsTaskTool(toolName))
+        // Allow mixed intents (task + document in one question).
+        // Reject only when the intent is purely document and a task tool is chosen.
+        if (intent.IsDocumentIntent && !intent.IsTaskIntent && IsTaskTool(toolName))
         {
             return new AIReviewVerdict(false, "User asked about documents but planned a task tool", "get_group_documents");
         }
 
-        if (intent.IsTaskIntent && IsDocumentTool(toolName))
+        // Reject only when the intent is purely task and a document tool is chosen.
+        if (intent.IsTaskIntent && !intent.IsDocumentIntent && IsDocumentTool(toolName))
         {
             return new AIReviewVerdict(false, "User asked about tasks but planned a document tool", "get_tasks");
         }
@@ -570,26 +584,103 @@ public class AIAgent
                 SuggestedToolName: decision.ToolName);
         }
 
+        // get_tasks has complex parameter normalization - always review
         if (decision.ToolName.Equals("get_tasks", StringComparison.OrdinalIgnoreCase))
         {
             reviewedParameters = NormalizeGetTasksParameters(userQuestion, reviewedParameters);
+            var verdict = await ReviewToolParametersAsync(userQuestion, context, tool, reviewedParameters, cancellationToken);
+            if (verdict.SuggestedParameters != null)
+            {
+                reviewedParameters = MergeJsonObjects(reviewedParameters, verdict.SuggestedParameters);
+            }
+            return new AIFlowDecision(
+                StepName: "parameter-review",
+                Decision: decision,
+                ToolParameters: reviewedParameters,
+                IsAccepted: verdict.IsAccepted,
+                ReviewState: verdict.ReviewState,
+                ReviewNote: $"[{verdict.ReviewState}] {verdict.ReviewNote}",
+                SuggestedToolName: verdict.SuggestedToolName,
+                SuggestedParameters: verdict.SuggestedParameters);
         }
 
-        var verdict = await ReviewToolParametersAsync(userQuestion, context, tool, reviewedParameters, cancellationToken);
-        if (verdict.SuggestedParameters != null)
+        // For other tools, only review if parameters look suspicious
+        if (reviewedParameters.Count == 0)
         {
-            reviewedParameters = MergeJsonObjects(reviewedParameters, verdict.SuggestedParameters);
+            // No parameters - tools like get_group_stats, get_members don't need params
+            _logger.LogInformation("[PARAM-REVIEW] Tool {Tool} has no params, auto-accepting", decision.ToolName);
+            return new AIFlowDecision(
+                StepName: "parameter-review",
+                Decision: decision,
+                ToolParameters: reviewedParameters,
+                IsAccepted: true,
+                ReviewState: "accepted",
+                ReviewNote: "No parameters required");
         }
 
+        // Check if all params are empty/null (suspicious)
+        var hasValidParams = false;
+        foreach (var prop in reviewedParameters)
+        {
+            var node = prop.Value;
+            if (node == null)
+            {
+                continue;
+            }
+
+            if (node is JsonValue value)
+            {
+                if (value.TryGetValue<string>(out var stringValue))
+                {
+                    if (!string.IsNullOrWhiteSpace(stringValue))
+                    {
+                        hasValidParams = true;
+                        break;
+                    }
+
+                    continue;
+                }
+
+                // Non-string primitives (numbers/booleans) count as valid when present.
+                hasValidParams = true;
+                break;
+            }
+
+            // Objects/arrays count as valid when present.
+            if (node is JsonObject || node is JsonArray)
+            {
+                hasValidParams = true;
+                break;
+            }
+        }
+        if (!hasValidParams)
+        {
+            // All params are null/empty - probably wrong, let LLM review
+            var verdict = await ReviewToolParametersAsync(userQuestion, context, tool, reviewedParameters, cancellationToken);
+            if (verdict.SuggestedParameters != null)
+            {
+                reviewedParameters = MergeJsonObjects(reviewedParameters, verdict.SuggestedParameters);
+            }
+            return new AIFlowDecision(
+                StepName: "parameter-review",
+                Decision: decision,
+                ToolParameters: reviewedParameters,
+                IsAccepted: verdict.IsAccepted,
+                ReviewState: verdict.ReviewState,
+                ReviewNote: $"[{verdict.ReviewState}] {verdict.ReviewNote}",
+                SuggestedToolName: verdict.SuggestedToolName,
+                SuggestedParameters: verdict.SuggestedParameters);
+        }
+
+        // Parameters look valid - skip expensive LLM review
+        _logger.LogInformation("[PARAM-REVIEW] Tool {Tool} has valid params, skipping LLM review", decision.ToolName);
         return new AIFlowDecision(
             StepName: "parameter-review",
             Decision: decision,
             ToolParameters: reviewedParameters,
-            IsAccepted: verdict.IsAccepted,
-            ReviewState: verdict.ReviewState,
-            ReviewNote: $"[{verdict.ReviewState}] {verdict.ReviewNote}",
-            SuggestedToolName: verdict.SuggestedToolName,
-            SuggestedParameters: verdict.SuggestedParameters);
+            IsAccepted: true,
+            ReviewState: "accepted",
+            ReviewNote: "Parameters validated (no LLM review needed)");
     }
 
     private bool ValidateToolResult(string toolName, AIQueryResult result, out string? validationNote)
@@ -623,7 +714,8 @@ public class AIAgent
         ToolExecutionHistory history,
         AIQueryContext context,
         CancellationToken cancellationToken,
-        bool isContinuation = false)
+        bool isContinuation = false,
+        int consecutiveDecideWithoutExecution = 0)
     {
         return DecideActionAsync(
             userQuestion,
@@ -632,7 +724,8 @@ public class AIAgent
             history,
             context,
             cancellationToken,
-            isContinuation);
+            isContinuation,
+            consecutiveDecideWithoutExecution);
     }
 
     /// <summary>
@@ -646,6 +739,9 @@ public class AIAgent
         var sw = Stopwatch.StartNew();
         var history = new ToolExecutionHistory();
         var reasoningSteps = new List<string>();
+
+        // Reset token usage tracking for this request
+        _currentTokenUsage = null;
 
         try
         {
@@ -668,7 +764,7 @@ public class AIAgent
 
             // Doc intent: luon nap danh sach tai lieu + semantic search som
             // de co context va document_id filter truoc khi vao vong plan chinh.
-            if (intent.IsDocumentIntent)
+            if (intent.IsDocumentIntent && !intent.IsTaskIntent)
             {
                 await AutoFetchDocumentContextAsync(userQuestion, history, reasoningSteps, context, cancellationToken);
             }
@@ -691,9 +787,10 @@ public class AIAgent
 
             var maxToolCalls = GetEffectiveMaxToolCalls();
             var parameterReviewFailures = 0;
+            var consecutiveDecideWithoutExec = 0; // Track how many times DecideActionAsync is called without executing a tool
 
             // Step 4-7: Generate params -> review -> execute -> validate, loop up to hard limit
-            while (decision.ShouldCallTool && decision.ToolName != null && history.Calls.Count < maxToolCalls)
+            while (decision.ShouldCallTool && decision.ToolName != null && history.Calls.Count < maxToolCalls && consecutiveDecideWithoutExec < MaxConsecutiveDecideWithoutExecution)
             {
                 reasoningSteps.Add($"[PLAN] Call tool '{decision.ToolName}'");
                 _logger.LogInformation(
@@ -707,6 +804,7 @@ public class AIAgent
                 if (!isToolAllowed)
                 {
                     reasoningSteps.Add($"Tool '{decision.ToolName}' not allowed for this context");
+                    consecutiveDecideWithoutExec++;
                     decision = await DecideActionAsync(
                         userQuestion,
                         systemPrompt,
@@ -714,7 +812,8 @@ public class AIAgent
                         history,
                         context,
                         cancellationToken,
-                        isContinuation: true);
+                        isContinuation: true,
+                        consecutiveDecideWithoutExecution: consecutiveDecideWithoutExec);
                     continue; // LLM được chọn tool khác
                 }
 
@@ -758,6 +857,7 @@ public class AIAgent
                     }
                     else
                     {
+                        consecutiveDecideWithoutExec++;
                         decision = await PlanNextActionAsync(
                             userQuestion,
                             systemPrompt,
@@ -765,7 +865,8 @@ public class AIAgent
                             history,
                             context,
                             cancellationToken,
-                            isContinuation: true);
+                            isContinuation: true,
+                            consecutiveDecideWithoutExecution: consecutiveDecideWithoutExec);
                         continue;
                     }
                 }
@@ -783,6 +884,7 @@ public class AIAgent
                         reasoningSteps.Add($"[REVIEW] Suggested tool: {fitVerdict.SuggestedToolName}");
                     }
 
+                    consecutiveDecideWithoutExec++;
                     decision = await PlanNextActionAsync(
                         userQuestion,
                         systemPrompt,
@@ -790,32 +892,37 @@ public class AIAgent
                         history,
                         context,
                         cancellationToken,
-                        isContinuation: true);
+                        isContinuation: true,
+                        consecutiveDecideWithoutExecution: consecutiveDecideWithoutExec);
                     continue;
                 }
 
                 // Guard: mot tool chi duoc phep thanh cong 1 lan trong cung 1 turn.
-                // Neu tool da thanh cong truoc do, dung du lieu cu de tra loi thay vi goi lai.
+                // Neu tool da thanh cong truoc do voi data hop le, dung du lieu cu de tra loi thay vi goi lai.
                 var previousSuccessfulCall = history.Calls
                     .LastOrDefault(c => c.ToolName.Equals(decision.ToolName, StringComparison.OrdinalIgnoreCase) && c.Result.IsSuccess);
                 if (previousSuccessfulCall != null)
                 {
-                    var forcedAnswer = BuildForcedAnswerFromToolResult(previousSuccessfulCall.ToolName, previousSuccessfulCall.Result.Data)
-                        ?? "Da co du lieu hop le tu tool truoc do. Vui long dung ket qua hien co de tra loi.";
-
-                    reasoningSteps.Add($"[GUARD] Tool '{decision.ToolName}' already succeeded. Skip repeated call and finalize.");
-                    decision = new AgentDecision
+                    var forcedAnswer = BuildForcedAnswerFromToolResult(previousSuccessfulCall.ToolName, previousSuccessfulCall.Result.Data);
+                    if (forcedAnswer != null)
                     {
-                        ShouldCallTool = false,
-                        FinalAnswer = forcedAnswer
-                    };
-                    break;
+                        // Data is valid — skip tool call, synthesize from cached result
+                        reasoningSteps.Add($"[GUARD] Tool '{decision.ToolName}' already succeeded with valid data. Skip repeated call and finalize.");
+                        decision = new AgentDecision
+                        {
+                            ShouldCallTool = false,
+                            FinalAnswer = forcedAnswer
+                        };
+                        break;
+                    }
+                    // Data is null/empty — let tool execute again
                 }
 
                 // Step 5: Tool execution
                 _logger.LogInformation("[TOOL-CALL] Executing tool={ToolName}", decision.ToolName);
                 var toolResult = await ExecuteToolAsync(decision.ToolName, decision.ToolParameters!, context, cancellationToken);
                 history.AddCall(decision.ToolName, decision.ToolParameters!, toolResult);
+                consecutiveDecideWithoutExec = 0; // Tool executed, reset counter
                 await SaveTaskPaginationStateIfNeededAsync(context, decision.ToolName, decision.ToolParameters!, toolResult);
 
                 // Step 6: Result validation
@@ -839,19 +946,17 @@ public class AIAgent
                         "[AI-TOOL-OK] tool={Tool} success=true elapsedMs={Ms} data={Summary}",
                         decision.ToolName, toolResult.ExecutionTimeMs, toolResult.GetDataSummary());
 
-                    if (decision.ToolName.Equals("get_tasks", StringComparison.OrdinalIgnoreCase))
-                    {
-                        var forcedAnswer = BuildTaskAnswerFromGetTasksResult(toolResult.Data)
-                            ?? "Da tim thay danh sach task phu hop.";
+                    // Use generic formatter for all tools
+                    var forcedAnswer = BuildForcedAnswerFromToolResult(decision.ToolName, toolResult.Data)
+                        ?? "Da lay du lieu thanh cong.";
 
-                        reasoningSteps.Add("[GUARD] get_tasks succeeded -> finalize immediately and stop the tool loop.");
-                        decision = new AgentDecision
-                        {
-                            ShouldCallTool = false,
-                            FinalAnswer = forcedAnswer
-                        };
-                        break;
-                    }
+                    reasoningSteps.Add($"[GUARD] {decision.ToolName} succeeded -> finalize and stop the tool loop.");
+                    decision = new AgentDecision
+                    {
+                        ShouldCallTool = false,
+                        FinalAnswer = forcedAnswer
+                    };
+                    break;
                 }
                 else
                 {
@@ -885,6 +990,7 @@ public class AIAgent
                     }
 
                     // Step 7: Feed validation/error info back to planning loop
+                    consecutiveDecideWithoutExec++;
                     decision = await DecideActionAsync(
                         userQuestion,
                         systemPrompt,
@@ -892,7 +998,8 @@ public class AIAgent
                         history,
                         context,
                         cancellationToken,
-                        isContinuation: true);
+                        isContinuation: true,
+                        consecutiveDecideWithoutExecution: consecutiveDecideWithoutExec);
                     continue; // LLM được retry — KHÔNG break
                 }
             }
@@ -909,13 +1016,26 @@ public class AIAgent
 
             // Xác định FallbackReason
             string? fallbackReason = null;
+            string? finalAnswer = null;
 
             if (!string.IsNullOrWhiteSpace(decision?.FinalAnswer))
             {
+                var synthesisSystemPrompt = BuildMarkdownSynthesisSystemPrompt(context.Language);
+                finalAnswer = await _llmService.GenerateTextResponseAsync(
+                    synthesisSystemPrompt,
+                    decision.FinalAnswer,
+                    string.Empty,
+                    cancellationToken);
+
+                if (string.IsNullOrWhiteSpace(finalAnswer))
+                {
+                    finalAnswer = decision.FinalAnswer;
+                }
+
                 _logger.LogInformation(
                     "[AI-SUCCESS] ToolCalls={Count} AnswerLen={Len} Question={Q}",
                     history.Calls.Count,
-                    decision.FinalAnswer.Length,
+                    finalAnswer.Length,
                     userQuestion);
             }
             else if (history.Calls.Count >= _config.MaxToolCalls)
@@ -956,15 +1076,17 @@ public class AIAgent
 
             var result = new AIAgentResult
             {
-                Answer = !string.IsNullOrWhiteSpace(decision?.FinalAnswer)
-                    ? decision.FinalAnswer
+                Answer = !string.IsNullOrWhiteSpace(finalAnswer)
+                    ? finalAnswer
                     : "Xin lỗi, AI không trả lời được câu hỏi này.",
                 ReasoningSteps = reasoningSteps,
                 ToolCalls = history.Calls,
                 ProcessingTimeMs = sw.ElapsedMilliseconds,
                 ToolCallCount = history.Calls.Count,
                 Success = true,
-                FallbackReason = fallbackReason
+                FallbackReason = fallbackReason,
+                // Token usage is tracked across all LLM calls in ProcessAsync
+                TokenUsage = _currentTokenUsage
             };
 
             _logger.LogInformation(
@@ -992,362 +1114,881 @@ public class AIAgent
         }
     }
 
-    private static string? BuildTaskAnswerFromGetTasksResult(JsonObject? data)
+    /// <summary>
+    /// Process question with streaming final answer.
+    /// Runs ReAct loop synchronously (tool calls), but streams LLM response.
+    /// For SSE streaming endpoint.
+    /// </summary>
+    public async IAsyncEnumerable<AIStreamChunk> ProcessStreamAsync(
+        string userQuestion,
+        AIQueryContext context,
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
-        if (data == null)
+        AIStreamResult? result = null;
+        Exception? caughtException = null;
+
+        try
         {
-            return null;
+            result = await ProcessStreamInternalAsync(userQuestion, context, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            caughtException = ex;
         }
 
-        var currentPage = data.TryGetPropertyValue("current_page", out var pageNode) && pageNode != null
-            ? pageNode.GetValue<int>()
-            : 1;
-        var totalPages = data.TryGetPropertyValue("total_pages", out var totalPagesNode) && totalPagesNode != null
-            ? totalPagesNode.GetValue<int>()
-            : 1;
-        var pageSize = data.TryGetPropertyValue("page_size", out var pageSizeNode) && pageSizeNode != null
-            ? pageSizeNode.GetValue<int>()
-            : 20;
-        var total = data.TryGetPropertyValue("total", out var totalNode) && totalNode != null
-            ? totalNode.GetValue<int>()
-            : 0;
-
-        var lines = new List<string>
+        if (caughtException != null)
         {
-            $"Da tim thay {total} task.",
-            $"Trang {currentPage}/{totalPages} (page_size={pageSize})."
+            _logger.LogError(caughtException, "AIAgent ProcessStreamAsync error");
+            // Cannot yield in catch, so yield directly from if block (after catch)
+            yield return new AIStreamChunk
+            {
+                Type = "error",
+                ErrorMessage = "Đã xảy ra lỗi khi xử lý yêu cầu. Vui lòng thử lại sau."
+            };
+            yield break;
+        }
+
+        if (result == null)
+        {
+            _logger.LogError("AIAgent ProcessStreamAsync returned null result without exception");
+            yield return new AIStreamChunk
+            {
+                Type = "error",
+                ErrorMessage = "Đã xảy ra lỗi khi xử lý yêu cầu. Vui lòng thử lại sau."
+            };
+            yield break;
+        }
+
+        // Yield metadata first
+        yield return new AIStreamChunk
+        {
+            Type = "metadata",
+            RemainingRequests = null,
+            DailyLimit = null,
+            ToolCount = result.ToolCount,
+            ProcessingTimeMs = result.ProcessingTimeMs,
+            InputTokens = result.TokenUsage?.InputTokens,
+            OutputTokens = result.TokenUsage?.OutputTokens,
+            CachedTokens = result.TokenUsage?.CachedTokens,
+            ThinkingTokens = result.TokenUsage?.ThinkingTokens
         };
 
-        if (data.TryGetPropertyValue("tasks", out var tasksNode) && tasksNode is JsonArray tasksArr && tasksArr.Count > 0)
+        // Yield chunks
+        foreach (var chunk in result.Chunks)
         {
-            lines.Add("Danh sach task:");
-            foreach (var node in tasksArr)
+            yield return chunk;
+        }
+    }
+
+    /// <summary>
+    /// Internal processing that returns a result instead of yielding directly
+    /// </summary>
+    private async Task<AIStreamResult> ProcessStreamInternalAsync(
+        string userQuestion,
+        AIQueryContext context,
+        CancellationToken cancellationToken)
+    {
+        var sw = Stopwatch.StartNew();
+        var history = new ToolExecutionHistory();
+        var reasoningSteps = new List<string>();
+        var chunks = new List<AIStreamChunk>();
+
+        // Reset token usage tracking for this streaming request
+        _currentTokenUsage = null;
+
+        // Step 1: Intent understanding
+        var intent = AnalyzeIntent(userQuestion, context);
+        reasoningSteps.Add($"[INTENT] {intent.Summary}");
+
+        var paginationState = await GetTaskPaginationStateAsync(context);
+        var isTaskFollowup = IsTaskPaginationFollowup(userQuestion);
+
+        if (isTaskFollowup)
+        {
+            reasoningSteps.Add("[FOLLOWUP] Detected task pagination follow-up. Use cached task state.");
+            await TryExecuteTaskFollowupAsync(userQuestion, context, history, reasoningSteps, paginationState, cancellationToken);
+        }
+
+        if (intent.IsDocumentIntent && !intent.IsTaskIntent)
+        {
+            await AutoFetchDocumentContextAsync(userQuestion, history, reasoningSteps, context, cancellationToken);
+        }
+
+        reasoningSteps.Add($"[ANALYZE] Question={userQuestion}");
+
+        // Step 2: Tool planning
+        var toolsManifest = _toolRegistry.GetToolsManifestForContext(context);
+        var systemPrompt = GetRoleSystemPrompt(context);
+
+        var decision = await PlanNextActionAsync(
+            userQuestion,
+            systemPrompt,
+            toolsManifest,
+            history,
+            context,
+            cancellationToken);
+
+        var maxToolCalls = GetEffectiveMaxToolCalls();
+        var parameterReviewFailures = 0;
+        var consecutiveDecideWithoutExec = 0;
+
+        // Step 3-7: Tool loop (same as ProcessAsync)
+        while (decision.ShouldCallTool
+               && decision.ToolName != null
+               && history.Calls.Count < maxToolCalls
+               && consecutiveDecideWithoutExec < MaxConsecutiveDecideWithoutExecution)
+        {
+            reasoningSteps.Add($"[PLAN] Call tool '{decision.ToolName}'");
+
+            var allowedTools = _toolRegistry.GetAllowedTools(context);
+            var isToolAllowed = allowedTools.Any(t => t.Name.Equals(decision.ToolName, StringComparison.OrdinalIgnoreCase));
+
+            if (!isToolAllowed)
             {
-                if (node is not JsonObject task) continue;
-
-                var title = task.TryGetPropertyValue("title", out var titleNode) && titleNode != null
-                    ? titleNode.GetValue<string>()
-                    : "(khong co tieu de)";
-                var priority = task.TryGetPropertyValue("priority", out var priorityNode) && priorityNode != null
-                    ? priorityNode.GetValue<string>()
-                    : "N/A";
-                var severity = task.TryGetPropertyValue("severity", out var severityNode) && severityNode != null
-                    ? severityNode.GetValue<string>()
-                    : "N/A";
-                var status = task.TryGetPropertyValue("status", out var statusNode) && statusNode != null
-                    ? statusNode.GetValue<string>()
-                    : "N/A";
-
-                lines.Add($"- {title} | Priority: {priority} | Severity: {severity} | Status: {status}");
+                reasoningSteps.Add($"Tool '{decision.ToolName}' not allowed for this context");
+                consecutiveDecideWithoutExec++;
+                decision = await DecideActionAsync(
+                    userQuestion,
+                    systemPrompt,
+                    toolsManifest,
+                    history,
+                    context,
+                    cancellationToken,
+                    isContinuation: true,
+                    consecutiveDecideWithoutExecution: consecutiveDecideWithoutExec);
+                continue;
             }
-        }
-        else
-        {
-            lines.Add("Khong co task phu hop voi bo loc hien tai.");
-        }
 
-        return string.Join("\n", lines);
-    }
+            var reviewed = await ReviewPlannedToolAsync(userQuestion, context, decision, cancellationToken);
+            decision.ToolParameters = reviewed.ToolParameters;
 
-    private static string? BuildGroupStatsAnswerFromResult(JsonObject? data)
-    {
-        if (data == null)
-        {
-            return null;
-        }
-
-        var groupName = data.TryGetPropertyValue("group_info", out var groupInfoNode)
-            && groupInfoNode is JsonObject groupInfo
-            && groupInfo.TryGetPropertyValue("name", out var groupNameNode)
-            && groupNameNode != null
-                ? groupNameNode.GetValue<string>()
-                : "Nhom hien tai";
-
-        if (!(data.TryGetPropertyValue("task_statistics", out var statsNode) && statsNode is JsonObject stats))
-        {
-            return $"Thong ke nhom {groupName} da san sang.";
-        }
-
-        int ReadInt(string key)
-        {
-            return stats.TryGetPropertyValue(key, out var node) && node != null ? node.GetValue<int>() : 0;
-        }
-
-        var total = ReadInt("total_tasks");
-        var completed = ReadInt("completed_tasks");
-        var inProgress = ReadInt("in_progress_tasks");
-        var notStarted = ReadInt("not_started_tasks");
-        var overdue = ReadInt("overdue_tasks");
-        var completion = ReadInt("completion_percentage");
-
-        var lines = new List<string>
-        {
-            $"Tong quan nhom: {groupName}",
-            $"- Tong task: {total}",
-            $"- Da hoan thanh: {completed}",
-            $"- Dang thuc hien: {inProgress}",
-            $"- Chua bat dau: {notStarted}",
-            $"- Qua han: {overdue}",
-            $"- Ty le hoan thanh: {completion}%"
-        };
-
-        return string.Join("\n", lines);
-    }
-
-    private static string? BuildGroupDocumentsAnswerFromResult(JsonObject? data)
-    {
-        if (data == null)
-        {
-            return null;
-        }
-
-        var totalCount = data.TryGetPropertyValue("total_count", out var totalNode) && totalNode != null
-            ? totalNode.GetValue<int>()
-            : 0;
-
-        var lines = new List<string>
-        {
-            $"Danh sach tai lieu: tim thay {totalCount} tai lieu trong nhom."
-        };
-
-        if (data.TryGetPropertyValue("documents", out var docsNode) && docsNode is JsonArray docs && docs.Count > 0)
-        {
-            lines.Add("Cac tai lieu cua nhom:");
-            foreach (var item in docs)
+            if (!reviewed.IsAccepted)
             {
-                if (item is not JsonObject doc) continue;
-
-                var fileName = doc.TryGetPropertyValue("file_name", out var fileNameNode) && fileNameNode != null
-                    ? fileNameNode.GetValue<string>()
-                    : "(tieu de khong xac dinh)";
-                var fileSize = doc.TryGetPropertyValue("file_size", out var sizeNode) && sizeNode != null
-                    ? sizeNode.GetValue<long>()
-                    : 0L;
-                var contentType = doc.TryGetPropertyValue("content_type", out var typeNode) && typeNode != null
-                    ? typeNode.GetValue<string>()
-                    : "N/A";
-                var uploadedAt = doc.TryGetPropertyValue("uploaded_at", out var dateNode) && dateNode != null
-                    ? dateNode.GetValue<string>()
-                    : "N/A";
-                var uploadedBy = doc.TryGetPropertyValue("uploaded_by", out var byNode) && byNode != null
-                    ? byNode.GetValue<string>()
-                    : "N/A";
-
-                var sizeKb = fileSize / 1024.0;
-                var sizeStr = fileSize > 1024 * 1024 ? $"{fileSize / (1024.0 * 1024):F1} MB" : $"{sizeKb:F1} KB";
-
-                lines.Add($"- {fileName} | {sizeStr} | {contentType} | Tao luc: {uploadedAt}");
-            }
-        }
-        else
-        {
-            lines.Add("Khong co tai lieu nao trong nhom.");
-        }
-
-        return string.Join("\n", lines);
-    }
-
-    private static string? BuildSearchDocumentsAnswerFromResult(JsonObject? data)
-    {
-        if (data == null)
-        {
-            return null;
-        }
-
-        var lines = new List<string>();
-
-        if (data.TryGetPropertyValue("results", out var resultsNode) && resultsNode is JsonArray results && results.Count > 0)
-        {
-            lines.Add($"Tim thay {results.Count} ket qua lien quan:");
-            lines.Add("");
-
-            var docGrouping = new Dictionary<string, List<JsonObject>>();
-            
-            // Group by document/file
-            foreach (var item in results)
-            {
-                if (item is not JsonObject chunk) continue;
-
-                var fileName = chunk.TryGetPropertyValue("file_name", out var fnNode) && fnNode != null
-                    ? fnNode.GetValue<string>()
-                    : "unknown";
-
-                if (!docGrouping.ContainsKey(fileName))
+                parameterReviewFailures++;
+                if (!string.IsNullOrWhiteSpace(reviewed.SuggestedToolName))
                 {
-                    docGrouping[fileName] = new();
+                    decision = new AgentDecision
+                    {
+                        ShouldCallTool = true,
+                        ToolName = reviewed.SuggestedToolName,
+                        ToolParameters = reviewed.ToolParameters
+                    };
+                    continue;
                 }
-                docGrouping[fileName].Add(chunk);
-            }
 
-            // Format by document (sorted by highest relevance score)
-            var sortedDocs = docGrouping.OrderByDescending(x => 
-                x.Value.FirstOrDefault()?.TryGetPropertyValue("relevance_score", out var s) == true && s != null 
-                    ? s.GetValue<decimal>() 
-                    : 0);
-
-            foreach (var (fileName, chunks) in sortedDocs)
-            {
-                lines.Add($"📄 {fileName}:");
-                
-                var sortedChunks = chunks.OrderByDescending(c => 
-                    c.TryGetPropertyValue("relevance_score", out var score) && score != null 
-                        ? score.GetValue<decimal>() 
-                        : 0);
-
-                foreach (var chunk in sortedChunks)
+                if (parameterReviewFailures >= 2)
                 {
-                    var content = chunk.TryGetPropertyValue("content", out var contentNode) && contentNode != null
-                        ? contentNode.GetValue<string>()
-                        : "";
-                    var score = chunk.TryGetPropertyValue("relevance_score", out var scoreNode) && scoreNode != null
-                        ? scoreNode.GetValue<decimal>()
-                        : 0;
-                    var chunkIndex = chunk.TryGetPropertyValue("chunk_index", out var indexNode) && indexNode != null
-                        ? indexNode.GetValue<int>()
-                        : 0;
-
-                    // Truncate content to first 150 chars
-                    var displayContent = content.Length > 150 ? content.Substring(0, 150) + "..." : content;
-                    lines.Add($"  [Chunk {chunkIndex} | Score: {score:F2}]");
-                    lines.Add($"  \"{displayContent}\"");
-                    lines.Add("");
+                    reviewed = reviewed with { IsAccepted = true };
+                }
+                else
+                {
+                    consecutiveDecideWithoutExec++;
+                    decision = await PlanNextActionAsync(
+                        userQuestion,
+                        systemPrompt,
+                        toolsManifest,
+                        history,
+                        context,
+                        cancellationToken,
+                        isContinuation: true,
+                        consecutiveDecideWithoutExecution: consecutiveDecideWithoutExec);
+                    continue;
                 }
             }
-        }
-        else
-        {
-            lines.Add("Khong tim thay ket qua phu hop voi cau tim kiem cua ban.");
-        }
-
-        return string.Join("\n", lines);
-    }
-
-    private static string? BuildDeadlinesAnswerFromResult(JsonObject? data)
-    {
-        if (data == null)
-        {
-            return null;
-        }
-
-        var total = data.TryGetPropertyValue("total", out var totalNode) && totalNode != null
-            ? totalNode.GetValue<int>()
-            : 0;
-
-        var lines = new List<string>
-        {
-            $"Danh gia deadline sap toi: tim thay {total} task."
-        };
-
-        if (data.TryGetPropertyValue("deadlines", out var deadlinesNode) && deadlinesNode is JsonArray deadlines && deadlines.Count > 0)
-        {
-            lines.Add("Cac deadline can chu y:");
-            foreach (var item in deadlines)
+            else
             {
-                if (item is not JsonObject d) continue;
-
-                var title = d.TryGetPropertyValue("title", out var titleNode) && titleNode != null
-                    ? titleNode.GetValue<string>()
-                    : "(khong co tieu de)";
-                var dueDate = d.TryGetPropertyValue("due_date", out var dueNode) && dueNode != null
-                    ? dueNode.GetValue<string>()
-                    : "N/A";
-                var daysRemaining = d.TryGetPropertyValue("days_remaining", out var daysNode) && daysNode != null
-                    ? daysNode.GetValue<int>()
-                    : 0;
-                var progress = d.TryGetPropertyValue("progress", out var progressNode) && progressNode != null
-                    ? progressNode.GetValue<int>()
-                    : 0;
-
-                lines.Add($"- {title} | Due: {dueDate} | Con {daysRemaining} ngay | Progress: {progress}%");
+                parameterReviewFailures = 0;
             }
-        }
-        else
-        {
-            lines.Add("Khong co deadline nao sap toi trong khoang thoi gian hien tai.");
-        }
 
-        return string.Join("\n", lines);
-    }
-
-    private static string? BuildGroupRiskAnswerFromResult(JsonObject? data)
-    {
-        if (data == null)
-        {
-            return null;
-        }
-
-        var groupName = data.TryGetPropertyValue("group_name", out var groupNameNode) && groupNameNode != null
-            ? groupNameNode.GetValue<string>()
-            : "Nhom hien tai";
-        var riskLevel = data.TryGetPropertyValue("risk_level", out var riskLevelNode) && riskLevelNode != null
-            ? riskLevelNode.GetValue<string>()
-            : "N/A";
-
-        var lines = new List<string>
-        {
-            $"Tong quan rui ro du an ({groupName}): {riskLevel}."
-        };
-
-        if (data.TryGetPropertyValue("risk_factors", out var factorsNode) && factorsNode is JsonArray factors && factors.Count > 0)
-        {
-            lines.Add("Rui ro nghiem trong/can theo doi:");
-            foreach (var factor in factors)
+            var fitVerdict = ReviewToolFit(intent, decision);
+            if (!fitVerdict.IsAccepted)
             {
-                if (factor != null)
+                reasoningSteps.Add($"[REVIEW] Tool fit rejected: {fitVerdict.ReviewNote}");
+                consecutiveDecideWithoutExec++;
+                decision = await PlanNextActionAsync(
+                    userQuestion,
+                    systemPrompt,
+                    toolsManifest,
+                    history,
+                    context,
+                    cancellationToken,
+                    isContinuation: true,
+                    consecutiveDecideWithoutExecution: consecutiveDecideWithoutExec);
+                continue;
+            }
+
+            var previousSuccessfulCall = history.Calls
+                .LastOrDefault(c => c.ToolName.Equals(decision.ToolName, StringComparison.OrdinalIgnoreCase) && c.Result.IsSuccess);
+            if (previousSuccessfulCall != null)
+            {
+                var forcedAnswer = BuildForcedAnswerFromToolResult(previousSuccessfulCall.ToolName, previousSuccessfulCall.Result.Data);
+                if (forcedAnswer != null)
                 {
-                    lines.Add($"- {factor.GetValue<string>()}");
+                    reasoningSteps.Add($"[GUARD] Tool '{decision.ToolName}' already succeeded with valid data. Skip repeated call.");
+                    decision = new AgentDecision
+                    {
+                        ShouldCallTool = false,
+                        FinalAnswer = forcedAnswer
+                    };
+                    break;
+                }
+
+                // Tool succeeded but returned null data — count how many times it was called
+                var sameToolCalls = history.Calls
+                    .Count(c => c.ToolName.Equals(decision.ToolName, StringComparison.OrdinalIgnoreCase) && c.Result.IsSuccess);
+                _logger.LogWarning(
+                    "[GUARD-NULL-DATA] Tool={Tool} Data=null, SameToolCalls={Count}",
+                    decision.ToolName, sameToolCalls);
+                if (sameToolCalls >= 2)
+                {
+                    // Stop calling this tool — data is consistently null
+                    var fallback = $"Da goi tool '{decision.ToolName}' {sameToolCalls} lan nhung khong co du lieu. Vui long dua ra cau tra loi dua tren du lieu hien co.";
+                    reasoningSteps.Add($"[GUARD] Tool '{decision.ToolName}' called {sameToolCalls} times with null data. Stopping.");
+                    decision = new AgentDecision
+                    {
+                        ShouldCallTool = false,
+                        FinalAnswer = fallback
+                    };
+                    break;
                 }
             }
-        }
 
-        if (data.TryGetPropertyValue("recommendations", out var recsNode) && recsNode is JsonArray recs && recs.Count > 0)
-        {
-            lines.Add("De xuat giam rui ro:");
-            foreach (var rec in recs)
+            // Tool execution
+            var toolResult = await ExecuteToolAsync(decision.ToolName, decision.ToolParameters!, context, cancellationToken);
+            history.AddCall(decision.ToolName, decision.ToolParameters!, toolResult);
+            consecutiveDecideWithoutExec = 0;
+            await SaveTaskPaginationStateIfNeededAsync(context, decision.ToolName, decision.ToolParameters!, toolResult);
+
+            if (toolResult.IsSuccess)
             {
-                if (rec != null)
+                if (!ValidateToolResult(decision.ToolName, toolResult, out var validationNote))
                 {
-                    lines.Add($"- {rec.GetValue<string>()}");
+                    reasoningSteps.Add($"[VALIDATE] {decision.ToolName}: {validationNote}");
+                    consecutiveDecideWithoutExec++;
+                    decision = await PlanNextActionAsync(
+                        userQuestion,
+                        systemPrompt,
+                        toolsManifest,
+                        history,
+                        context,
+                        cancellationToken,
+                        isContinuation: true,
+                        consecutiveDecideWithoutExecution: consecutiveDecideWithoutExec);
+                    continue;
                 }
+
+                // Use generic formatter for all tools
+                var forcedAnswer = BuildForcedAnswerFromToolResult(decision.ToolName, toolResult.Data)
+                    ?? "Da lay du lieu thanh cong.";
+
+                reasoningSteps.Add($"[GUARD] {decision.ToolName} succeeded -> finalize.");
+                decision = new AgentDecision
+                {
+                    ShouldCallTool = false,
+                    FinalAnswer = forcedAnswer
+                };
+                break;
+            }
+            else
+            {
+                reasoningSteps.Add($"Tool '{decision.ToolName}' failed: {toolResult.ErrorMessage}");
+
+                if (decision.ToolName == "search_documents" &&
+                    HasEmptyQuery(decision.ToolParameters!) &&
+                    history.Calls.Count(c => c.ToolName == "search_documents" && HasEmptyQuery(c.Parameters)) >= 2)
+                {
+                    decision = new AgentDecision
+                    {
+                        ShouldCallTool = true,
+                        ToolName = "get_group_documents",
+                        ToolParameters = new JsonObject()
+                    };
+                    continue;
+                }
+
+                decision = await DecideActionAsync(
+                    userQuestion,
+                    systemPrompt,
+                    toolsManifest,
+                    history,
+                    context,
+                    cancellationToken,
+                    isContinuation: true,
+                    consecutiveDecideWithoutExecution: ++consecutiveDecideWithoutExec);
             }
         }
 
-        return string.Join("\n", lines);
+        sw.Stop();
+
+        // Check if we have a forced answer (from tool results)
+        if (!string.IsNullOrWhiteSpace(decision?.FinalAnswer))
+        {
+            _logger.LogInformation("[AI-SYNTHESIS] Calling LLM to synthesize final answer from tool results");
+            reasoningSteps.Add("[SYNTHESIS] Final answer from tool results - calling LLM to format response and suggest next steps");
+
+            var synthesisSystemPrompt = BuildMarkdownSynthesisSystemPrompt(context.Language);
+            await foreach (var chunk in _llmService.GenerateAnswerStreamAsync(
+                synthesisSystemPrompt,
+                decision.FinalAnswer,
+                string.Empty,
+                cancellationToken,
+                forceTextMode: true))
+            {
+                if (!string.IsNullOrEmpty(chunk))
+                {
+                    chunks.Add(new AIStreamChunk { Type = "chunk", Content = chunk });
+                }
+            }
+
+            chunks.Add(new AIStreamChunk { Type = "done" });
+            return new AIStreamResult
+            {
+                ToolCount = history.Calls.Count,
+                ProcessingTimeMs = sw.ElapsedMilliseconds,
+                Chunks = chunks,
+                TokenUsage = _currentTokenUsage
+            };
+        }
+
+        // Build prompt for streaming LLM call
+        var prompt = BuildPromptForFinalAnswer(
+            userQuestion,
+            systemPrompt,
+            toolsManifest,
+            history,
+            context,
+            cancellationToken);
+
+        _logger.LogInformation(
+            "[LLM-STREAM] Starting streaming response. Question={Question}",
+            userQuestion.Length > 50 ? userQuestion[..50] + "..." : userQuestion);
+
+        // Stream LLM response chunks
+        await foreach (var chunk in _llmService.GenerateAnswerStreamAsync(
+            prompt,
+            userQuestion,
+            "",
+            cancellationToken))
+        {
+            if (!string.IsNullOrEmpty(chunk))
+            {
+                chunks.Add(new AIStreamChunk { Type = "chunk", Content = chunk });
+            }
+        }
+
+        chunks.Add(new AIStreamChunk { Type = "done" });
+
+        return new AIStreamResult
+        {
+            ToolCount = history.Calls.Count,
+            ProcessingTimeMs = sw.ElapsedMilliseconds,
+            Chunks = chunks,
+            TokenUsage = _currentTokenUsage
+        };
+    }
+
+    /// <summary>
+    /// Build prompt for final answer generation (without response schema for streaming)
+    /// </summary>
+    private string BuildPromptForFinalAnswer(
+        string userQuestion,
+        string systemPrompt,
+        JsonObject toolsManifest,
+        ToolExecutionHistory history,
+        AIQueryContext context,
+        CancellationToken cancellationToken)
+    {
+        var promptBuilder = new System.Text.StringBuilder();
+
+        promptBuilder.AppendLine(systemPrompt);
+        promptBuilder.AppendLine();
+        promptBuilder.AppendLine("=== AVAILABLE TOOLS ===");
+        promptBuilder.AppendLine(toolsManifest["tools"]?.ToString() ?? "[]");
+        promptBuilder.AppendLine();
+        promptBuilder.AppendLine("=== USER QUESTION ===");
+        promptBuilder.AppendLine(userQuestion);
+        promptBuilder.AppendLine();
+
+        if (history.Calls.Count > 0)
+        {
+            promptBuilder.AppendLine("=== TOOL RESULTS ===");
+            var recentCalls = history.Calls.TakeLast(3).ToList();
+            foreach (var call in recentCalls)
+            {
+                promptBuilder.AppendLine($"Tool: {call.ToolName}");
+                promptBuilder.AppendLine($"Parameters: {call.Parameters}");
+                promptBuilder.AppendLine($"Result: {call.Result.ToJson()}");
+                promptBuilder.AppendLine();
+            }
+        }
+
+        promptBuilder.AppendLine("=== INSTRUCTIONS ===");
+        promptBuilder.AppendLine("- Based on the tool results above, provide a clear and helpful answer");
+        promptBuilder.AppendLine("- Format your answer in Vietnamese with proper markdown if needed");
+        promptBuilder.AppendLine("- If tool results are empty or insufficient, say so honestly");
+
+        return promptBuilder.ToString();
     }
 
     private static string? BuildForcedAnswerFromToolResult(string toolName, JsonObject? data)
     {
-        if (toolName.Equals("get_tasks", StringComparison.OrdinalIgnoreCase))
+        if (data == null)
         {
-            return BuildTaskAnswerFromGetTasksResult(data);
+            return null;
         }
 
-        if (toolName.Equals("get_group_stats", StringComparison.OrdinalIgnoreCase))
+        // Let the LLM decide the final format and next action suggestions using tool data as context.
+        return BuildPromptForLLMSynthesis(toolName, data);
+    }
+
+    /// <summary>
+    /// Build context for LLM to synthesize its own answer
+    /// AI will decide format (table, list, markdown, etc.)
+    /// </summary>
+    private static string BuildPromptForLLMSynthesis(string toolName, JsonObject data)
+    {
+        var sb = new System.Text.StringBuilder();
+        sb.AppendLine($"Tool '{toolName}' returned the following data:");
+        sb.AppendLine();
+        sb.AppendLine(data.ToJsonString());
+        sb.AppendLine();
+        sb.AppendLine("TASK: Use the data above to answer the user's request in Vietnamese.");
+        sb.AppendLine();
+        sb.AppendLine("RULES:");
+        sb.AppendLine("- Choose the best response format yourself: paragraph, bullets, table, or a mix.");
+        sb.AppendLine("- DO NOT return JSON.");
+        sb.AppendLine("- Highlight important items such as overdue tasks, high priority work, missing deadlines, or risks.");
+        sb.AppendLine("- If the data suggests what to do next, include a short 'Gợi ý tiếp theo' section with 1-3 concrete actions.");
+        sb.AppendLine("- Keep the answer concise but useful. Prefer readable markdown.");
+        return sb.ToString();
+    }
+
+    private static string BuildCompactToolResultForPrompt(AIQueryResult result)
+    {
+        var payload = new JsonObject
         {
-            return BuildGroupStatsAnswerFromResult(data);
+            ["is_success"] = JsonValue.Create(result.IsSuccess),
+            ["execution_time_ms"] = JsonValue.Create(result.ExecutionTimeMs)
+        };
+
+        if (!string.IsNullOrWhiteSpace(result.ErrorMessage))
+        {
+            payload["error_message"] = JsonValue.Create(result.ErrorMessage);
         }
 
-        if (toolName.Equals("get_deadlines", StringComparison.OrdinalIgnoreCase))
+        if (result.Data != null)
         {
-            return BuildDeadlinesAnswerFromResult(data);
+            var compactData = result.Data.DeepClone() as JsonObject ?? new JsonObject();
+            CompactNodeForPrompt(compactData, 0);
+            payload["data"] = compactData;
         }
 
-        if (toolName.Equals("get_group_risk", StringComparison.OrdinalIgnoreCase))
+        var compactJson = payload.ToJsonString();
+        if (compactJson.Length > MaxToolResultCharsForPrompt)
         {
-            return BuildGroupRiskAnswerFromResult(data);
+            compactJson = compactJson[..MaxToolResultCharsForPrompt] + "... [truncated]";
         }
 
-        if (toolName.Equals("get_group_documents", StringComparison.OrdinalIgnoreCase))
+        return compactJson;
+    }
+
+    private static void CompactNodeForPrompt(JsonNode? node, int depth)
+    {
+        if (node == null || depth > 4)
         {
-            return BuildGroupDocumentsAnswerFromResult(data);
+            return;
         }
 
-        if (toolName.Equals("search_documents", StringComparison.OrdinalIgnoreCase))
+        if (node is JsonObject obj)
         {
-            return BuildSearchDocumentsAnswerFromResult(data);
+            var keys = obj.Select(kv => kv.Key).ToList();
+            foreach (var key in keys)
+            {
+                var child = obj[key];
+                if (child is JsonValue value)
+                {
+                    if (value.TryGetValue<string>(out var str) && str.Length > MaxStringCharsForPrompt)
+                    {
+                        obj[key] = JsonValue.Create(str[..MaxStringCharsForPrompt] + "...");
+                    }
+                    continue;
+                }
+
+                if (child is JsonArray arr)
+                {
+                    var removedCount = arr.Count - MaxArrayItemsForPrompt;
+                    while (arr.Count > MaxArrayItemsForPrompt)
+                    {
+                        arr.RemoveAt(arr.Count - 1);
+                    }
+
+                    foreach (var item in arr)
+                    {
+                        CompactNodeForPrompt(item, depth + 1);
+                    }
+
+                    if (removedCount > 0)
+                    {
+                        obj[key + "_truncated_count"] = JsonValue.Create(removedCount);
+                    }
+                }
+                else
+                {
+                    CompactNodeForPrompt(child, depth + 1);
+                }
+            }
+
+            return;
         }
 
-        return data == null ? null : $"Da lay du lieu tu tool '{toolName}'.";
+        if (node is JsonArray array)
+        {
+            while (array.Count > MaxArrayItemsForPrompt)
+            {
+                array.RemoveAt(array.Count - 1);
+            }
+
+            foreach (var item in array)
+            {
+                CompactNodeForPrompt(item, depth + 1);
+            }
+        }
+    }
+
+    private static string BuildMarkdownSynthesisSystemPrompt(string language)
+    {
+        var isEnglish = language.Equals("en", StringComparison.OrdinalIgnoreCase);
+
+        return isEnglish
+            ? "You are an AI assistant that turns tool data into a clean Markdown answer. Never return JSON. Use headings, bullet lists, and tables when useful. Include a short \"Next steps\" section when the data implies concrete actions."
+            : "Ban la tro ly AI bien du lieu tu tool thanh cau tra loi Markdown sach se. Tuyet doi khong tra ve JSON. Hay dung tieu de, danh sach bullet va bang khi can. Neu du lieu goi y hanh dong cu the, hay them muc \"Goi y tiep theo\" ngan gon.";
+    }
+
+    /// <summary>
+    /// Generic formatter - convert tool result JSON thành readable markdown
+    /// Khong can handler riêng cho từng tool
+    /// </summary>
+    private static string FormatToolResultAsMarkdown(string toolName, JsonObject data)
+    {
+        var lines = new List<string>();
+        var toolTitle = GetToolDisplayName(toolName);
+
+        JsonArray? personalTasksArray = null;
+        if (data.TryGetPropertyValue("personal_tasks", out var personalTasksNode) && personalTasksNode is JsonArray personalTasksJsonArray)
+        {
+            personalTasksArray = personalTasksJsonArray;
+        }
+
+        JsonArray? groupTasksArray = null;
+        if (data.TryGetPropertyValue("group_tasks", out var groupTasksNode) && groupTasksNode is JsonArray groupTasksJsonArray)
+        {
+            groupTasksArray = groupTasksJsonArray;
+        }
+
+        if (personalTasksArray != null || groupTasksArray != null)
+        {
+            return FormatPersonalAndGroupTasksAsMarkdown(toolTitle, data, personalTasksArray, groupTasksArray);
+        }
+
+        // 1. Handle arrays (tasks, documents, members, etc.)
+        JsonArray? itemArray = null;
+        if (TryGetArray(data, "tasks", out var tasks)) { itemArray = tasks; }
+        else if (TryGetArray(data, "documents", out var docs)) { itemArray = docs; }
+        else if (TryGetArray(data, "members", out var members)) { itemArray = members; }
+        else if (TryGetArray(data, "deadlines", out var deadlines)) { itemArray = deadlines; }
+        else if (TryGetArray(data, "groups", out var groups)) { itemArray = groups; }
+        else if (TryGetArray(data, "results", out var results)) { itemArray = results; }
+
+        if (itemArray != null)
+        {
+            var count = itemArray.Count;
+
+            // Summary count
+            if (data.TryGetPropertyValue("total", out var totalNode) && totalNode != null)
+            {
+                lines.Add($"**{toolTitle}** - Tìm thấy {totalNode} kết quả:");
+            }
+            else if (data.TryGetPropertyValue("total_count", out var totalCountNode) && totalCountNode != null)
+            {
+                lines.Add($"**{toolTitle}** - Tổng cộng {totalCountNode} mục:");
+            }
+            else
+            {
+                lines.Add($"**{toolTitle}** - {count} kết quả:");
+            }
+
+            // Limit notice
+            if (data.TryGetPropertyValue("summary", out var summaryNode) && summaryNode != null)
+            {
+                lines.Add($"_{summaryNode.GetValue<string>()}_");
+            }
+
+            // Format each item
+            foreach (var item in itemArray.Take(10)) // Max 10 items displayed
+            {
+                if (item is not JsonObject obj) continue;
+                lines.Add(FormatItemAsMarkdown(obj));
+            }
+
+            if (itemArray.Count > 10)
+            {
+                lines.Add($"... và {itemArray.Count - 10} mục khác.");
+            }
+
+            return string.Join("\n", lines);
+        }
+
+        // 2. Handle stats/analytics objects
+        if (data.TryGetPropertyValue("task_statistics", out var statsNode) && statsNode is JsonObject stats)
+        {
+            lines.Add($"**{toolTitle}**");
+            lines.Add(FormatStatsAsMarkdown(stats));
+
+            // Group info if present
+            if (data.TryGetPropertyValue("group_info", out var groupInfoNode) && groupInfoNode is JsonObject groupInfo)
+            {
+                var groupName = groupInfo.TryGetPropertyValue("name", out var nameNode) && nameNode != null
+                    ? nameNode.GetValue<string>() : "Nhóm hiện tại";
+                lines.Insert(0, $"## {groupName}");
+            }
+
+            return string.Join("\n", lines);
+        }
+
+        if (data.TryGetPropertyValue("statistics", out var statisticsNode) && statisticsNode is JsonObject statistics)
+        {
+            lines.Add($"**{toolTitle}**");
+            lines.Add(FormatStatsAsMarkdown(statistics));
+            return string.Join("\n", lines);
+        }
+
+        // 3. Handle risk analysis
+        if (data.TryGetPropertyValue("risk_level", out var riskNode) && riskNode != null)
+        {
+            lines.Add($"**{toolTitle}**");
+            var riskLevel = riskNode.GetValue<string>();
+            var riskIcon = riskLevel switch
+            {
+                "HIGH" => "🔴",
+                "MEDIUM" => "🟡",
+                "LOW" => "🟢",
+                _ => "⚪"
+            };
+            lines.Add($"{riskIcon} Mức độ rủi ro: **{riskLevel}**");
+
+            if (data.TryGetPropertyValue("risk_factors", out var factorsNode) && factorsNode is JsonArray factors)
+            {
+                lines.Add("**Yếu tố rủi ro:**");
+                foreach (var factor in factors.Take(5))
+                {
+                    if (factor is JsonObject factorObj)
+                    {
+                        var desc = factorObj.TryGetPropertyValue("description", out var descNode) && descNode != null
+                            ? descNode.GetValue<string>() : factor.ToString();
+                        lines.Add($"- {desc}");
+                    }
+                }
+            }
+
+            return string.Join("\n", lines);
+        }
+
+        // 4. Handle single object with common fields
+        var commonTitle = data.TryGetPropertyValue("title", out var titleNode) && titleNode != null
+            ? titleNode.GetValue<string>()
+            : data.TryGetPropertyValue("name", out var nameObjNode) && nameObjNode != null
+                ? nameObjNode.GetValue<string>()
+                : toolTitle;
+
+        lines.Add($"**{commonTitle}**");
+
+        // Common fields
+        var commonFields = new[] { "description", "status", "progress", "priority", "severity", "completion_rate", "member_count" };
+        foreach (var field in commonFields)
+        {
+            if (data.TryGetPropertyValue(field, out var fieldNode) && fieldNode != null && fieldNode.GetValueKind() != JsonValueKind.Object && fieldNode.GetValueKind() != JsonValueKind.Array)
+            {
+                lines.Add($"- **{field.Replace("_", " ").ToUpperInvariant()}**: {fieldNode}");
+            }
+        }
+
+        // 5. Fallback - just show data summary
+        if (lines.Count <= 1)
+        {
+            return $"**{toolTitle}**: Đã lấy dữ liệu thành công. Xem chi tiết trong hệ thống.";
+        }
+
+        return string.Join("\n", lines);
+    }
+
+    private static string FormatPersonalAndGroupTasksAsMarkdown(
+        string toolTitle,
+        JsonObject data,
+        JsonArray? personalTasks,
+        JsonArray? groupTasks)
+    {
+        var lines = new List<string> { $"**{toolTitle}**" };
+
+        if (data.TryGetPropertyValue("summary", out var summaryNode) && summaryNode != null)
+        {
+            lines.Add($"_{summaryNode.GetValue<string>()}_");
+        }
+
+        if (data.TryGetPropertyValue("personal_count", out var personalCountNode) && personalCountNode != null)
+        {
+            var personalCount = personalCountNode.GetValue<int>();
+            var groupCount = data.TryGetPropertyValue("group_count", out var groupCountNode) && groupCountNode != null
+                ? groupCountNode.GetValue<int>()
+                : groupTasks?.Count ?? 0;
+            lines.Add($"- **Tổng quan**: {personalCount} công việc cá nhân, {groupCount} công việc nhóm.");
+        }
+
+        if (personalTasks != null)
+        {
+            lines.Add("");
+            lines.Add("### Công việc cá nhân");
+            if (personalTasks.Count == 0)
+            {
+                lines.Add("- Không có công việc cá nhân.");
+            }
+            else
+            {
+                foreach (var item in personalTasks.Take(10))
+                {
+                    if (item is JsonObject obj)
+                    {
+                        lines.Add(FormatItemAsMarkdown(obj));
+                    }
+                }
+
+                if (personalTasks.Count > 10)
+                {
+                    lines.Add($"... và {personalTasks.Count - 10} công việc cá nhân khác.");
+                }
+            }
+        }
+
+        if (groupTasks != null)
+        {
+            lines.Add("");
+            lines.Add("### Công việc nhóm");
+            if (groupTasks.Count == 0)
+            {
+                lines.Add("- Không có công việc nhóm.");
+            }
+            else
+            {
+                foreach (var item in groupTasks.Take(10))
+                {
+                    if (item is JsonObject obj)
+                    {
+                        lines.Add(FormatItemAsMarkdown(obj));
+                    }
+                }
+
+                if (groupTasks.Count > 10)
+                {
+                    lines.Add($"... và {groupTasks.Count - 10} công việc nhóm khác.");
+                }
+            }
+        }
+
+        if (data.TryGetPropertyValue("recommendation", out var recommendationNode) && recommendationNode != null)
+        {
+            lines.Add("");
+            lines.Add("**Khuyến nghị**");
+            lines.Add(recommendationNode.ToString());
+        }
+
+        return string.Join("\n", lines.Where(line => line != null));
+    }
+
+    private static bool TryGetArray(JsonObject data, string key, out JsonArray? array)
+    {
+        array = null;
+        if (data.TryGetPropertyValue(key, out var node) && node is JsonArray arr && arr.Count > 0)
+        {
+            array = arr;
+            return true;
+        }
+        return false;
+    }
+
+    private static string FormatItemAsMarkdown(JsonObject item)
+    {
+        var title = item.TryGetPropertyValue("title", out var t) && t != null ? t.GetValue<string>() : "N/A";
+        var status = item.TryGetPropertyValue("status", out var s) && s != null ? s.GetValue<string>() : null;
+        var priority = item.TryGetPropertyValue("priority", out var p) && p != null ? p.GetValue<string>() : null;
+        var dueDate = item.TryGetPropertyValue("due_date", out var d) && d != null ? d.GetValue<string>() : null;
+        var progress = item.TryGetPropertyValue("progress", out var pg) && pg != null ? $"{pg}%" : null;
+        var groupName = item.TryGetPropertyValue("group_name", out var g) && g != null ? $"[{g.GetValue<string>()}]" : null;
+        var source = item.TryGetPropertyValue("source", out var src) && src != null ? $"({src.GetValue<string>()})" : null;
+
+        var parts = new List<string> { $"- {title}" };
+        if (groupName != null) parts.Add(groupName);
+        if (status != null) parts.Add($"| Status: {status}");
+        if (priority != null) parts.Add($"| Priority: {priority}");
+        if (progress != null) parts.Add($"| Progress: {progress}");
+        if (dueDate != null && dueDate != "") parts.Add($"| Due: {dueDate}");
+        if (source != null) parts.Add(source);
+
+        return string.Join(" ", parts);
+    }
+
+    private static string FormatStatsAsMarkdown(JsonObject stats)
+    {
+        var lines = new List<string>();
+        var mappings = new Dictionary<string, string>
+        {
+            ["total_tasks"] = "Tổng task",
+            ["completed_tasks"] = "Đã hoàn thành",
+            ["in_progress_tasks"] = "Đang thực hiện",
+            ["not_started_tasks"] = "Chưa bắt đầu",
+            ["overdue_tasks"] = "Quá hạn",
+            ["completion_percentage"] = "Tỷ lệ hoàn thành",
+            ["active_groups"] = "Nhóm đang hoạt động",
+            ["total_members"] = "Tổng thành viên"
+        };
+
+        foreach (var (key, label) in mappings)
+        {
+            if (stats.TryGetPropertyValue(key, out var node) && node != null)
+            {
+                var value = node.GetValueKind() == JsonValueKind.Number
+                    ? node.GetValue<int>().ToString()
+                    : node.ToString();
+                lines.Add($"- **{label}**: {value}");
+            }
+        }
+
+        return lines.Count > 0 ? string.Join("\n", lines) : "- Không có dữ liệu thống kê.";
+    }
+
+    private static string GetToolDisplayName(string toolName)
+    {
+        var displayNames = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["get_tasks"] = "Danh sách công việc",
+            ["get_personal_tasks"] = "Công việc cá nhân",
+            ["get_group_stats"] = "Thống kê nhóm",
+            ["get_personal_stats"] = "Thống kê cá nhân",
+            ["get_studio_analytics"] = "Analytics Studio",
+            ["get_members"] = "Thành viên nhóm",
+            ["get_deadlines"] = "Deadline",
+            ["get_personal_deadlines"] = "Deadline cá nhân",
+            ["search_documents"] = "Tài liệu tìm kiếm",
+            ["search_studio_documents"] = "Tài liệu Studio",
+            ["get_group_documents"] = "Tài liệu nhóm",
+            ["get_studio_groups"] = "Danh sách nhóm",
+            ["get_group_risk"] = "Phân tích rủi ro nhóm",
+            ["get_risk_groups"] = "Nhóm rủi ro",
+            ["get_studio_health"] = "Tình trạng Studio",
+            ["compare_groups"] = "So sánh nhóm",
+            ["get_group_performance"] = "Hiệu suất nhóm",
+            ["get_member_permissions"] = "Quyền thành viên"
+        };
+
+        return displayNames.TryGetValue(toolName, out var name) ? name : toolName.Replace("_", " ").ToUpperInvariant();
     }
 
     private static bool HasTaskFilterParameters(JsonObject? parameters)
@@ -1627,7 +2268,8 @@ public class AIAgent
         ToolExecutionHistory history,
         AIQueryContext context,
         CancellationToken cancellationToken,
-        bool isContinuation = false)
+        bool isContinuation = false,
+        int consecutiveDecideWithoutExecution = 0)
     {
         // Build prompt với context
         var promptBuilder = new System.Text.StringBuilder();
@@ -1665,14 +2307,14 @@ public class AIAgent
                 promptBuilder.AppendLine($"Tool: {call.ToolName}");
                 promptBuilder.AppendLine($"Parameters: {call.Parameters}");
                 
-                // Include FULL result data - no truncation, so LLM sees all items
-                var resultJson = call.Result.ToJson();
+                var fullResultJson = call.Result.ToJson();
+                var resultJson = BuildCompactToolResultForPrompt(call.Result);
                 var resultLength = resultJson.Length;
                 cumulativeChars += resultLength;
                 
                 // Log context breakdown per tool
                 toolContextLog.AppendLine(
-                    $"Tool={call.ToolName} CharsIncluded={resultLength} CumulativeChars={cumulativeChars}");
+                    $"Tool={call.ToolName} CharsIncluded={resultLength} CharsOriginal={fullResultJson.Length} CumulativeChars={cumulativeChars}");
                     
                 promptBuilder.AppendLine($"Result: {resultJson}");
                 promptBuilder.AppendLine();
@@ -1775,8 +2417,20 @@ public class AIAgent
         
         var estimatedTokens = (int)(prompt.Length * _config.TokensPerCharacter);
         var wasContextTrimmed = false;
-        var softMaxContextTokens = (int)Math.Floor(_config.MaxContextTokens * 0.5);
-        
+        var softMaxContextTokens = (int)Math.Floor(_config.MaxContextTokens * _config.SoftLimitRatio);
+
+        if (consecutiveDecideWithoutExecution >= MaxConsecutiveDecideWithoutExecution)
+        {
+            _logger.LogWarning(
+                "[DECIDE-LIMIT] Consecutive DecideAction calls without execution reached {Count}. Forcing finalize.",
+                consecutiveDecideWithoutExecution);
+            return new AgentDecision
+            {
+                ShouldCallTool = false,
+                FinalAnswer = "Da goi nhieu lan nhung khong co du lieu moi. Vui long dua ra cau tra loi dua tren thong tin hien co."
+            };
+        }
+
         // Analyze prompt breakdown to see which sections consume most context
         var promptBreakdown = new System.Text.StringBuilder("[CONTEXT-BREAKDOWN] Prompt sections:\n");
         var systemPromptSection = systemPrompt;
@@ -1823,6 +2477,7 @@ public class AIAgent
             // Smart trim: cắt từ cuối INSTRUCTIONS section để giữ system prompt + tools + question
             // Điều này đảm bảo LLM vẫn thấy rules quan trọng
             var instructionsIdx = prompt.LastIndexOf("=== INSTRUCTIONS ===");
+            var trimNote = $"[... TRUNCATED TO STAY WITHIN SOFT TOKEN LIMIT ({_config.SoftLimitRatio:P0} BUFFER) ...]";
             if (instructionsIdx > 0)
             {
                 var maxCharLimit = (int)(softMaxContextTokens / _config.TokensPerCharacter);
@@ -1830,18 +2485,18 @@ public class AIAgent
                 if (keepPrefix.Length < maxCharLimit)
                 {
                     // Giữ prefix + phần INSTRUCTIONS
-                    prompt = keepPrefix + "\n[... INSTRUCTIONS TRUNCATED DUE TO SOFT TOKEN LIMIT (50% BUFFER) ...]";
+                    prompt = keepPrefix + "\n[... INSTRUCTIONS TRUNCATED DUE TO SOFT TOKEN LIMIT ...]";
                 }
                 else
                 {
                     // Cắt cả prefix
-                    prompt = prompt[..(int)(softMaxContextTokens / _config.TokensPerCharacter)] + "\n[... TRUNCATED TO STAY WITHIN SOFT TOKEN LIMIT (50% BUFFER) ...]";
+                    prompt = prompt[..(int)(softMaxContextTokens / _config.TokensPerCharacter)] + $"\n{trimNote}";
                 }
             }
             else
             {
                 // Fallback: cắt từ cuối
-                prompt = prompt[..(int)(softMaxContextTokens / _config.TokensPerCharacter)] + "\n[... TRUNCATED TO STAY WITHIN SOFT TOKEN LIMIT (50% BUFFER) ...]";
+                prompt = prompt[..(int)(softMaxContextTokens / _config.TokensPerCharacter)] + $"\n{trimNote}";
             }
         }
         else
@@ -1855,18 +2510,25 @@ public class AIAgent
             "[LLM-PROMPT] Step={Step} PromptTokens={Tokens} ToolCalls={Count} WasTrimmed={Trimmed}",
             history.Calls.Count, estimatedTokens, history.Calls.Count, wasContextTrimmed);
 
-        var response = await _llmService.GenerateAnswerAsync(
+        var (response, usage) = await _llmService.GenerateAnswerWithUsageAsync(
             prompt,
             userQuestion,
             "", // No extra context needed
             cancellationToken);
 
+        // Accumulate token usage across all LLM calls
+        _currentTokenUsage = new TokenUsage(
+            (_currentTokenUsage?.InputTokens ?? 0) + usage.InputTokens,
+            (_currentTokenUsage?.OutputTokens ?? 0) + usage.OutputTokens,
+            (_currentTokenUsage?.CachedTokens ?? 0) + usage.CachedTokens,
+            (_currentTokenUsage?.ThinkingTokens ?? 0) + usage.ThinkingTokens);
+
         _logger.LogInformation(
-            "[LLM-RESPONSE] Step={Step} IsContinuation={IsCont} ResponseLength={Len} Response={Response}",
+            "[LLM-RESPONSE] Step={Step} IsContinuation={IsCont} ResponseLength={Len} TokenUsage=In:{In} Out:{Out} Cached:{Cached} Thoughts:{Thoughts}",
             history.Calls.Count,
             isContinuation,
             response.Length,
-            response.Length > 300 ? response[..300] + "..." : response);
+            usage.InputTokens, usage.OutputTokens, usage.CachedTokens, usage.ThinkingTokens);
 
         // Parse response để quyết định action
         return ParseDecision(response, toolsManifest);
@@ -1882,6 +2544,7 @@ public class AIAgent
         CancellationToken cancellationToken)
     {
         // Lấy TYPE từ registry (không dùng instance cũ)
+        _logger.LogInformation("[TOOL-EXEC-START] Tool={Tool} Params={Params}", toolName, parameters.ToString());
         var toolType = _toolRegistry.GetToolType(toolName);
         if (toolType == null)
         {
@@ -1920,7 +2583,9 @@ public class AIAgent
 
         try
         {
-            var result = await tool.ExecuteAsync(context, parameters, cancellationToken);
+            // Use tool cache for better performance - cache hit returns immediately
+            var result = await _toolCacheService.ExecuteWithCacheAsync(
+                tool, context.UserId, context.GroupId, parameters, context, cancellationToken);
             
             // Log tool result - truncate to first 100 characters
             var resultData = result.Data?.ToString() ?? "";
@@ -2537,6 +3202,9 @@ public class AIAgentResult
     /// Lý do khi fallback fire — null nếu LLM trả lời thật.
     /// </summary>
     public string? FallbackReason { get; set; }
+
+    // Token usage from Gemini usage_metadata (for accurate analytics)
+    public TokenUsage? TokenUsage { get; set; }
 }
 /// <summary>
 /// Quyết định của Agent
@@ -2547,4 +3215,35 @@ public class AgentDecision
     public string? ToolName { get; set; }
     public JsonObject? ToolParameters { get; set; }
     public string? FinalAnswer { get; set; }
+}
+
+/// <summary>
+/// SSE chunk for streaming AI responses
+/// </summary>
+public class AIStreamChunk
+{
+    public string Type { get; set; } = ""; // metadata, chunk, done, error
+    public string? Content { get; set; }
+    public int? RemainingRequests { get; set; }
+    public int? DailyLimit { get; set; }
+    public int? ToolCount { get; set; }
+    public long? ProcessingTimeMs { get; set; }
+    public string? ErrorMessage { get; set; }
+
+    // Token usage from Gemini usage_metadata (for analytics)
+    public int? InputTokens { get; set; }
+    public int? OutputTokens { get; set; }
+    public int? CachedTokens { get; set; }
+    public int? ThinkingTokens { get; set; }
+}
+
+/// <summary>
+/// Internal result for streaming processing
+/// </summary>
+internal class AIStreamResult
+{
+    public int ToolCount { get; set; }
+    public long ProcessingTimeMs { get; set; }
+    public List<AIStreamChunk> Chunks { get; set; } = new();
+    public TokenUsage? TokenUsage { get; set; }
 }

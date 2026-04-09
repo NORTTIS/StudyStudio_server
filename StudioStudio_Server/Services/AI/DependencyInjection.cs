@@ -21,6 +21,9 @@ public static class AIServiceExtensions
         // Register AI Agent (Scoped) - đã inject IServiceProvider để resolve tools
         services.AddScoped<AIAgent>();
 
+        // Register AI Tool Cache Service (Scoped) - caching tool results với invalidation support
+        services.AddScoped<AIToolCacheService>();
+
         // Register all tools (Scoped) - chỉ đăng ký concrete type
         // IAITool resolve sẽ tự động tìm các tool đã đăng ký theo Type
         services.AddScoped<GetTasksTool>();
@@ -31,8 +34,6 @@ public static class AIServiceExtensions
         services.AddScoped<SearchStudioDocumentsTool>();
         services.AddScoped<GetStudioGroupsTool>();
         services.AddScoped<GetStudioAnalyticsTool>();
-        services.AddScoped<GetGroupComparisonTool>();
-        services.AddScoped<GetStorageUsageTool>();
         services.AddScoped<GetMemberPermissionsTool>();
         services.AddScoped<GetGroupDocumentsTool>();
         services.AddScoped<GetGroupPerformanceTool>();
@@ -67,8 +68,6 @@ public static class AIServiceExtensions
             typeof(SearchStudioDocumentsTool),
             typeof(GetStudioGroupsTool),
             typeof(GetStudioAnalyticsTool),
-            typeof(GetGroupComparisonTool),
-            typeof(GetStorageUsageTool),
             typeof(GetMemberPermissionsTool),
             typeof(GetGroupDocumentsTool),
             typeof(GetGroupPerformanceTool),

@@ -33,6 +33,17 @@ namespace StudioStudio_Server.Repositories
                 .ToListAsync();
         }
 
+        public async Task<List<GroupAttachment>> GetByGroupIdPagedAsync(Guid groupId, int skip, int take)
+        {
+            return await _context.GroupAttachments
+                .Where(a => a.GroupId == groupId && !a.IsDeleted)
+                .OrderByDescending(a => a.UploadedAt)
+                .Skip(skip)
+                .Take(take)
+                .AsNoTracking()
+                .ToListAsync();
+        }
+
         public async Task<List<GroupAttachment>> GetByGroupIdWithStatusAsync(Guid groupId, DocumentStatus status)
         {
             return await _context.GroupAttachments

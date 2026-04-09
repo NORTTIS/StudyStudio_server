@@ -11,6 +11,7 @@ namespace StudioStudio_Server.Repositories.Interfaces
         Task<List<GroupAnalytics>> GetGroupAnalyticsRangeAsync(Guid groupId, DateOnly startDate, DateOnly endDate);
         Task<List<GroupAnalytics>> GetGroupAnalyticsRangeAsync(StudioDbContext context, Guid groupId, DateOnly startDate, DateOnly endDate);
         Task<List<GroupAnalytics>> GetAllGroupAnalyticsRangeAsync(DateOnly startDate, DateOnly endDate);
+        Task<Dictionary<Guid, List<GroupAnalytics>>> GetGroupAnalyticsRangeBatchAsync(List<Guid> groupIds, DateOnly startDate, DateOnly endDate);
         Task UpsertGroupAnalyticsAsync(GroupAnalytics analytics);
 
         // Aggregation helpers for ETL jobs

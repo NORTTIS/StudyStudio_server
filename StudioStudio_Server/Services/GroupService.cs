@@ -34,6 +34,7 @@ namespace StudioStudio_Server.Services
         private readonly IEmailService _emailService;
         private readonly IHttpContextAccessor _httpContextAccessor;
         private readonly IConfiguration _configuration;
+        private readonly ICacheService _cacheService;
 
         private static readonly string[] BrandColors = new[]
         {
@@ -58,7 +59,8 @@ namespace StudioStudio_Server.Services
             IStudioParticipantRepository studioParticipantRepository,
             IEmailService emailService,
             IHttpContextAccessor httpContextAccessor,
-            IConfiguration configuration)
+            IConfiguration configuration,
+            ICacheService cacheService)
         {
             _logger = logger;
             _messageService = messageService;
@@ -76,6 +78,7 @@ namespace StudioStudio_Server.Services
             _emailService = emailService;
             _httpContextAccessor = httpContextAccessor;
             _configuration = configuration;
+            _cacheService = cacheService;
         }
 
         public async Task<GroupListResponse> GetGroupsAsync(Guid userId)
@@ -771,6 +774,9 @@ namespace StudioStudio_Server.Services
             // Save changes
             await _groupRepository.UpdateAsync(group);
 
+            // Invalidate AI group cache so AI sees fresh group data immediately
+            await _cacheService.InvalidateAIGroupCacheAsync(group.GroupId);
+
             return new UpdateGroupResponse
             {
                 GroupId = group.GroupId,
@@ -1326,7 +1332,18 @@ namespace StudioStudio_Server.Services
 
             targetParticipant.IsApproved = true;
             await _groupParticipantRepository.UpdateAsync(targetParticipant);
-            
+
+            // Invalidate AI member cache so AI sees fresh member data immediately
+            try
+            {
+                await _cacheService.InvalidateAIMemberCacheAsync(groupId);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex,
+                    "Non-critical AI member cache invalidation failed for GroupId={GroupId}",
+                    groupId);
+            }
 
             // Auto-approve user in studio if they were added as pending when joining group
             if (group.StudioId.HasValue)

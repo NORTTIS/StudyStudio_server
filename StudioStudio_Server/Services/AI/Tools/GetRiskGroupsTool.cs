@@ -68,17 +68,26 @@ public class GetRiskGroupsTool : IAITool
             var now = DateTime.UtcNow;
             var sevenDaysAgo = DateOnly.FromDateTime(now.AddDays(-7));
 
+            // Batch: all task stats in 1 query + all analytics in 1 query
+            var groupIds = groups.Select(g => g.GroupId).ToList();
+            var taskStatsMap = groupIds.Count > 0
+                ? await _taskRepository.GetGroupTaskStatisticsBatchAsync(groupIds)
+                : new Dictionary<Guid, global::StudioStudio_Server.Models.DTOs.Response.TaskSummaryResponse>();
+            var analyticsMap = groupIds.Count > 0
+                ? await _analyticsRepository.GetGroupAnalyticsRangeBatchAsync(groupIds, sevenDaysAgo, DateOnly.FromDateTime(now))
+                : new Dictionary<Guid, global::System.Collections.Generic.List<global::StudioStudio_Server.Models.Entities.GroupAnalytics>>();
+
             foreach (var group in groups)
             {
-                var taskStats = await _taskRepository.GetGroupTaskStatisticsAsync(group.GroupId);
-                var analytics = await _analyticsRepository.GetGroupAnalyticsRangeAsync(group.GroupId, sevenDaysAgo, DateOnly.FromDateTime(now));
+                taskStatsMap.TryGetValue(group.GroupId, out var taskStats);
+                analyticsMap.TryGetValue(group.GroupId, out var analytics);
 
-                var totalTasks = taskStats.TotalTasks;
-                var completedTasks = taskStats.CompletedTasks;
-                var overdueTasks = taskStats.OverdueTasks;
+                var totalTasks = taskStats?.TotalTasks ?? 0;
+                var completedTasks = taskStats?.CompletedTasks ?? 0;
+                var overdueTasks = taskStats?.OverdueTasks ?? 0;
                 var completionRate = totalTasks > 0 ? Math.Round((double)completedTasks / totalTasks * 100, 1) : 0.0;
 
-                var hasRecentActivity = analytics.Any(a => a.ActiveMembers > 0 || a.MessagesCount > 0 || a.CompletedTasks > 0);
+                var hasRecentActivity = analytics?.Any(a => a.ActiveMembers > 0 || a.MessagesCount > 0 || a.CompletedTasks > 0) ?? false;
                 var isLowCompletion = completionRate < threshold;
                 var isHighOverdue = overdueTasks >= 2;
                 var isInactive = !hasRecentActivity;

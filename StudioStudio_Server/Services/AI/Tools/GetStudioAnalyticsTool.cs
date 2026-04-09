@@ -67,6 +67,12 @@ public class GetStudioAnalyticsTool : IAITool
 
             var groups = await _studioRepository.GetGroupsByStudioIdAsync(studioId);
             var totalGroups = groups.Count;
+            var allGroupIds = groups.Select(g => g.GroupId).ToList();
+
+            // Batch: all task stats in 1 query
+            var taskStatsMap = allGroupIds.Count > 0
+                ? await _taskRepository.GetGroupTaskStatisticsBatchAsync(allGroupIds)
+                : new Dictionary<Guid, global::StudioStudio_Server.Models.DTOs.Response.TaskSummaryResponse>();
 
             int totalMembers = 0;
             int totalTasks = 0;
@@ -75,13 +81,12 @@ public class GetStudioAnalyticsTool : IAITool
 
             foreach (var g in groups)
             {
-                var members = await _participantRepository.GetAllByGroupIdAsync(g.GroupId);
-                totalMembers += members.Count;
-
-                var taskStats = await _taskRepository.GetGroupTaskStatisticsAsync(g.GroupId);
-                totalTasks += taskStats.TotalTasks;
-                completedTasks += taskStats.CompletedTasks;
-                overdueTasks += taskStats.OverdueTasks;
+                if (taskStatsMap.TryGetValue(g.GroupId, out var taskStats))
+                {
+                    totalTasks += taskStats.TotalTasks;
+                    completedTasks += taskStats.CompletedTasks;
+                    overdueTasks += taskStats.OverdueTasks;
+                }
             }
 
             var completionRate = totalTasks > 0

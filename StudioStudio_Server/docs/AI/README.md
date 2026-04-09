@@ -78,8 +78,6 @@ StudioStudio_Server/
 │   └── Tools/                        # 10 IAITool implementations
 │       ├── GetStudioGroupsTool.cs
 │       ├── GetStudioAnalyticsTool.cs
-│       ├── GetGroupComparisonTool.cs
-│       ├── GetStorageUsageTool.cs
 │       ├── GetMemberPermissionsTool.cs
 │       ├── GetGroupDocumentsTool.cs
 │       ├── GetGroupPerformanceTool.cs
