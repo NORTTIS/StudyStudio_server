@@ -549,6 +549,23 @@ namespace StudioStudio_Server.Services
                         task.Title,
                         userId);
                 }
+
+                // Also notify Owner/Moderator of the group
+                var participants = await _participantRepository.GetAllByGroupIdAsync(groupId);
+                var ownerModeratorIds = participants
+                    .Where(p => p.Role == GroupRole.Owner || p.Role == GroupRole.Moderator)
+                    .Select(p => p.UserId)
+                    .Distinct()
+                    .ToList();
+
+                foreach (var ownerModeratorId in ownerModeratorIds)
+                {
+                    await _notificationService.NotifyTaskCompletedAsync(
+                        ownerModeratorId,
+                        taskId,
+                        task.Title,
+                        userId);
+                }
             }
 
             // ============================================================
@@ -627,15 +644,15 @@ namespace StudioStudio_Server.Services
 
             await _activityLogService.LogTaskDeleteAsync(userId, taskId, groupId, taskPriority, taskSeverity);
 
-            // Only notify Owner/Moderator of the group for soft-delete review workflow
+            // Also notify Owner/Moderator of the group
             var participants = await _participantRepository.GetAllByGroupIdAsync(groupId);
-            var reviewerIds = participants
+            var ownerModeratorIds = participants
                 .Where(p => p.Role == GroupRole.Owner || p.Role == GroupRole.Moderator)
                 .Select(p => p.UserId)
                 .Distinct()
                 .ToList();
 
-            foreach (var reviewerId in reviewerIds)
+            foreach (var reviewerId in ownerModeratorIds)
             {
                 await _notificationService.NotifyTaskDeletedAsync(
                     reviewerId,
