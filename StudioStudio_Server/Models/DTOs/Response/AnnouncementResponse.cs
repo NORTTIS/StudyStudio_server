@@ -9,5 +9,9 @@ namespace StudioStudio_Server.Models.DTOs.Response
         public bool IsActive { get; set; }
         public DateTime CreatedAt { get; set; }
         public DateTime? PublishedAt { get; set; }
+        public bool IsRead { get; set; }
+        public Guid? TaskId { get; set; }
+        public Guid? GroupId { get; set; }
+        public string? SourceType { get; set; }
     }
 }

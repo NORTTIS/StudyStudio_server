@@ -28,31 +28,25 @@ namespace StudioStudio_Server.Services
         }
 
         /// <summary>
-        /// Get list of all active public announcements
-        /// Condition: IsActive = true
-        /// Order by: PublishedAt DESC
-        /// CACHED: Uses AnnouncementExpiration (5 minutes)
+        /// Get list of all announcements for user (both types combined)
+        /// - Type 0-3: all active, with IsRead from UserAnnouncement
+        /// - Type 4-17: only mentioned, with IsRead
+        /// NO CACHE: Direct repository call for real-time filtering
         /// </summary>
         public async Task<List<AnnouncementResponse>> GetAllActiveAnnouncementsAsync(Guid userId)
         {
-            var cacheKey = _cacheService.GetAnnouncementsKey();
-
-            var announcements = await _cacheService.GetOrSetAsync(
-                cacheKey,
-                async () => await _announcementRepository.GetAllActiveAsync(userId),
-                _cacheService.GetExpirationForKey(cacheKey)
-            );
+            var announcements = await _announcementRepository.GetAllForUserAsync(userId);
 
             return announcements?
-                .Select(MapToAnnouncementResponse)
+                .Select(a => MapToAnnouncementResponse(a, userId))
                 .ToList() ?? new List<AnnouncementResponse>();
         }
 
         /// <summary>
-        /// Get details of a specific public announcement
+        /// Get details of a specific announcement with user-specific IsRead
         /// Validate: Announcement must exist and be active (IsActive = true)
         /// </summary>
-        public async Task<AnnouncementResponse> GetAnnouncementByIdAsync(Guid announcementId)
+        public async Task<AnnouncementResponse> GetAnnouncementByIdAsync(Guid announcementId, Guid userId)
         {
             var announcement = await _announcementRepository.GetByIdAsync(announcementId);
 
@@ -63,88 +57,33 @@ namespace StudioStudio_Server.Services
                     StatusCodes.Status404NotFound);
             }
 
-            return MapToAnnouncementResponse(announcement);
+            return MapToAnnouncementResponse(announcement, userId);
         }
 
         /// <summary>
-        /// Get list of personalized announcements for user (tagged/mentioned announcements)
-        /// Includes full announcement details joined with user announcement records
-        /// Returns: User's personal announcement notifications
+        /// Mark announcement as read (for both type 0-3 and type 4-17)
+        /// If UserAnnouncement record exists, update IsRead = true
+        /// Otherwise, create new record to track that user has seen this announcement
         /// </summary>
-        public async Task<List<UserAnnouncementResponse>> GetUserAnnouncementsAsync(Guid userId)
+        public async Task MarkAnnouncementAsReadAsync(Guid announcementId, Guid userId)
         {
-            var userAnnouncements = await _userAnnouncementRepository.GetByUserIdAsync(userId);
+            var existing = await _userAnnouncementRepository
+                .GetByAnnouncementAndUserAsync(announcementId, userId);
 
-            var announcementIds = userAnnouncements
-                .Select(ua => ua.AnnouncementId)
-                .Distinct()
-                .ToList();
-
-            var announcementsDict = await GetAnnouncementsByIdsAsync(announcementIds);
-
-            return userAnnouncements
-                .Select(ua => MapToUserAnnouncementResponse(
-                    ua,
-                    announcementsDict.GetValueOrDefault(ua.AnnouncementId)))
-                .ToList();
-        }
-
-        /// <summary>
-        /// Mark announcement as read (unified endpoint for both user and public announcements)
-        /// Case 1: If userAnnouncementId exists in UserAnnouncement -> Validate ownership and set IsRead = true
-        /// Case 2: If not found in UserAnnouncement -> Treat as public announcementId and create new UserAnnouncement record
-        /// This allows users to mark both personal and admin announcements as read using the same endpoint
-        /// </summary>
-        public async Task MarkAnnouncementAsReadAsync(Guid userAnnouncementId, Guid userId)
-        {
-            // Try to find existing UserAnnouncement first
-            var userAnnouncement = await _userAnnouncementRepository.GetByIdAsync(userAnnouncementId);
-
-            if (userAnnouncement != null)
+            if (existing != null)
             {
-                // Case 1: Found in UserAnnouncement - update existing record
-                ValidateUserAnnouncementOwnership(userAnnouncement, userId);
-
-                if (!userAnnouncement.IsRead)
+                if (!existing.IsRead)
                 {
-                    userAnnouncement.IsRead = true;
-                    await _userAnnouncementRepository.UpdateAsync(userAnnouncement);
-                }
-                return;
-            }
-
-            // Case 2: Not found in UserAnnouncement - treat as public announcement ID
-            // Validate public announcement exists and is active
-            var announcement = await _announcementRepository.GetByIdAsync(userAnnouncementId);
-
-            if (announcement == null || !announcement.IsActive)
-            {
-                throw new AppException(
-                    ErrorCodes.AnnouncementNotFound,
-                    StatusCodes.Status404NotFound);
-            }
-
-            // Check if user already has this announcement marked
-            var existingUserAnnouncements = await _userAnnouncementRepository.GetByUserIdAsync(userId);
-            var existingRecord = existingUserAnnouncements
-                .FirstOrDefault(ua => ua.AnnouncementId == userAnnouncementId);
-
-            if (existingRecord != null)
-            {
-                // Already exists, just update IsRead = true
-                if (!existingRecord.IsRead)
-                {
-                    existingRecord.IsRead = true;
-                    await _userAnnouncementRepository.UpdateAsync(existingRecord);
+                    existing.IsRead = true;
+                    await _userAnnouncementRepository.UpdateAsync(existing);
                 }
             }
             else
             {
-                // Create new UserAnnouncement record for this public announcement
-                var newUserAnnouncement = new UserAnnouncement
+                var newUA = new UserAnnouncement
                 {
                     UserAnnouncementId = Guid.NewGuid(),
-                    AnnouncementId = userAnnouncementId,
+                    AnnouncementId = announcementId,
                     MentionedId = userId,
                     CreatedBy = userId,
                     IsRead = true,
@@ -152,19 +91,21 @@ namespace StudioStudio_Server.Services
                     CreatedAt = DateTime.UtcNow,
                     UpdatedAt = DateTime.UtcNow
                 };
-
-                await _userAnnouncementRepository.AddAsync(newUserAnnouncement);
+                await _userAnnouncementRepository.AddAsync(newUA);
             }
+
+            await _cacheService.InvalidateAnnouncementCachesAsync();
         }
 
         /// <summary>
-        /// Delete (soft delete) user announcement
+        /// Soft delete user announcement (IsDelete = true in UserAnnouncement)
         /// Validate: UserAnnouncement must exist and belong to the user
-        /// Action: Set IsDelete = true in repository
         /// </summary>
-        public async Task DeleteUserAnnouncementAsync(Guid userAnnouncementId, Guid userId)
+        public async Task DeleteAnnouncementAsync(Guid announcementId, Guid userId)
         {
-            var userAnnouncement = await _userAnnouncementRepository.GetByIdAsync(userAnnouncementId);
+            // Find UserAnnouncement by AnnouncementId and userId
+            var userAnnouncement = await _userAnnouncementRepository
+                .GetByAnnouncementAndUserAsync(announcementId, userId);
 
             if (userAnnouncement == null)
             {
@@ -173,9 +114,8 @@ namespace StudioStudio_Server.Services
                     StatusCodes.Status404NotFound);
             }
 
-            ValidateUserAnnouncementOwnership(userAnnouncement, userId);
-
-            await _userAnnouncementRepository.DeleteAsync(userAnnouncementId);
+            await _userAnnouncementRepository.DeleteAsync(userAnnouncement.UserAnnouncementId);
+            await _cacheService.InvalidateAnnouncementCachesAsync();
         }
 
         /// <summary>
@@ -212,19 +152,25 @@ namespace StudioStudio_Server.Services
         }
 
         /// <summary>
-        /// Map Announcement entity to AnnouncementResponse DTO
+        /// Map Announcement entity to AnnouncementResponse DTO with user-specific IsRead
         /// </summary>
-        private AnnouncementResponse MapToAnnouncementResponse(Announcement announcement)
+        private AnnouncementResponse MapToAnnouncementResponse(Announcement a, Guid userId)
         {
+            var ua = a.UserAnnouncements?.FirstOrDefault(u => u.MentionedId == userId);
+
             return new AnnouncementResponse
             {
-                AnnouncementId = announcement.AnnouncementId,
-                Title = announcement.Title,
-                Content = announcement.Content,
-                Type = announcement.Type.ToString(),
-                IsActive = announcement.IsActive,
-                CreatedAt = announcement.CreatedAt,
-                PublishedAt = announcement.PublishedAt
+                AnnouncementId = a.AnnouncementId,
+                Title = a.Title,
+                Content = a.Content,
+                Type = a.Type.ToString(),
+                IsActive = a.IsActive,
+                CreatedAt = a.CreatedAt,
+                PublishedAt = a.PublishedAt,
+                IsRead = ua?.IsRead ?? false,
+                TaskId = a.TaskId,
+                GroupId = a.GroupId,
+                SourceType = a.SourceType
             };
         }
 
@@ -246,7 +192,10 @@ namespace StudioStudio_Server.Services
                 CreatedAt = userAnnouncement.CreatedAt,
                 PublishedAt = announcement?.PublishedAt,
                 MentionedId = userAnnouncement.MentionedId,
-                CreatedBy = userAnnouncement.CreatedBy
+                CreatedBy = userAnnouncement.CreatedBy,
+                TaskId = announcement?.TaskId,
+                GroupId = announcement?.GroupId,
+                SourceType = announcement?.SourceType
             };
         }
     }

@@ -16,5 +16,6 @@ namespace StudioStudio_Server.Services.Interfaces
         Task ReorderPersonalTaskAsync(Guid userId, ReorderTaskRequest request);
         Task DeletePersonalTaskAsync(Guid userId, Guid taskId);
         Task PermanentDeleteGroupTaskAsync(Guid userId, Guid groupId, Guid taskId);
+        Task<TaskGroupResponse?> GetTaskGroupAsync(Guid taskId, Guid userId);
     }
 }

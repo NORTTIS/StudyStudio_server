@@ -79,5 +79,17 @@ namespace StudioStudio_Server.Repositories
             _context.UserAnnouncements.Update(userAnnouncement);
             await _context.SaveChangesAsync();
         }
+
+        /// <summary>
+        /// Lấy UserAnnouncement theo AnnouncementId và MentionedId
+        /// </summary>
+        public async Task<UserAnnouncement?> GetByAnnouncementAndUserAsync(Guid announcementId, Guid userId)
+        {
+            return await _context.UserAnnouncements
+                .FirstOrDefaultAsync(ua =>
+                    ua.AnnouncementId == announcementId &&
+                    ua.MentionedId == userId &&
+                    !ua.IsDelete);
+        }
     }
 }

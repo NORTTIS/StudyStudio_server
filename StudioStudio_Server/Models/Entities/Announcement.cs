@@ -13,6 +13,12 @@ namespace StudioStudio_Server.Models.Entities
         public DateTime CreatedAt { get; set; }
         public DateTime? UpdatedAt { get; set; }
         public DateTime? PublishedAt { get; set; }
+
+        // Context metadata for click-to-redirect
+        public Guid? TaskId { get; set; }
+        public Guid? GroupId { get; set; }
+        public string? SourceType { get; set; } // e.g. "task", "discuss", "comment", "message"
+
         public List<UserAnnouncement> UserAnnouncements { get; set; } = new List<UserAnnouncement>();
     }
 }

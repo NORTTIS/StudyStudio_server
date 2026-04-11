@@ -42,16 +42,19 @@ namespace StudioStudio_Server.Services
             if (assignee == null || assigner == null) return;
 
             var assignerName = BuildUserName(assigner);
+            var groupIdForAssign = await _getGroupIdForTaskAsync(taskId);
             await CreateInAppAsync(
                 assigneeId,
                 assignedBy,
                 "Task assigned",
                 $"{assignerName} assigned you a task: {taskTitle}",
-                AnnouncementType.TaskAssignment);
+                AnnouncementType.TaskAssignment,
+                taskId,
+                groupIdForAssign,
+                "task");
 
-            var groupId = await _getGroupIdForTaskAsync(taskId);
-            var taskUrl = groupId.HasValue ? BuildTaskUrl(taskId, groupId.Value) : "";
             var language = GetLanguage(assignee);
+            var taskUrl = groupIdForAssign.HasValue ? BuildTaskUrl(taskId, language) : "";
             var body = EmailTemplate.TaskAssignedEmail(taskTitle, assignerName, deadline, taskUrl, language);
             await _emailService.SendEmailWithPreferenceCheckAsync(assignee.Email, "Task Assigned - Study Studio", body, assignee);
         }
@@ -65,31 +68,38 @@ namespace StudioStudio_Server.Services
 
             var actorName = BuildUserName(actor);
             var groupId = await _getGroupIdForTaskAsync(taskId);
-            var taskUrl = groupId.HasValue ? BuildTaskUrl(taskId, groupId.Value) : "";
 
             if (newAssignee != null)
             {
+                var newAssigneeTaskUrl = groupId.HasValue ? BuildTaskUrl(taskId, GetLanguage(newAssignee)) : "";
                 await CreateInAppAsync(
                     newAssigneeId,
                     reassignedBy,
                     "Task reassigned to you",
                     $"{actorName} reassigned task to you: {taskTitle}",
-                    AnnouncementType.TaskReassignment);
+                    AnnouncementType.TaskReassignment,
+                    taskId,
+                    groupId,
+                    "task");
 
-                var body = EmailTemplate.TaskReassignedEmail(taskTitle, oldAssignee != null ? BuildUserName(oldAssignee) : "Unassigned", BuildUserName(newAssignee), taskUrl, GetLanguage(newAssignee));
+                var body = EmailTemplate.TaskReassignedEmail(taskTitle, oldAssignee != null ? BuildUserName(oldAssignee) : "Unassigned", BuildUserName(newAssignee), newAssigneeTaskUrl, GetLanguage(newAssignee));
                 await _emailService.SendEmailWithPreferenceCheckAsync(newAssignee.Email, "Task Reassigned - Study Studio", body, newAssignee);
             }
 
             if (oldAssignee != null)
             {
+                var oldAssigneeTaskUrl = groupId.HasValue ? BuildTaskUrl(taskId, GetLanguage(oldAssignee)) : "";
                 await CreateInAppAsync(
                     oldAssigneeId,
                     reassignedBy,
                     "Task reassigned",
                     $"{actorName} reassigned your task: {taskTitle}",
-                    AnnouncementType.TaskReassignment);
+                    AnnouncementType.TaskReassignment,
+                    taskId,
+                    groupId,
+                    "task");
 
-                var body = EmailTemplate.TaskReassignedEmail(taskTitle, BuildUserName(oldAssignee), newAssignee != null ? BuildUserName(newAssignee) : "Unassigned", taskUrl, GetLanguage(oldAssignee));
+                var body = EmailTemplate.TaskReassignedEmail(taskTitle, BuildUserName(oldAssignee), newAssignee != null ? BuildUserName(newAssignee) : "Unassigned", oldAssigneeTaskUrl, GetLanguage(oldAssignee));
                 await _emailService.SendEmailWithPreferenceCheckAsync(oldAssignee.Email, "Task Reassigned - Study Studio", body, oldAssignee);
             }
         }
@@ -99,15 +109,18 @@ namespace StudioStudio_Server.Services
             var user = await _userRepository.GetByIdAsync(userId);
             if (user == null) return;
 
+            var groupId = await _getGroupIdForTaskAsync(taskId);
             await CreateInAppAsync(
                 userId,
                 userId,
                 "Task status updated",
                 $"{changedBy} changed status: {oldStatus} → {newStatus}",
-                AnnouncementType.TaskStatusChange);
+                AnnouncementType.TaskStatusChange,
+                taskId,
+                groupId,
+                "task");
 
-            var groupId = await _getGroupIdForTaskAsync(taskId);
-            var taskUrl = groupId.HasValue ? BuildTaskUrl(taskId, groupId.Value) : "";
+            var taskUrl = groupId.HasValue ? BuildTaskUrl(taskId, GetLanguage(user)) : "";
             var body = EmailTemplate.TaskStatusChangedEmail("Task", oldStatus, newStatus, changedBy, taskUrl, GetLanguage(user));
             await _emailService.SendEmailWithPreferenceCheckAsync(user.Email, "Task Status Updated - Study Studio", body, user);
         }
@@ -119,15 +132,18 @@ namespace StudioStudio_Server.Services
             if (assignee == null || actor == null) return;
 
             var actorName = BuildUserName(actor);
+            var groupId = await _getGroupIdForTaskAsync(taskId);
             await CreateInAppAsync(
                 assigneeId,
                 completedBy,
                 "Task completed",
                 $"{actorName} completed task: {taskTitle}",
-                AnnouncementType.TaskCompleted);
+                AnnouncementType.TaskCompleted,
+                taskId,
+                groupId,
+                "task");
 
-            var groupId = await _getGroupIdForTaskAsync(taskId);
-            var taskUrl = groupId.HasValue ? BuildTaskUrl(taskId, groupId.Value) : "";
+            var taskUrl = groupId.HasValue ? BuildTaskUrl(taskId, GetLanguage(assignee)) : "";
             var body = EmailTemplate.TaskCompletedEmail(taskTitle, actorName, taskUrl, GetLanguage(assignee));
             await _emailService.SendEmailWithPreferenceCheckAsync(assignee.Email, "Task Completed - Study Studio", body, assignee);
         }
@@ -140,7 +156,17 @@ namespace StudioStudio_Server.Services
 
             var mentionerName = BuildUserName(mentioner);
             var groupId = await _getGroupIdForTaskAsync(taskId);
-            var taskUrl = groupId.HasValue ? BuildTaskUrl(taskId, groupId.Value) : "";
+            await CreateInAppAsync(
+                mentionedUserId,
+                mentionerId,
+                "Mentioned in comment",
+                $"{mentionerName} mentioned you in a comment: {taskTitle}",
+                AnnouncementType.Mention,
+                taskId,
+                groupId,
+                "comment");
+
+            var taskUrl = groupId.HasValue ? BuildTaskUrl(taskId, GetLanguage(mentionedUser)) : "";
             var body = EmailTemplate.MentionedInCommentEmail(taskTitle, mentionerName, commentPreview, taskUrl, GetLanguage(mentionedUser));
             await _emailService.SendEmailWithPreferenceCheckAsync(mentionedUser.Email, "Mentioned in Task Comment - Study Studio", body, mentionedUser);
         }
@@ -152,6 +178,16 @@ namespace StudioStudio_Server.Services
             if (mentionedUser == null || mentioner == null) return;
 
             var mentionerName = BuildUserName(mentioner);
+            await CreateInAppAsync(
+                mentionedUserId,
+                mentionerId,
+                "Mentioned in group discussion",
+                $"{mentionerName} mentioned you in {groupName}",
+                AnnouncementType.Mention,
+                null,
+                groupId,
+                "discuss");
+
             var body = EmailTemplate.MentionedInGroupDiscussEmail(groupName, mentionerName, messagePreview, BuildGroupDiscussUrl(groupId), GetLanguage(mentionedUser));
             await _emailService.SendEmailWithPreferenceCheckAsync(mentionedUser.Email, "Mentioned in Group Discussion - Study Studio", body, mentionedUser);
         }
@@ -163,12 +199,16 @@ namespace StudioStudio_Server.Services
             if (assignee == null || actor == null) return;
 
             var actorName = BuildUserName(actor);
+            var groupId = await _getGroupIdForTaskAsync(taskId);
             await CreateInAppAsync(
                 assigneeId,
                 deletedBy,
                 "Task deleted",
                 $"{actorName} deleted task: {taskTitle}",
-                AnnouncementType.TaskDeleted);
+                AnnouncementType.TaskDeleted,
+                taskId,
+                groupId,
+                "task");
 
             var body = EmailTemplate.TaskDeletedEmail(taskTitle, actorName, GetLanguage(assignee));
             await _emailService.SendEmailWithPreferenceCheckAsync(assignee.Email, "Task Deleted - Study Studio", body, assignee);
@@ -181,12 +221,16 @@ namespace StudioStudio_Server.Services
             if (assignee == null || actor == null) return;
 
             var actorName = BuildUserName(actor);
+            var groupId = await _getGroupIdForTaskAsync(taskId);
             await CreateInAppAsync(
                 previousAssigneeId,
                 unassignedBy,
                 "Task unassigned",
                 $"{actorName} removed you from task: {taskTitle}",
-                AnnouncementType.TaskUnassigned);
+                AnnouncementType.TaskUnassigned,
+                taskId,
+                groupId,
+                "task");
 
             var body = EmailTemplate.TaskUnassignedEmail(taskTitle, actorName, GetLanguage(assignee));
             await _emailService.SendEmailWithPreferenceCheckAsync(assignee.Email, "Task Unassigned - Study Studio", body, assignee);
@@ -197,15 +241,18 @@ namespace StudioStudio_Server.Services
             var assignee = await _userRepository.GetByIdAsync(assigneeId);
             if (assignee == null) return;
 
+            var groupId = await _getGroupIdForTaskAsync(taskId);
             await CreateInAppAsync(
                 assigneeId,
                 assigneeId,
                 "Task overdue",
                 $"Task is overdue: {taskTitle}",
-                AnnouncementType.TaskOverdue);
+                AnnouncementType.TaskOverdue,
+                taskId,
+                groupId,
+                "task");
 
-            var groupId = await _getGroupIdForTaskAsync(taskId);
-            var taskUrl = groupId.HasValue ? BuildTaskUrl(taskId, groupId.Value) : "";
+            var taskUrl = groupId.HasValue ? BuildTaskUrl(taskId, GetLanguage(assignee)) : "";
             var body = EmailTemplate.TaskOverdueEmail(taskTitle, dueDate, overdueDays, taskUrl, GetLanguage(assignee));
             await _emailService.SendEmailWithPreferenceCheckAsync(assignee.Email, "Task Overdue - Study Studio", body, assignee);
         }
@@ -215,20 +262,31 @@ namespace StudioStudio_Server.Services
             var assignee = await _userRepository.GetByIdAsync(assigneeId);
             if (assignee == null) return;
 
+            var groupId = await _getGroupIdForTaskAsync(taskId);
             await CreateInAppAsync(
                 assigneeId,
                 assigneeId,
                 "Task deadline reminder",
                 $"Deadline is approaching: {taskTitle}",
-                AnnouncementType.TaskReminder);
+                AnnouncementType.TaskReminder,
+                taskId,
+                groupId,
+                "task");
 
-            var groupId = await _getGroupIdForTaskAsync(taskId);
-            var taskUrl = groupId.HasValue ? BuildTaskUrl(taskId, groupId.Value) : "";
+            var taskUrl = groupId.HasValue ? BuildTaskUrl(taskId, GetLanguage(assignee)) : "";
             var body = EmailTemplate.TaskReminderEmail(taskTitle, dueDate, hoursUntilDeadline, taskUrl, GetLanguage(assignee));
             await _emailService.SendEmailWithPreferenceCheckAsync(assignee.Email, "Task Deadline Reminder - Study Studio", body, assignee);
         }
 
-        private async Task CreateInAppAsync(Guid targetUserId, Guid createdBy, string title, string content, AnnouncementType type)
+        private async Task CreateInAppAsync(
+            Guid targetUserId,
+            Guid createdBy,
+            string title,
+            string content,
+            AnnouncementType type,
+            Guid? taskId = null,
+            Guid? groupId = null,
+            string? sourceType = null)
         {
             var now = DateTime.UtcNow;
             var announcement = new Announcement
@@ -241,7 +299,10 @@ namespace StudioStudio_Server.Services
                 CreatedBy = createdBy,
                 CreatedAt = now,
                 UpdatedAt = now,
-                PublishedAt = now
+                PublishedAt = now,
+                TaskId = taskId,
+                GroupId = groupId,
+                SourceType = sourceType
             };
 
             await _announcementRepository.AddAsync(announcement);
@@ -256,10 +317,11 @@ namespace StudioStudio_Server.Services
             });
         }
 
-        private string BuildTaskUrl(Guid taskId, Guid groupId)
+        private string BuildTaskUrl(Guid taskId, Language language)
         {
             var baseUrl = _configuration["Frontend:BaseUrl"] ?? "http://localhost:3000";
-            return $"{baseUrl}/group/{groupId}?taskId={taskId}&openTaskDetail=1";
+            var locale = language == Language.Vietnamese ? "vi" : "en";
+            return $"{baseUrl}/{locale}/group/task/{taskId}";
         }
 
         private async Task<Guid?> _getGroupIdForTaskAsync(Guid taskId)
@@ -271,7 +333,7 @@ namespace StudioStudio_Server.Services
         private string BuildGroupDiscussUrl(Guid groupId)
         {
             var baseUrl = _configuration["Frontend:BaseUrl"] ?? "http://localhost:3000";
-            return $"{baseUrl}/group/{groupId}/discuss";
+            return $"{baseUrl}/vi/group/{groupId}/discuss";
         }
 
         private static string BuildUserName(User user)

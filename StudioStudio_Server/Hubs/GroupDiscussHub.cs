@@ -193,7 +193,9 @@ namespace StudioStudio_Server.Hubs
                 CreatedBy = senderId,
                 CreatedAt = now,
                 UpdatedAt = now,
-                PublishedAt = now
+                PublishedAt = now,
+                GroupId = groupId,
+                SourceType = "discuss"
             };
 
             await _announcementRepository.AddAsync(announcement);
@@ -210,12 +212,6 @@ namespace StudioStudio_Server.Hubs
                 };
 
                 await _userAnnouncementService.AddAnnouncementAsync(userAnnouncement);
-                await _notificationService.NotifyMentionedInGroupDiscussAsync(
-                    taggedUserId,
-                    groupId,
-                    senderId,
-                    group.GroupName,
-                    ExtractPlainText(content));
                 await Clients.User(taggedUserId.ToString()).SendAsync("ReceiveAnnouncement", announcement);
             }
 

@@ -165,6 +165,23 @@ namespace StudioStudio_Server.Controllers
                 null));
         }
 
+        [HttpGet("{taskId}/group")]
+        public async Task<ActionResult<ApiResponse<TaskGroupResponse>>> GetTaskGroup(Guid taskId)
+        {
+            var userId = ValidateAndGetUserId();
+            var result = await _taskService.GetTaskGroupAsync(taskId, userId);
+            if (result == null)
+            {
+                throw new AppException(ErrorCodes.TaskNotFound, StatusCodes.Status404NotFound);
+            }
+
+            var message = _messageService.GetMessage(ErrorCodes.SuccessGetData);
+            return Ok(ApiResponse<TaskGroupResponse>.Success(
+                ErrorCodes.SuccessGetData,
+                message,
+                result));
+        }
+
         private Guid ValidateAndGetUserId()
         {
             var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;

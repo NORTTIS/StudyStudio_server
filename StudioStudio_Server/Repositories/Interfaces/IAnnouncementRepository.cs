@@ -8,6 +8,7 @@ namespace StudioStudio_Server.Repositories.Interfaces
         Task AddAsync(Announcement announcement);
         Task<Announcement?> GetByIdAsync(Guid announcementId);
         Task<List<Announcement>> GetAllActiveAsync(Guid userId);
+        Task<List<Announcement>> GetAllForUserAsync(Guid userId);
         Task<List<Announcement>> GetByUserIdAsync(Guid userId);
         Task<List<Announcement>> GetByIdsAsync(List<Guid> announcementIds);
         Task<List<Announcement>> GetSystemAnnouncementsAsync();

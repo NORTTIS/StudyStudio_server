@@ -1136,5 +1136,19 @@ namespace StudioStudio_Server.Repositories
                 throw;
             }
         }
+
+        /// <summary>
+        /// Get the GroupId for a given task (used for task deep-link URL resolution)
+        /// Returns null if task not found or is soft-deleted
+        /// </summary>
+        public async Task<Guid?> GetTaskGroupIdAsync(Guid taskId)
+        {
+            var task = await _context.Tasks
+                .Where(t => t.TaskId == taskId && !t.IsPendingDeleted)
+                .Select(t => new { t.GroupId })
+                .FirstOrDefaultAsync();
+
+            return task?.GroupId;
+        }
     }
 }

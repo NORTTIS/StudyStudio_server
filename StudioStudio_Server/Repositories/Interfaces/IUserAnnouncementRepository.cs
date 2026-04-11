@@ -8,6 +8,7 @@ namespace StudioStudio_Server.Repositories.Interfaces
         Task DeleteAsync(Guid userAnnouncementId);
         Task<List<UserAnnouncement>> GetByUserIdAsync(Guid userId);
         Task<UserAnnouncement?> GetByIdAsync(Guid userAnnouncementId);
+        Task<UserAnnouncement?> GetByAnnouncementAndUserAsync(Guid announcementId, Guid userId);
         Task UpdateAsync(UserAnnouncement userAnnouncement);
     }
 }

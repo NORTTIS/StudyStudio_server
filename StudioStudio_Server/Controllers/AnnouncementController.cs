@@ -77,14 +77,14 @@ namespace StudioStudio_Server.Controllers
 
         /// <summary>
         /// [PUBLIC] GET /api/announcements/{id}
-        /// Get details of a public announcement
-        /// Validate: Announcement must be active
+        /// Get details of an announcement with user-specific IsRead
         /// </summary>
         [HttpGet("{id}")]
         [Authorize]
         public async Task<ActionResult<ApiResponse<AnnouncementResponse>>> GetAnnouncementById(Guid id)
         {
-            var response = await _announcementService.GetAnnouncementByIdAsync(id);
+            var userId = ValidateAndGetUserId();
+            var response = await _announcementService.GetAnnouncementByIdAsync(id, userId);
             var message = _messageService.GetMessage(ErrorCodes.SuccessGetData);
 
             return Ok(ApiResponse<AnnouncementResponse>.Success(
@@ -94,36 +94,16 @@ namespace StudioStudio_Server.Controllers
         }
 
         /// <summary>
-        /// [AUTHORIZED] GET /api/announcements/user
-        /// Get list of user's personal announcements (mentioned/tagged)
-        /// Order by: CreatedAt DESC
+        /// [AUTHORIZED] PUT /api/announcements/{announcementId}/read
+        /// Mark announcement as read (works for both type 0-3 and type 4-17)
         /// </summary>
-        [HttpGet("user")]
-        [Authorize]
-        public async Task<ActionResult<ApiResponse<List<UserAnnouncementResponse>>>> GetUserAnnouncements()
-        {
-            var userId = ValidateAndGetUserId();
-            var response = await _announcementService.GetUserAnnouncementsAsync(userId);
-            var message = _messageService.GetMessage(ErrorCodes.SuccessGetData);
-
-            return Ok(ApiResponse<List<UserAnnouncementResponse>>.Success(
-                ErrorCodes.SuccessGetData,
-                message,
-                response));
-        }
-
-        /// <summary>
-        /// [AUTHORIZED] PUT /api/announcements/user/{userAnnouncementId}/read
-        /// Mark personal announcement as read (IsRead = true)
-        /// Validate: User must own this announcement
-        /// </summary>
-        [HttpPut("user/{userAnnouncementId}/read")]
+        [HttpPut("{announcementId}/read")]
         [Authorize]
         public async Task<ActionResult<ApiResponse<object>>> MarkAnnouncementAsRead(
-            Guid userAnnouncementId)
+            Guid announcementId)
         {
             var userId = ValidateAndGetUserId();
-            await _announcementService.MarkAnnouncementAsReadAsync(userAnnouncementId, userId);
+            await _announcementService.MarkAnnouncementAsReadAsync(announcementId, userId);
             var message = _messageService.GetMessage(ErrorCodes.SuccessGetData);
 
             return Ok(ApiResponse<object>.Success(
@@ -133,17 +113,16 @@ namespace StudioStudio_Server.Controllers
         }
 
         /// <summary>
-        /// [AUTHORIZED] DELETE /api/announcements/user/{userAnnouncementId}
-        /// Delete (soft delete) personal announcement (IsDelete = true)
-        /// Validate: User must own this announcement
+        /// [AUTHORIZED] DELETE /api/announcements/{announcementId}
+        /// Soft delete user announcement (IsDelete = true)
         /// </summary>
-        [HttpDelete("user/{userAnnouncementId}")]
+        [HttpDelete("{announcementId}")]
         [Authorize]
-        public async Task<ActionResult<ApiResponse<object>>> DeleteUserAnnouncement(
-            Guid userAnnouncementId)
+        public async Task<ActionResult<ApiResponse<object>>> DeleteAnnouncement(
+            Guid announcementId)
         {
             var userId = ValidateAndGetUserId();
-            await _announcementService.DeleteUserAnnouncementAsync(userAnnouncementId, userId);
+            await _announcementService.DeleteAnnouncementAsync(announcementId, userId);
             var message = _messageService.GetMessage(ErrorCodes.SuccessGetData);
 
             return Ok(ApiResponse<object>.Success(

@@ -60,5 +60,6 @@ namespace StudioStudio_Server.Repositories.Interfaces
             TaskPriority? minPriority = null,
             TaskSeverity? minSeverity = null);
         Task PermanentDeleteAsync(Guid taskId);
+        Task<Guid?> GetTaskGroupIdAsync(Guid taskId);
     }
 }

@@ -291,7 +291,9 @@ namespace StudioStudio_Server.Services
                 CreatedBy = senderId,
                 CreatedAt = now,
                 UpdatedAt = now,
-                PublishedAt = now
+                PublishedAt = now,
+                TaskId = taskId,
+                SourceType = "comment"
             };
 
             await _announcementRepository.AddAsync(announcement);
@@ -308,13 +310,6 @@ namespace StudioStudio_Server.Services
                 };
 
                 await _userAnnouncementService.AddAnnouncementAsync(userAnnouncement);
-
-                await _notificationService.NotifyMentionedInCommentAsync(
-                    taggedUserId,
-                    taskId,
-                    task!.Title,
-                    senderId,
-                    ExtractPlainText(content));
             }
 
             _logger.LogInformation(

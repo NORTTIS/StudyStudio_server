@@ -1121,5 +1121,29 @@ namespace StudioStudio_Server.Services
             // Invalidate group AI task cache so AI sees fresh data immediately
             await _cacheService.InvalidateAITaskCacheAsync(userId, groupId);
         }
+
+        /// <summary>
+        /// Get the group ID for a given task (used for task deep-link URL resolution)
+        /// Returns null if task not found or is soft-deleted
+        /// </summary>
+        public async Task<TaskGroupResponse?> GetTaskGroupAsync(Guid taskId, Guid userId)
+        {
+            var task = await _taskRepository.GetByIdAsync(taskId);
+            if (task?.GroupId == null)
+            {
+                return null;
+            }
+
+            var groupId = task.GroupId.Value;
+            if (!await _participantRepository.IsUserApprovedInGroupAsync(groupId, userId))
+            {
+                return null;
+            }
+
+            return new TaskGroupResponse
+            {
+                GroupId = groupId
+            };
+        }
     }
 }
