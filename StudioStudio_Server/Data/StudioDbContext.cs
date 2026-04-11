@@ -418,7 +418,7 @@ namespace StudioStudio_Server.Data
             {
                 e.HasKey(x => x.UserAnnouncementId);
 
-                e.HasOne<Announcement>()
+                e.HasOne(x => x.Announcement)
                     .WithMany(a => a.UserAnnouncements)
                     .HasForeignKey(x => x.AnnouncementId)
                     .OnDelete(DeleteBehavior.Cascade);

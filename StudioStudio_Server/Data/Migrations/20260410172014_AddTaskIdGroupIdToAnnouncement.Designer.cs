@@ -1325,7 +1325,7 @@ namespace StudioStudio_Server.Data.Migrations
 
             modelBuilder.Entity("StudioStudio_Server.Models.Entities.UserAnnouncement", b =>
                 {
-                    b.HasOne("StudioStudio_Server.Models.Entities.Announcement", null)
+                    b.HasOne("StudioStudio_Server.Models.Entities.Announcement", "Announcement")
                         .WithMany("UserAnnouncements")
                         .HasForeignKey("AnnouncementId")
                         .OnDelete(DeleteBehavior.Cascade)
