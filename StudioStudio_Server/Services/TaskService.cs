@@ -362,15 +362,31 @@ namespace StudioStudio_Server.Services
                 task.DueDate = dueDateUtc.Value;
             }
 
+            // Load existing assignee early for progress completion notification
+            var existingAssignmentsEarly = await _taskAssignmentRepository.GetAssigneesByTaskId(taskId);
+            var oldAssigneeId = existingAssignmentsEarly.FirstOrDefault()?.AssignedTo;
+
             if (request.Progress.HasValue)
             {
                 var oldProgress = task.Progress;
                 task.Progress = request.Progress.Value;
 
-                // Log task completion when progress reaches 100
-                if (oldProgress != 100 && task.Progress == 100)
+                var reachedCompletion = oldProgress < 100 && task.Progress >= 100;
+                var reopenedTask = oldProgress >= 100 && task.Progress < 100;
+
+                // Keep CompletedAt in sync with progress state.
+                if (task.Progress >= 100 && !task.CompletedAt.HasValue)
                 {
                     task.CompletedAt = DateTime.UtcNow;
+                }
+                else if (reopenedTask)
+                {
+                    task.CompletedAt = null;
+                }
+
+                // Log task completion when progress reaches 100
+                if (reachedCompletion)
+                {
                     // Log with priority/severity for weighted contribution scoring
                     await _activityLogService.LogTaskCompleteAsync(
                         userId, task.TaskId, task.GroupId,
@@ -381,6 +397,39 @@ namespace StudioStudio_Server.Services
                 await _activityLogService.LogTaskUpdateAsync(
                     userId, task.TaskId, task.GroupId, null,
                     (int)task.Priority, (int)task.Severity);
+
+                // Task completion notification — only fire on transition TO 100%
+                if (reachedCompletion)
+                {
+                    var completionRecipientIds = new HashSet<Guid>();
+
+                    if (oldAssigneeId.HasValue)
+                    {
+                        completionRecipientIds.Add(oldAssigneeId.Value);
+                    }
+
+                    // Also notify Owner/Moderator of the group
+                    var participants = await _participantRepository.GetAllByGroupIdAsync(groupId);
+                    var ownerModeratorIds = participants
+                        .Where(p => p.Role == GroupRole.Owner || p.Role == GroupRole.Moderator)
+                        .Select(p => p.UserId)
+                        .Distinct()
+                        .ToList();
+
+                    foreach (var ownerModeratorId in ownerModeratorIds)
+                    {
+                        completionRecipientIds.Add(ownerModeratorId);
+                    }
+
+                    foreach (var recipientId in completionRecipientIds)
+                    {
+                        await _notificationService.NotifyTaskCompletedAsync(
+                            recipientId,
+                            taskId,
+                            task.Title,
+                            userId);
+                    }
+                }
             }
 
             string? oldStatusName = null;
@@ -422,7 +471,7 @@ namespace StudioStudio_Server.Services
             // PHASE 2 OPTIMIZATION: Get existing assignments ONCE and reuse
             // ============================================================
             var existingAssignments = await _taskAssignmentRepository.GetAssigneesByTaskId(taskId);
-            var oldAssigneeId = existingAssignments.FirstOrDefault()?.AssignedTo;
+            // oldAssigneeId already loaded above for progress notification
 
             // ============================================================
             // PHASE 2 OPTIMIZATION: Collect all user IDs needed for
@@ -538,36 +587,6 @@ namespace StudioStudio_Server.Services
                 }
             }
 
-            // Task completion notification (reuse oldAssigneeId)
-            if (request.Progress.HasValue && request.Progress.Value == 100)
-            {
-                if (oldAssigneeId.HasValue)
-                {
-                    await _notificationService.NotifyTaskCompletedAsync(
-                        oldAssigneeId.Value,
-                        taskId,
-                        task.Title,
-                        userId);
-                }
-
-                // Also notify Owner/Moderator of the group
-                var participants = await _participantRepository.GetAllByGroupIdAsync(groupId);
-                var ownerModeratorIds = participants
-                    .Where(p => p.Role == GroupRole.Owner || p.Role == GroupRole.Moderator)
-                    .Select(p => p.UserId)
-                    .Distinct()
-                    .ToList();
-
-                foreach (var ownerModeratorId in ownerModeratorIds)
-                {
-                    await _notificationService.NotifyTaskCompletedAsync(
-                        ownerModeratorId,
-                        taskId,
-                        task.Title,
-                        userId);
-                }
-            }
-
             // ============================================================
             // PREPARE RESPONSE: reuse preloaded data
             // ============================================================
@@ -610,6 +629,7 @@ namespace StudioStudio_Server.Services
                 Assignee = assigneeDetail,
                 EstimatedHours = task.EstimatedHours,
                 ActualHours = task.ActualHours,
+                CompletedAt = task.CompletedAt,
             };
         }
 
@@ -996,10 +1016,22 @@ namespace StudioStudio_Server.Services
                 var oldProgress = task.Progress;
                 task.Progress = request.Progress.Value;
 
-                // Log task completion when progress reaches 100
-                if (oldProgress != 100 && task.Progress == 100)
+                var reachedCompletion = oldProgress < 100 && task.Progress >= 100;
+                var reopenedTask = oldProgress >= 100 && task.Progress < 100;
+
+                // Keep CompletedAt in sync with progress state.
+                if (task.Progress >= 100 && !task.CompletedAt.HasValue)
                 {
                     task.CompletedAt = DateTime.UtcNow;
+                }
+                else if (reopenedTask)
+                {
+                    task.CompletedAt = null;
+                }
+
+                // Log task completion when progress reaches 100
+                if (reachedCompletion)
+                {
                     // Log with priority/severity for weighted contribution scoring
                     await _activityLogService.LogTaskCompleteAsync(
                         userId, task.TaskId, task.GroupId,
@@ -1067,6 +1099,7 @@ namespace StudioStudio_Server.Services
                 },
                 EstimatedHours = task.EstimatedHours,
                 ActualHours = task.ActualHours,
+                CompletedAt = task.CompletedAt,
             };
         }
         public async Task ReorderPersonalTaskAsync(Guid userId, ReorderTaskRequest request)

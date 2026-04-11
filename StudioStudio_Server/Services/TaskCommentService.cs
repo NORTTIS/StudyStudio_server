@@ -293,6 +293,7 @@ namespace StudioStudio_Server.Services
                 UpdatedAt = now,
                 PublishedAt = now,
                 TaskId = taskId,
+                GroupId = task.GroupId,
                 SourceType = "comment"
             };
 

@@ -21,7 +21,7 @@ namespace StudioStudio_Server.Models.DTOs.Response
         public UserDto Assignee { get; set; } = new UserDto();
         public decimal? EstimatedHours { get; set; }
         public decimal? ActualHours { get; set; }
-
+        public DateTime? CompletedAt { get; set; }
     }
 
     public class GroupTaskStatusDto

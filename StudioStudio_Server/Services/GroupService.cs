@@ -337,6 +337,7 @@ namespace StudioStudio_Server.Services
                             DueDate = t.DueDate,
                             EstimatedHours = t.EstimatedHours,
                             ActualHours = t.ActualHours,
+                            CompletedAt = t.CompletedAt,
                             Assignee = assigneeDict.TryGetValue(t.TaskId, out var assignee) ? assignee : null
                         }).ToList()
             : new List<TaskItemResponse>()
