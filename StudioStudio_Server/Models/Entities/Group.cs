@@ -21,6 +21,8 @@
 
         public bool IsArchived { get; set; } = false;
 
+        public bool AllowMemberUpdateProgress { get; set; } = false;
+
         public Studio? Studio { get; set; }
 
         // Group personalization

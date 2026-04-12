@@ -26,5 +26,8 @@ namespace StudioStudio_Server.Models.DTOs.Request
 
         // 🔹 ADDED: Open/Closed group
         public bool? IsOpen { get; set; }
+
+        // 🔹 ADDED: Allow member to update task progress
+        public bool? AllowMemberUpdateProgress { get; set; }
     }
 }

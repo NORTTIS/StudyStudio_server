@@ -61,6 +61,7 @@
         public bool IsOpen { get; set; }
         public bool IsArchived { get; set; }
         public bool IsMember { get; set; }
+        public bool AllowMemberUpdateProgress { get; set; }
     }
 
     public class StudioDto
