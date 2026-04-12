@@ -81,6 +81,11 @@ namespace StudioStudio_Server.Services
             _cacheService = cacheService;
         }
 
+        /// <summary>
+        /// Get all groups that the current user can access and split them by UI sections.
+        /// Validate: <paramref name="userId"/> must belong to an existing non-deleted user.
+        /// Returns: Group list response with subscription summary and categorized cards.
+        /// </summary>
         public async Task<GroupListResponse> GetGroupsAsync(Guid userId)
         {
             // Get user's subscription plan
@@ -214,6 +219,11 @@ namespace StudioStudio_Server.Services
             return response;
         }
 
+        /// <summary>
+        /// Get full detail for one group that the caller is an approved member of.
+        /// Validate: <paramref name="userId"/> must be an approved participant of <paramref name="groupId"/>.
+        /// Returns: Group detail response including participants, statuses and counters.
+        /// </summary>
         public async Task<GroupDetailResponse> GetGroupDetailAsync(Guid userId, Guid groupId)
         {
             // Get group with participants
@@ -609,6 +619,11 @@ namespace StudioStudio_Server.Services
             await _groupRepository.DeleteAsync(group);
         }
 
+        /// <summary>
+        /// Update group metadata and optional template activation state.
+        /// Validate: caller must be Owner/Moderator and request payload must pass field constraints.
+        /// Returns: Updated group snapshot for client refresh.
+        /// </summary>
         public async Task<UpdateGroupResponse> UpdateGroupAsync(Guid userId, UpdateGroupRequest request)
         {
             // Check if group exists

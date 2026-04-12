@@ -32,7 +32,7 @@ namespace StudioStudio_Server.Services
             _logger = logger;
         }
 
-        public async Task NotifyTaskAssignedAsync(User assignee, User assignedBy, Guid taskId, string taskTitle, DateTime? deadline)
+        public async Task NotifyTaskAssignedAsync(User assignee, User assignedBy, Guid taskId, string taskTitle, DateTime? deadline, CancellationToken cancellationToken = default)
         {
             var assignerName = BuildUserName(assignedBy);
             var groupIdForAssign = await _getGroupIdForTaskAsync(taskId);
@@ -53,58 +53,64 @@ namespace StudioStudio_Server.Services
             await _emailService.SendEmailWithPreferenceCheckAsync(assignee.Email, "Task Assigned - Study Studio", body, assignee);
         }
 
-        public async Task NotifyTaskReassignedAsync(User newAssignee, User oldAssignee, User actor, Guid taskId, string taskTitle)
+        public async Task NotifyTaskReassignedAsync(User newAssignee, User oldAssignee, User actor, Guid taskId, string taskTitle, CancellationToken cancellationToken = default)
         {
             var actorName = BuildUserName(actor);
             var groupId = await _getGroupIdForTaskAsync(taskId);
 
-            var newAssigneeTaskUrl = groupId.HasValue ? BuildTaskUrl(taskId, GetLanguage(newAssignee)) : "";
-            await CreateInAppAsync(
-                newAssignee.UserId,
-                actor.UserId,
-                "Task reassigned to you",
-                $"{actorName} reassigned task to you: {taskTitle}",
-                AnnouncementType.TaskReassignment,
-                taskId,
-                groupId,
-                "task");
+            if (newAssignee.UserId != actor.UserId)
+            {
+                var newAssigneeTaskUrl = groupId.HasValue ? BuildTaskUrl(taskId, GetLanguage(newAssignee)) : "";
+                await CreateInAppAsync(
+                    newAssignee.UserId,
+                    actor.UserId,
+                    "Task reassigned to you",
+                    $"{actorName} reassigned task to you: {taskTitle}",
+                    AnnouncementType.TaskReassignment,
+                    taskId,
+                    groupId,
+                    "task");
 
-            var body = EmailTemplate.TaskReassignedEmail(
-                taskTitle,
-                BuildUserName(oldAssignee),
-                BuildUserName(newAssignee),
-                newAssigneeTaskUrl,
-                GetLanguage(newAssignee));
-            await _emailService.SendEmailWithPreferenceCheckAsync(newAssignee.Email, "Task Reassigned - Study Studio", body, newAssignee);
+                var body = EmailTemplate.TaskReassignedEmail(
+                    taskTitle,
+                    BuildUserName(oldAssignee),
+                    BuildUserName(newAssignee),
+                    newAssigneeTaskUrl,
+                    GetLanguage(newAssignee));
+                await _emailService.SendEmailWithPreferenceCheckAsync(newAssignee.Email, "Task Reassigned - Study Studio", body, newAssignee);
+            }
 
-            var oldAssigneeTaskUrl = groupId.HasValue ? BuildTaskUrl(taskId, GetLanguage(oldAssignee)) : "";
-            await CreateInAppAsync(
-                oldAssignee.UserId,
-                actor.UserId,
-                "Task reassigned",
-                $"{actorName} reassigned your task: {taskTitle}",
-                AnnouncementType.TaskReassignment,
-                taskId,
-                groupId,
-                "task");
+            if (oldAssignee.UserId != actor.UserId)
+            {
+                var oldAssigneeTaskUrl = groupId.HasValue ? BuildTaskUrl(taskId, GetLanguage(oldAssignee)) : "";
+                await CreateInAppAsync(
+                    oldAssignee.UserId,
+                    actor.UserId,
+                    "Task reassigned",
+                    $"{actorName} reassigned your task: {taskTitle}",
+                    AnnouncementType.TaskReassignment,
+                    taskId,
+                    groupId,
+                    "task");
 
-            var body2 = EmailTemplate.TaskReassignedEmail(
-                taskTitle,
-                BuildUserName(oldAssignee),
-                BuildUserName(newAssignee),
-                oldAssigneeTaskUrl,
-                GetLanguage(oldAssignee));
-            await _emailService.SendEmailWithPreferenceCheckAsync(oldAssignee.Email, "Task Reassigned - Study Studio", body2, oldAssignee);
+                var body2 = EmailTemplate.TaskReassignedEmail(
+                    taskTitle,
+                    BuildUserName(oldAssignee),
+                    BuildUserName(newAssignee),
+                    oldAssigneeTaskUrl,
+                    GetLanguage(oldAssignee));
+                await _emailService.SendEmailWithPreferenceCheckAsync(oldAssignee.Email, "Task Reassigned - Study Studio", body2, oldAssignee);
+            }
         }
 
-        public async Task NotifyTaskStatusChangedAsync(User user, Guid taskId, string oldStatus, string newStatus, string changedBy)
+        public async Task NotifyTaskStatusChangedAsync(User user, User actor, Guid taskId, string oldStatus, string newStatus, string changedBy, CancellationToken cancellationToken = default)
         {
             var groupId = await _getGroupIdForTaskAsync(taskId);
             var language = GetLanguage(user);
 
             await CreateInAppAsync(
                 user.UserId,
-                user.UserId,
+                actor.UserId,
                 "Task status updated",
                 $"{changedBy} changed status: {oldStatus} → {newStatus}",
                 AnnouncementType.TaskStatusChange,
@@ -117,7 +123,7 @@ namespace StudioStudio_Server.Services
             await _emailService.SendEmailWithPreferenceCheckAsync(user.Email, "Task Status Updated - Study Studio", body, user);
         }
 
-        public async Task NotifyTaskCompletedAsync(User assignee, User completedBy, Guid taskId, string taskTitle)
+        public async Task NotifyTaskCompletedAsync(User assignee, User completedBy, Guid taskId, string taskTitle, CancellationToken cancellationToken = default)
         {
             var actorName = BuildUserName(completedBy);
             var groupId = await _getGroupIdForTaskAsync(taskId);
@@ -138,7 +144,7 @@ namespace StudioStudio_Server.Services
             await _emailService.SendEmailWithPreferenceCheckAsync(assignee.Email, "Task Completed - Study Studio", body, assignee);
         }
 
-        public async Task NotifyMentionedInCommentAsync(User mentionedUser, User mentioner, Guid taskId, string taskTitle, string commentPreview)
+        public async Task NotifyMentionedInCommentAsync(User mentionedUser, User mentioner, Guid taskId, string taskTitle, string commentPreview, CancellationToken cancellationToken = default)
         {
             var mentionerName = BuildUserName(mentioner);
             var groupId = await _getGroupIdForTaskAsync(taskId);
@@ -159,7 +165,7 @@ namespace StudioStudio_Server.Services
             await _emailService.SendEmailWithPreferenceCheckAsync(mentionedUser.Email, "Mentioned in Task Comment - Study Studio", body, mentionedUser);
         }
 
-        public async Task NotifyMentionedInGroupDiscussAsync(User mentionedUser, User mentioner, Guid groupId, string groupName, string messagePreview)
+        public async Task NotifyMentionedInGroupDiscussAsync(User mentionedUser, User mentioner, Guid groupId, string groupName, string messagePreview, CancellationToken cancellationToken = default)
         {
             var mentionerName = BuildUserName(mentioner);
             var language = GetLanguage(mentionedUser);
@@ -178,7 +184,7 @@ namespace StudioStudio_Server.Services
             await _emailService.SendEmailWithPreferenceCheckAsync(mentionedUser.Email, "Mentioned in Group Discussion - Study Studio", body, mentionedUser);
         }
 
-        public async Task NotifyTaskDeletedAsync(User assignee, User deletedBy, Guid taskId, string taskTitle)
+        public async Task NotifyTaskDeletedAsync(User assignee, User deletedBy, Guid taskId, string taskTitle, CancellationToken cancellationToken = default)
         {
             var actorName = BuildUserName(deletedBy);
             var groupId = await _getGroupIdForTaskAsync(taskId);
@@ -198,7 +204,7 @@ namespace StudioStudio_Server.Services
             await _emailService.SendEmailWithPreferenceCheckAsync(assignee.Email, "Task Deleted - Study Studio", body, assignee);
         }
 
-        public async Task NotifyTaskUnassignedAsync(User assignee, User actor, Guid taskId, string taskTitle)
+        public async Task NotifyTaskUnassignedAsync(User assignee, User actor, Guid taskId, string taskTitle, CancellationToken cancellationToken = default)
         {
             var actorName = BuildUserName(actor);
             var groupId = await _getGroupIdForTaskAsync(taskId);
@@ -218,7 +224,7 @@ namespace StudioStudio_Server.Services
             await _emailService.SendEmailWithPreferenceCheckAsync(assignee.Email, "Task Unassigned - Study Studio", body, assignee);
         }
 
-        public async Task NotifyTaskOverdueAsync(User assignee, Guid taskId, string taskTitle, DateTime dueDate, int overdueDays)
+        public async Task NotifyTaskOverdueAsync(User assignee, Guid taskId, string taskTitle, DateTime dueDate, int overdueDays, CancellationToken cancellationToken = default)
         {
             var groupId = await _getGroupIdForTaskAsync(taskId);
             var language = GetLanguage(assignee);
@@ -238,7 +244,7 @@ namespace StudioStudio_Server.Services
             await _emailService.SendEmailWithPreferenceCheckAsync(assignee.Email, "Task Overdue - Study Studio", body, assignee);
         }
 
-        public async Task NotifyTaskReminderAsync(User assignee, Guid taskId, string taskTitle, DateTime dueDate, int hoursUntilDeadline)
+        public async Task NotifyTaskReminderAsync(User assignee, Guid taskId, string taskTitle, DateTime dueDate, int hoursUntilDeadline, CancellationToken cancellationToken = default)
         {
             var groupId = await _getGroupIdForTaskAsync(taskId);
             var language = GetLanguage(assignee);

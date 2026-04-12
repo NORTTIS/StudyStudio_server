@@ -3,11 +3,11 @@ using Microsoft.IdentityModel.Tokens;
 using StudioStudio_Server.Exceptions;
 using StudioStudio_Server.Models.DTOs.Request;
 using StudioStudio_Server.Models.DTOs.Response;
+using StudioStudio_Server.Models.BackgroundJobs;
 using StudioStudio_Server.Models.Entities;
 using StudioStudio_Server.Models.Enums;
 using StudioStudio_Server.Repositories.Interfaces;
 using StudioStudio_Server.Services.Interfaces;
-using StudioStudio_Server.Services.TaskNotificationQueue;
 using StudioStudio_Server.Utils;
 
 namespace StudioStudio_Server.Services

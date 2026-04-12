@@ -1,5 +1,8 @@
-namespace StudioStudio_Server.Services.TaskNotificationQueue
+namespace StudioStudio_Server.Models.BackgroundJobs
 {
+    /// <summary>
+    /// Represents a queued task update event used by the background notification worker.
+    /// </summary>
     public class TaskUpdateNotificationJob
     {
         public Guid TaskId { get; set; }

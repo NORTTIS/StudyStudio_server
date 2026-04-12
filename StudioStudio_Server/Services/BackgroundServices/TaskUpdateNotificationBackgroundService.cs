@@ -3,7 +3,6 @@ using StudioStudio_Server.Models.Entities;
 using StudioStudio_Server.Models.Enums;
 using StudioStudio_Server.Repositories.Interfaces;
 using StudioStudio_Server.Services.Interfaces;
-using StudioStudio_Server.Services.TaskNotificationQueue;
 
 namespace StudioStudio_Server.Services.BackgroundServices
 {
@@ -70,6 +69,7 @@ namespace StudioStudio_Server.Services.BackgroundServices
                     }
 
                     var users = await userRepository.GetByIdsAsync(userIds.ToList());
+                    users = users.Where(u => u.Status != UserStatus.Deleted).ToList();
                     var userDict = users.ToDictionary(u => u.UserId);
 
                     var notificationTasks = new List<Task>();
@@ -121,15 +121,12 @@ namespace StudioStudio_Server.Services.BackgroundServices
                             if (job.OldAssigneeId.HasValue && job.OldAssigneeId.Value != job.RequestedAssigneeId.Value
                                 && userDict.TryGetValue(job.OldAssigneeId.Value, out var oldAssignee))
                             {
-                                if (newAssignee.UserId != job.ActorUserId && oldAssignee.UserId != job.ActorUserId)
-                                {
-                                    notificationTasks.Add(notificationService.NotifyTaskReassignedAsync(
-                                        newAssignee,
-                                        oldAssignee,
-                                        currentUser,
-                                        job.TaskId,
-                                        job.TaskTitle));
-                                }
+                                notificationTasks.Add(notificationService.NotifyTaskReassignedAsync(
+                                    newAssignee,
+                                    oldAssignee,
+                                    currentUser,
+                                    job.TaskId,
+                                    job.TaskTitle));
                             }
                             else if (!job.OldAssigneeId.HasValue)
                             {
@@ -155,6 +152,7 @@ namespace StudioStudio_Server.Services.BackgroundServices
                         var changedBy = $"{currentUser.FirstName} {currentUser.LastName}".Trim();
                         notificationTasks.Add(notificationService.NotifyTaskStatusChangedAsync(
                             statusAssignee,
+                            currentUser,
                             job.TaskId,
                             job.OldStatusName,
                             job.NewStatusName,
