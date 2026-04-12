@@ -21,7 +21,26 @@ namespace StudioStudio_Server.Services.Interfaces
         /// Validate: caller should pass cancellation token to stop worker gracefully.
         /// Returns: The next queued notification job.
         /// </summary>
-        ValueTask<TaskUpdateNotificationJob> DequeueAsync(CancellationToken cancellationToken = default);
+        /// <summary>
+        /// Dequeue the next task update notification job as a lease.
+        /// Validate: caller must acknowledge or abandon the lease after processing.
+        /// Returns: The next leased notification item, or null when the queue is empty.
+        /// </summary>
+        ValueTask<TaskUpdateNotificationLease?> DequeueAsync(CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// Acknowledge a leased notification payload after successful processing.
+        /// Validate: payload must match a leased item from the inflight list.
+        /// Returns: Completed when the payload is removed from inflight storage.
+        /// </summary>
+        ValueTask AcknowledgeAsync(TaskUpdateNotificationLease lease, CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// Requeue a leased notification payload after processing failure.
+        /// Validate: payload must match a leased item from the inflight list.
+        /// Returns: Completed when the payload is moved back to the pending queue.
+        /// </summary>
+        ValueTask AbandonAsync(TaskUpdateNotificationLease lease, CancellationToken cancellationToken = default);
 
         /// <summary>
         /// Get the current queue depth.

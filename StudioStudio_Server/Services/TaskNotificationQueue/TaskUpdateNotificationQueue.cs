@@ -7,7 +7,8 @@ namespace StudioStudio_Server.Services.TaskNotificationQueue
 {
     public class TaskUpdateNotificationQueue : ITaskUpdateNotificationQueue
     {
-        private const string QueueKey = "queue:task-update-notification";
+        private const string PendingQueueKey = "queue:task-update-notification:pending";
+        private const string InflightQueueKey = "queue:task-update-notification:inflight";
         private readonly IConnectionMultiplexer _redis;
         private readonly ILogger<TaskUpdateNotificationQueue> _logger;
         private readonly JsonSerializerOptions _serializerOptions = new(JsonSerializerDefaults.Web);
@@ -28,7 +29,7 @@ namespace StudioStudio_Server.Services.TaskNotificationQueue
 
             try
             {
-                await db.ListRightPushAsync(QueueKey, payload);
+                await db.ListRightPushAsync(PendingQueueKey, payload);
             }
             catch (Exception ex)
             {
@@ -36,20 +37,38 @@ namespace StudioStudio_Server.Services.TaskNotificationQueue
                 throw;
             }
 
-            var depth = await db.ListLengthAsync(QueueKey);
+            long depth;
+            try
+            {
+                depth = await db.ListLengthAsync(PendingQueueKey);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to read queue depth after enqueue for {QueueKey}", PendingQueueKey);
+                depth = -1;
+            }
 
-            _logger.LogInformation(
-                "Enqueued task update notification job: TaskId={TaskId}, GroupId={GroupId}, QueueDepth={QueueDepth}",
-                job.TaskId, job.GroupId, depth);
+            if (depth >= 0)
+            {
+                _logger.LogInformation(
+                    "Enqueued task update notification job: TaskId={TaskId}, GroupId={GroupId}, QueueDepth={QueueDepth}",
+                    job.TaskId, job.GroupId, depth);
+            }
+            else
+            {
+                _logger.LogInformation(
+                    "Enqueued task update notification job: TaskId={TaskId}, GroupId={GroupId}",
+                    job.TaskId, job.GroupId);
+            }
         }
 
-        public async ValueTask<TaskUpdateNotificationJob> DequeueAsync(CancellationToken cancellationToken = default)
+        public async ValueTask<TaskUpdateNotificationLease?> DequeueAsync(CancellationToken cancellationToken = default)
         {
             var db = _redis.GetDatabase();
 
             while (!cancellationToken.IsCancellationRequested)
             {
-                var item = await db.ListLeftPopAsync(QueueKey);
+                var item = await db.ListRightPopLeftPushAsync(PendingQueueKey, InflightQueueKey);
                 if (item.HasValue)
                 {
                     try
@@ -57,15 +76,21 @@ namespace StudioStudio_Server.Services.TaskNotificationQueue
                         var job = JsonSerializer.Deserialize<TaskUpdateNotificationJob>(item!, _serializerOptions);
                         if (job == null)
                         {
+                            await db.ListRemoveAsync(InflightQueueKey, item!);
                             _logger.LogWarning("Skipped empty task update notification payload from Redis queue");
                             continue;
                         }
 
-                        return job;
+                        return new TaskUpdateNotificationLease
+                        {
+                            Payload = item!,
+                            Job = job
+                        };
                     }
                     catch (Exception ex)
                     {
-                        _logger.LogError(ex, "Failed to deserialize task update notification payload: {Payload}", item.ToString());
+                        await db.ListRemoveAsync(InflightQueueKey, item!);
+                        _logger.LogError(ex, "Failed to deserialize task update notification payload from Redis queue");
                     }
                 }
 
@@ -75,17 +100,39 @@ namespace StudioStudio_Server.Services.TaskNotificationQueue
             throw new OperationCanceledException(cancellationToken);
         }
 
+        public async ValueTask AcknowledgeAsync(TaskUpdateNotificationLease lease, CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var db = _redis.GetDatabase();
+            await db.ListRemoveAsync(InflightQueueKey, lease.Payload);
+        }
+
+        public async ValueTask AbandonAsync(TaskUpdateNotificationLease lease, CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var db = _redis.GetDatabase();
+
+            var removed = await db.ListRemoveAsync(InflightQueueKey, lease.Payload);
+            if (removed > 0)
+            {
+                await db.ListLeftPushAsync(PendingQueueKey, lease.Payload);
+                return;
+            }
+
+            _logger.LogWarning("Unable to requeue task update notification lease because inflight payload was not found");
+        }
+
         public int GetQueueDepth()
         {
             try
             {
                 var db = _redis.GetDatabase();
-                var depth = db.ListLength(QueueKey);
+                var depth = db.ListLength(PendingQueueKey);
                 return depth > int.MaxValue ? int.MaxValue : (int)depth;
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "Failed to get queue depth for {QueueKey}", QueueKey);
+                _logger.LogWarning(ex, "Failed to get queue depth for {QueueKey}", PendingQueueKey);
                 return 0;
             }
         }

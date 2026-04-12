@@ -32,6 +32,11 @@ namespace StudioStudio_Server.Services
             _logger = logger;
         }
 
+        /// <summary>
+        /// Notify the assignee about a newly assigned task.
+        /// Validate: assignee and assignedBy must be loaded user entities and taskId must resolve to a task.
+        /// Returns: A completed notification task after in-app and email delivery attempts.
+        /// </summary>
         public async Task NotifyTaskAssignedAsync(User assignee, User assignedBy, Guid taskId, string taskTitle, DateTime? deadline, CancellationToken cancellationToken = default)
         {
             var assignerName = BuildUserName(assignedBy);
@@ -53,6 +58,11 @@ namespace StudioStudio_Server.Services
             await _emailService.SendEmailWithPreferenceCheckAsync(assignee.Email, "Task Assigned - Study Studio", body, assignee);
         }
 
+        /// <summary>
+        /// Notify the old and new assignees when a task is reassigned.
+        /// Validate: assignees and actor must be loaded user entities and taskId must resolve to a task.
+        /// Returns: A completed notification task after in-app and email delivery attempts.
+        /// </summary>
         public async Task NotifyTaskReassignedAsync(User newAssignee, User oldAssignee, User actor, Guid taskId, string taskTitle, CancellationToken cancellationToken = default)
         {
             var actorName = BuildUserName(actor);
@@ -103,6 +113,11 @@ namespace StudioStudio_Server.Services
             }
         }
 
+        /// <summary>
+        /// Notify the assignee when a task status changes.
+        /// Validate: user and actor must be loaded user entities and status values must be non-empty.
+        /// Returns: A completed notification task after in-app and email delivery attempts.
+        /// </summary>
         public async Task NotifyTaskStatusChangedAsync(User user, User actor, Guid taskId, string oldStatus, string newStatus, string changedBy, CancellationToken cancellationToken = default)
         {
             var groupId = await _getGroupIdForTaskAsync(taskId);
@@ -123,6 +138,11 @@ namespace StudioStudio_Server.Services
             await _emailService.SendEmailWithPreferenceCheckAsync(user.Email, "Task Status Updated - Study Studio", body, user);
         }
 
+        /// <summary>
+        /// Notify the assignee that a task has been completed.
+        /// Validate: assignee and completedBy must be loaded user entities and taskId must resolve to a task.
+        /// Returns: A completed notification task after in-app and email delivery attempts.
+        /// </summary>
         public async Task NotifyTaskCompletedAsync(User assignee, User completedBy, Guid taskId, string taskTitle, CancellationToken cancellationToken = default)
         {
             var actorName = BuildUserName(completedBy);
@@ -144,6 +164,11 @@ namespace StudioStudio_Server.Services
             await _emailService.SendEmailWithPreferenceCheckAsync(assignee.Email, "Task Completed - Study Studio", body, assignee);
         }
 
+        /// <summary>
+        /// Notify a user when they are mentioned in a task comment.
+        /// Validate: mentionedUser and mentioner must be loaded user entities and taskId must resolve to a task.
+        /// Returns: A completed notification task after in-app and email delivery attempts.
+        /// </summary>
         public async Task NotifyMentionedInCommentAsync(User mentionedUser, User mentioner, Guid taskId, string taskTitle, string commentPreview, CancellationToken cancellationToken = default)
         {
             var mentionerName = BuildUserName(mentioner);
@@ -165,6 +190,11 @@ namespace StudioStudio_Server.Services
             await _emailService.SendEmailWithPreferenceCheckAsync(mentionedUser.Email, "Mentioned in Task Comment - Study Studio", body, mentionedUser);
         }
 
+        /// <summary>
+        /// Notify a user when they are mentioned in a group discussion message.
+        /// Validate: mentionedUser and mentioner must be loaded user entities and groupId must resolve to a group.
+        /// Returns: A completed notification task after in-app and email delivery attempts.
+        /// </summary>
         public async Task NotifyMentionedInGroupDiscussAsync(User mentionedUser, User mentioner, Guid groupId, string groupName, string messagePreview, CancellationToken cancellationToken = default)
         {
             var mentionerName = BuildUserName(mentioner);
@@ -184,6 +214,11 @@ namespace StudioStudio_Server.Services
             await _emailService.SendEmailWithPreferenceCheckAsync(mentionedUser.Email, "Mentioned in Group Discussion - Study Studio", body, mentionedUser);
         }
 
+        /// <summary>
+        /// Notify the assignee when a task is deleted.
+        /// Validate: assignee and deletedBy must be loaded user entities and taskId must resolve to a task.
+        /// Returns: A completed notification task after in-app and email delivery attempts.
+        /// </summary>
         public async Task NotifyTaskDeletedAsync(User assignee, User deletedBy, Guid taskId, string taskTitle, CancellationToken cancellationToken = default)
         {
             var actorName = BuildUserName(deletedBy);
@@ -204,6 +239,11 @@ namespace StudioStudio_Server.Services
             await _emailService.SendEmailWithPreferenceCheckAsync(assignee.Email, "Task Deleted - Study Studio", body, assignee);
         }
 
+        /// <summary>
+        /// Notify the assignee when they are removed from a task.
+        /// Validate: assignee and actor must be loaded user entities and taskId must resolve to a task.
+        /// Returns: A completed notification task after in-app and email delivery attempts.
+        /// </summary>
         public async Task NotifyTaskUnassignedAsync(User assignee, User actor, Guid taskId, string taskTitle, CancellationToken cancellationToken = default)
         {
             var actorName = BuildUserName(actor);
@@ -224,6 +264,11 @@ namespace StudioStudio_Server.Services
             await _emailService.SendEmailWithPreferenceCheckAsync(assignee.Email, "Task Unassigned - Study Studio", body, assignee);
         }
 
+        /// <summary>
+        /// Notify the assignee when a task is overdue.
+        /// Validate: assignee must be a loaded user entity and dueDate must represent the overdue deadline.
+        /// Returns: A completed notification task after in-app and email delivery attempts.
+        /// </summary>
         public async Task NotifyTaskOverdueAsync(User assignee, Guid taskId, string taskTitle, DateTime dueDate, int overdueDays, CancellationToken cancellationToken = default)
         {
             var groupId = await _getGroupIdForTaskAsync(taskId);
@@ -244,6 +289,11 @@ namespace StudioStudio_Server.Services
             await _emailService.SendEmailWithPreferenceCheckAsync(assignee.Email, "Task Overdue - Study Studio", body, assignee);
         }
 
+        /// <summary>
+        /// Notify the assignee about an approaching task deadline.
+        /// Validate: assignee must be a loaded user entity and dueDate must represent the deadline.
+        /// Returns: A completed notification task after in-app and email delivery attempts.
+        /// </summary>
         public async Task NotifyTaskReminderAsync(User assignee, Guid taskId, string taskTitle, DateTime dueDate, int hoursUntilDeadline, CancellationToken cancellationToken = default)
         {
             var groupId = await _getGroupIdForTaskAsync(taskId);
