@@ -4,6 +4,9 @@ using StudioStudio_Server.Models.Enums;
 
 namespace StudioStudio_Server.Services.Interfaces
 {
+    /// <summary>
+    /// Group domain service contract for group lifecycle and member-facing queries.
+    /// </summary>
     public interface IGroupService
     {
         Task<GroupListResponse> GetGroupsAsync(Guid userId);

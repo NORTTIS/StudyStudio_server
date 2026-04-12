@@ -1,9 +1,9 @@
 using Microsoft.Extensions.DependencyInjection;
+using StudioStudio_Server.Models.BackgroundJobs;
 using StudioStudio_Server.Models.Entities;
 using StudioStudio_Server.Models.Enums;
 using StudioStudio_Server.Repositories.Interfaces;
 using StudioStudio_Server.Services.Interfaces;
-using StudioStudio_Server.Services.TaskNotificationQueue;
 
 namespace StudioStudio_Server.Services.BackgroundServices
 {
@@ -29,9 +29,17 @@ namespace StudioStudio_Server.Services.BackgroundServices
 
             while (!stoppingToken.IsCancellationRequested)
             {
+                TaskUpdateNotificationLease? lease = null;
                 try
                 {
-                    var job = await _queue.DequeueAsync(stoppingToken);
+                    var dequeuedLease = await _queue.DequeueAsync(stoppingToken);
+                    if (dequeuedLease is null)
+                    {
+                        continue;
+                    }
+
+                    lease = dequeuedLease;
+                    var job = lease.Job;
 
                     using var scope = _serviceScopeFactory.CreateScope();
                     var userRepository = scope.ServiceProvider.GetRequiredService<IUserRepository>();
@@ -70,6 +78,7 @@ namespace StudioStudio_Server.Services.BackgroundServices
                     }
 
                     var users = await userRepository.GetByIdsAsync(userIds.ToList());
+                    users = users.Where(u => u.Status != UserStatus.Deleted).ToList();
                     var userDict = users.ToDictionary(u => u.UserId);
 
                     var notificationTasks = new List<Task>();
@@ -104,7 +113,13 @@ namespace StudioStudio_Server.Services.BackgroundServices
                     {
                         if (job.RequestedAssigneeId == null)
                         {
-                            if (job.OldAssigneeId.HasValue && userDict.TryGetValue(job.OldAssigneeId.Value, out var oldAssignee))
+                            User? oldAssignee = null;
+                            if (job.OldAssigneeId.HasValue)
+                            {
+                                userDict.TryGetValue(job.OldAssigneeId.Value, out oldAssignee);
+                            }
+
+                            if (oldAssignee != null)
                             {
                                 if (oldAssignee.UserId != job.ActorUserId)
                                 {
@@ -116,12 +131,22 @@ namespace StudioStudio_Server.Services.BackgroundServices
                                 }
                             }
                         }
-                        else if (userDict.TryGetValue(job.RequestedAssigneeId.Value, out var newAssignee))
+                        else
                         {
-                            if (job.OldAssigneeId.HasValue && job.OldAssigneeId.Value != job.RequestedAssigneeId.Value
-                                && userDict.TryGetValue(job.OldAssigneeId.Value, out var oldAssignee))
+                            if (!userDict.TryGetValue(job.RequestedAssigneeId.Value, out var newAssignee))
                             {
-                                if (newAssignee.UserId != job.ActorUserId && oldAssignee.UserId != job.ActorUserId)
+                                newAssignee = null;
+                            }
+
+                            if (newAssignee != null)
+                            {
+                                User? oldAssignee = null;
+                                if (job.OldAssigneeId.HasValue)
+                                {
+                                    userDict.TryGetValue(job.OldAssigneeId.Value, out oldAssignee);
+                                }
+
+                                if (job.OldAssigneeId.HasValue && job.OldAssigneeId.Value != job.RequestedAssigneeId.Value && oldAssignee != null)
                                 {
                                     notificationTasks.Add(notificationService.NotifyTaskReassignedAsync(
                                         newAssignee,
@@ -130,17 +155,17 @@ namespace StudioStudio_Server.Services.BackgroundServices
                                         job.TaskId,
                                         job.TaskTitle));
                                 }
-                            }
-                            else if (!job.OldAssigneeId.HasValue)
-                            {
-                                if (newAssignee.UserId != job.ActorUserId)
+                                else if (!job.OldAssigneeId.HasValue)
                                 {
-                                    notificationTasks.Add(notificationService.NotifyTaskAssignedAsync(
-                                        newAssignee,
-                                        currentUser,
-                                        job.TaskId,
-                                        job.TaskTitle,
-                                        job.DueDate));
+                                    if (newAssignee.UserId != job.ActorUserId)
+                                    {
+                                        notificationTasks.Add(notificationService.NotifyTaskAssignedAsync(
+                                            newAssignee,
+                                            currentUser,
+                                            job.TaskId,
+                                            job.TaskTitle,
+                                            job.DueDate));
+                                    }
                                 }
                             }
                         }
@@ -155,6 +180,7 @@ namespace StudioStudio_Server.Services.BackgroundServices
                         var changedBy = $"{currentUser.FirstName} {currentUser.LastName}".Trim();
                         notificationTasks.Add(notificationService.NotifyTaskStatusChangedAsync(
                             statusAssignee,
+                            currentUser,
                             job.TaskId,
                             job.OldStatusName,
                             job.NewStatusName,
@@ -165,6 +191,9 @@ namespace StudioStudio_Server.Services.BackgroundServices
                     {
                         await Task.WhenAll(notificationTasks);
                     }
+
+                    await _queue.AcknowledgeAsync(lease, stoppingToken);
+                    lease = null;
                 }
                 catch (OperationCanceledException)
                 {
@@ -173,6 +202,11 @@ namespace StudioStudio_Server.Services.BackgroundServices
                 catch (Exception ex)
                 {
                     _logger.LogError(ex, "Error while processing task update notification job");
+                    if (lease != null)
+                    {
+                        await _queue.AbandonAsync(lease, stoppingToken);
+                    }
+
                     await Task.Delay(TimeSpan.FromSeconds(2), stoppingToken);
                 }
             }
