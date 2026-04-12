@@ -239,7 +239,7 @@ namespace StudioStudio_Server.Data
                 e.HasOne(x => x.Uploader)
                     .WithMany()
                     .HasForeignKey(x => x.UploadedBy)
-                    .OnDelete(DeleteBehavior.SetNull);
+                    .OnDelete(DeleteBehavior.Restrict);
             });
 
             // SUBSCRIPTION PLAN
@@ -291,7 +291,7 @@ namespace StudioStudio_Server.Data
                 e.HasOne(x => x.User)
                     .WithMany()
                     .HasForeignKey(x => x.UserId)
-                    .OnDelete(DeleteBehavior.SetNull);
+                    .OnDelete(DeleteBehavior.Restrict);
             });
 
             // ACTIVITY LOG
@@ -302,7 +302,7 @@ namespace StudioStudio_Server.Data
                 e.HasOne(x => x.User)
                     .WithMany()
                     .HasForeignKey(x => x.UserId)
-                    .OnDelete(DeleteBehavior.SetNull);
+                    .OnDelete(DeleteBehavior.Restrict);
 
                 e.HasOne(x => x.Group)
                     .WithMany()

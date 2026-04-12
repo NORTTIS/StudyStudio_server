@@ -28,6 +28,7 @@ namespace StudioStudio_Server.Models.DTOs.Response
         public string? Alias { get; set; }
         public bool IsOpen { get; set; }
         public bool IsArchived { get; set; }
+        public bool AllowMemberUpdateProgress { get; set; }
     }
 
     public class TaskStatusDto

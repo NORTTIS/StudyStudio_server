@@ -7,6 +7,7 @@ using StudioStudio_Server.Models.Entities;
 using StudioStudio_Server.Models.Enums;
 using StudioStudio_Server.Repositories.Interfaces;
 using StudioStudio_Server.Services.Interfaces;
+using StudioStudio_Server.Services.TaskNotificationQueue;
 using StudioStudio_Server.Utils;
 
 namespace StudioStudio_Server.Services
@@ -25,7 +26,7 @@ namespace StudioStudio_Server.Services
         private readonly IHttpContextAccessor _httpContextAccessor;
         private readonly IActivityLogService _activityLogService;
         private readonly INotificationService _notificationService;
-        private readonly ICacheService _cacheService;
+        private readonly ITaskUpdateNotificationQueue _taskUpdateNotificationQueue;
 
         public TaskService(
             ITaskRepository taskRepository,
@@ -40,7 +41,7 @@ namespace StudioStudio_Server.Services
             IHttpContextAccessor httpContextAccessor,
             IActivityLogService activityLogService,
             INotificationService notificationService,
-            ICacheService cacheService)
+            ITaskUpdateNotificationQueue taskUpdateNotificationQueue)
         {
             _taskRepository = taskRepository;
             _logger = logger;
@@ -54,7 +55,7 @@ namespace StudioStudio_Server.Services
             _httpContextAccessor = httpContextAccessor;
             _activityLogService = activityLogService;
             _notificationService = notificationService;
-            _cacheService = cacheService;
+            _taskUpdateNotificationQueue = taskUpdateNotificationQueue;
         }
 
         /// <summary>
@@ -182,9 +183,6 @@ namespace StudioStudio_Server.Services
 
             await _taskRepository.AddAsync(taskItem);
 
-            // Invalidate AI task cache so AI sees fresh data immediately
-            await _cacheService.InvalidateAITaskCacheAsync(userId, request.GroupId);
-
             // Log task creation activity with priority/severity for weighted contribution scoring
             await _activityLogService.LogTaskCreateAsync(
                 userId, taskItem.TaskId, taskItem.GroupId, null,
@@ -219,13 +217,18 @@ namespace StudioStudio_Server.Services
                 // Log task assignment activity
                 await _activityLogService.LogTaskAssignAsync(userId, taskItem.TaskId, assigneeDetail.Id, taskItem.GroupId);
 
-                // Notify assignment
-                await _notificationService.NotifyTaskAssignedAsync(
-                    assigneeDetail.Id,
-                    taskItem.TaskId,
-                    userId,
-                    taskItem.Title,
-                    taskItem.DueDate);
+                // Load current user for notification
+                var currentUser = await _userRepository.GetByIdAsync(userId);
+                if (currentUser != null)
+                {
+                    // Notify assignment
+                    await _notificationService.NotifyTaskAssignedAsync(
+                        assignee,
+                        currentUser,
+                        taskItem.TaskId,
+                        taskItem.Title,
+                        taskItem.DueDate);
+                }
             }
             return new TaskItemResponse
             {
@@ -329,6 +332,23 @@ namespace StudioStudio_Server.Services
             ValidateHours(request.EstimatedHours, effectiveStartDate, effectiveDueDate, "EstimatedHours");
             ValidateHours(request.ActualHours, effectiveStartDate, effectiveDueDate, "ActualHours");
 
+            // ============================================================
+            // Preload assignees for validation and response
+            // ============================================================
+            var existingAssignments = await _taskAssignmentRepository.GetAssigneesByTaskId(taskId);
+            var oldAssigneeId = existingAssignments.FirstOrDefault()?.AssignedTo;
+
+            var userIdsToLoad = new List<Guid?>();
+            userIdsToLoad.Add(request.AssigneeId); // New assignee
+            userIdsToLoad.Add(oldAssigneeId); // Old assignee
+            var validUserIds = userIdsToLoad.Where(id => id.HasValue && id.Value != Guid.Empty).Select(id => id!.Value).Distinct().ToList();
+            var userDict = new Dictionary<Guid, User>();
+            if (validUserIds.Count > 0)
+            {
+                var users = await _userRepository.GetByIdsAsync(validUserIds);
+                userDict = users.ToDictionary(u => u.UserId);
+            }
+
             // Update basic fields
             if (!string.IsNullOrWhiteSpace(request.TaskName))
             {
@@ -362,19 +382,19 @@ namespace StudioStudio_Server.Services
                 task.DueDate = dueDateUtc.Value;
             }
 
-            // Load existing assignee early for progress completion notification
-            var existingAssignmentsEarly = await _taskAssignmentRepository.GetAssigneesByTaskId(taskId);
-            var oldAssigneeId = existingAssignmentsEarly.FirstOrDefault()?.AssignedTo;
+            bool reachedCompletion = false;
+            string? oldStatusName = null;
+            string? newStatusName = null;
 
+            // Handle progress update
             if (request.Progress.HasValue)
             {
                 var oldProgress = task.Progress;
                 task.Progress = request.Progress.Value;
 
-                var reachedCompletion = oldProgress < 100 && task.Progress >= 100;
+                reachedCompletion = oldProgress < 100 && task.Progress >= 100;
                 var reopenedTask = oldProgress >= 100 && task.Progress < 100;
 
-                // Keep CompletedAt in sync with progress state.
                 if (task.Progress >= 100 && !task.CompletedAt.HasValue)
                 {
                     task.CompletedAt = DateTime.UtcNow;
@@ -384,58 +404,19 @@ namespace StudioStudio_Server.Services
                     task.CompletedAt = null;
                 }
 
-                // Log task completion when progress reaches 100
                 if (reachedCompletion)
                 {
-                    // Log with priority/severity for weighted contribution scoring
                     await _activityLogService.LogTaskCompleteAsync(
                         userId, task.TaskId, task.GroupId,
                         (int)task.Priority, (int)task.Severity);
                 }
 
-                // Log task update activity for contribution scoring
                 await _activityLogService.LogTaskUpdateAsync(
                     userId, task.TaskId, task.GroupId, null,
                     (int)task.Priority, (int)task.Severity);
-
-                // Task completion notification — only fire on transition TO 100%
-                if (reachedCompletion)
-                {
-                    var completionRecipientIds = new HashSet<Guid>();
-
-                    if (oldAssigneeId.HasValue)
-                    {
-                        completionRecipientIds.Add(oldAssigneeId.Value);
-                    }
-
-                    // Also notify Owner/Moderator of the group
-                    var participants = await _participantRepository.GetAllByGroupIdAsync(groupId);
-                    var ownerModeratorIds = participants
-                        .Where(p => p.Role == GroupRole.Owner || p.Role == GroupRole.Moderator)
-                        .Select(p => p.UserId)
-                        .Distinct()
-                        .ToList();
-
-                    foreach (var ownerModeratorId in ownerModeratorIds)
-                    {
-                        completionRecipientIds.Add(ownerModeratorId);
-                    }
-
-                    foreach (var recipientId in completionRecipientIds)
-                    {
-                        await _notificationService.NotifyTaskCompletedAsync(
-                            recipientId,
-                            taskId,
-                            task.Title,
-                            userId);
-                    }
-                }
             }
 
-            string? oldStatusName = null;
-            string? newStatusName = null;
-
-            // Update GroupStatusId if provided
+            // Handle status update
             if (request.GroupStatusId.HasValue)
             {
                 if (task.GroupStatusId.HasValue && statusMap.TryGetValue(task.GroupStatusId.Value, out var oldStatus))
@@ -451,144 +432,69 @@ namespace StudioStudio_Server.Services
                 task.GroupStatusId = request.GroupStatusId.Value;
             }
 
-            // Update hours if provided
-            if (request.EstimatedHours.HasValue)
-            {
-                task.EstimatedHours = request.EstimatedHours.Value;
-            }
+            // Update hours
+            if (request.EstimatedHours.HasValue) task.EstimatedHours = request.EstimatedHours.Value;
+            if (request.ActualHours.HasValue) task.ActualHours = request.ActualHours.Value;
 
-            if (request.ActualHours.HasValue)
-            {
-                task.ActualHours = request.ActualHours.Value;
-            }
-
+            // ============================================================
+            // DB write
+            // ============================================================
             await _taskRepository.UpdateAsync(task);
-
-            // Invalidate AI task cache so AI sees fresh data immediately
-            await _cacheService.InvalidateAITaskCacheAsync(userId, groupId);
-
             // ============================================================
-            // PHASE 2 OPTIMIZATION: Get existing assignments ONCE and reuse
+            // Handle assignee changes (DB writes)
             // ============================================================
-            var existingAssignments = await _taskAssignmentRepository.GetAssigneesByTaskId(taskId);
-            // oldAssigneeId already loaded above for progress notification
-
-            // ============================================================
-            // PHASE 2 OPTIMIZATION: Collect all user IDs needed for
-            // notifications, then batch-load them
-            // ============================================================
-            var userIdsForNotifications = new List<Guid>();
-
-            // Add current user for "changedBy" notification
-            userIdsForNotifications.Add(userId);
-
-            // Add old assignee for unassign notification
-            if (oldAssigneeId.HasValue)
-                userIdsForNotifications.Add(oldAssigneeId.Value);
-
-            // Add new assignee for assign notification
-            if (request.AssigneeId.HasValue && request.AssigneeId.Value != Guid.Empty)
-                userIdsForNotifications.Add(request.AssigneeId.Value);
-
-            var userDict = new Dictionary<Guid, User>();
-            if (userIdsForNotifications.Count > 0)
+            // Unassign: null or Guid.Empty both trigger removal
+            if (!request.AssigneeId.HasValue || request.AssigneeId.Value == Guid.Empty)
             {
-                var users = await _userRepository.GetByIdsAsync(userIdsForNotifications.Distinct().ToList());
-                userDict = users.ToDictionary(u => u.UserId);
+                if (existingAssignments.Any())
+                {
+                    await _taskAssignmentRepository.RemoveAsync(existingAssignments);
+                }
             }
-
-            // ============================================================
-            // HANDLE ASSIGNEE UPDATE
-            // ============================================================
-            if (request.AssigneeId.HasValue)
+            else
             {
-                // If AssigneeId is Guid.Empty, remove all assignments
-                if (request.AssigneeId.Value == Guid.Empty)
+                // Validate new assignee
+                if (!userDict.TryGetValue(request.AssigneeId.Value, out var newAssignee) || newAssignee == null)
+                {
+                    throw new AppException(ErrorCodes.UserNotFound, StatusCodes.Status404NotFound);
+                }
+
+                var alreadyAssigned = existingAssignments.Any(a => a.AssignedTo == request.AssigneeId.Value);
+                if (!alreadyAssigned)
                 {
                     if (existingAssignments.Any())
-                    {
                         await _taskAssignmentRepository.RemoveAsync(existingAssignments);
 
-                        if (oldAssigneeId.HasValue)
-                        {
-                            await _notificationService.NotifyTaskUnassignedAsync(
-                                oldAssigneeId.Value,
-                                taskId,
-                                task.Title,
-                                userId);
-                        }
-                    }
-                }
-                else
-                {
-                    // Validate new assignee exists (use preloaded user)
-                    if (!userDict.TryGetValue(request.AssigneeId.Value, out var newAssignee) || newAssignee == null)
+                    await _taskAssignmentRepository.AddAsync(new TaskAssignment
                     {
-                        throw new AppException(ErrorCodes.UserNotFound, StatusCodes.Status404NotFound);
-                    }
-
-                    // Check if assignee is already assigned
-                    var alreadyAssigned = existingAssignments.Any(a => a.AssignedTo == request.AssigneeId.Value);
-
-                    if (!alreadyAssigned)
-                    {
-                        // Remove existing assignments
-                        if (existingAssignments.Any())
-                        {
-                            await _taskAssignmentRepository.RemoveAsync(existingAssignments);
-                        }
-
-                        // Add new assignment
-                        await _taskAssignmentRepository.AddAsync(new TaskAssignment
-                        {
-                            AssignmentId = Guid.NewGuid(),
-                            AssignedTo = request.AssigneeId.Value,
-                            AssignedBy = userId,
-                            AssignedAt = DateTime.UtcNow,
-                            TaskId = taskId
-                        });
-
-                        if (oldAssigneeId.HasValue)
-                        {
-                            await _notificationService.NotifyTaskReassignedAsync(
-                                request.AssigneeId.Value,
-                                oldAssigneeId.Value,
-                                taskId,
-                                userId,
-                                task.Title);
-                        }
-                        else
-                        {
-                            await _notificationService.NotifyTaskAssignedAsync(
-                                request.AssigneeId.Value,
-                                taskId,
-                                userId,
-                                task.Title,
-                                task.DueDate);
-                        }
-                    }
+                        AssignmentId = Guid.NewGuid(),
+                        AssignedTo = request.AssigneeId.Value,
+                        AssignedBy = userId,
+                        AssignedAt = DateTime.UtcNow,
+                        TaskId = taskId
+                    });
                 }
             }
 
-            // Status change notification (reuse oldAssigneeId from existingAssignments)
-            if (!string.IsNullOrWhiteSpace(oldStatusName) && !string.IsNullOrWhiteSpace(newStatusName) && oldStatusName != newStatusName)
+            await _taskUpdateNotificationQueue.EnqueueAsync(new TaskUpdateNotificationJob
             {
-                if (oldAssigneeId.HasValue)
-                {
-                    userDict.TryGetValue(userId, out var changedByUser);
-                    var changedBy = changedByUser != null ? $"{changedByUser.FirstName} {changedByUser.LastName}".Trim() : "A user";
-
-                    await _notificationService.NotifyTaskStatusChangedAsync(
-                        oldAssigneeId.Value,
-                        taskId,
-                        oldStatusName,
-                        newStatusName,
-                        changedBy);
-                }
-            }
+                TaskId = task.TaskId,
+                GroupId = groupId,
+                ActorUserId = userId,
+                TaskTitle = task.Title,
+                DueDate = task.DueDate,
+                OldAssigneeId = oldAssigneeId,
+                RequestedAssigneeId = request.AssigneeId.HasValue && request.AssigneeId.Value != Guid.Empty
+                    ? request.AssigneeId.Value
+                    : null,
+                HasAssigneeUpdate = request.AssigneeId.HasValue || !existingAssignments.IsNullOrEmpty(),
+                ReachedCompletion = reachedCompletion,
+                OldStatusName = oldStatusName,
+                NewStatusName = newStatusName
+            });
 
             // ============================================================
-            // PREPARE RESPONSE: reuse preloaded data
+            // Prepare response
             // ============================================================
             GroupTaskStatusDto? groupStatusDto = null;
             if (task.GroupStatusId.HasValue && statusMap.TryGetValue(task.GroupStatusId.Value, out var groupStatus))
@@ -659,26 +565,26 @@ namespace StudioStudio_Server.Services
 
             await _taskRepository.SoftDeleteAsync(taskId);
 
-            // Invalidate AI task cache so AI sees fresh data immediately
-            await _cacheService.InvalidateAITaskCacheAsync(userId, groupId);
-
             await _activityLogService.LogTaskDeleteAsync(userId, taskId, groupId, taskPriority, taskSeverity);
 
-            // Also notify Owner/Moderator of the group
+            // Notify Owner/Moderator of the group (parallel, using preloaded users)
             var participants = await _participantRepository.GetAllByGroupIdAsync(groupId);
             var ownerModeratorIds = participants
                 .Where(p => p.Role == GroupRole.Owner || p.Role == GroupRole.Moderator)
                 .Select(p => p.UserId)
+                .Where(id => id != userId)
                 .Distinct()
                 .ToList();
 
-            foreach (var reviewerId in ownerModeratorIds)
+            var currentUser = await _userRepository.GetByIdAsync(userId);
+            if (ownerModeratorIds.Count > 0 && currentUser != null)
             {
-                await _notificationService.NotifyTaskDeletedAsync(
-                    reviewerId,
-                    taskId,
-                    task.Title,
-                    userId);
+                var omUsers = await _userRepository.GetByIdsAsync(ownerModeratorIds);
+                var tasks = omUsers
+                    .Select(om => _notificationService.NotifyTaskDeletedAsync(om, currentUser, taskId, task.Title))
+                    .ToList();
+                if (tasks.Count > 0)
+                    await Task.WhenAll(tasks);
             }
         }
 
@@ -890,9 +796,6 @@ namespace StudioStudio_Server.Services
 
             await _taskRepository.AddAsync(taskItem);
 
-            // Invalidate AI task cache so AI sees fresh data immediately
-            await _cacheService.InvalidateAITaskCacheAsync(userId, null);
-
             // Log task creation activity with priority/severity for weighted contribution scoring
             await _activityLogService.LogTaskCreateAsync(
                 userId, taskItem.TaskId, null, null,
@@ -1063,9 +966,6 @@ namespace StudioStudio_Server.Services
 
             await _taskRepository.UpdateAsync(task);
 
-            // Invalidate AI task cache so AI sees fresh data immediately
-            await _cacheService.InvalidateAITaskCacheAsync(userId, null);
-
             // Prepare response
             var personalStatus = task.PersonalStatusId.HasValue
                 ? await _personalTaskStatusRepository.GetDetailAsync(task.PersonalStatusId.Value)
@@ -1168,8 +1068,6 @@ namespace StudioStudio_Server.Services
 
             await _taskRepository.PermanentDeleteAsync(taskId);
 
-            // Invalidate group AI task cache so AI sees fresh data immediately
-            await _cacheService.InvalidateAITaskCacheAsync(userId, groupId);
         }
 
         /// <summary>

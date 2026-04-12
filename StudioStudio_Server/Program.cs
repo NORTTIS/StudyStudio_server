@@ -87,7 +87,6 @@ else
 builder.Services.AddScoped<IMessageService, MessageService>();
 builder.Services.AddScoped<IEmailService, SMTPEmailService>();
 builder.Services.AddScoped<INotificationService, NotificationService>();
-builder.Services.AddScoped<INotificationService, NotificationService>();
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
@@ -180,7 +179,8 @@ builder.Services.AddScoped<IAnalyticsService, AnalyticsService>();
 // Analytics Background Jobs
 builder.Services.AddHostedService<StudioStudio_Server.Services.BackgroundServices.GroupAnalyticsJob>();
 builder.Services.AddHostedService<StudioStudio_Server.Services.BackgroundServices.TaskNotificationBackgroundService>();
-builder.Services.AddHostedService<StudioStudio_Server.Services.BackgroundServices.TaskNotificationBackgroundService>();
+builder.Services.AddSingleton<StudioStudio_Server.Services.Interfaces.ITaskUpdateNotificationQueue, StudioStudio_Server.Services.TaskNotificationQueue.TaskUpdateNotificationQueue>();
+builder.Services.AddHostedService<StudioStudio_Server.Services.BackgroundServices.TaskUpdateNotificationBackgroundService>();
 
 builder.Services.AddControllers(options =>
     {

@@ -169,7 +169,8 @@ namespace StudioStudio_Server.Services
                     Alias = g.Alias,
                     IsOpen = g.IsOpen,
                     IsArchived = g.IsArchived,
-                    IsMember = groupParticipants.Any(p => p.UserId == userId && p.IsApproved)
+                    IsMember = groupParticipants.Any(p => p.UserId == userId && p.IsApproved),
+                    AllowMemberUpdateProgress = g.AllowMemberUpdateProgress
                 };
             }).ToList();
 
@@ -316,6 +317,7 @@ namespace StudioStudio_Server.Services
                 Alias = group.Alias,
                 IsOpen = group.IsOpen,
                 IsArchived = group.IsArchived,
+                AllowMemberUpdateProgress = group.AllowMemberUpdateProgress,
                 TaskStatuses = taskStatuses.Select(ts => new TaskStatusDto
                 {
                     StatusId = ts.StatusId,
@@ -720,6 +722,12 @@ namespace StudioStudio_Server.Services
                 group.IsOpen = request.IsOpen.Value;
             }
 
+            // validate and update AllowMemberUpdateProgress setting (Owner/Moderator only)
+            if (request.AllowMemberUpdateProgress.HasValue)
+            {
+                group.AllowMemberUpdateProgress = request.AllowMemberUpdateProgress.Value;
+            }
+
             // Handle template creation/deactivation
             var existingTemplate = await _templateRepository.GetByGroupIdAsync(request.GroupId);
             Template? activeTemplate = null;
@@ -795,7 +803,8 @@ namespace StudioStudio_Server.Services
                 Tagline = group.Tagline,
                 Alias = group.Alias,
                 IsOpen = group.IsOpen,
-                IsArchived = group.IsArchived
+                IsArchived = group.IsArchived,
+                AllowMemberUpdateProgress = group.AllowMemberUpdateProgress
             };
         }
 

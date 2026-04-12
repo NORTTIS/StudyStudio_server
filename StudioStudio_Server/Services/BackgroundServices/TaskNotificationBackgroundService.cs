@@ -109,12 +109,23 @@ namespace StudioStudio_Server.Services.BackgroundServices
 
             var taskDict = tasks.ToDictionary(t => t.TaskId, t => t);
 
+            // Batch-load all assignee users for notifications
+            var allUserIds = assignments.Select(a => a.AssignedTo).Distinct().ToList();
+            var allUsers = await db.Users
+                .Where(u => allUserIds.Contains(u.UserId))
+                .AsNoTracking()
+                .ToListAsync(stoppingToken);
+            var userDict = allUsers.ToDictionary(u => u.UserId, u => u);
+
             int reminderCount = 0;
             int overdueCount = 0;
 
             foreach (var assignment in assignments)
             {
                 if (!taskDict.TryGetValue(assignment.TaskId, out var task) || !task.DueDate.HasValue)
+                    continue;
+
+                if (!userDict.TryGetValue(assignment.AssignedTo, out var assignee) || assignee == null)
                     continue;
 
                 var dueDate = task.DueDate.Value;
@@ -129,7 +140,7 @@ namespace StudioStudio_Server.Services.BackgroundServices
                     if (!alreadySent)
                     {
                         await notificationService.NotifyTaskReminderAsync(
-                            assignment.AssignedTo,
+                            assignee,
                             task.TaskId,
                             task.Title,
                             dueDate,
@@ -150,7 +161,7 @@ namespace StudioStudio_Server.Services.BackgroundServices
                     {
                         var overdueDays = (todayDate.ToDateTime(TimeOnly.MinValue) - dueDate).Days;
                         await notificationService.NotifyTaskOverdueAsync(
-                            assignment.AssignedTo,
+                            assignee,
                             task.TaskId,
                             task.Title,
                             dueDate,
