@@ -443,39 +443,36 @@ namespace StudioStudio_Server.Services
             // ============================================================
             // Handle assignee changes (DB writes)
             // ============================================================
-            if (request.AssigneeId.HasValue)
+            // Unassign: null or Guid.Empty both trigger removal
+            if (!request.AssigneeId.HasValue || request.AssigneeId.Value == Guid.Empty)
             {
-                if (request.AssigneeId.Value == Guid.Empty)
+                if (existingAssignments.Any())
                 {
-                    // Unassign
-                    if (existingAssignments.Any())
-                    {
-                        await _taskAssignmentRepository.RemoveAsync(existingAssignments);
-                    }
+                    await _taskAssignmentRepository.RemoveAsync(existingAssignments);
                 }
-                else
+            }
+            else
+            {
+                // Validate new assignee
+                if (!userDict.TryGetValue(request.AssigneeId.Value, out var newAssignee) || newAssignee == null)
                 {
-                    // Validate new assignee
-                    if (!userDict.TryGetValue(request.AssigneeId.Value, out var newAssignee) || newAssignee == null)
-                    {
-                        throw new AppException(ErrorCodes.UserNotFound, StatusCodes.Status404NotFound);
-                    }
+                    throw new AppException(ErrorCodes.UserNotFound, StatusCodes.Status404NotFound);
+                }
 
-                    var alreadyAssigned = existingAssignments.Any(a => a.AssignedTo == request.AssigneeId.Value);
-                    if (!alreadyAssigned)
-                    {
-                        if (existingAssignments.Any())
-                            await _taskAssignmentRepository.RemoveAsync(existingAssignments);
+                var alreadyAssigned = existingAssignments.Any(a => a.AssignedTo == request.AssigneeId.Value);
+                if (!alreadyAssigned)
+                {
+                    if (existingAssignments.Any())
+                        await _taskAssignmentRepository.RemoveAsync(existingAssignments);
 
-                        await _taskAssignmentRepository.AddAsync(new TaskAssignment
-                        {
-                            AssignmentId = Guid.NewGuid(),
-                            AssignedTo = request.AssigneeId.Value,
-                            AssignedBy = userId,
-                            AssignedAt = DateTime.UtcNow,
-                            TaskId = taskId
-                        });
-                    }
+                    await _taskAssignmentRepository.AddAsync(new TaskAssignment
+                    {
+                        AssignmentId = Guid.NewGuid(),
+                        AssignedTo = request.AssigneeId.Value,
+                        AssignedBy = userId,
+                        AssignedAt = DateTime.UtcNow,
+                        TaskId = taskId
+                    });
                 }
             }
 
@@ -490,7 +487,7 @@ namespace StudioStudio_Server.Services
                 RequestedAssigneeId = request.AssigneeId.HasValue && request.AssigneeId.Value != Guid.Empty
                     ? request.AssigneeId.Value
                     : null,
-                HasAssigneeUpdate = request.AssigneeId.HasValue,
+                HasAssigneeUpdate = request.AssigneeId.HasValue || !existingAssignments.IsNullOrEmpty(),
                 ReachedCompletion = reachedCompletion,
                 OldStatusName = oldStatusName,
                 NewStatusName = newStatusName
