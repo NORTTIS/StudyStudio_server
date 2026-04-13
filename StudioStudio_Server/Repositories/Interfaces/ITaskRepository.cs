@@ -58,7 +58,9 @@ namespace StudioStudio_Server.Repositories.Interfaces
             string? statusKeyword = null,
             string? statusCategory = null,
             TaskPriority? minPriority = null,
-            TaskSeverity? minSeverity = null);
+            TaskSeverity? minSeverity = null,
+            bool? hasNoAssignee = null,
+            bool? hasNoDueDate = null);
         Task PermanentDeleteAsync(Guid taskId);
         Task<Guid?> GetTaskGroupIdAsync(Guid taskId);
     }

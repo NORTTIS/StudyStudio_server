@@ -36,6 +36,6 @@ namespace StudioStudio_Server.Models.DTOs.Response
         public Guid StatusId { get; set; }
         public string StatusName { get; set; } = string.Empty;
         public int Position { get; set; }
-        public List<TaskItemResponse> TaskList { get; set; } = new();
+        public List<TaskItemResponse>? TaskList { get; set; }
     }
 }

@@ -567,7 +567,9 @@ namespace StudioStudio_Server.Repositories
             string? statusKeyword = null,
             string? statusCategory = null,
             TaskPriority? minPriority = null,
-            TaskSeverity? minSeverity = null)
+            TaskSeverity? minSeverity = null,
+            bool? hasNoAssignee = null,
+            bool? hasNoDueDate = null)
         {
             // Convert DateTime parameters to UTC to avoid PostgreSQL timezone issues
             if (startDateFrom.HasValue && startDateFrom.Value.Kind == DateTimeKind.Unspecified)
@@ -597,9 +599,10 @@ namespace StudioStudio_Server.Repositories
             // Apply search filter
             if (!string.IsNullOrWhiteSpace(search))
             {
+                var normalizedSearch = search.Trim().ToLower();
                 query = query.Where(t =>
-                    t.Title.Contains(search) ||
-                    (t.Description != null && t.Description.Contains(search))
+                    t.Title.ToLower().Contains(normalizedSearch) ||
+                    (t.Description != null && t.Description.ToLower().Contains(normalizedSearch))
                 );
             }
 
@@ -684,6 +687,35 @@ namespace StudioStudio_Server.Repositories
             if (dueDateTo.HasValue)
             {
                 query = query.Where(t => t.DueDate.HasValue && t.DueDate.Value <= dueDateTo.Value);
+            }
+
+            // Apply hasNoDueDate filter
+            if (hasNoDueDate.HasValue)
+            {
+                query = hasNoDueDate.Value
+                    ? query.Where(t => !t.DueDate.HasValue)
+                    : query.Where(t => t.DueDate.HasValue);
+            }
+
+            // Apply hasNoAssignee filter via subquery on TaskAssignments
+            if (hasNoAssignee.HasValue)
+            {
+                if (hasNoAssignee.Value)
+                {
+                    var unassignedTaskIds = await _context.TaskAssignments
+                        .Select(a => a.TaskId)
+                        .Distinct()
+                        .ToListAsync();
+                    query = query.Where(t => !unassignedTaskIds.Contains(t.TaskId));
+                }
+                else
+                {
+                    var assignedTaskIds = await _context.TaskAssignments
+                        .Select(a => a.TaskId)
+                        .Distinct()
+                        .ToListAsync();
+                    query = query.Where(t => assignedTaskIds.Contains(t.TaskId));
+                }
             }
 
             // Get total count before pagination

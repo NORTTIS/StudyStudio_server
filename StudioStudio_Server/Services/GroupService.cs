@@ -259,38 +259,8 @@ namespace StudioStudio_Server.Services
             // Get member count
             var memberCount = await _groupParticipantRepository.GetParticipantCountByGroupIdAsync(groupId);
 
-            // Get task statuses
+            // Get task statuses only; tasks are loaded lazily by the board via /group/{groupId}/tasks
             var taskStatuses = await _groupTaskStatusRepository.GetByGroupIdAsync(groupId);
-
-            // Get tasks
-            var taskStatusIdList = taskStatuses.Select(s => s.StatusId).ToList();
-            var taskList = await _taskRepository.GetListTasksByListStatusId(taskStatusIdList);
-
-            // Get assinees
-            var taskIdList = taskList.SelectMany(t => t.Value).Select(t => t.TaskId).ToList();
-
-            Dictionary<Guid, UserDto> assigneeDict = new();
-            if (taskIdList.Count > 0)
-            {
-                var assignees = await _taskAssignmentRepository.GetListAssigneesByListTaskId(taskIdList);
-                var userIds = assignees.Select(a => a.AssignedTo).Distinct().ToList();
-                var users = await _userRepository.GetByIdsAsync(userIds);
-                var userDict = users.ToDictionary(u => u.UserId);
-
-                foreach (var assignee in assignees)
-                {
-                    if (userDict.TryGetValue(assignee.AssignedTo, out var user))
-                    {
-                        assigneeDict[assignee.TaskId] = new UserDto
-                        {
-                            Id = user.UserId,
-                            FirstName = user.FirstName,
-                            LastName = user.LastName,
-                            AvatarUrl = AvatarUrlHelper.BuildAbsoluteAvatarUrl(user.AvatarUrl, _httpContextAccessor.HttpContext)
-                        };
-                    }
-                }
-            }
 
 
             // Check if group is a template
@@ -333,26 +303,7 @@ namespace StudioStudio_Server.Services
                     StatusId = ts.StatusId,
                     StatusName = ts.StatusName,
                     Position = ts.Position,
-                    TaskList = taskList.TryGetValue(ts.StatusId, out var tasks)
-                        ? tasks.Select(t => new TaskItemResponse
-                        {
-                            TaskId = t.TaskId,
-                            TaskTitle = t.Title,
-                            TaskDescription = t.Description!,
-                            TaskPriority = t.Priority,
-                            TaskSeverity = t.Severity,
-                            Position = t.Position,
-                            Progress = t.Progress,
-                            CreatedById = t.OwnerId,
-                            CreatedAt = t.CreatedAt,
-                            StartDate = t.StartDate,
-                            DueDate = t.DueDate,
-                            EstimatedHours = t.EstimatedHours,
-                            ActualHours = t.ActualHours,
-                            CompletedAt = t.CompletedAt,
-                            Assignee = assigneeDict.TryGetValue(t.TaskId, out var assignee) ? assignee : null
-                        }).ToList()
-            : new List<TaskItemResponse>()
+                    TaskList = null
                 }).ToList()
             };
         }
@@ -1109,6 +1060,9 @@ namespace StudioStudio_Server.Services
             DateTime? startDateTo = null,
             DateTime? dueDateFrom = null,
             DateTime? dueDateTo = null,
+            string? statusCategory = null,
+            bool? hasNoAssignee = null,
+            bool? hasNoDueDate = null,
             string? sortBy = "createdAt",
             bool sortAscending = true)
         {
@@ -1153,7 +1107,10 @@ namespace StudioStudio_Server.Services
                 dueDateFrom,
                 dueDateTo,
                 sortBy,
-                sortAscending);
+                sortAscending,
+                statusCategory: statusCategory,
+                hasNoAssignee: hasNoAssignee,
+                hasNoDueDate: hasNoDueDate);
 
             // Get task IDs for loading assignees
             var taskIds = tasks.Select(t => t.TaskId).ToList();

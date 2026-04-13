@@ -113,6 +113,9 @@ namespace StudioStudio_Server.Controllers
         /// - severity: Filter by severity (Low=0, Medium=1, High=2)
         /// - startDateFrom, startDateTo: Filter by start date range
         /// - dueDateFrom, dueDateTo: Filter by due date range
+        /// - statusCategory: Filter by progress category ("completed", "inprogress", "notstarted")
+        /// - hasNoAssignee: Filter tasks with no assignees (true/false)
+        /// - hasNoDueDate: Filter tasks with no due date (true/false)
         /// - sortBy: Sort field (createdAt, dueDate, startDate, priority, severity, progress)
         /// - sortAscending: Sort direction (true=ASC, false=DESC)
         /// Response includes: Task list + Group statuses for filter dropdown
@@ -131,6 +134,9 @@ namespace StudioStudio_Server.Controllers
             [FromQuery] DateTime? startDateTo = null,
             [FromQuery] DateTime? dueDateFrom = null,
             [FromQuery] DateTime? dueDateTo = null,
+            [FromQuery] string? statusCategory = null,
+            [FromQuery] bool? hasNoAssignee = null,
+            [FromQuery] bool? hasNoDueDate = null,
             [FromQuery] string? sortBy = "createdAt",
             [FromQuery] bool sortAscending = true)
         {
@@ -149,9 +155,12 @@ namespace StudioStudio_Server.Controllers
                 startDateTo,
                 dueDateFrom,
                 dueDateTo,
+                statusCategory,
+                hasNoAssignee,
+                hasNoDueDate,
                 sortBy,
                 sortAscending);
-            
+
             var message = _messageService.GetMessage(ErrorCodes.SuccessGetData);
 
             return Ok(ApiResponse<GroupTaskListResponse>.Success(
