@@ -86,8 +86,9 @@ public class GetDeadlinesTool : IAITool
                 groupId, 1, 200, null, assigneeId, null, null, null, null, null,
                 now,                   // dueDateFrom
                 endDate,               // dueDateTo
+                null, null, null, null, // statusCategory, hasNoAssignee, hasNoDueDate, overdue
                 "dueDate", true,      // sortBy, sortAscending
-                null, null,           // statusKeyword, statusCategory
+                null,                  // statusKeyword
                 null, null);          // minPriority, minSeverity
 
             // Filter: co deadline, trong khoang thoi gian, chua hoan thanh
@@ -105,8 +106,9 @@ public class GetDeadlinesTool : IAITool
                 groupId, 1, 50, null, assigneeId, null, null, null, null, null,
                 now.AddDays(-30),     // look back 30 days max
                 null,                  // no upper bound
+                null, null, null, null, // statusCategory, hasNoAssignee, hasNoDueDate, overdue
                 "dueDate", true,
-                null, null,
+                null,
                 null, null);
 
             var overdueTasks = allOverdue

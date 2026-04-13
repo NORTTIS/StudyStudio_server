@@ -202,7 +202,7 @@ public class GetTasksTool : IAITool
             Guid? assigneeId = (role == GroupRole.Owner || role == GroupRole.Moderator) ? null : context.UserId;
 
             var (tasks, total) = await _taskRepository.GetGroupTasksWithFiltersAsync(
-                groupId, page, pageSize, searchQuery, assigneeId, null, priority, severity, null, null, null, null, "dueDate", true, statusKeyword, statusCategory, minPriority, minSeverity);
+                groupId, page, pageSize, searchQuery, assigneeId, null, priority, severity, null, null, null, null, statusCategory, null, null, null, "dueDate", true, statusKeyword, minPriority, minSeverity);
 
             var filteredCountOnCurrentPage = tasks.Count;
             var totalPages = (int)Math.Ceiling(total / (double)pageSize);

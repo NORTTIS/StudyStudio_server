@@ -31,6 +31,10 @@ namespace StudioStudio_Server.Services.Interfaces
             DateTime? startDateTo = null,
             DateTime? dueDateFrom = null,
             DateTime? dueDateTo = null,
+            string? statusCategory = null,
+            bool? hasNoAssignee = null,
+            bool? hasNoDueDate = null,
+            bool? overdue = null,
             string? sortBy = "createdAt",
             bool sortAscending = true);
 

@@ -562,10 +562,13 @@ namespace StudioStudio_Server.Repositories
             DateTime? startDateTo = null,
             DateTime? dueDateFrom = null,
             DateTime? dueDateTo = null,
+            string? statusCategory = null,
+            bool? hasNoAssignee = null,
+            bool? hasNoDueDate = null,
+            bool? overdue = null,
             string? sortBy = "createdAt",
             bool sortAscending = true,
             string? statusKeyword = null,
-            string? statusCategory = null,
             TaskPriority? minPriority = null,
             TaskSeverity? minSeverity = null)
         {
@@ -666,24 +669,36 @@ namespace StudioStudio_Server.Repositories
                 query = query.Where(t => t.Severity >= minSeverity.Value);
             }
 
-            // Apply start date range filter
-            if (startDateFrom.HasValue)
+            // Apply date range filter (OR logic: match if startDate OR dueDate is in range)
+            if (startDateFrom.HasValue || dueDateTo.HasValue)
             {
-                query = query.Where(t => t.StartDate.HasValue && t.StartDate.Value >= startDateFrom.Value);
-            }
-            if (startDateTo.HasValue)
-            {
-                query = query.Where(t => t.StartDate.HasValue && t.StartDate.Value <= startDateTo.Value);
+                var from = startDateFrom ?? DateTime.MinValue;
+                var to = dueDateTo ?? DateTime.MaxValue;
+
+                query = query.Where(t =>
+                    (t.StartDate.HasValue && t.StartDate.Value >= from && t.StartDate.Value <= to) ||
+                    (t.DueDate.HasValue && t.DueDate.Value >= from && t.DueDate.Value <= to));
             }
 
-            // Apply due date range filter
-            if (dueDateFrom.HasValue)
+            // Apply overdue filter (DueDate < today AND Progress < 100)
+            if (overdue == true)
             {
-                query = query.Where(t => t.DueDate.HasValue && t.DueDate.Value >= dueDateFrom.Value);
+                var today = DateTime.UtcNow.Date;
+                query = query.Where(t => t.DueDate.HasValue
+                    && t.DueDate.Value.Date < today
+                    && t.Progress < 100);
             }
-            if (dueDateTo.HasValue)
+
+            // Apply has no assignee filter
+            if (hasNoAssignee == true)
             {
-                query = query.Where(t => t.DueDate.HasValue && t.DueDate.Value <= dueDateTo.Value);
+                query = query.Where(t => !_context.TaskAssignments.Any(a => a.TaskId == t.TaskId));
+            }
+
+            // Apply has no due date filter
+            if (hasNoDueDate == true)
+            {
+                query = query.Where(t => !t.DueDate.HasValue);
             }
 
             // Get total count before pagination

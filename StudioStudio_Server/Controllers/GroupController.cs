@@ -110,9 +110,13 @@ namespace StudioStudio_Server.Controllers
         /// - assigneeId: Filter by assignee
         /// - statusId: Filter by task status
         /// - priority: Filter by priority (Low=0, Medium=1, High=2)
-        /// - severity: Filter by severity (Low=0, Medium=1, High=2)
+        /// - severity: Filter by severity (Minor=0, Moderate=1, Major=2, Critical=3)
         /// - startDateFrom, startDateTo: Filter by start date range
         /// - dueDateFrom, dueDateTo: Filter by due date range
+        /// - statusCategory: Filter by progress (completed, inprogress, notstarted)
+        /// - hasNoAssignee: Filter tasks with no assignee (true/false)
+        /// - hasNoDueDate: Filter tasks with no due date (true/false)
+        /// - overdue: Filter overdue tasks (true/false)
         /// - sortBy: Sort field (createdAt, dueDate, startDate, priority, severity, progress)
         /// - sortAscending: Sort direction (true=ASC, false=DESC)
         /// Response includes: Task list + Group statuses for filter dropdown
@@ -131,6 +135,10 @@ namespace StudioStudio_Server.Controllers
             [FromQuery] DateTime? startDateTo = null,
             [FromQuery] DateTime? dueDateFrom = null,
             [FromQuery] DateTime? dueDateTo = null,
+            [FromQuery] string? statusCategory = null,
+            [FromQuery] bool? hasNoAssignee = null,
+            [FromQuery] bool? hasNoDueDate = null,
+            [FromQuery] bool? overdue = null,
             [FromQuery] string? sortBy = "createdAt",
             [FromQuery] bool sortAscending = true)
         {
@@ -149,9 +157,13 @@ namespace StudioStudio_Server.Controllers
                 startDateTo,
                 dueDateFrom,
                 dueDateTo,
+                statusCategory,
+                hasNoAssignee,
+                hasNoDueDate,
+                overdue,
                 sortBy,
                 sortAscending);
-            
+
             var message = _messageService.GetMessage(ErrorCodes.SuccessGetData);
 
             return Ok(ApiResponse<GroupTaskListResponse>.Success(
