@@ -137,6 +137,7 @@ namespace StudioStudio_Server.Models.DTOs.Response
     {
         public DateOnly Date { get; set; }
         public int ActivityLevel { get; set; } // 0-4 scale
+        public int ActivityCount { get; set; } // actual weighted score
     }
 
     /// <summary>

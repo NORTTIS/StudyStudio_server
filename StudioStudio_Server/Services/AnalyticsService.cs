@@ -547,10 +547,27 @@ namespace StudioStudio_Server.Services
         public async Task<List<MemberHeatmapData>> GetMemberHeatmapAsync(
             Guid groupId, DateOnly? startDate = null, DateOnly? endDate = null)
         {
-            var end = endDate ?? DateOnly.FromDateTime(DateTime.UtcNow);
+            // Default to local dates so today's date is correct (user's local timezone = UTC+7)
+            var end = endDate ?? DateOnly.FromDateTime(DateTime.Now.Date);
             var start = startDate ?? end.AddDays(-30);
-            var startDateTime = DateTime.SpecifyKind(start.ToDateTime(TimeOnly.MinValue), DateTimeKind.Utc);
-            var endDateTime = DateTime.SpecifyKind(end.ToDateTime(TimeOnly.MaxValue), DateTimeKind.Utc);
+
+            // User inputs local dates, but DB stores TIMESTAMPTZ (UTC).
+            // Convert local date range to UTC for DB query:
+            // e.g. local date 2026-04-13 → UTC range [2026-04-12 17:00, 2026-04-13 16:59]
+            var zoneId = TimeZoneInfo.TryConvertIanaIdToWindowsId("Asia/Bangkok", out var windowsId)
+                ? windowsId
+                : "SE Asia Standard Time";
+            var tz = TimeZoneInfo.FindSystemTimeZoneById(zoneId);
+
+            DateTime ToUtcStart(DateOnly d) => TimeZoneInfo.ConvertTimeToUtc(d.ToDateTime(TimeOnly.MinValue), tz);
+            DateTime ToUtcEnd(DateOnly d) => TimeZoneInfo.ConvertTimeToUtc(d.ToDateTime(TimeOnly.MaxValue), tz);
+
+            var startDateTime = DateTime.SpecifyKind(ToUtcStart(start), DateTimeKind.Utc);
+            var endDateTime = DateTime.SpecifyKind(ToUtcEnd(end), DateTimeKind.Utc);
+
+            // Helper: convert UTC timestamp from DB → local DateOnly
+            DateOnly ToLocalDate(DateTime utcDt) => DateOnly.FromDateTime(TimeZoneInfo.ConvertTimeFromUtc(
+                DateTime.SpecifyKind(utcDt, DateTimeKind.Utc), tz));
 
             // Weight coefficients (same as contribution formula)
             var priorityWeight = new[] { 1.0, 1.5, 2.0 };   // Low, Medium, High
@@ -569,30 +586,50 @@ namespace StudioStudio_Server.Services
                 .ToDictionaryAsync(u => u.UserId, u => u.FullName);
 
             // Get tasks completed per member per day WITH priority/severity for weighted scoring
-            var tasksCompleted = await _context.Tasks
+            var rawTasks = await _context.Tasks
                 .Where(t => t.GroupId == groupId && t.CompletedAt >= startDateTime && t.CompletedAt <= endDateTime)
-                .Select(t => new { t.OwnerId, Date = DateOnly.FromDateTime(t.CompletedAt!.Value), t.Priority, t.Severity })
+                .Select(t => new { t.OwnerId, t.CompletedAt, t.Priority, t.Severity })
                 .ToListAsync();
+            var tasksCompleted = rawTasks
+                .Select(t => new { t.OwnerId, Date = ToLocalDate(t.CompletedAt!.Value), t.Priority, t.Severity })
+                .ToList();
 
             // Get messages sent per member per day
-            var messagesSent = await _context.GroupMessages
+            var rawMessages = await _context.GroupMessages
                 .Where(m => m.GroupId == groupId && m.CreatedAt >= startDateTime && m.CreatedAt <= endDateTime)
-                .Select(m => new { m.UserId, Date = DateOnly.FromDateTime(m.CreatedAt) })
+                .Select(m => new { m.UserId, m.CreatedAt })
                 .ToListAsync();
+            var messagesSent = rawMessages
+                .Select(m => new { m.UserId, Date = ToLocalDate(m.CreatedAt) })
+                .ToList();
 
             // Get comments posted per member per day
-            var commentsPosted = await _context.TaskComments
+            var rawComments = await _context.TaskComments
                 .Where(c => c.Task.GroupId == groupId && c.CreatedAt >= startDateTime && c.CreatedAt <= endDateTime)
-                .Select(c => new { c.UserId, Date = DateOnly.FromDateTime(c.CreatedAt) })
+                .Select(c => new { c.UserId, c.CreatedAt })
                 .ToListAsync();
+            var commentsPosted = rawComments
+                .Select(c => new { c.UserId, Date = ToLocalDate(c.CreatedAt) })
+                .ToList();
+
+            // Get task CRUD activities from ActivityLog (CREATE, UPDATE, DELETE)
+            var rawCrud = await _context.ActivityLogs
+                .Where(l => l.GroupId == groupId
+                    && (l.ActionType == ActivityActionTypes.TASK_CREATE
+                        || l.ActionType == ActivityActionTypes.TASK_UPDATE
+                        || l.ActionType == ActivityActionTypes.TASK_DELETE)
+                    && l.CreatedAt >= startDateTime && l.CreatedAt <= endDateTime)
+                .Select(l => new { l.UserId, l.ActionType, l.CreatedAt, l.TaskPriority, l.TaskSeverity })
+                .ToListAsync();
+            var taskCrudActivities = rawCrud
+                .Select(l => new { l.UserId, l.ActionType, Date = ToLocalDate(l.CreatedAt), l.TaskPriority, l.TaskSeverity })
+                .ToList();
 
             // Calculate activity level (0-4) per member per day with weighted scoring
-            // Formula: TASK_COMPLETE → 10×PW×SW (only COMPLETE is weighted)
-            //          Messages → +1 flat | Comments → +1 flat
+            // Formula: TASK_COMPLETE → 10×PW×SW | TASK_CREATE → 3 pts | TASK_UPDATE → 1 pt | TASK_DELETE → 1 pt | Messages → +1 | Comments → +1
             var allActivity = new Dictionary<(Guid userId, DateOnly date), int>();
 
-            // Tasks: only TASK_COMPLETE is weighted by Priority × Severity (10-40 pts per task)
-            // CREATE/UPDATE/DELETE are NOT included to prevent score inflation via spam
+            // Tasks COMPLETED: weighted by Priority × Severity (10-40 pts per task)
             foreach (var item in tasksCompleted)
             {
                 var pWeight = priorityWeight[Math.Min((int)item.Priority, 2)];
@@ -600,6 +637,16 @@ namespace StudioStudio_Server.Services
                 var weightedPoints = (int)(CompletePoints * pWeight * sWeight);
                 allActivity[(item.OwnerId, item.Date)] = allActivity.GetValueOrDefault((item.OwnerId, item.Date), 0) + weightedPoints;
             }
+
+            // Task CRUD from ActivityLog: flat points per action type
+            foreach (var item in taskCrudActivities)
+            {
+                var priority = item.TaskPriority ?? 0;
+                var severity = item.TaskSeverity ?? 0;
+                var points = (int)ActivityScoreHelper.GetScore(item.ActionType, priority, severity);
+                allActivity[(item.UserId, item.Date)] = allActivity.GetValueOrDefault((item.UserId, item.Date), 0) + points;
+            }
+
             // Messages: +1 point flat
             foreach (var item in messagesSent)
                 allActivity[(item.UserId, item.Date)] = allActivity.GetValueOrDefault((item.UserId, item.Date), 0) + 1;
@@ -628,7 +675,8 @@ namespace StudioStudio_Server.Services
                     activityPoints.Add(new DailyActivityPoint
                     {
                         Date = date,
-                        ActivityLevel = level
+                        ActivityLevel = level,
+                        ActivityCount = rawActivity
                     });
                 }
 

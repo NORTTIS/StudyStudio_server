@@ -250,21 +250,35 @@ namespace StudioStudio_Server.Repositories
         public async Task<Dictionary<Guid, Dictionary<DateOnly, int>>> GetMemberDailyCompletionsAsync(
             StudioDbContext context, Guid groupId, DateOnly startDate, DateOnly endDate)
         {
-            var startDateTime = startDate.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
-            var endDateTime = endDate.ToDateTime(TimeOnly.MaxValue, DateTimeKind.Utc);
+            // User inputs local dates, DB stores TIMESTAMPTZ (UTC).
+            // Convert local date range to UTC for DB query.
+            var zoneId = TimeZoneInfo.TryConvertIanaIdToWindowsId("Asia/Bangkok", out var windowsId)
+                ? windowsId
+                : "SE Asia Standard Time";
+            var tz = TimeZoneInfo.FindSystemTimeZoneById(zoneId);
 
-            var completedTasks = await context.Tasks
+            DateTime ToUtcStart(DateOnly d) => TimeZoneInfo.ConvertTimeToUtc(d.ToDateTime(TimeOnly.MinValue), tz);
+            DateTime ToUtcEnd(DateOnly d) => TimeZoneInfo.ConvertTimeToUtc(d.ToDateTime(TimeOnly.MaxValue), tz);
+
+            var startDateTime = DateTime.SpecifyKind(ToUtcStart(startDate), DateTimeKind.Utc);
+            var endDateTime = DateTime.SpecifyKind(ToUtcEnd(endDate), DateTimeKind.Utc);
+
+            // Helper: convert UTC timestamp from DB → local DateOnly
+            DateOnly ToLocalDate(DateTime utcDt) => DateOnly.FromDateTime(TimeZoneInfo.ConvertTimeFromUtc(
+                DateTime.SpecifyKind(utcDt, DateTimeKind.Utc), tz));
+
+            var rawCompleted = await context.Tasks
                 .AsNoTracking()
                 .Where(t => t.GroupId == groupId
                             && t.CompletedAt.HasValue
                             && t.CompletedAt >= startDateTime
                             && t.CompletedAt <= endDateTime)
-                .Select(t => new
-                {
-                    t.OwnerId,
-                    CompletedDate = DateOnly.FromDateTime(t.CompletedAt!.Value)
-                })
+                .Select(t => new { t.OwnerId, t.CompletedAt })
                 .ToListAsync();
+
+            var completedTasks = rawCompleted
+                .Select(t => new { t.OwnerId, CompletedDate = ToLocalDate(t.CompletedAt!.Value) })
+                .ToList();
 
             var result = completedTasks
                 .GroupBy(t => t.OwnerId)
