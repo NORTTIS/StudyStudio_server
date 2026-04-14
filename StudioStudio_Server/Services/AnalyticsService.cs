@@ -107,14 +107,62 @@ namespace StudioStudio_Server.Services
 
             // Query all time data (no date filter)
             var memberTaskBreakdown = await GetMemberTaskBreakdownAllTimeAsync(groupId);
+            var groupTaskBreakdown = await GetGroupTaskBreakdownAllTimeAsync(groupId);
             var memberActivitySummary = await GetMemberActivitySummaryAllTimeAsync(groupId);
             var memberContribution = await GetGroupMemberContributionAsync(groupId);
 
             return new GroupSummaryResponse
             {
                 MemberTaskBreakdown = memberTaskBreakdown,
+                GroupTaskBreakdown = groupTaskBreakdown,
                 MemberActivitySummary = memberActivitySummary,
                 MemberContribution = memberContribution
+            };
+        }
+
+        /// <summary>
+        /// Get unique task breakdown for entire group (not per-member) - for Team Chart
+        /// Counts each task only once regardless of how many assignees it has
+        /// </summary>
+        private async Task<GroupTaskBreakdownData> GetGroupTaskBreakdownAllTimeAsync(Guid groupId)
+        {
+            var tasks = await _context.Tasks
+                .AsNoTracking()
+                .Where(t => t.GroupId == groupId && !t.IsPendingDeleted)
+                .Select(t => new
+                {
+                    t.Progress,
+                    t.CompletedAt,
+                    t.DueDate
+                })
+                .ToListAsync();
+
+            var done = tasks.Count(t => t.Progress == 100 || t.CompletedAt != null);
+            var overdue = tasks.Count(t =>
+                t.DueDate.HasValue && t.DueDate.Value < DateTime.UtcNow && t.Progress < 100);
+            var inProgress = tasks.Count(t => t.Progress > 0 && t.Progress < 100);
+            var todo = tasks.Count(t => t.Progress == 0);
+            var inProgressOverdue = tasks.Count(t =>
+                t.Progress > 0 && t.Progress < 100 &&
+                t.DueDate.HasValue && t.DueDate.Value < DateTime.UtcNow);
+            var todoOverdue = tasks.Count(t =>
+                t.Progress == 0 &&
+                t.DueDate.HasValue && t.DueDate.Value < DateTime.UtcNow);
+
+            // Unique total — each task counted once (Venn overlaps excluded)
+            var todoOnly = todo - todoOverdue;
+            var inProgressOnly = inProgress - inProgressOverdue;
+            var totalTasks = todoOnly + inProgressOnly + done + overdue;
+
+            return new GroupTaskBreakdownData
+            {
+                TotalTasks = totalTasks,
+                TodoTasks = todo,
+                InProgressTasks = inProgress,
+                DoneTasks = done,
+                OverdueTasks = overdue,
+                InProgressOverdueTasks = inProgressOverdue,
+                TodoOverdueTasks = todoOverdue
             };
         }
 
@@ -152,7 +200,8 @@ namespace StudioStudio_Server.Services
 
             var result = memberUserIds.Select(userId =>
             {
-                var (done, inProgress, todo, overdue, total) = breakdown.GetValueOrDefault(userId, (0, 0, 0, 0, 0));
+                var (done, inProgress, todo, overdue, inProgressOverdue, todoOverdue, total) =
+                    breakdown.GetValueOrDefault(userId, (0, 0, 0, 0, 0, 0, 0));
                 var contributionCount = totalActivity > 0
                     ? Math.Round((double)(done + inProgress + todo + overdue) / totalActivity * 100, 2)
                     : 0;
@@ -169,6 +218,8 @@ namespace StudioStudio_Server.Services
                     InProgressTasks = inProgress,
                     TodoTasks = todo,
                     OverdueTasks = overdue,
+                    InProgressOverdueTasks = inProgressOverdue,
+                    TodoOverdueTasks = todoOverdue,
                     ContributionCountRate = contributionCount,
                     ContributionScoreRate = contributionScore,
                     MessagesSent = messagesSent.GetValueOrDefault(userId, 0)
@@ -396,7 +447,8 @@ namespace StudioStudio_Server.Services
 
             var result = memberUserIds.Select(userId =>
             {
-                var (done, inProgress, todo, overdue, total) = breakdown.GetValueOrDefault(userId, (0, 0, 0, 0, 0));
+                var (done, inProgress, todo, overdue, inProgressOverdue, todoOverdue, total) =
+                    breakdown.GetValueOrDefault(userId, (0, 0, 0, 0, 0, 0, 0));
                 var contributionCount = totalActivity > 0
                     ? Math.Round((double)(done + inProgress + todo + overdue) / totalActivity * 100, 2)
                     : 0;
@@ -410,6 +462,8 @@ namespace StudioStudio_Server.Services
                     InProgressTasks = inProgress,
                     TodoTasks = todo,
                     OverdueTasks = overdue,
+                    InProgressOverdueTasks = inProgressOverdue,
+                    TodoOverdueTasks = todoOverdue,
                     ContributionCountRate = contributionCount,
                     MessagesSent = messagesSent.GetValueOrDefault(userId, 0)
                 };
@@ -423,26 +477,46 @@ namespace StudioStudio_Server.Services
         /// Powers Chart 3 (Line Chart)
         /// </summary>
         public async Task<List<MemberProgressTrendData>> GetMemberProgressTrendAsync(
-            Guid groupId, DateOnly? startDate = null, DateOnly? endDate = null)
+            Guid groupId,
+            DateOnly? startDate = null,
+            DateOnly? endDate = null,
+            List<Guid>? memberIds = null)
         {
-            var end = endDate ?? DateOnly.FromDateTime(DateTime.UtcNow);
-            var start = startDate ?? end.AddDays(-30);
+            // Resolve end date: use provided value, or default to UTC today
+            DateOnly end, start;
+            if (endDate.HasValue)
+            {
+                end = endDate.Value;
+                start = startDate ?? end.AddDays(-30);
+            }
+            else
+            {
+                // Use UtcNow.Date directly — avoids server timezone shift from DateOnly.FromDateTime(...)
+                var utcDate = DateTime.UtcNow.Date;
+                end = DateOnly.FromDateTime(utcDate);
+                start = end.AddDays(-30);
+            }
 
-            // Get all group members with names
-            var memberUserIds = await _context.GroupParticipants
+            // Get all group member IDs
+            var allMemberIds = await _context.GroupParticipants
                 .Where(p => p.GroupId == groupId)
                 .Select(p => p.UserId)
                 .ToListAsync();
 
+            // Filter to requested members if provided; otherwise return all
+            var targetMemberIds = memberIds?.Any() == true
+                ? allMemberIds.Intersect(memberIds).ToList()
+                : allMemberIds;
+
             var users = await _context.Users
-                .Where(u => memberUserIds.Contains(u.UserId))
+                .Where(u => targetMemberIds.Contains(u.UserId))
                 .Select(u => new { u.UserId, FullName = u.FirstName + " " + u.LastName })
                 .ToDictionaryAsync(u => u.UserId, u => u.FullName);
 
             // Get daily completions per member
             var dailyCompletions = await _analyticsRepository.GetMemberDailyCompletionsAsync(groupId, start, end);
 
-            return memberUserIds.Select(userId =>
+            return targetMemberIds.Select(userId =>
             {
                 var memberDaily = dailyCompletions.GetValueOrDefault(userId, new Dictionary<DateOnly, int>());
 

@@ -26,9 +26,9 @@ namespace StudioStudio_Server.Repositories.Interfaces
         /// <summary>
         /// Get task status counts (done, in-progress, todo, overdue) per member in a group within date range
         /// </summary>
-        Task<Dictionary<Guid, (int Done, int InProgress, int Todo, int Overdue, int Total)>> GetMemberTaskStatusBreakdownAsync(
+        Task<Dictionary<Guid, (int Done, int InProgress, int Todo, int Overdue, int InProgressOverdue, int TodoOverdue, int Total)>> GetMemberTaskStatusBreakdownAsync(
             Guid groupId, DateTime from, DateTime to);
-        Task<Dictionary<Guid, (int Done, int InProgress, int Todo, int Overdue, int Total)>> GetMemberTaskStatusBreakdownAsync(
+        Task<Dictionary<Guid, (int Done, int InProgress, int Todo, int Overdue, int InProgressOverdue, int TodoOverdue, int Total)>> GetMemberTaskStatusBreakdownAsync(
             StudioDbContext context, Guid groupId, DateTime from, DateTime to);
 
         /// <summary>
@@ -48,7 +48,7 @@ namespace StudioStudio_Server.Repositories.Interfaces
         /// <summary>
         /// Get task status counts per member WITHOUT date filter (all time) - for summary endpoint
         /// </summary>
-        Task<Dictionary<Guid, (int Done, int InProgress, int Todo, int Overdue, int Total)>> GetMemberTaskStatusBreakdownAllTimeAsync(Guid groupId);
+        Task<Dictionary<Guid, (int Done, int InProgress, int Todo, int Overdue, int InProgressOverdue, int TodoOverdue, int Total)>> GetMemberTaskStatusBreakdownAllTimeAsync(Guid groupId);
 
         // ==================== PERSONAL ANALYTICS ====================
 

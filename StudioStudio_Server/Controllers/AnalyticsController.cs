@@ -70,20 +70,21 @@ namespace StudioStudio_Server.Controllers
         }
 
         /// <summary>
-        /// Get member progress trend with date filter
+        /// Get member progress trend with date filter and optional member filter
         /// </summary>
         [HttpGet("group/{groupId}/trend")]
         public async Task<ActionResult<ApiResponse<List<MemberProgressTrendData>>>> GetMemberProgressTrend(
             Guid groupId,
             [FromQuery] DateTime? startDate = null,
-            [FromQuery] DateTime? endDate = null)
+            [FromQuery] DateTime? endDate = null,
+            [FromQuery] List<Guid>? memberIds = null)
         {
             var userId = ValidateAndGetUserId();
 
             DateOnly? start = startDate.HasValue ? DateOnly.FromDateTime(startDate.Value) : null;
             DateOnly? end = endDate.HasValue ? DateOnly.FromDateTime(endDate.Value) : null;
 
-            var result = await _analyticsService.GetMemberProgressTrendAsync(groupId, start, end);
+            var result = await _analyticsService.GetMemberProgressTrendAsync(groupId, start, end, memberIds);
 
             return Ok(ApiResponse<List<MemberProgressTrendData>>.Success(
                 ErrorCodes.SuccessGetData,

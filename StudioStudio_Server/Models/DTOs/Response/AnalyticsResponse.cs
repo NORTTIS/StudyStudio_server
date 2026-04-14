@@ -101,6 +101,9 @@ namespace StudioStudio_Server.Models.DTOs.Response
         public int InProgressTasks { get; set; }
         public int TodoTasks { get; set; }
         public int OverdueTasks { get; set; }
+        // Intersection counts for Venn diagram
+        public int InProgressOverdueTasks { get; set; }  // InProgress ∩ Overdue
+        public int TodoOverdueTasks { get; set; }        // Todo ∩ Overdue
         // Percentage of this member's task count vs. group total task count (count-based)
         public double ContributionCountRate { get; set; }
         // Percentage of this member's weighted score vs. group total weighted score (score-based)

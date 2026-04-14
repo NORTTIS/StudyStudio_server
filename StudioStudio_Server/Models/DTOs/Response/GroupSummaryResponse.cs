@@ -8,9 +8,14 @@ namespace StudioStudio_Server.Models.DTOs.Response
     {
         /// <summary>
         /// Task status breakdown per member (done, in-progress, todo, overdue)
-        /// Dùng cho: Chart 1 (Personal Donut), Chart 2 (Group Donut), Chart 4 (Bar Chart)
+        /// Dùng cho: Chart 1 (Personal Donut), Chart 4 (Bar Chart)
         /// </summary>
         public List<MemberTaskBreakdownData> MemberTaskBreakdown { get; set; } = new();
+
+        /// <summary>
+        /// Unique task breakdown for entire group (for Team Chart)
+        /// </summary>
+        public GroupTaskBreakdownData? GroupTaskBreakdown { get; set; }
 
         /// <summary>
         /// Member activity summary với last activity timestamp
@@ -23,5 +28,22 @@ namespace StudioStudio_Server.Models.DTOs.Response
         /// Dùng cho: Layer chi tiết khi click vào member
         /// </summary>
         public List<MemberContributionData> MemberContribution { get; set; } = new();
+    }
+
+    /// <summary>
+    /// Unique task breakdown for entire group (for Team Chart)
+    /// </summary>
+    public class GroupTaskBreakdownData
+    {
+        /// <summary>
+        /// Unique total count — each task counted once (Venn overlaps excluded)
+        /// </summary>
+        public int TotalTasks { get; set; }
+        public int TodoTasks { get; set; }
+        public int InProgressTasks { get; set; }
+        public int DoneTasks { get; set; }
+        public int OverdueTasks { get; set; }
+        public int InProgressOverdueTasks { get; set; }
+        public int TodoOverdueTasks { get; set; }
     }
 }

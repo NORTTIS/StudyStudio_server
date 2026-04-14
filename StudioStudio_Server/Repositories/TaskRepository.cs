@@ -640,7 +640,7 @@ namespace StudioStudio_Server.Repositories
                 {
                     "completed" => query.Where(t => t.Progress >= 100),
                     "inprogress" => query.Where(t => t.Progress > 0 && t.Progress < 100),
-                    "notstarted" => query.Where(t => t.Progress <= 0),
+                    "notstarted" => query.Where(t => t.Progress == 0),
                     _ => query
                 };
             }
@@ -680,12 +680,12 @@ namespace StudioStudio_Server.Repositories
                     (t.DueDate.HasValue && t.DueDate.Value >= from && t.DueDate.Value <= to));
             }
 
-            // Apply overdue filter (DueDate < today AND Progress < 100)
+            // Apply overdue filter (DueDate < UtcNow AND Progress < 100)
             if (overdue == true)
             {
-                var today = DateTime.UtcNow.Date;
+                var now = DateTime.UtcNow;
                 query = query.Where(t => t.DueDate.HasValue
-                    && t.DueDate.Value.Date < today
+                    && t.DueDate.Value < now
                     && t.Progress < 100);
             }
 

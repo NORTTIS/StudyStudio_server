@@ -13,7 +13,7 @@ namespace StudioStudio_Server.Services.Interfaces
 
         // Group Analytics Enhanced (for GroupAnalyticPage)
         Task<List<MemberTaskBreakdownData>> GetMemberTaskBreakdownAsync(Guid groupId, DateOnly? startDate, DateOnly? endDate);
-        Task<List<MemberProgressTrendData>> GetMemberProgressTrendAsync(Guid groupId, DateOnly? startDate, DateOnly? endDate);
+        Task<List<MemberProgressTrendData>> GetMemberProgressTrendAsync(Guid groupId, DateOnly? startDate, DateOnly? endDate, List<Guid>? memberIds = null);
         Task<List<MemberHeatmapData>> GetMemberHeatmapAsync(Guid groupId, DateOnly? startDate, DateOnly? endDate);
         Task<List<MemberActivitySummary>> GetMemberActivitySummaryAsync(Guid groupId, DateOnly? startDate, DateOnly? endDate);
 

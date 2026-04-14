@@ -167,43 +167,75 @@ namespace StudioStudio_Server.Repositories
         /// Todo: Progress == 0 AND (no due date OR due date >= now)
         /// Overdue: DueDate < now AND Progress < 100
         /// </summary>
-        public async Task<Dictionary<Guid, (int Done, int InProgress, int Todo, int Overdue, int Total)>> GetMemberTaskStatusBreakdownAsync(
+        public async Task<Dictionary<Guid, (int Done, int InProgress, int Todo, int Overdue, int InProgressOverdue, int TodoOverdue, int Total)>> GetMemberTaskStatusBreakdownAsync(
             Guid groupId, DateTime from, DateTime to)
         {
             return await GetMemberTaskStatusBreakdownAsync(_context, groupId, from, to);
         }
 
-        public async Task<Dictionary<Guid, (int Done, int InProgress, int Todo, int Overdue, int Total)>> GetMemberTaskStatusBreakdownAsync(
+        public async Task<Dictionary<Guid, (int Done, int InProgress, int Todo, int Overdue, int InProgressOverdue, int TodoOverdue, int Total)>> GetMemberTaskStatusBreakdownAsync(
             StudioDbContext context, Guid groupId, DateTime from, DateTime to)
         {
+            // Get all tasks in the group
             var tasks = await context.Tasks
                 .AsNoTracking()
                 .Where(t => t.GroupId == groupId && t.CreatedAt >= from && t.CreatedAt <= to)
                 .Select(t => new
                 {
-                    t.OwnerId,
+                    t.TaskId,
                     t.Progress,
                     t.CompletedAt,
                     t.DueDate,
-                    IsDone = t.Progress == 100 || t.CompletedAt != null,
-                    IsOverdue = t.DueDate.HasValue && t.DueDate.Value < DateTime.UtcNow && t.Progress < 100,
-                    IsInProgress = t.Progress > 0 && t.Progress < 100 && (!t.DueDate.HasValue || t.DueDate.Value >= DateTime.UtcNow)
+                    OwnerId = t.OwnerId
                 })
                 .ToListAsync();
 
-            return tasks
-                .GroupBy(t => t.OwnerId)
-                .ToDictionary(
-                    g => g.Key,
-                    g =>
-                    {
-                        var done = g.Count(t => t.IsDone);
-                        var overdue = g.Count(t => t.IsOverdue);
-                        var inProgress = g.Count(t => t.IsInProgress && !t.IsDone && !t.IsOverdue);
-                        var todo = g.Count(t => !t.IsDone && !t.IsInProgress && !t.IsOverdue);
-                        var total = g.Count();
-                        return (done, inProgress, todo, overdue, total);
-                    });
+            // Get all task assignments for tasks in this group
+            var taskIds = tasks.Select(t => t.TaskId).ToList();
+            var assignments = await context.TaskAssignments
+                .AsNoTracking()
+                .Where(a => taskIds.Contains(a.TaskId))
+                .Select(a => new { a.TaskId, a.AssignedTo })
+                .ToListAsync();
+
+            // Create lookup: TaskId -> List of AssigneeIds
+            var assigneeLookup = assignments
+                .GroupBy(a => a.TaskId)
+                .ToDictionary(g => g.Key, g => g.Select(a => a.AssignedTo).ToList());
+
+            // Get all members in the group
+            var memberIds = await context.GroupParticipants
+                .Where(p => p.GroupId == groupId)
+                .Select(p => p.UserId)
+                .ToListAsync();
+
+            // For each member, count tasks where they are assigned OR they are the owner
+            var result = new Dictionary<Guid, (int Done, int InProgress, int Todo, int Overdue, int InProgressOverdue, int TodoOverdue, int Total)>();
+
+            foreach (var memberId in memberIds)
+            {
+                var memberTasks = tasks
+                    .Where(t => assigneeLookup.TryGetValue(t.TaskId, out var assignees) && assignees.Contains(memberId))
+                    .ToList();
+
+                var done = memberTasks.Count(t => t.Progress == 100 || t.CompletedAt != null);
+                var overdue = memberTasks.Count(t =>
+                    t.DueDate.HasValue && t.DueDate.Value < DateTime.UtcNow && t.Progress < 100);
+                var inProgress = memberTasks.Count(t => t.Progress > 0 && t.Progress < 100);
+                var todo = memberTasks.Count(t => t.Progress == 0);
+                // Intersection counts for Venn diagram
+                var inProgressOverdue = memberTasks.Count(t =>
+                    t.Progress > 0 && t.Progress < 100 &&
+                    t.DueDate.HasValue && t.DueDate.Value < DateTime.UtcNow);
+                var todoOverdue = memberTasks.Count(t =>
+                    t.Progress == 0 &&
+                    t.DueDate.HasValue && t.DueDate.Value < DateTime.UtcNow);
+                var total = memberTasks.Count;
+
+                result[memberId] = (done, inProgress, todo, overdue, inProgressOverdue, todoOverdue, total);
+            }
+
+            return result;
         }
 
         /// <summary>
@@ -218,8 +250,8 @@ namespace StudioStudio_Server.Repositories
         public async Task<Dictionary<Guid, Dictionary<DateOnly, int>>> GetMemberDailyCompletionsAsync(
             StudioDbContext context, Guid groupId, DateOnly startDate, DateOnly endDate)
         {
-            var startDateTime = DateTime.SpecifyKind(startDate.ToDateTime(TimeOnly.MinValue), DateTimeKind.Utc);
-            var endDateTime = DateTime.SpecifyKind(endDate.ToDateTime(TimeOnly.MaxValue), DateTimeKind.Utc);
+            var startDateTime = startDate.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
+            var endDateTime = endDate.ToDateTime(TimeOnly.MaxValue, DateTimeKind.Utc);
 
             var completedTasks = await context.Tasks
                 .AsNoTracking()
@@ -316,37 +348,70 @@ namespace StudioStudio_Server.Repositories
 
         /// <summary>
         /// Get task status counts per member WITHOUT date filter (all time) - for summary endpoint
+        /// Counts tasks where user is assigned OR is the owner
         /// </summary>
-        public async Task<Dictionary<Guid, (int Done, int InProgress, int Todo, int Overdue, int Total)>> GetMemberTaskStatusBreakdownAllTimeAsync(Guid groupId)
+        public async Task<Dictionary<Guid, (int Done, int InProgress, int Todo, int Overdue, int InProgressOverdue, int TodoOverdue, int Total)>> GetMemberTaskStatusBreakdownAllTimeAsync(Guid groupId)
         {
+            // Get all tasks in the group
             var tasks = await _context.Tasks
                 .AsNoTracking()
                 .Where(t => t.GroupId == groupId)
                 .Select(t => new
                 {
-                    t.OwnerId,
+                    t.TaskId,
                     t.Progress,
                     t.CompletedAt,
                     t.DueDate,
-                    IsDone = t.Progress == 100 || t.CompletedAt != null,
-                    IsOverdue = t.DueDate.HasValue && t.DueDate.Value < DateTime.UtcNow && t.Progress < 100,
-                    IsInProgress = t.Progress > 0 && t.Progress < 100 && (!t.DueDate.HasValue || t.DueDate.Value >= DateTime.UtcNow)
+                    OwnerId = t.OwnerId
                 })
                 .ToListAsync();
 
-            return tasks
-                .GroupBy(t => t.OwnerId)
-                .ToDictionary(
-                    g => g.Key,
-                    g =>
-                    {
-                        var done = g.Count(t => t.IsDone);
-                        var overdue = g.Count(t => t.IsOverdue);
-                        var inProgress = g.Count(t => t.IsInProgress && !t.IsDone && !t.IsOverdue);
-                        var todo = g.Count(t => !t.IsDone && !t.IsInProgress && !t.IsOverdue);
-                        var total = g.Count();
-                        return (done, inProgress, todo, overdue, total);
-                    });
+            // Get all task assignments for tasks in this group
+            var taskIds = tasks.Select(t => t.TaskId).ToList();
+            var assignments = await _context.TaskAssignments
+                .AsNoTracking()
+                .Where(a => taskIds.Contains(a.TaskId))
+                .Select(a => new { a.TaskId, a.AssignedTo })
+                .ToListAsync();
+
+            // Create a lookup: TaskId -> List of AssigneeIds
+            var assigneeLookup = assignments
+                .GroupBy(a => a.TaskId)
+                .ToDictionary(g => g.Key, g => g.Select(a => a.AssignedTo).ToList());
+
+            // Get all members in the group
+            var memberIds = await _context.GroupParticipants
+                .Where(p => p.GroupId == groupId)
+                .Select(p => p.UserId)
+                .ToListAsync();
+
+            // For each member, count tasks where they are assigned OR they are the owner
+            var result = new Dictionary<Guid, (int Done, int InProgress, int Todo, int Overdue, int InProgressOverdue, int TodoOverdue, int Total)>();
+
+            foreach (var memberId in memberIds)
+            {
+                var memberTasks = tasks
+                    .Where(t => assigneeLookup.TryGetValue(t.TaskId, out var assignees) && assignees.Contains(memberId))
+                    .ToList();
+
+                var done = memberTasks.Count(t => t.Progress == 100 || t.CompletedAt != null);
+                var overdue = memberTasks.Count(t =>
+                    t.DueDate.HasValue && t.DueDate.Value < DateTime.UtcNow && t.Progress < 100);
+                var inProgress = memberTasks.Count(t => t.Progress > 0 && t.Progress < 100);
+                var todo = memberTasks.Count(t => t.Progress == 0);
+                // Intersection counts for Venn diagram
+                var inProgressOverdue = memberTasks.Count(t =>
+                    t.Progress > 0 && t.Progress < 100 &&
+                    t.DueDate.HasValue && t.DueDate.Value < DateTime.UtcNow);
+                var todoOverdue = memberTasks.Count(t =>
+                    t.Progress == 0 &&
+                    t.DueDate.HasValue && t.DueDate.Value < DateTime.UtcNow);
+                var total = memberTasks.Count;
+
+                result[memberId] = (done, inProgress, todo, overdue, inProgressOverdue, todoOverdue, total);
+            }
+
+            return result;
         }
 
         // ==================== PERSONAL ANALYTICS ====================
