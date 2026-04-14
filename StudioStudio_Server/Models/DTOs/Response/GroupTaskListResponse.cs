@@ -32,6 +32,8 @@ namespace StudioStudio_Server.Models.DTOs.Response
         public int Progress { get; set; }
         public DateTime? StartDate { get; set; }
         public DateTime? DueDate { get; set; }
+        public DateTime? CompletedAt { get; set; }
+        public int Position { get; set; }
         public DateTime CreatedAt { get; set; }
         public List<UserDto> Assignees { get; set; } = new();
         public UserDto CreatedBy { get; set; } = new UserDto();

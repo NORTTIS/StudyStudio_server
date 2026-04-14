@@ -1208,6 +1208,8 @@ namespace StudioStudio_Server.Services
                 Progress = t.Progress,
                 StartDate = t.StartDate,
                 DueDate = t.DueDate,
+                CompletedAt = t.CompletedAt,
+                Position = t.Position,
                 CreatedAt = t.CreatedAt,
                 Assignees = taskAssigneesDict.TryGetValue(t.TaskId, out var assignees)
                     ? assignees
