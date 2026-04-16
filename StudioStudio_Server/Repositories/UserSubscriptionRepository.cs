@@ -38,8 +38,6 @@ namespace StudioStudio_Server.Repositories
                 .Select(us => us.Plan)
                 .AsNoTracking()
                 .FirstOrDefaultAsync();
-            Console.WriteLine($"User {userId} active subscription: {activePlan?.ToString() ?? "None"}");
-
             // If user has active subscription, return it
             if (activePlan != null)
             {
@@ -51,8 +49,6 @@ namespace StudioStudio_Server.Repositories
                 .Where(sp => sp.BillingCycle == BillingCycle.Free && sp.IsActive)
                 .AsNoTracking()
                 .FirstOrDefaultAsync();
-            Console.WriteLine($"User {userId} has no active subscription, returning Free Plan: {freePlan?.ToString() ?? "None"}");
-
             return freePlan;
         }
 

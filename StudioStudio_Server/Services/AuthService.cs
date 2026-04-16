@@ -298,11 +298,7 @@ namespace StudioStudio_Server.Services
             await _refreshTokenRepository.RevokeAsync(token);
 
             // ✅ CLEANUP: Delete all expired/revoked tokens for this user
-            var deletedCount = await _refreshTokenRepository.CleanupUserTokensAsync(token.UserId);
-            if (deletedCount > 0)
-            {
-                Console.WriteLine($"Cleaned up {deletedCount} expired/revoked refresh tokens for user {token.UserId}");
-            }
+            await _refreshTokenRepository.CleanupUserTokensAsync(token.UserId);
 
             var user = await _userRepository.GetByIdAsync(token.UserId);
             if (user == null)
@@ -355,11 +351,7 @@ namespace StudioStudio_Server.Services
                 await _refreshTokenRepository.RevokeAsync(token);
 
                 // ✅ CLEANUP: Delete all expired/revoked tokens for this user
-                var deletedCount = await _refreshTokenRepository.CleanupUserTokensAsync(token.UserId);
-                if (deletedCount > 0)
-                {
-                    Console.WriteLine($"Cleaned up {deletedCount} expired/revoked refresh tokens for user {token.UserId}");
-                }
+                await _refreshTokenRepository.CleanupUserTokensAsync(token.UserId);
             }
 
             response.Cookies.Delete("refreshToken", new CookieOptions
@@ -465,9 +457,8 @@ namespace StudioStudio_Server.Services
                     AvatarUrl = user.AvatarUrl
                 };
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                Console.WriteLine(ex.ToString());
                 throw new AppException(ErrorCodes.AuthInvalidCredential, StatusCodes.Status401Unauthorized);
             }
         }
@@ -566,11 +557,7 @@ namespace StudioStudio_Server.Services
             await _userRepository.UpdateAsync(user);
             await _resetCache.InvalidateResetTokenAsync(resetData.Email);
 
-            var revokedCount = await _refreshTokenRepository.RevokeAllUserTokensAsync(user.UserId);
-            if (revokedCount > 0)
-            {
-                Console.WriteLine($"Revoked {revokedCount} active refresh tokens for user {user.UserId} after password reset");
-            }
+            await _refreshTokenRepository.RevokeAllUserTokensAsync(user.UserId);
         }
 
         /// <summary>

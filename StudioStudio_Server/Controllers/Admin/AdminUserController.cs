@@ -88,7 +88,6 @@ namespace StudioStudio_Server.Controllers.Admin
                     ErrorCodes.UserInvalidStatus,
                     StatusCodes.Status400BadRequest);
             }
-            Console.WriteLine("Updating user status: " + id + " to " + status);
             await _adminUserService.UpdateUserStatusAsync(id, status);
 
             var message = _messageService.GetMessage(ErrorCodes.SuccessUpdateData);

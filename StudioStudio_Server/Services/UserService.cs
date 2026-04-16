@@ -333,8 +333,6 @@ namespace StudioStudio_Server.Services
             );
 
             int dailyLimit = subscriptionPlan?.MaxAiRequestsPerDay ?? 20; // Default: Free Plan = 20
-            Console.WriteLine($"User {userId} has used {usedToday}/{dailyLimit} AI requests today.");
-            Console.WriteLine($"Subscription Plan: {subscriptionPlan?.PlanName ?? "Free Plan"}, Max AI Requests/Day: {dailyLimit}");
 
             return (usedToday, dailyLimit);
         }

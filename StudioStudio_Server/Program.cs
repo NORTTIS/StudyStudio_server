@@ -74,14 +74,12 @@ if (cacheProvider.Equals("Redis", StringComparison.OrdinalIgnoreCase))
 {
     // Redis Cache for Production (using existing IConnectionMultiplexer)
     builder.Services.AddScoped<ICacheService, RedisCacheService>();
-    Console.WriteLine("? Using Redis Distributed Cache (StackExchange.Redis)");
 }
 else
 {
     // Memory Cache for Development
     builder.Services.AddMemoryCache();
     builder.Services.AddScoped<ICacheService, CacheService>();
-    Console.WriteLine("? Using In-Memory Cache");
 }
 
 builder.Services.AddScoped<IMessageService, MessageService>();
