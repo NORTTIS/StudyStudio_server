@@ -773,19 +773,7 @@ namespace StudioStudio_Server.Tests.Services
 
         #region SoftDeleteTaskAsync
 
-        [Fact]
-        public async Task SoftDeleteTaskAsync_MemberRole_ThrowsForbidden()
-        {
-            // Arrange
-            _participantRepoMock.Setup(x => x.GetGroupRoleByUserIdAsync(_userId, _groupId))
-                .ReturnsAsync(GroupRole.Member);
-
-            // Act & Assert
-            var ex = await Assert.ThrowsAsync<AppException>(() =>
-                _service.SoftDeleteTaskAsync(_userId, _groupId, _taskId));
-            Assert.Equal(ErrorCodes.GroupDeleteTaskDenined, ex.Code);
-        }
-
+       
         [Fact]
         public async Task SoftDeleteTaskAsync_ViewerRole_ThrowsForbidden()
         {

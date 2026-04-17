@@ -391,41 +391,31 @@ namespace StudioStudio_Server.Services
 
                 var user = await _userRepository.GetByEmailAsync(email);
 
-                // Hash random password (used when creating new user via Google OAuth)
-                var tempPassword = Guid.NewGuid().ToString();
-                var passwordHash = user != null
-                    ? _passwordHasher.HashPassword(user, tempPassword)
-                    : null;
-
+            
                 if (user == null)
                 {
+                    var tempPassword = Guid.NewGuid().ToString();
+                    var passwordHash = _passwordHasher.HashPassword(null!, tempPassword);
                     user = new User
                     {
                         UserId = Guid.NewGuid(),
                         Email = email,
-                        PasswordHash = passwordHash!,
+                        PasswordHash = passwordHash,
                         GoogleId = googleId,
                         FirstName = firstName,
                         LastName = lastName,
                         AvatarUrl = imgURL,
                         Status = UserStatus.Active,
-                        IsVerify = false
+                        IsVerify = true
                     };
 
                     await _userRepository.AddAsync(user);
                 }
                 else
                 {
-                    if (user.Status == UserStatus.Deleted)
-                    {
-                        throw new AppException(ErrorCodes.UserAccountAlreadyDeleted, StatusCodes.Status400BadRequest);
-                    }
 
                     user.GoogleId ??= googleId;
-                    user.FirstName ??= firstName;
-                    user.LastName ??= lastName;
                     user.AvatarUrl ??= imgURL;
-                    user.Status = UserStatus.Active;
 
                     await _userRepository.UpdateAsync(user);
                 }

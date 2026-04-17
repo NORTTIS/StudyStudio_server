@@ -542,7 +542,7 @@ namespace StudioStudio_Server.Services
         public async Task SoftDeleteTaskAsync(Guid userId, Guid groupId, Guid taskId)
         {
             var userRole = await _participantRepository.GetGroupRoleByUserIdAsync(userId, groupId);
-            if (!userRole.Equals(GroupRole.Owner) && !userRole.Equals(GroupRole.Moderator))
+            if (!userRole.Equals(GroupRole.Owner) && !userRole.Equals(GroupRole.Moderator) && !userRole.Equals(GroupRole.Member))
             {
                 throw new AppException(ErrorCodes.GroupDeleteTaskDenined, StatusCodes.Status403Forbidden);
             }
