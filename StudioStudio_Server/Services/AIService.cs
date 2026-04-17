@@ -15,36 +15,24 @@ namespace StudioStudio_Server.Services
     /// Hybrid RAG = Document Context + Task Statistics
     /// LLM: Gemini 2.5 Flash (primary) with fallback to Gemini 2.5 Pro
     /// </summary>
-    public class AIService : IAIService
+    public class AIService(
+        IGroupParticipantRepository groupParticipantRepository,
+        IEmbeddingService embeddingService,
+        IVectorDatabaseService vectorDbService,
+        ITaskRepository taskRepository,
+        ILLMService llmService,
+        IUserSubscriptionRepository userSubscriptionRepository,
+        IAIRequestLogRepository aiRequestLogRepository,
+        ILogger<AIService> logger) : IAIService
     {
-        private readonly IGroupParticipantRepository _groupParticipantRepository;
-        private readonly IEmbeddingService _embeddingService;
-        private readonly IVectorDatabaseService _vectorDbService;
-        private readonly ITaskRepository _taskRepository;
-        private readonly ILLMService _llmService;
-        private readonly IUserSubscriptionRepository _userSubscriptionRepository;
-        private readonly IAIRequestLogRepository _aiRequestLogRepository;
-        private readonly ILogger<AIService> _logger;
-
-        public AIService(
-            IGroupParticipantRepository groupParticipantRepository,
-            IEmbeddingService embeddingService,
-            IVectorDatabaseService vectorDbService,
-            ITaskRepository taskRepository,
-            ILLMService llmService,
-            IUserSubscriptionRepository userSubscriptionRepository,
-            IAIRequestLogRepository aiRequestLogRepository,
-            ILogger<AIService> logger)
-        {
-            _groupParticipantRepository = groupParticipantRepository;
-            _embeddingService = embeddingService;
-            _vectorDbService = vectorDbService;
-            _taskRepository = taskRepository;
-            _llmService = llmService;
-            _userSubscriptionRepository = userSubscriptionRepository;
-            _aiRequestLogRepository = aiRequestLogRepository;
-            _logger = logger;
-        }
+        private readonly IGroupParticipantRepository _groupParticipantRepository = groupParticipantRepository;
+        private readonly IEmbeddingService _embeddingService = embeddingService;
+        private readonly IVectorDatabaseService _vectorDbService = vectorDbService;
+        private readonly ITaskRepository _taskRepository = taskRepository;
+        private readonly ILLMService _llmService = llmService;
+        private readonly IUserSubscriptionRepository _userSubscriptionRepository = userSubscriptionRepository;
+        private readonly IAIRequestLogRepository _aiRequestLogRepository = aiRequestLogRepository;
+        private readonly ILogger<AIService> _logger = logger;
 
         /// <summary>
         /// Process user question with Hybrid RAG approach

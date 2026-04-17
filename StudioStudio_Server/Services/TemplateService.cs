@@ -9,27 +9,18 @@ using StudioStudio_Server.Services.Interfaces;
 
 namespace StudioStudio_Server.Services
 {
-    public class TemplateService : ITemplateService
+    public class TemplateService(
+        ITemplateRepository templateRepository,
+        IGroupRepository groupRepository,
+        IGroupTaskStatusRepository groupTaskStatusRepository,
+        IGroupParticipantRepository groupParticipantRepository,
+        StudioDbContext context) : ITemplateService
     {
-        private readonly ITemplateRepository _templateRepository;
-        private readonly IGroupRepository _groupRepository;
-        private readonly IGroupTaskStatusRepository _groupTaskStatusRepository;
-        private readonly IGroupParticipantRepository _groupParticipantRepository;
-        private readonly StudioDbContext _context;
-
-        public TemplateService(
-            ITemplateRepository templateRepository,
-            IGroupRepository groupRepository,
-            IGroupTaskStatusRepository groupTaskStatusRepository,
-            IGroupParticipantRepository groupParticipantRepository,
-            StudioDbContext context)
-        {
-            _templateRepository = templateRepository;
-            _groupRepository = groupRepository;
-            _groupTaskStatusRepository = groupTaskStatusRepository;
-            _groupParticipantRepository = groupParticipantRepository;
-            _context = context;
-        }
+        private readonly ITemplateRepository _templateRepository = templateRepository;
+        private readonly IGroupRepository _groupRepository = groupRepository;
+        private readonly IGroupTaskStatusRepository _groupTaskStatusRepository = groupTaskStatusRepository;
+        private readonly IGroupParticipantRepository _groupParticipantRepository = groupParticipantRepository;
+        private readonly StudioDbContext _context = context;
 
         public async Task<TemplateResponse> CreateTemplateAsync(Guid userId, CreateTemplateRequest request)
         {

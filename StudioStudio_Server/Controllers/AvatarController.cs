@@ -11,15 +11,8 @@ namespace StudioStudio_Server.Controllers
     [ApiController]
     [Route("api/avatar")]
     [Authorize]
-    public class AvatarController : ControllerBase
+    public class AvatarController(IAvatarService avatarService) : ControllerBase
     {
-        private readonly IAvatarService _avatarService;
-
-        public AvatarController(IAvatarService avatarService)
-        {
-            _avatarService = avatarService;
-        }
-
         private Guid GetUserId()
         {
             var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
@@ -37,11 +30,11 @@ namespace StudioStudio_Server.Controllers
         [HttpPost("group/{groupId}/request-upload")]
         public async Task<IActionResult> RequestGroupAvatarUpload(
             Guid groupId,
-            [FromBody] RequestAvatarUploadRequest request,
-            CancellationToken cancellationToken)
+            [FromBody] RequestAvatarUploadRequest request
+            )
         {
             var userId = GetUserId();
-            var result = await _avatarService.RequestGroupAvatarUploadAsync(userId, groupId, request);
+            var result = await avatarService.RequestGroupAvatarUploadAsync(userId, groupId, request);
             return Ok(ApiResponse<AvatarUploadResponse>.Success(
                 ErrorCodes.SuccessGetData,
                 "Presigned upload URL generated successfully",
@@ -55,11 +48,11 @@ namespace StudioStudio_Server.Controllers
         [HttpPost("studio/{studioId}/request-upload")]
         public async Task<IActionResult> RequestStudioAvatarUpload(
             Guid studioId,
-            [FromBody] RequestAvatarUploadRequest request,
-            CancellationToken cancellationToken)
+            [FromBody] RequestAvatarUploadRequest request
+            )
         {
             var userId = GetUserId();
-            var result = await _avatarService.RequestStudioAvatarUploadAsync(userId, studioId, request);
+            var result = await avatarService.RequestStudioAvatarUploadAsync(userId, studioId, request);
             return Ok(ApiResponse<AvatarUploadResponse>.Success(
                 ErrorCodes.SuccessGetData,
                 "Presigned upload URL generated successfully",
@@ -73,11 +66,11 @@ namespace StudioStudio_Server.Controllers
         [HttpPost("group/{groupId}/complete")]
         public async Task<IActionResult> CompleteGroupAvatarUpload(
             Guid groupId,
-            [FromBody] CompleteAvatarUploadRequest request,
-            CancellationToken cancellationToken)
+            [FromBody] CompleteAvatarUploadRequest request
+            )
         {
             var userId = GetUserId();
-            await _avatarService.CompleteGroupAvatarUploadAsync(userId, groupId, request);
+            await avatarService.CompleteGroupAvatarUploadAsync(userId, groupId, request);
             return Ok(ApiResponse<object>.Success(
                 ErrorCodes.SuccessUpdateData,
                 "Group avatar updated successfully",
@@ -91,11 +84,11 @@ namespace StudioStudio_Server.Controllers
         [HttpPost("studio/{studioId}/complete")]
         public async Task<IActionResult> CompleteStudioAvatarUpload(
             Guid studioId,
-            [FromBody] CompleteAvatarUploadRequest request,
-            CancellationToken cancellationToken)
+            [FromBody] CompleteAvatarUploadRequest request
+            )
         {
             var userId = GetUserId();
-            await _avatarService.CompleteStudioAvatarUploadAsync(userId, studioId, request);
+            await avatarService.CompleteStudioAvatarUploadAsync(userId, studioId, request);
             return Ok(ApiResponse<object>.Success(
                 ErrorCodes.SuccessUpdateData,
                 "Studio avatar updated successfully",
@@ -108,11 +101,11 @@ namespace StudioStudio_Server.Controllers
         /// </summary>
         [HttpDelete("group/{groupId}")]
         public async Task<IActionResult> DeleteGroupAvatar(
-            Guid groupId,
-            CancellationToken cancellationToken)
+            Guid groupId
+            )
         {
             var userId = GetUserId();
-            await _avatarService.DeleteGroupAvatarAsync(userId, groupId);
+            await avatarService.DeleteGroupAvatarAsync(userId, groupId);
             return Ok(ApiResponse<object>.Success(
                 ErrorCodes.SuccessUpdateData,
                 "Group avatar deleted successfully",
@@ -125,11 +118,11 @@ namespace StudioStudio_Server.Controllers
         /// </summary>
         [HttpDelete("studio/{studioId}")]
         public async Task<IActionResult> DeleteStudioAvatar(
-            Guid studioId,
-            CancellationToken cancellationToken)
+            Guid studioId
+            )
         {
             var userId = GetUserId();
-            await _avatarService.DeleteStudioAvatarAsync(userId, studioId);
+            await avatarService.DeleteStudioAvatarAsync(userId, studioId);
             return Ok(ApiResponse<object>.Success(
                 ErrorCodes.SuccessUpdateData,
                 "Studio avatar deleted successfully",
@@ -145,11 +138,11 @@ namespace StudioStudio_Server.Controllers
         [HttpPost("group/{groupId}/banner/request-upload")]
         public async Task<IActionResult> RequestGroupBannerUpload(
             Guid groupId,
-            [FromBody] RequestAvatarUploadRequest request,
-            CancellationToken cancellationToken)
+            [FromBody] RequestAvatarUploadRequest request
+            )
         {
             var userId = GetUserId();
-            var result = await _avatarService.RequestGroupBannerUploadAsync(userId, groupId, request);
+            var result = await avatarService.RequestGroupBannerUploadAsync(userId, groupId, request);
             return Ok(ApiResponse<AvatarUploadResponse>.Success(
                 ErrorCodes.SuccessGetData,
                 "Presigned upload URL generated successfully",
@@ -163,11 +156,11 @@ namespace StudioStudio_Server.Controllers
         [HttpPost("group/{groupId}/banner/complete")]
         public async Task<IActionResult> CompleteGroupBannerUpload(
             Guid groupId,
-            [FromBody] CompleteAvatarUploadRequest request,
-            CancellationToken cancellationToken)
+            [FromBody] CompleteAvatarUploadRequest request
+            )
         {
             var userId = GetUserId();
-            await _avatarService.CompleteGroupBannerUploadAsync(userId, groupId, request);
+            await avatarService.CompleteGroupBannerUploadAsync(userId, groupId, request);
             return Ok(ApiResponse<object>.Success(
                 ErrorCodes.SuccessUpdateData,
                 "Group banner updated successfully",
@@ -180,11 +173,11 @@ namespace StudioStudio_Server.Controllers
         /// </summary>
         [HttpDelete("group/{groupId}/banner")]
         public async Task<IActionResult> DeleteGroupBanner(
-            Guid groupId,
-            CancellationToken cancellationToken)
+            Guid groupId
+            )
         {
             var userId = GetUserId();
-            await _avatarService.DeleteGroupBannerAsync(userId, groupId);
+            await avatarService.DeleteGroupBannerAsync(userId, groupId);
             return Ok(ApiResponse<object>.Success(
                 ErrorCodes.SuccessUpdateData,
                 "Group banner deleted successfully",
@@ -200,11 +193,11 @@ namespace StudioStudio_Server.Controllers
         [HttpPost("studio/{studioId}/banner/request-upload")]
         public async Task<IActionResult> RequestStudioBannerUpload(
             Guid studioId,
-            [FromBody] RequestAvatarUploadRequest request,
-            CancellationToken cancellationToken)
+            [FromBody] RequestAvatarUploadRequest request
+            )
         {
             var userId = GetUserId();
-            var result = await _avatarService.RequestStudioBannerUploadAsync(userId, studioId, request);
+            var result = await avatarService.RequestStudioBannerUploadAsync(userId, studioId, request);
             return Ok(ApiResponse<AvatarUploadResponse>.Success(
                 ErrorCodes.SuccessGetData,
                 "Presigned upload URL generated successfully",
@@ -218,11 +211,11 @@ namespace StudioStudio_Server.Controllers
         [HttpPost("studio/{studioId}/banner/complete")]
         public async Task<IActionResult> CompleteStudioBannerUpload(
             Guid studioId,
-            [FromBody] CompleteAvatarUploadRequest request,
-            CancellationToken cancellationToken)
+            [FromBody] CompleteAvatarUploadRequest request
+            )
         {
             var userId = GetUserId();
-            await _avatarService.CompleteStudioBannerUploadAsync(userId, studioId, request);
+            await avatarService.CompleteStudioBannerUploadAsync(userId, studioId, request);
             return Ok(ApiResponse<object>.Success(
                 ErrorCodes.SuccessUpdateData,
                 "Studio banner updated successfully",
@@ -235,11 +228,11 @@ namespace StudioStudio_Server.Controllers
         /// </summary>
         [HttpDelete("studio/{studioId}/banner")]
         public async Task<IActionResult> DeleteStudioBanner(
-            Guid studioId,
-            CancellationToken cancellationToken)
+            Guid studioId
+            )
         {
             var userId = GetUserId();
-            await _avatarService.DeleteStudioBannerAsync(userId, studioId);
+            await avatarService.DeleteStudioBannerAsync(userId, studioId);
             return Ok(ApiResponse<object>.Success(
                 ErrorCodes.SuccessUpdateData,
                 "Studio banner deleted successfully",

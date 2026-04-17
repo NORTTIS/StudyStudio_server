@@ -16,19 +16,10 @@ namespace StudioStudio_Server.Controllers.Admin
     [Route("api/admin/groups")]
     [ApiController]
     [Authorize]
-    public class AdminGroupController : ControllerBase
+    public class AdminGroupController(
+        IAdminGroupService adminGroupService,
+        IMessageService messageService) : ControllerBase
     {
-        private readonly IAdminGroupService _adminGroupService;
-        private readonly IMessageService _messageService;
-
-        public AdminGroupController(
-            IAdminGroupService adminGroupService,
-            IMessageService messageService)
-        {
-            _adminGroupService = adminGroupService;
-            _messageService = messageService;
-        }
-
         /// <summary>
         /// [ADMIN] GET /api/admin/groups
         /// Get paginated list of groups with filters
@@ -43,8 +34,8 @@ namespace StudioStudio_Server.Controllers.Admin
         {
             JwtHelper.ValidateAdminUser(User);
 
-            var response = await _adminGroupService.GetGroupsAsync(request);
-            var message = _messageService.GetMessage(ErrorCodes.SuccessGetData);
+            var response = await adminGroupService.GetGroupsAsync(request);
+            var message = messageService.GetMessage(ErrorCodes.SuccessGetData);
 
             return Ok(ApiResponse<AdminGroupListResponse>.Success(
                 ErrorCodes.SuccessGetData,
@@ -64,9 +55,9 @@ namespace StudioStudio_Server.Controllers.Admin
         {
             JwtHelper.ValidateAdminUser(User);
 
-            await _adminGroupService.UpdateGroupStatusAsync(id, request.IsActive);
+            await adminGroupService.UpdateGroupStatusAsync(id, request.IsActive);
 
-            var message = _messageService.GetMessage(ErrorCodes.SuccessUpdateData);
+            var message = messageService.GetMessage(ErrorCodes.SuccessUpdateData);
 
             return Ok(ApiResponse<string>.Success(
                 ErrorCodes.SuccessUpdateData,

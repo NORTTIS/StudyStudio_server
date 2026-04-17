@@ -16,19 +16,10 @@ namespace StudioStudio_Server.Controllers.Admin
     [Route("api/admin/statistics")]
     [ApiController]
     [Authorize]
-    public class AdminStatisticsController : ControllerBase
+    public class AdminStatisticsController(
+        IAdminStatisticsService statisticsService,
+        IMessageService messageService) : ControllerBase
     {
-        private readonly IAdminStatisticsService _statisticsService;
-        private readonly IMessageService _messageService;
-
-        public AdminStatisticsController(
-            IAdminStatisticsService statisticsService,
-            IMessageService messageService)
-        {
-            _statisticsService = statisticsService;
-            _messageService = messageService;
-        }
-
         /// <summary>
         /// [ADMIN] GET /api/admin/statistics/hourly-activity
         /// Get hourly activity heatmap data
@@ -45,12 +36,11 @@ namespace StudioStudio_Server.Controllers.Admin
             if (request.StartDate.HasValue && request.EndDate.HasValue && request.StartDate > request.EndDate)
             {
                 throw new AppException(
-                    ErrorCodes.RevenueInvalidDateRange,
-                    StatusCodes.Status400BadRequest);
+                    ErrorCodes.RevenueInvalidDateRange);
             }
 
-            var response = await _statisticsService.GetHourlyActivityAsync(request);
-            var message = _messageService.GetMessage(ErrorCodes.SuccessGetData);
+            var response = await statisticsService.GetHourlyActivityAsync(request);
+            var message = messageService.GetMessage(ErrorCodes.SuccessGetData);
 
             return Ok(ApiResponse<HourlyActivityResponse>.Success(
                 ErrorCodes.SuccessGetData,
@@ -75,12 +65,11 @@ namespace StudioStudio_Server.Controllers.Admin
             if (request.StartDate.HasValue && request.EndDate.HasValue && request.StartDate > request.EndDate)
             {
                 throw new AppException(
-                    ErrorCodes.RevenueInvalidDateRange,
-                    StatusCodes.Status400BadRequest);
+                    ErrorCodes.RevenueInvalidDateRange);
             }
 
-            var response = await _statisticsService.GetReportStatusAsync(request);
-            var message = _messageService.GetMessage(ErrorCodes.SuccessGetData);
+            var response = await statisticsService.GetReportStatusAsync(request);
+            var message = messageService.GetMessage(ErrorCodes.SuccessGetData);
 
             return Ok(ApiResponse<ReportStatusResponse>.Success(
                 ErrorCodes.SuccessGetData,
@@ -104,12 +93,11 @@ namespace StudioStudio_Server.Controllers.Admin
             if (request.StartDate.HasValue && request.EndDate.HasValue && request.StartDate > request.EndDate)
             {
                 throw new AppException(
-                    ErrorCodes.RevenueInvalidDateRange,
-                    StatusCodes.Status400BadRequest);
+                    ErrorCodes.RevenueInvalidDateRange);
             }
 
-            var response = await _statisticsService.GetUserDistributionAsync(request);
-            var message = _messageService.GetMessage(ErrorCodes.SuccessGetData);
+            var response = await statisticsService.GetUserDistributionAsync(request);
+            var message = messageService.GetMessage(ErrorCodes.SuccessGetData);
 
             return Ok(ApiResponse<UserDistributionResponse>.Success(
                 ErrorCodes.SuccessGetData,
@@ -133,12 +121,11 @@ namespace StudioStudio_Server.Controllers.Admin
             if (request.StartDate.HasValue && request.EndDate.HasValue && request.StartDate > request.EndDate)
             {
                 throw new AppException(
-                    ErrorCodes.RevenueInvalidDateRange,
-                    StatusCodes.Status400BadRequest);
+                    ErrorCodes.RevenueInvalidDateRange);
             }
 
-            var response = await _statisticsService.GetSubscriptionDistributionAsync(request);
-            var message = _messageService.GetMessage(ErrorCodes.SuccessGetData);
+            var response = await statisticsService.GetSubscriptionDistributionAsync(request);
+            var message = messageService.GetMessage(ErrorCodes.SuccessGetData);
 
             return Ok(ApiResponse<SubscriptionDistributionResponse>.Success(
                 ErrorCodes.SuccessGetData,
@@ -163,12 +150,11 @@ namespace StudioStudio_Server.Controllers.Admin
             if (request.StartDate.HasValue && request.EndDate.HasValue && request.StartDate > request.EndDate)
             {
                 throw new AppException(
-                    ErrorCodes.RevenueInvalidDateRange,
-                    StatusCodes.Status400BadRequest);
+                    ErrorCodes.RevenueInvalidDateRange);
             }
 
-            var response = await _statisticsService.GetRecentActivityAsync(request);
-            var message = _messageService.GetMessage(ErrorCodes.SuccessGetData);
+            var response = await statisticsService.GetRecentActivityAsync(request);
+            var message = messageService.GetMessage(ErrorCodes.SuccessGetData);
 
             return Ok(ApiResponse<RecentActivityResponse>.Success(
                 ErrorCodes.SuccessGetData,
@@ -193,12 +179,11 @@ namespace StudioStudio_Server.Controllers.Admin
             if (request.StartDate.HasValue && request.EndDate.HasValue && request.StartDate > request.EndDate)
             {
                 throw new AppException(
-                    ErrorCodes.RevenueInvalidDateRange,
-                    StatusCodes.Status400BadRequest);
+                    ErrorCodes.RevenueInvalidDateRange);
             }
 
-            var response = await _statisticsService.GetTopActiveGroupsAsync(request);
-            var message = _messageService.GetMessage(ErrorCodes.SuccessGetData);
+            var response = await statisticsService.GetTopActiveGroupsAsync(request);
+            var message = messageService.GetMessage(ErrorCodes.SuccessGetData);
 
             return Ok(ApiResponse<TopActiveGroupsResponse>.Success(
                 ErrorCodes.SuccessGetData,

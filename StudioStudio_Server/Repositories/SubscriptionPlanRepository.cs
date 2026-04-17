@@ -9,14 +9,9 @@ namespace StudioStudio_Server.Repositories
     /// Repository handling operations with SubscriptionPlan entity
     /// Manages subscription tiers (Free, Premium)
     /// </summary>
-    public class SubscriptionPlanRepository : ISubscriptionPlanRepository
+    public class SubscriptionPlanRepository(StudioDbContext db) : ISubscriptionPlanRepository
     {
-        private readonly StudioDbContext _db;
-
-        public SubscriptionPlanRepository(StudioDbContext db)
-        {
-            _db = db;
-        }
+        private readonly StudioDbContext _db = db;
 
         public async Task<List<SubscriptionPlan>> GetAllAsync()
         {

@@ -2,8 +2,8 @@ using System.Diagnostics;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using StudioStudio_Server.Repositories.Interfaces;
+using StudioStudio_Server.Services.AI.Interfaces;
 using StudioStudio_Server.Services.AI.Models;
-using StudioStudio_Server.Services.AI.Tools.Interfaces;
 
 namespace StudioStudio_Server.Services.AI.Tools;
 
@@ -12,14 +12,13 @@ namespace StudioStudio_Server.Services.AI.Tools;
 /// Dùng cho Group AI - chỉ phân tích nhóm hiện tại (từ context)
 /// </summary>
 [DebuggerStepThrough]
-public class GetGroupRiskTool : IAITool
+public class GetGroupRiskTool(
+    IGroupRepository groupRepository,
+    ITaskRepository taskRepository,
+    IGroupParticipantRepository participantRepository,
+    IAnalyticsRepository analyticsRepository,
+    ILogger<GetGroupRiskTool> logger) : IAITool
 {
-    private readonly IGroupRepository _groupRepository;
-    private readonly ITaskRepository _taskRepository;
-    private readonly IGroupParticipantRepository _participantRepository;
-    private readonly IAnalyticsRepository _analyticsRepository;
-    private readonly ILogger<GetGroupRiskTool> _logger;
-
     public string Name => "get_group_risk";
     public string Description => "Phan tich rui ro cua nhom hien tai. Khong can tham so - tu dong su dung GroupId tu context.";
     public JsonObject ParametersSchema => new JsonObject
@@ -28,20 +27,6 @@ public class GetGroupRiskTool : IAITool
         ["properties"] = new JsonObject(),
         ["required"] = new JsonArray()
     };
-
-    public GetGroupRiskTool(
-        IGroupRepository groupRepository,
-        ITaskRepository taskRepository,
-        IGroupParticipantRepository participantRepository,
-        IAnalyticsRepository analyticsRepository,
-        ILogger<GetGroupRiskTool> logger)
-    {
-        _groupRepository = groupRepository;
-        _taskRepository = taskRepository;
-        _participantRepository = participantRepository;
-        _analyticsRepository = analyticsRepository;
-        _logger = logger;
-    }
 
     public bool ValidateParameters(JsonObject p) => true; // No parameters needed
 
@@ -58,18 +43,18 @@ public class GetGroupRiskTool : IAITool
             var sevenDaysAgo = DateOnly.FromDateTime(now.AddDays(-7));
 
             // Get group info
-            var group = await _groupRepository.GetByIdAsync(groupId);
+            var group = await groupRepository.GetByIdAsync(groupId);
             if (group == null)
                 return AIQueryResult.Error("Khong tim thay nhom");
 
             // Get task statistics
-            var taskStats = await _taskRepository.GetGroupTaskStatisticsAsync(groupId);
+            var taskStats = await taskRepository.GetGroupTaskStatisticsAsync(groupId);
 
             // Get analytics for last 7 days
-            var analytics = await _analyticsRepository.GetGroupAnalyticsRangeAsync(groupId, sevenDaysAgo, DateOnly.FromDateTime(now));
+            var analytics = await analyticsRepository.GetGroupAnalyticsRangeAsync(groupId, sevenDaysAgo, DateOnly.FromDateTime(now));
 
             // Get members
-            var members = await _participantRepository.GetAllByGroupIdAsync(groupId);
+            var members = await participantRepository.GetAllByGroupIdAsync(groupId);
 
             // Calculate metrics
             var totalTasks = taskStats.TotalTasks;
@@ -135,7 +120,7 @@ public class GetGroupRiskTool : IAITool
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "GetGroupRiskTool error");
+            logger.LogError(ex, "GetGroupRiskTool error");
             return AIQueryResult.Error("Da xay ra loi khi phan tich rui ro nhom");
         }
     }

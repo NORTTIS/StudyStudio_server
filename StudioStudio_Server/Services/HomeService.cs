@@ -9,33 +9,22 @@ using StudioStudio_Server.Utils;
 
 namespace StudioStudio_Server.Services
 {
-    public class HomeService : IHomeService
+    public class HomeService(
+        ITaskAssignmentRepository assignmentRepository,
+        ITaskRepository taskRepository,
+        IGroupRepository groupRepository,
+        IGroupTaskStatusRepository groupTaskStatusRepository,
+        IPersonalTaskStatusRepository personalTaskStatusRepository,
+        IUserRepository userRepository,
+        IHttpContextAccessor httpContextAccessor) : IHomeService
     {
-        private readonly ITaskAssignmentRepository _assignmentRepository;
-        private readonly ITaskRepository _taskRepository;
-        private readonly IGroupRepository _groupRepository;
-        private readonly IGroupTaskStatusRepository _groupTaskStatusRepository;
-        private readonly IPersonalTaskStatusRepository _personalTaskStatusRepository;
-        private readonly IUserRepository _userRepository;
-        private readonly IHttpContextAccessor _httpContextAccessor;
-
-        public HomeService(
-            ITaskAssignmentRepository assignmentRepository,
-            ITaskRepository taskRepository,
-            IGroupRepository groupRepository,
-            IGroupTaskStatusRepository groupTaskStatusRepository,
-            IPersonalTaskStatusRepository personalTaskStatusRepository,
-            IUserRepository userRepository,
-            IHttpContextAccessor httpContextAccessor)
-        {
-            _assignmentRepository = assignmentRepository;
-            _taskRepository = taskRepository;
-            _groupRepository = groupRepository;
-            _groupTaskStatusRepository = groupTaskStatusRepository;
-            _personalTaskStatusRepository = personalTaskStatusRepository;
-            _userRepository = userRepository;
-            _httpContextAccessor = httpContextAccessor;
-        }
+        private readonly ITaskAssignmentRepository _assignmentRepository = assignmentRepository;
+        private readonly ITaskRepository _taskRepository = taskRepository;
+        private readonly IGroupRepository _groupRepository = groupRepository;
+        private readonly IGroupTaskStatusRepository _groupTaskStatusRepository = groupTaskStatusRepository;
+        private readonly IPersonalTaskStatusRepository _personalTaskStatusRepository = personalTaskStatusRepository;
+        private readonly IUserRepository _userRepository = userRepository;
+        private readonly IHttpContextAccessor _httpContextAccessor = httpContextAccessor;
 
         /// <summary>
         /// Get personal task board data for the current user.

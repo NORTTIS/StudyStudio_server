@@ -543,14 +543,29 @@ namespace StudioStudio_Server.Services
                 .Select(u => new { u.UserId, FullName = u.FirstName + " " + u.LastName })
                 .ToDictionaryAsync(u => u.UserId, u => u.FullName);
 
-            // Lấy công việc đã hoàn thành với priority/severity để tính weighted scoring
-            var rawTasks = await context.Tasks
+            // Lấy tasks đã hoàn thành + assignee hiện tại (tránh abuse từ ActivityLog)
+            var completedTaskIds = await context.Tasks
                 .Where(t => t.GroupId == groupId && t.CompletedAt >= startDateTime && t.CompletedAt <= endDateTime)
-                .Select(t => new { t.OwnerId, t.CompletedAt, t.Priority, t.Severity })
+                .Select(t => t.TaskId)
                 .ToListAsync();
-            var tasksCompleted = rawTasks
-                .Select(t => new { t.OwnerId, Date = ToLocalDate(t.CompletedAt!.Value), t.Priority, t.Severity })
-                .ToList();
+
+            var assigneesByTask = new Dictionary<Guid, Guid?>();
+            if (completedTaskIds.Count > 0)
+            {
+                var assignments = await context.TaskAssignments
+                    .Where(a => completedTaskIds.Contains(a.TaskId))
+                    .Select(a => new { a.TaskId, a.AssignedTo })
+                    .ToListAsync();
+
+                assigneesByTask = assignments
+                    .GroupBy(a => a.TaskId)
+                    .ToDictionary(g => g.Key, g => (Guid?)g.FirstOrDefault()?.AssignedTo);
+            }
+
+            var rawCompleted = await context.Tasks
+                .Where(t => t.GroupId == groupId && t.CompletedAt >= startDateTime && t.CompletedAt <= endDateTime)
+                .Select(t => new { t.TaskId, t.CompletedAt, t.Priority, t.Severity })
+                .ToListAsync();
 
             // Lấy tin nhắn đã gửi theo ngày
             var rawMessages = await context.GroupMessages
@@ -584,16 +599,20 @@ namespace StudioStudio_Server.Services
                 .ToList();
 
             // Tính điểm hoạt động cho từng thành viên mỗi ngày
-            // Công thức: TASK_COMPLETE → 10×PW×SW | CREATE → 3pts | UPDATE → 1pt | DELETE → 1pt | Messages → +1 | Comments → +1
+            // Công thức: TASK_COMPLETE → assignee nhận 10×PW×SW (1 lần/task) | CREATE → 3pts | UPDATE → 1pt | DELETE → 1pt | Messages → +1 | Comments → +1
             var allActivity = new Dictionary<(Guid userId, DateOnly date), int>();
 
-            // Công việc hoàn thành: weighted theo Priority × Severity (10-40 điểm/task)
-            foreach (var item in tasksCompleted)
+            // TASK_COMPLETE: assignee nhận điểm, không assignee → bỏ qua
+            foreach (var item in rawCompleted)
             {
-                var pWeight = priorityWeight[Math.Min((int)item.Priority, 2)];
-                var sWeight = severityWeight[Math.Min((int)item.Severity, 3)];
-                var weightedPoints = (int)(CompletePoints * pWeight * sWeight);
-                allActivity[(item.OwnerId, item.Date)] = allActivity.GetValueOrDefault((item.OwnerId, item.Date), 0) + weightedPoints;
+                if (!assigneesByTask.TryGetValue(item.TaskId, out var assigneeId) || assigneeId == null)
+                    continue;
+
+                var priority = (int)item.Priority;
+                var severity = (int)item.Severity;
+                var points = (int)(CompletePoints * priorityWeight[Math.Min(priority, 2)] * severityWeight[Math.Min(severity, 3)]);
+                var key = (assigneeId.Value, ToLocalDate(item.CompletedAt!.Value));
+                allActivity[key] = allActivity.GetValueOrDefault(key, 0) + points;
             }
 
             // Task CRUD từ ActivityLog: điểm cố định theo loại action
@@ -879,7 +898,7 @@ namespace StudioStudio_Server.Services
 
             // Lấy tất cả nhóm active
             var groups = await context.Groups
-                .Where(g => g.StudioId == studioId && g.IsActive)
+                .Where(g => g.StudioId == studioId && g.IsActive && g.IsArchived == false)
                 .Select(g => new { g.GroupId, g.GroupName, g.ColorHex })
                 .ToListAsync();
 
@@ -1117,7 +1136,7 @@ namespace StudioStudio_Server.Services
 
             // Lấy tất cả nhóm user tham gia
             var groups = await context.Groups
-                .Where(g => groupIds.Contains(g.GroupId))
+                .Where(g => groupIds.Contains(g.GroupId)&& g.IsArchived == false && g.IsActive == true)
                 .Select(g => new { g.GroupId, g.GroupName })
                 .ToListAsync();
 

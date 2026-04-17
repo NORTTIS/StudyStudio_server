@@ -1,23 +1,21 @@
 using System.Diagnostics;
 using System.Globalization;
 using System.Text;
-using System.Text.Json;
 using System.Text.Json.Nodes;
 using StudioStudio_Server.Models.Enums;
 using StudioStudio_Server.Repositories.Interfaces;
+using StudioStudio_Server.Services.AI.Interfaces;
 using StudioStudio_Server.Services.AI.Models;
-using StudioStudio_Server.Services.AI.Tools.Interfaces;
 
 namespace StudioStudio_Server.Services.AI.Tools;
 
-public class GetTasksTool : IAITool
+public class GetTasksTool(
+    ITaskRepository taskRepository,
+    IGroupParticipantRepository participantRepository,
+    ILogger<GetTasksTool> logger) : IAITool
 {
     private const int DefaultPageSize = 20;
     private const int MaxPageSize = 20;
-
-    private readonly ITaskRepository _taskRepository;
-    private readonly IGroupParticipantRepository _participantRepository;
-    private readonly ILogger<GetTasksTool> _logger;
 
     public string Name => "get_tasks";
     public string Description => "Return a group's task list based on the user's intent. "
@@ -49,16 +47,6 @@ public class GetTasksTool : IAITool
         },
         ["required"] = new JsonArray()
     };
-
-    public GetTasksTool(
-        ITaskRepository taskRepository,
-        IGroupParticipantRepository participantRepository,
-        ILogger<GetTasksTool> logger)
-    {
-        _taskRepository = taskRepository;
-        _participantRepository = participantRepository;
-        _logger = logger;
-    }
 
     private static string? Js(JsonNode? n) => n?.GetValue<string>();
     private static int Ji(JsonNode? n) => n == null ? 0 : n.GetValue<int>();
@@ -166,11 +154,11 @@ public class GetTasksTool : IAITool
 
             var groupId = context.GroupId.Value;
 
-            if (!await _participantRepository.IsUserInGroupAsync(groupId, context.UserId))
+            if (!await participantRepository.IsUserInGroupAsync(groupId, context.UserId))
                 return AIQueryResult.Error("Ban khong co quyen truy cap nhom nay");
 
             // Role check: Owner/Moderator thay tat ca, Member chi task duoc assign
-            var role = await _participantRepository.GetGroupRoleByUserIdAsync(context.UserId, groupId);
+            var role = await participantRepository.GetGroupRoleByUserIdAsync(context.UserId, groupId);
             if (role == GroupRole.Commenter || role == GroupRole.Viewer)
                 return AIQueryResult.Error("Ban khong co quyen su dung AI nhom nay");
 
@@ -201,7 +189,7 @@ public class GetTasksTool : IAITool
             // Owner/Moderator: lay tat ca task; Member: chi task duoc assign
             Guid? assigneeId = (role == GroupRole.Owner || role == GroupRole.Moderator) ? null : context.UserId;
 
-            var (tasks, total) = await _taskRepository.GetGroupTasksWithFiltersAsync(
+            var (tasks, total) = await taskRepository.GetGroupTasksWithFiltersAsync(
                 groupId, page, pageSize, searchQuery, assigneeId, null, priority, severity, null, null, null, null, statusCategory, null, null, null, "dueDate", true, statusKeyword, minPriority, minSeverity);
 
             var filteredCountOnCurrentPage = tasks.Count;
@@ -255,7 +243,7 @@ public class GetTasksTool : IAITool
             // Log data size info for context tracking
             var resultJson = result.ToJson();
             
-            _logger.LogInformation(
+            logger.LogInformation(
                 "[TASKS-RESULT] query={Query} statusKeyword={StatusKeyword} statusCategory={StatusCategory} priority={Priority} minPriority={MinPriority} severity={Severity} minSeverity={MinSeverity} total={Total} returned={Returned} page={Page}/{TotalPages} pageSize={PageSize} contextSize={CharCount} (full data included)",
                 searchQuery ?? "", statusKeyword ?? "", statusCategory ?? "", priority?.ToString() ?? "", minPriority?.ToString() ?? "", severity?.ToString() ?? "", minSeverity?.ToString() ?? "", total, formattedTasks.Count, page, totalPages, pageSize, resultJson.Length);
             
@@ -263,7 +251,7 @@ public class GetTasksTool : IAITool
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "GetTasksTool error");
+            logger.LogError(ex, "GetTasksTool error");
             return AIQueryResult.Error("Da xay ra loi khi lay danh sach cong viec.");
         }
     }

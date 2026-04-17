@@ -5,7 +5,6 @@ using StudioStudio_Server.Exceptions;
 using StudioStudio_Server.Models.DTOs.Request;
 using StudioStudio_Server.Models.DTOs.Response;
 using StudioStudio_Server.Services.Interfaces;
-using StudioStudio_Server.Utils;
 using System.Security.Claims;
 
 namespace StudioStudio_Server.Controllers
@@ -16,19 +15,8 @@ namespace StudioStudio_Server.Controllers
     /// </summary>
     [Route("api/payment")]
     [ApiController]
-    public class PaymentController : ControllerBase
+    public class PaymentController(IPaymentService paymentService, IMessageService messageService, ILogger<PaymentController> logger) : ControllerBase
     {
-        private readonly IPaymentService _paymentService;
-        private readonly IMessageService _messageService;
-        private readonly ILogger<PaymentController> _logger;
-
-        public PaymentController(IPaymentService paymentService, IMessageService messageService, ILogger<PaymentController> logger)
-        {
-            _paymentService = paymentService;
-            _messageService = messageService;
-            _logger = logger;
-        }
-
         private Guid ValidateAndGetUserId()
         {
             var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
@@ -64,8 +52,8 @@ namespace StudioStudio_Server.Controllers
         public async Task<ActionResult<ApiResponse<CreatePaymentResponse>>> CreatePayment([FromBody] CreatePaymentRequest request)
         {
             var userId = ValidateAndGetUserId();
-            var result = await _paymentService.CreatePaymentLinkAsync(userId, request);
-            var message = _messageService.GetMessage(ErrorCodes.SuccessPaymentCreated);
+            var result = await paymentService.CreatePaymentLinkAsync(userId, request);
+            var message = messageService.GetMessage(ErrorCodes.SuccessPaymentCreated);
 
             return Ok(ApiResponse<CreatePaymentResponse>.Success(
                 ErrorCodes.SuccessPaymentCreated,
@@ -83,16 +71,16 @@ namespace StudioStudio_Server.Controllers
         {
             try
             {
-                await _paymentService.HandleWebhookAsync(webhookBody);
+                await paymentService.HandleWebhookAsync(webhookBody);
             }
             catch (AppException ex) when (ex.Code == ErrorCodes.PaymentWebhookInvalid)
             {
                 // Chữ ký sai — không retry, vẫn trả 200
-                _logger.LogWarning("Invalid webhook signature");
+                logger.LogWarning("Invalid webhook signature");
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Webhook processing error");
+                logger.LogError(ex, "Webhook processing error");
                 return StatusCode(500, new { success = false });
             }
             return Ok(new { success = true });
@@ -107,8 +95,8 @@ namespace StudioStudio_Server.Controllers
         public async Task<ActionResult<ApiResponse<PaymentStatusResponse>>> GetStatus([FromRoute] Guid paymentId)
         {
             var userId = ValidateAndGetUserId();
-            var result = await _paymentService.GetPaymentStatusAsync(userId, paymentId);
-            var message = _messageService.GetMessage(ErrorCodes.SuccessGetData);
+            var result = await paymentService.GetPaymentStatusAsync(userId, paymentId);
+            var message = messageService.GetMessage(ErrorCodes.SuccessGetData);
 
             return Ok(ApiResponse<PaymentStatusResponse>.Success(
                 ErrorCodes.SuccessGetData,
@@ -125,8 +113,8 @@ namespace StudioStudio_Server.Controllers
         public async Task<ActionResult<ApiResponse<PaymentStatusResponse>>> CancelPayment([FromRoute] long orderCode)
         {
             var userId = ValidateAndGetUserId();
-            var result = await _paymentService.CancelPaymentAsync(userId, orderCode);
-            var message = _messageService.GetMessage(ErrorCodes.SuccessPaymentCancelled);
+            var result = await paymentService.CancelPaymentAsync(userId, orderCode);
+            var message = messageService.GetMessage(ErrorCodes.SuccessPaymentCancelled);
 
             return Ok(ApiResponse<PaymentStatusResponse>.Success(
                 ErrorCodes.SuccessPaymentCancelled,
@@ -139,8 +127,8 @@ namespace StudioStudio_Server.Controllers
         public async Task<ActionResult<ApiResponse<PaymentHistoryResponse>>> PaymentHistory()
         {
             var userId = ValidateAndGetUserId();
-            var result = await _paymentService.GetPaymentHistoryAsync(userId);
-            var message = _messageService.GetMessage(ErrorCodes.SuccessGetData);
+            var result = await paymentService.GetPaymentHistoryAsync(userId);
+            var message = messageService.GetMessage(ErrorCodes.SuccessGetData);
             return Ok(ApiResponse<PaymentHistoryResponse>.Success(
                 ErrorCodes.SuccessGetData,
                 message,

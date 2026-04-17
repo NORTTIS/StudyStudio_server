@@ -9,14 +9,9 @@ namespace StudioStudio_Server.Repositories
     /// <summary>
     /// Repository handling data access for admin statistics
     /// </summary>
-    public class AdminStatisticsRepository : IAdminStatisticsRepository
+    public class AdminStatisticsRepository(StudioDbContext context) : IAdminStatisticsRepository
     {
-        private readonly StudioDbContext _context;
-
-        public AdminStatisticsRepository(StudioDbContext context)
-        {
-            _context = context;
-        }
+        private readonly StudioDbContext _context = context;
 
         /// <summary>
         /// Get hourly login activity data grouped by hour and day of week

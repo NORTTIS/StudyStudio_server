@@ -10,14 +10,9 @@ namespace StudioStudio_Server.Services
     /// <summary>
     /// Service xử lý các thao tác admin với nhóm
     /// </summary>
-    public class AdminGroupService : IAdminGroupService
+    public class AdminGroupService(IGroupRepository groupRepository) : IAdminGroupService
     {
-        private readonly IGroupRepository _groupRepository;
-
-        public AdminGroupService(IGroupRepository groupRepository)
-        {
-            _groupRepository = groupRepository;
-        }
+        private readonly IGroupRepository _groupRepository = groupRepository;
 
         /// <summary>
         /// Get paginated list of groups with filters for admin

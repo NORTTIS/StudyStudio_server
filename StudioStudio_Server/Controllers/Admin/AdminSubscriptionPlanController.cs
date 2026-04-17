@@ -16,19 +16,10 @@ namespace StudioStudio_Server.Controllers.Admin
     [Route("api/admin/subscription-plans")]
     [ApiController]
     [Authorize]
-    public class AdminSubscriptionPlanController : ControllerBase
+    public class AdminSubscriptionPlanController(
+        ISubscriptionPlanService subscriptionPlanService,
+        IMessageService messageService) : ControllerBase
     {
-        private readonly ISubscriptionPlanService _subscriptionPlanService;
-        private readonly IMessageService _messageService;
-
-        public AdminSubscriptionPlanController(
-            ISubscriptionPlanService subscriptionPlanService,
-            IMessageService messageService)
-        {
-            _subscriptionPlanService = subscriptionPlanService;
-            _messageService = messageService;
-        }
-
         /// <summary>
         /// [ADMIN] GET /api/admin/subscription-plans/statistics
         /// Get subscription plan statistics and information
@@ -42,8 +33,8 @@ namespace StudioStudio_Server.Controllers.Admin
         {
             JwtHelper.ValidateAdminUser(User);
 
-            var response = await _subscriptionPlanService.GetStatisticsAsync();
-            var message = _messageService.GetMessage(ErrorCodes.SuccessGetData);
+            var response = await subscriptionPlanService.GetStatisticsAsync();
+            var message = messageService.GetMessage(ErrorCodes.SuccessGetData);
 
             return Ok(ApiResponse<SubscriptionStatisticsResponse>.Success(
                 ErrorCodes.SuccessGetData,
@@ -66,8 +57,8 @@ namespace StudioStudio_Server.Controllers.Admin
         {
             JwtHelper.ValidateAdminUser(User);
 
-            var response = await _subscriptionPlanService.UpdatePlanAsync(request);
-            var message = _messageService.GetMessage(ErrorCodes.SuccessUpdateSubscriptionPlan);
+            var response = await subscriptionPlanService.UpdatePlanAsync(request);
+            var message = messageService.GetMessage(ErrorCodes.SuccessUpdateSubscriptionPlan);
 
             return Ok(ApiResponse<SubscriptionPlanDetail>.Success(
                 ErrorCodes.SuccessUpdateSubscriptionPlan,

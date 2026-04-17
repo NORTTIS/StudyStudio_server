@@ -1,9 +1,8 @@
 using System.Diagnostics;
-using System.Text.Json;
 using System.Text.Json.Nodes;
 using StudioStudio_Server.Repositories.Interfaces;
+using StudioStudio_Server.Services.AI.Interfaces;
 using StudioStudio_Server.Services.AI.Models;
-using StudioStudio_Server.Services.AI.Tools.Interfaces;
 
 namespace StudioStudio_Server.Services.AI.Tools;
 
@@ -11,10 +10,8 @@ namespace StudioStudio_Server.Services.AI.Tools;
 /// Tool để lấy deadline của công việc cá nhân (không cần group_id)
 /// Scope: Personal AI (UserId only)
 /// </summary>
-public class GetPersonalDeadlinesTool : IAITool
+public class GetPersonalDeadlinesTool(ITaskRepository taskRepository, ILogger<GetPersonalDeadlinesTool> logger) : IAITool
 {
-    private readonly ITaskRepository _taskRepository;
-    private readonly ILogger<GetPersonalDeadlinesTool> _logger;
     private const int DefaultDaysAhead = 30;
 
     public string Name => "get_personal_deadlines";
@@ -30,12 +27,6 @@ public class GetPersonalDeadlinesTool : IAITool
         },
         ["required"] = new JsonArray()
     };
-
-    public GetPersonalDeadlinesTool(ITaskRepository taskRepository, ILogger<GetPersonalDeadlinesTool> logger)
-    {
-        _taskRepository = taskRepository;
-        _logger = logger;
-    }
 
     private static string? Js(JsonNode? n) => n?.GetValue<string>();
     private static int Ji(JsonNode? n) => n == null ? 0 : n.GetValue<int>();
@@ -57,12 +48,12 @@ public class GetPersonalDeadlinesTool : IAITool
             var endDate = now.AddDays(daysAhead);
 
             // Upcoming deadlines: filter at DB layer to avoid loading all tasks
-            var deadlineTasks = await _taskRepository.GetPersonalTasksByOwnerWithDeadlineAsync(
+            var deadlineTasks = await taskRepository.GetPersonalTasksByOwnerWithDeadlineAsync(
                 context.UserId, now, endDate, limit);
 
             // Overdue: bounded look-back to avoid loading all history
             // Note: Progress < 100 is already filtered in the repo query
-            var overdueTasks = await _taskRepository.GetPersonalTasksByOwnerWithDeadlineAsync(
+            var overdueTasks = await taskRepository.GetPersonalTasksByOwnerWithDeadlineAsync(
                 context.UserId, now.AddDays(-30), now, 5);
 
             var deadlines = deadlineTasks.Select(t => new JsonObject
@@ -107,7 +98,7 @@ public class GetPersonalDeadlinesTool : IAITool
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "GetPersonalDeadlinesTool error for UserId={UserId}", context.UserId);
+            logger.LogError(ex, "GetPersonalDeadlinesTool error for UserId={UserId}", context.UserId);
             return AIQueryResult.Error("Da xay ra loi khi lay deadline ca nhan.");
         }
     }

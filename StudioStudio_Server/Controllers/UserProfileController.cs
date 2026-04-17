@@ -3,7 +3,6 @@ using Microsoft.AspNetCore.Mvc;
 using StudioStudio_Server.Exceptions;
 using StudioStudio_Server.Models.DTOs.Request;
 using StudioStudio_Server.Models.DTOs.Response;
-using StudioStudio_Server.Repositories.Interfaces;
 using StudioStudio_Server.Services.Interfaces;
 using StudioStudio_Server.Utils;
 using System.Security.Claims;
@@ -17,17 +16,8 @@ namespace StudioStudio_Server.Controllers
     [Route("api")]
     [ApiController]
     [Authorize]
-    public class UserProfileController : ControllerBase
+    public class UserProfileController(IUserService userService, IMessageService messageService) : ControllerBase
     {
-        private readonly IUserService _userService;
-        private readonly IMessageService _messageService;
-
-        public UserProfileController(IUserService userService, IMessageService messageService)
-        {
-            _userService = userService;
-            _messageService = messageService;
-        }
-
         /// <summary>
         /// Authenticate and get userId from JWT token
         /// Validate: User must not be admin (admin cannot use user APIs)
@@ -55,7 +45,7 @@ namespace StudioStudio_Server.Controllers
         public async Task<ActionResult<ApiResponse<UserProfileResponse>>> GetUserProfile()
         {
             var userId = ValidateAndGetUserId();
-            var user = await _userService.GetByIdAsync(userId);
+            var user = await userService.GetByIdAsync(userId);
 
             if (user == null)
             {
@@ -65,11 +55,11 @@ namespace StudioStudio_Server.Controllers
             }
 
             // Get AI request limit info
-            var (usedToday, dailyLimit) = await _userService.GetAiRequestLimitInfoAsync(userId);
+            var (usedToday, dailyLimit) = await userService.GetAiRequestLimitInfoAsync(userId);
             int remaining = Math.Max(0, dailyLimit - usedToday);
 
             // Get user subscription plan
-            var plan = await _userService.GetUserSubscriptionPlan(userId);
+            var plan = await userService.GetUserSubscriptionPlan(userId);
 
             var response = new UserProfileResponse
             {
@@ -95,7 +85,7 @@ namespace StudioStudio_Server.Controllers
                 AiDailyLimit = dailyLimit
             };
 
-            var message = _messageService.GetMessage(ErrorCodes.SuccessGetData);
+            var message = messageService.GetMessage(ErrorCodes.SuccessGetData);
 
             return Ok(ApiResponse<UserProfileResponse>.Success(
                 ErrorCodes.SuccessGetData,
@@ -113,8 +103,8 @@ namespace StudioStudio_Server.Controllers
         public async Task<IActionResult> UpdateUserProfile([FromForm] UpdateUserProfileRequest request)
         {
             var userId = ValidateAndGetUserId();
-            await _userService.UpdateProfileAsync(userId, request);
-            var message = _messageService.GetMessage(ErrorCodes.SuccessUpdateProfile);
+            await userService.UpdateProfileAsync(userId, request);
+            var message = messageService.GetMessage(ErrorCodes.SuccessUpdateProfile);
 
             return Ok(ApiResponse<object>.Success(
                 ErrorCodes.SuccessUpdateProfile,
@@ -134,8 +124,8 @@ namespace StudioStudio_Server.Controllers
         public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordRequest request)
         {
             var userId = ValidateAndGetUserId();
-            await _userService.ChangePasswordAsync(userId, request);
-            var message = _messageService.GetMessage(ErrorCodes.SuccessChangePassword);
+            await userService.ChangePasswordAsync(userId, request);
+            var message = messageService.GetMessage(ErrorCodes.SuccessChangePassword);
 
             return Ok(ApiResponse<object>.Success(
                 ErrorCodes.SuccessChangePassword,
@@ -153,13 +143,12 @@ namespace StudioStudio_Server.Controllers
         public async Task<IActionResult> DeleteAccount()
         {
             var userId = ValidateAndGetUserId();
-            await _userService.DeleteAsync(userId);
-            var message = _messageService.GetMessage(ErrorCodes.SuccessDeleteAccount);
+            await userService.DeleteAsync(userId);
+            var message = messageService.GetMessage(ErrorCodes.SuccessDeleteAccount);
 
             return Ok(ApiResponse<object>.Success(
                 ErrorCodes.SuccessDeleteAccount,
-                message,
-                null));
+                message));
         }
     }
 }

@@ -13,21 +13,14 @@ namespace StudioStudio_Server.Services
     /// Only admins can create, update, and delete announcements
     /// CACHE INVALIDATION: Automatically invalidates announcement caches when data changes
     /// </summary>
-    public class AdminAnnouncementService : IAdminAnnouncementService
+    public class AdminAnnouncementService(
+        IAnnouncementRepository announcementRepository,
+        ILogger<AdminAnnouncementService> logger,
+        ICacheService cacheService) : IAdminAnnouncementService
     {
-        private readonly IAnnouncementRepository _announcementRepository;
-        private readonly ILogger<AdminAnnouncementService> _logger;
-        private readonly ICacheService _cacheService;
-
-        public AdminAnnouncementService(
-            IAnnouncementRepository announcementRepository,
-            ILogger<AdminAnnouncementService> logger,
-            ICacheService cacheService)
-        {
-            _announcementRepository = announcementRepository;
-            _logger = logger;
-            _cacheService = cacheService;
-        }
+        private readonly IAnnouncementRepository _announcementRepository = announcementRepository;
+        private readonly ILogger<AdminAnnouncementService> _logger = logger;
+        private readonly ICacheService _cacheService = cacheService;
 
         /// <summary>
         /// Get system-wide announcements (not @mentions)

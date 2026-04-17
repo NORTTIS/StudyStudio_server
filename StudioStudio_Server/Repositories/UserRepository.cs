@@ -9,14 +9,9 @@ namespace StudioStudio_Server.Repositories
     /// <summary>
     /// Repository handling CRUD operations with User entity
     /// </summary>
-    public class UserRepository : IUserRepository
+    public class UserRepository(StudioDbContext context) : IUserRepository
     {
-        private readonly StudioDbContext _context;
-
-        public UserRepository(StudioDbContext context)
-        {
-            _context = context;
-        }
+        private readonly StudioDbContext _context = context;
 
         /// <summary>
         /// Add new user to database

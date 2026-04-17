@@ -19,24 +19,17 @@ namespace StudioStudio_Server.Services.EmbeddingQueue
     /// - Automatic waiting when limit approached
     /// - No manual delays needed between jobs
     /// </summary>
-    public class EmbeddingBackgroundService : BackgroundService
+    public class EmbeddingBackgroundService(
+        IEmbeddingQueue queue,
+        IServiceScopeFactory serviceScopeFactory,
+        ILogger<EmbeddingBackgroundService> logger) : BackgroundService
     {
-        private readonly IEmbeddingQueue _queue;
-        private readonly IServiceScopeFactory _serviceScopeFactory;
-        private readonly ILogger<EmbeddingBackgroundService> _logger;
+        private readonly IEmbeddingQueue _queue = queue;
+        private readonly IServiceScopeFactory _serviceScopeFactory = serviceScopeFactory;
+        private readonly ILogger<EmbeddingBackgroundService> _logger = logger;
         
         private int _processedJobsCount = 0;
         private int _failedJobsCount = 0;
-
-        public EmbeddingBackgroundService(
-            IEmbeddingQueue queue,
-            IServiceScopeFactory serviceScopeFactory,
-            ILogger<EmbeddingBackgroundService> logger)
-        {
-            _queue = queue;
-            _serviceScopeFactory = serviceScopeFactory;
-            _logger = logger;
-        }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {

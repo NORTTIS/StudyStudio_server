@@ -15,19 +15,10 @@ namespace StudioStudio_Server.Controllers
     [Route("api/favourite")]
     [ApiController]
     [Authorize]
-    public class FavouriteController : ControllerBase
+    public class FavouriteController(
+        IFavouriteService favouriteService,
+        IMessageService messageService) : ControllerBase
     {
-        private readonly IFavouriteService _favouriteService;
-        private readonly IMessageService _messageService;
-
-        public FavouriteController(
-            IFavouriteService favouriteService,
-            IMessageService messageService)
-        {
-            _favouriteService = favouriteService;
-            _messageService = messageService;
-        }
-
         /// <summary>
         /// Authenticate and get userId from JWT token
         /// Validate: User must not be admin
@@ -71,8 +62,8 @@ namespace StudioStudio_Server.Controllers
             [FromBody] AddFavouriteRequest request)
         {
             var userId = ValidateAndGetUserId();
-            var result = await _favouriteService.AddFavouriteAsync(userId, request);
-            var message = _messageService.GetMessage(ErrorCodes.SuccessAddFavourite);
+            var result = await favouriteService.AddFavouriteAsync(userId, request);
+            var message = messageService.GetMessage(ErrorCodes.SuccessAddFavourite);
 
             return Ok(ApiResponse<FavouriteResponse>.Success(
                 ErrorCodes.SuccessAddFavourite,
@@ -90,8 +81,8 @@ namespace StudioStudio_Server.Controllers
             [FromBody] RemoveFavouriteRequest request)
         {
             var userId = ValidateAndGetUserId();
-            await _favouriteService.RemoveFavouriteAsync(userId, request);
-            var message = _messageService.GetMessage(ErrorCodes.SuccessRemoveFavourite);
+            await favouriteService.RemoveFavouriteAsync(userId, request);
+            var message = messageService.GetMessage(ErrorCodes.SuccessRemoveFavourite);
 
             return Ok(ApiResponse<object>.Success(
                 ErrorCodes.SuccessRemoveFavourite,

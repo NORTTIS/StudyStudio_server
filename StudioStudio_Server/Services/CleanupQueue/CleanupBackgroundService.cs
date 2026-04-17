@@ -10,27 +10,20 @@ namespace StudioStudio_Server.Services.CleanupQueue
     ///
     /// Run interval: Every 15 minutes
     /// </summary>
-    public class CleanupBackgroundService : BackgroundService
+    public class CleanupBackgroundService(
+        ICleanupQueue queue,
+        IServiceScopeFactory serviceScopeFactory,
+        ILogger<CleanupBackgroundService> logger) : BackgroundService
     {
-        private readonly ICleanupQueue _queue;
-        private readonly IServiceScopeFactory _serviceScopeFactory;
-        private readonly ILogger<CleanupBackgroundService> _logger;
+        private readonly ICleanupQueue _queue = queue;
+        private readonly IServiceScopeFactory _serviceScopeFactory = serviceScopeFactory;
+        private readonly ILogger<CleanupBackgroundService> _logger = logger;
 
         private static readonly TimeSpan ScanInterval = TimeSpan.FromMinutes(15);
         private static readonly TimeSpan StuckThreshold = TimeSpan.FromMinutes(30);
 
         private int _processedCount = 0;
         private int _failedCount = 0;
-
-        public CleanupBackgroundService(
-            ICleanupQueue queue,
-            IServiceScopeFactory serviceScopeFactory,
-            ILogger<CleanupBackgroundService> logger)
-        {
-            _queue = queue;
-            _serviceScopeFactory = serviceScopeFactory;
-            _logger = logger;
-        }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {

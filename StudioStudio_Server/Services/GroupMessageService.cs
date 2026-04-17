@@ -13,27 +13,18 @@ namespace StudioStudio_Server.Services
     /// Note: Realtime messaging is handled by GroupDiscussHub (SignalR)
     /// This service only handles HTTP queries (message history)
     /// </summary>
-    public class GroupMessageService : IGroupMessageService
+    public class GroupMessageService(
+        IGroupMessageRepository messageRepository,
+        IGroupParticipantRepository groupParticipantRepository,
+        ILogger<GroupMessageService> logger,
+        IHttpContextAccessor httpContextAccessor,
+        IActivityLogService activityLogService) : IGroupMessageService
     {
-        private readonly IGroupMessageRepository _messageRepository;
-        private readonly IGroupParticipantRepository _groupParticipantRepository;
-        private readonly ILogger<GroupMessageService> _logger;
-        private readonly IHttpContextAccessor _httpContextAccessor;
-        private readonly IActivityLogService _activityLogService;
-
-        public GroupMessageService(
-            IGroupMessageRepository messageRepository,
-            IGroupParticipantRepository groupParticipantRepository,
-            ILogger<GroupMessageService> logger,
-            IHttpContextAccessor httpContextAccessor,
-            IActivityLogService activityLogService)
-        {
-            _messageRepository = messageRepository;
-            _groupParticipantRepository = groupParticipantRepository;
-            _logger = logger;
-            _httpContextAccessor = httpContextAccessor;
-            _activityLogService = activityLogService;
-        }
+        private readonly IGroupMessageRepository _messageRepository = messageRepository;
+        private readonly IGroupParticipantRepository _groupParticipantRepository = groupParticipantRepository;
+        private readonly ILogger<GroupMessageService> _logger = logger;
+        private readonly IHttpContextAccessor _httpContextAccessor = httpContextAccessor;
+        private readonly IActivityLogService _activityLogService = activityLogService;
 
         /// <summary>
         /// Get message history in group (pagination)

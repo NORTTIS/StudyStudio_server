@@ -15,25 +15,12 @@ namespace StudioStudio_Server.Controllers
     [Route("api/studio")]
     [ApiController]
     [Authorize]
-    public class StudioController : ControllerBase
+    public class StudioController(
+        IStudioService studioService,
+        IGroupService groupService,
+        IMessageService messageService,
+        IBatchAssignService batchAssignService) : ControllerBase
     {
-        private readonly IStudioService _studioService;
-        private readonly IGroupService _groupService;
-        private readonly IMessageService _messageService;
-        private readonly IBatchAssignService _batchAssignService;
-
-        public StudioController(
-            IStudioService studioService,
-            IGroupService groupService,
-            IMessageService messageService,
-            IBatchAssignService batchAssignService)
-        {
-            _studioService = studioService;
-            _groupService = groupService;
-            _messageService = messageService;
-            _batchAssignService = batchAssignService;
-        }
-
         /// <summary>
         /// [AUTHORIZED] GET /api/studio
         /// Get list of studios owned by user
@@ -45,8 +32,8 @@ namespace StudioStudio_Server.Controllers
         public async Task<ActionResult<ApiResponse<StudioListResponse>>> GetUserStudios()
         {
             var userId = JwtHelper.ValidateAndGetUserId(User);
-            var result = await _studioService.GetUserStudiosAsync(userId);
-            var message = _messageService.GetMessage(ErrorCodes.SuccessGetData);
+            var result = await studioService.GetUserStudiosAsync(userId);
+            var message = messageService.GetMessage(ErrorCodes.SuccessGetData);
 
             return Ok(ApiResponse<StudioListResponse>.Success(
                 ErrorCodes.SuccessGetData,
@@ -64,8 +51,8 @@ namespace StudioStudio_Server.Controllers
         public async Task<ActionResult<ApiResponse<StudioResponse>>> GetStudioDetail(Guid studioId)
         {
             var userId = JwtHelper.ValidateAndGetUserId(User);
-            var result = await _studioService.GetStudioDetailAsync(userId, studioId);
-            var message = _messageService.GetMessage(ErrorCodes.SuccessGetData);
+            var result = await studioService.GetStudioDetailAsync(userId, studioId);
+            var message = messageService.GetMessage(ErrorCodes.SuccessGetData);
 
             return Ok(ApiResponse<StudioResponse>.Success(
                 ErrorCodes.SuccessGetData,
@@ -84,8 +71,8 @@ namespace StudioStudio_Server.Controllers
         public async Task<ActionResult<ApiResponse<StudioGroupListResponse>>> ViewStudioGroupList(Guid studioId)
         {
             var userId = JwtHelper.ValidateAndGetUserId(User);
-            var result = await _groupService.GetStudioGroupsAsync(userId, studioId);
-            var message = _messageService.GetMessage(ErrorCodes.SuccessGetGroup);
+            var result = await groupService.GetStudioGroupsAsync(userId, studioId);
+            var message = messageService.GetMessage(ErrorCodes.SuccessGetGroup);
 
             return Ok(ApiResponse<StudioGroupListResponse>.Success(
                 ErrorCodes.SuccessGetGroup,
@@ -104,8 +91,8 @@ namespace StudioStudio_Server.Controllers
             [FromBody] CreateStudioRequest request)
         {
             var userId = JwtHelper.ValidateAndGetUserId(User);
-            var result = await _studioService.CreateStudioAsync(userId, request);
-            var message = _messageService.GetMessage(ErrorCodes.SuccessCreateStudio);
+            var result = await studioService.CreateStudioAsync(userId, request);
+            var message = messageService.GetMessage(ErrorCodes.SuccessCreateStudio);
 
             return Ok(ApiResponse<StudioResponse>.Success(
                 ErrorCodes.SuccessCreateStudio,
@@ -126,8 +113,8 @@ namespace StudioStudio_Server.Controllers
             [FromBody] UpdateStudioRequest request)
         {
             var userId = JwtHelper.ValidateAndGetUserId(User);
-            var result = await _studioService.UpdateStudioAsync(userId, request);
-            var message = _messageService.GetMessage(ErrorCodes.SuccessUpdateStudio);
+            var result = await studioService.UpdateStudioAsync(userId, request);
+            var message = messageService.GetMessage(ErrorCodes.SuccessUpdateStudio);
 
             return Ok(ApiResponse<UpdateStudioResponse>.Success(
                 ErrorCodes.SuccessUpdateStudio,
@@ -147,13 +134,12 @@ namespace StudioStudio_Server.Controllers
         public async Task<ActionResult<ApiResponse<object>>> DeleteStudio(Guid studioId)
         {
             var userId = JwtHelper.ValidateAndGetUserId(User);
-            await _studioService.DeleteStudioAsync(userId, studioId);
-            var message = _messageService.GetMessage(ErrorCodes.SuccessDeleteStudio);
+            await studioService.DeleteStudioAsync(userId, studioId);
+            var message = messageService.GetMessage(ErrorCodes.SuccessDeleteStudio);
 
             return Ok(ApiResponse<object>.Success(
                 ErrorCodes.SuccessDeleteStudio,
-                message,
-                null));
+                message));
         }
 
         /// <summary>
@@ -166,8 +152,8 @@ namespace StudioStudio_Server.Controllers
         public async Task<ActionResult<ApiResponse<List<StudioMemberResponse>>>> GetStudioMembers(Guid studioId)
         {
             var userId = JwtHelper.ValidateAndGetUserId(User);
-            var result = await _studioService.GetStudioMembersAsync(userId, studioId);
-            var message = _messageService.GetMessage(ErrorCodes.SuccessGetData);
+            var result = await studioService.GetStudioMembersAsync(userId, studioId);
+            var message = messageService.GetMessage(ErrorCodes.SuccessGetData);
 
             return Ok(ApiResponse<List<StudioMemberResponse>>.Success(
                 ErrorCodes.SuccessGetData,
@@ -187,8 +173,8 @@ namespace StudioStudio_Server.Controllers
         public async Task<ActionResult<ApiResponse<LeaveStudioResponse>>> LeaveStudio(Guid studioId)
         {
             var userId = JwtHelper.ValidateAndGetUserId(User);
-            var result = await _studioService.LeaveStudioAsync(userId, studioId);
-            var message = _messageService.GetMessage(ErrorCodes.SuccessLeaveStudio);
+            var result = await studioService.LeaveStudioAsync(userId, studioId);
+            var message = messageService.GetMessage(ErrorCodes.SuccessLeaveStudio);
 
             return Ok(ApiResponse<LeaveStudioResponse>.Success(
                 ErrorCodes.SuccessLeaveStudio,
@@ -217,23 +203,23 @@ namespace StudioStudio_Server.Controllers
 
             if (file == null || file.Length == 0)
             {
-                throw new AppException(ErrorCodes.ValidationRequiredField, StatusCodes.Status400BadRequest);
+                throw new AppException(ErrorCodes.ValidationRequiredField);
             }
 
             if (file.Length > 5 * 1024 * 1024)
             {
-                throw new AppException(ErrorCodes.ValidationFileTooLarge, StatusCodes.Status400BadRequest);
+                throw new AppException(ErrorCodes.ValidationFileTooLarge);
             }
 
-            using var stream = file.OpenReadStream();
-            var result = await _batchAssignService.BatchAssignAsync(
+            await using var stream = file.OpenReadStream();
+            var result = await batchAssignService.BatchAssignAsync(
                 studioId,
                 userId,
                 stream,
                 file.FileName,
                 cancellationToken);
 
-            var message = _messageService.GetMessage(ErrorCodes.SuccessBatchAssign);
+            var message = messageService.GetMessage(ErrorCodes.SuccessBatchAssign);
             return Ok(ApiResponse<BatchAssignResponse>.Success(
                 ErrorCodes.SuccessBatchAssign,
                 message,
@@ -250,7 +236,7 @@ namespace StudioStudio_Server.Controllers
         public async Task<IActionResult> DownloadBatchAssignTemplate(Guid studioId)
         {
             var userId = JwtHelper.ValidateAndGetUserId(User);
-            var template = await _batchAssignService.GenerateTemplateAsync(studioId, userId);
+            var template = await batchAssignService.GenerateTemplateAsync(studioId, userId);
 
             return File(template, "text/csv", "batch_assign_template.csv");
         }
@@ -270,13 +256,13 @@ namespace StudioStudio_Server.Controllers
             CancellationToken cancellationToken)
         {
             var userId = JwtHelper.ValidateAndGetUserId(User);
-            var result = await _batchAssignService.RandomAssignAsync(
+            var result = await batchAssignService.RandomAssignAsync(
                 studioId,
                 userId,
                 request,
                 cancellationToken);
 
-            var message = _messageService.GetMessage(ErrorCodes.SuccessRandomAssign);
+            var message = messageService.GetMessage(ErrorCodes.SuccessRandomAssign);
             return Ok(ApiResponse<RandomAssignResponse>.Success(
                 ErrorCodes.SuccessRandomAssign,
                 message,
@@ -295,8 +281,8 @@ namespace StudioStudio_Server.Controllers
             [FromBody] ToggleIsOpenRequest request)
         {
             var userId = JwtHelper.ValidateAndGetUserId(User);
-            var result = await _studioService.ToggleIsOpenAsync(userId, studioId, request.IsOpen);
-            var message = _messageService.GetMessage(ErrorCodes.SuccessUpdateStudio);
+            var result = await studioService.ToggleIsOpenAsync(userId, studioId, request.IsOpen);
+            var message = messageService.GetMessage(ErrorCodes.SuccessUpdateStudio);
 
             return Ok(ApiResponse<ToggleIsOpenResponse>.Success(
                 ErrorCodes.SuccessUpdateStudio,
@@ -314,8 +300,8 @@ namespace StudioStudio_Server.Controllers
         public async Task<ActionResult<ApiResponse<StudioPendingMemberListResponse>>> GetPendingMembers(Guid studioId)
         {
             var userId = JwtHelper.ValidateAndGetUserId(User);
-            var result = await _studioService.GetPendingMembersAsync(userId, studioId);
-            var message = _messageService.GetMessage(ErrorCodes.SuccessGetData);
+            var result = await studioService.GetPendingMembersAsync(userId, studioId);
+            var message = messageService.GetMessage(ErrorCodes.SuccessGetData);
 
             return Ok(ApiResponse<StudioPendingMemberListResponse>.Success(
                 ErrorCodes.SuccessGetData,
@@ -335,8 +321,8 @@ namespace StudioStudio_Server.Controllers
             [FromBody] ApproveMemberRequest request)
         {
             var userId = JwtHelper.ValidateAndGetUserId(User);
-            var result = await _studioService.ApproveMemberAsync(userId, studioId, request.UserId);
-            var message = _messageService.GetMessage(ErrorCodes.SuccessUpdateData);
+            var result = await studioService.ApproveMemberAsync(userId, studioId, request.UserId);
+            var message = messageService.GetMessage(ErrorCodes.SuccessUpdateData);
 
             return Ok(ApiResponse<ApproveMemberResponse>.Success(
                 ErrorCodes.SuccessUpdateData,
@@ -356,8 +342,8 @@ namespace StudioStudio_Server.Controllers
             [FromBody] RemoveStudioMemberRequest request)
         {
             var userId = JwtHelper.ValidateAndGetUserId(User);
-            var result = await _studioService.RemoveMemberAsync(userId, request);
-            var message = _messageService.GetMessage(ErrorCodes.SuccessRemoveMember);
+            var result = await studioService.RemoveMemberAsync(userId, request);
+            var message = messageService.GetMessage(ErrorCodes.SuccessRemoveMember);
 
             return Ok(ApiResponse<RemoveStudioMemberResponse>.Success(
                 ErrorCodes.SuccessRemoveMember,
@@ -378,8 +364,8 @@ namespace StudioStudio_Server.Controllers
             [FromBody] ToggleArchiveRequest request)
         {
             var userId = JwtHelper.ValidateAndGetUserId(User);
-            var result = await _studioService.ToggleArchiveStudioAsync(userId, studioId, request.IsArchived);
-            var message = _messageService.GetMessage(ErrorCodes.SuccessUpdateStudio);
+            var result = await studioService.ToggleArchiveStudioAsync(userId, studioId, request.IsArchived);
+            var message = messageService.GetMessage(ErrorCodes.SuccessUpdateStudio);
 
             return Ok(ApiResponse<ArchiveStudioResponse>.Success(
                 ErrorCodes.SuccessUpdateStudio,

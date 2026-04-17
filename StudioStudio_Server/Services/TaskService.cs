@@ -12,51 +12,34 @@ using StudioStudio_Server.Utils;
 
 namespace StudioStudio_Server.Services
 {
-    public class TaskService : ITaskService
+    public class TaskService(
+        ITaskRepository taskRepository,
+        ILogger<TaskService> logger,
+        IMessageService message,
+        IGroupRepository groupRepository,
+        IGroupParticipantRepository participantRepository,
+        IGroupTaskStatusRepository groupTaskStatusRepository,
+        ITaskAssignmentRepository taskAssignmentRepository,
+        IUserRepository userRepository,
+        IPersonalTaskStatusRepository personalTaskStatusRepository,
+        IHttpContextAccessor httpContextAccessor,
+        IActivityLogService activityLogService,
+        INotificationService notificationService,
+        ITaskUpdateNotificationQueue taskUpdateNotificationQueue) : ITaskService
     {
-        private readonly ILogger<TaskService> _logger;
-        private readonly IMessageService _messageService;
-        private readonly ITaskRepository _taskRepository;
-        private readonly IGroupRepository _groupRepository;
-        private readonly IGroupParticipantRepository _participantRepository;
-        private readonly IGroupTaskStatusRepository _groupTaskStatusRepository;
-        private readonly ITaskAssignmentRepository _taskAssignmentRepository;
-        private readonly IUserRepository _userRepository;
-        private readonly IPersonalTaskStatusRepository _personalTaskStatusRepository;
-        private readonly IHttpContextAccessor _httpContextAccessor;
-        private readonly IActivityLogService _activityLogService;
-        private readonly INotificationService _notificationService;
-        private readonly ITaskUpdateNotificationQueue _taskUpdateNotificationQueue;
-
-        public TaskService(
-            ITaskRepository taskRepository,
-            ILogger<TaskService> logger,
-            IMessageService message,
-            IGroupRepository groupRepository,
-            IGroupParticipantRepository participantRepository,
-            IGroupTaskStatusRepository groupTaskStatusRepository,
-            ITaskAssignmentRepository taskAssignmentRepository,
-            IUserRepository userRepository,
-            IPersonalTaskStatusRepository personalTaskStatusRepository,
-            IHttpContextAccessor httpContextAccessor,
-            IActivityLogService activityLogService,
-            INotificationService notificationService,
-            ITaskUpdateNotificationQueue taskUpdateNotificationQueue)
-        {
-            _taskRepository = taskRepository;
-            _logger = logger;
-            _messageService = message;
-            _groupRepository = groupRepository;
-            _participantRepository = participantRepository;
-            _groupTaskStatusRepository = groupTaskStatusRepository;
-            _taskAssignmentRepository = taskAssignmentRepository;
-            _userRepository = userRepository;
-            _personalTaskStatusRepository = personalTaskStatusRepository;
-            _httpContextAccessor = httpContextAccessor;
-            _activityLogService = activityLogService;
-            _notificationService = notificationService;
-            _taskUpdateNotificationQueue = taskUpdateNotificationQueue;
-        }
+        private readonly ILogger<TaskService> _logger = logger;
+        private readonly IMessageService _messageService = message;
+        private readonly ITaskRepository _taskRepository = taskRepository;
+        private readonly IGroupRepository _groupRepository = groupRepository;
+        private readonly IGroupParticipantRepository _participantRepository = participantRepository;
+        private readonly IGroupTaskStatusRepository _groupTaskStatusRepository = groupTaskStatusRepository;
+        private readonly ITaskAssignmentRepository _taskAssignmentRepository = taskAssignmentRepository;
+        private readonly IUserRepository _userRepository = userRepository;
+        private readonly IPersonalTaskStatusRepository _personalTaskStatusRepository = personalTaskStatusRepository;
+        private readonly IHttpContextAccessor _httpContextAccessor = httpContextAccessor;
+        private readonly IActivityLogService _activityLogService = activityLogService;
+        private readonly INotificationService _notificationService = notificationService;
+        private readonly ITaskUpdateNotificationQueue _taskUpdateNotificationQueue = taskUpdateNotificationQueue;
 
         /// <summary>
         /// Validate TaskPriority enum value
@@ -349,6 +332,17 @@ namespace StudioStudio_Server.Services
                 userDict = users.ToDictionary(u => u.UserId);
             }
 
+            // Resolve the user who will be credited for task completion
+            var completionCreditedUserId = userId;
+            if (request.AssigneeId.HasValue && request.AssigneeId.Value != Guid.Empty)
+            {
+                completionCreditedUserId = request.AssigneeId.Value;
+            }
+            else if (oldAssigneeId.HasValue)
+            {
+                completionCreditedUserId = oldAssigneeId.Value;
+            }
+
             // Update basic fields
             if (!string.IsNullOrWhiteSpace(request.TaskName))
             {
@@ -407,7 +401,7 @@ namespace StudioStudio_Server.Services
                 if (reachedCompletion)
                 {
                     await _activityLogService.LogTaskCompleteAsync(
-                        userId, task.TaskId, task.GroupId,
+                        completionCreditedUserId, task.TaskId, task.GroupId,
                         (int)task.Priority, (int)task.Severity);
                 }
 

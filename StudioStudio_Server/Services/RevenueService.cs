@@ -9,18 +9,12 @@ using PaymentStatusEnum = StudioStudio_Server.Models.Enums.PaymentStatus;
 
 namespace StudioStudio_Server.Services
 {
-    public class RevenueService : IRevenueService
+    public class RevenueService(
+        StudioDbContext db,
+        ILogger<RevenueService> logger) : IRevenueService
     {
-        private readonly StudioDbContext _db;
-        private readonly ILogger<RevenueService> _logger;
-
-        public RevenueService(
-            StudioDbContext db,
-            ILogger<RevenueService> logger)
-        {
-            _db = db;
-            _logger = logger;
-        }
+        private readonly StudioDbContext _db = db;
+        private readonly ILogger<RevenueService> _logger = logger;
 
         #region Revenue Overview
 

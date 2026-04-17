@@ -1,14 +1,8 @@
 ﻿namespace StudioStudio_Server.Exceptions
 {
-    public class AppException : Exception
+    public class AppException(string code, int httpStatus = StatusCodes.Status400BadRequest, Exception? inner = null) : Exception(code, inner)
     {
-        public string Code { get; }
-        public int HttpStatus { get; }
-
-        public AppException(string code, int httpStatus = StatusCodes.Status400BadRequest, Exception? inner = null) : base(code, inner)
-        {
-            Code = code;
-            HttpStatus = httpStatus;
-        }
+        public string Code { get; } = code;
+        public int HttpStatus { get; } = httpStatus;
     }
 }

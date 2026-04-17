@@ -1,20 +1,18 @@
 using System.Diagnostics;
-using System.Text.Json;
 using System.Text.Json.Nodes;
 using StudioStudio_Server.Repositories.Interfaces;
+using StudioStudio_Server.Services.AI.Interfaces;
 using StudioStudio_Server.Services.AI.Models;
-using StudioStudio_Server.Services.AI.Tools.Interfaces;
 
 namespace StudioStudio_Server.Services.AI.Tools;
 
 [DebuggerStepThrough]
-public class GetStudioHealthTool : IAITool
+public class GetStudioHealthTool(
+    IStudioRepository studioRepository,
+    ITaskRepository taskRepository,
+    IGroupParticipantRepository participantRepository,
+    ILogger<GetStudioHealthTool> logger) : IAITool
 {
-    private readonly IStudioRepository _studioRepository;
-    private readonly ITaskRepository _taskRepository;
-    private readonly IGroupParticipantRepository _participantRepository;
-    private readonly IAnalyticsRepository _analyticsRepository;
-    private readonly ILogger<GetStudioHealthTool> _logger;
 
     public string Name => "get_studio_health";
     public string Description => "Kiem tra suc khoe tong the cua Studio. Khong can tham so (studio_id tu dong lay tu context).";
@@ -24,20 +22,6 @@ public class GetStudioHealthTool : IAITool
         ["properties"] = new JsonObject { },
         ["required"] = new JsonArray()
     };
-
-    public GetStudioHealthTool(
-        IStudioRepository studioRepository,
-        ITaskRepository taskRepository,
-        IGroupParticipantRepository participantRepository,
-        IAnalyticsRepository analyticsRepository,
-        ILogger<GetStudioHealthTool> logger)
-    {
-        _studioRepository = studioRepository;
-        _taskRepository = taskRepository;
-        _participantRepository = participantRepository;
-        _analyticsRepository = analyticsRepository;
-        _logger = logger;
-    }
 
     private static string? Js(JsonNode? n) => n?.GetValue<string>();
 
@@ -53,11 +37,11 @@ public class GetStudioHealthTool : IAITool
 
             var studioId = context.StudioId.Value;
 
-            var studio = await _studioRepository.GetByIdAsync(studioId);
+            var studio = await studioRepository.GetByIdAsync(studioId);
             if (studio == null)
                 return AIQueryResult.Error("Khong tim thay studio");
 
-            var groups = await _studioRepository.GetGroupsByStudioIdAsync(studioId);
+            var groups = await studioRepository.GetGroupsByStudioIdAsync(studioId);
             if (groups.Count == 0)
                 return AIQueryResult.Error("Studio khong co nhom nao");
 
@@ -66,8 +50,8 @@ public class GetStudioHealthTool : IAITool
 
             // Batch: all task stats in 1 query
             var groupIds = groups.Select(g => g.GroupId).ToList();
-            var taskStatsMap = await _taskRepository.GetGroupTaskStatisticsBatchAsync(groupIds);
-            var participantCountsMap = await _participantRepository.GetParticipantCountsBatchAsync(groupIds);
+            var taskStatsMap = await taskRepository.GetGroupTaskStatisticsBatchAsync(groupIds);
+            var participantCountsMap = await participantRepository.GetParticipantCountsBatchAsync(groupIds);
 
             var groupStats = new List<(Guid groupId, string name, int total, int completed, int overdue, int members)>();
             foreach (var group in groups)
@@ -129,7 +113,7 @@ public class GetStudioHealthTool : IAITool
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "GetStudioHealthTool error");
+            logger.LogError(ex, "GetStudioHealthTool error");
             return AIQueryResult.Error("Da xay ra loi khi kiem tra suc khoe studio");
         }
     }

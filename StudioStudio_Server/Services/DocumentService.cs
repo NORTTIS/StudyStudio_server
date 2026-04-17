@@ -27,22 +27,36 @@ namespace StudioStudio_Server.Services
     /// Service for document upload, processing and embedding
     /// Flow: Request Upload → Upload to B2 → Complete → Queue → Background Processing → Qdrant
     /// </summary>
-    public class DocumentService : IDocumentService
+    public class DocumentService(
+        IGroupAttachmentRepository attachmentRepository,
+        IGroupParticipantRepository groupParticipantRepository,
+        IFileStorageService fileStorageService,
+        IVectorDatabaseService vectorDbService,
+        IEmbeddingService embeddingService,
+        IUserRepository userRepository,
+        IServiceScopeFactory serviceScopeFactory,
+        IEmbeddingQueue embeddingQueue,
+        IDeleteQueue deleteQueue,
+        ILogger<DocumentService> logger,
+        IGroupRepository groupRepository,
+        IUserSubscriptionRepository userSubscriptionRepository,
+        IHttpContextAccessor httpContextAccessor,
+        ICacheService cacheService) : IDocumentService
     {
-        private readonly IGroupAttachmentRepository _attachmentRepository;
-        private readonly IGroupParticipantRepository _groupParticipantRepository;
-        private readonly IFileStorageService _fileStorageService;
-        private readonly IVectorDatabaseService _vectorDbService;
-        private readonly IEmbeddingService _embeddingService;
-        private readonly IUserRepository _userRepository;
-        private readonly IServiceScopeFactory _serviceScopeFactory;
-        private readonly IEmbeddingQueue _embeddingQueue;
-        private readonly IDeleteQueue _deleteQueue;
-        private readonly ILogger<DocumentService> _logger;
-        private readonly IGroupRepository _groupRepository;
-        private readonly IUserSubscriptionRepository _userSubscriptionRepository;
-        private readonly IHttpContextAccessor _httpContextAccessor;
-        private readonly ICacheService _cacheService;
+        private readonly IGroupAttachmentRepository _attachmentRepository = attachmentRepository;
+        private readonly IGroupParticipantRepository _groupParticipantRepository = groupParticipantRepository;
+        private readonly IFileStorageService _fileStorageService = fileStorageService;
+        private readonly IVectorDatabaseService _vectorDbService = vectorDbService;
+        private readonly IEmbeddingService _embeddingService = embeddingService;
+        private readonly IUserRepository _userRepository = userRepository;
+        private readonly IServiceScopeFactory _serviceScopeFactory = serviceScopeFactory;
+        private readonly IEmbeddingQueue _embeddingQueue = embeddingQueue;
+        private readonly IDeleteQueue _deleteQueue = deleteQueue;
+        private readonly ILogger<DocumentService> _logger = logger;
+        private readonly IGroupRepository _groupRepository = groupRepository;
+        private readonly IUserSubscriptionRepository _userSubscriptionRepository = userSubscriptionRepository;
+        private readonly IHttpContextAccessor _httpContextAccessor = httpContextAccessor;
+        private readonly ICacheService _cacheService = cacheService;
 
         // Allowed file extensions for upload
         private static readonly HashSet<string> AllowedExtensions = new()
@@ -59,38 +73,6 @@ namespace StudioStudio_Server.Services
             "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
             "application/msword"
         };
-
-        public DocumentService(
-            IGroupAttachmentRepository attachmentRepository,
-            IGroupParticipantRepository groupParticipantRepository,
-            IFileStorageService fileStorageService,
-            IVectorDatabaseService vectorDbService,
-            IEmbeddingService embeddingService,
-            IUserRepository userRepository,
-            IServiceScopeFactory serviceScopeFactory,
-            IEmbeddingQueue embeddingQueue,
-            IDeleteQueue deleteQueue,
-            ILogger<DocumentService> logger,
-            IGroupRepository groupRepository,
-            IUserSubscriptionRepository userSubscriptionRepository,
-            IHttpContextAccessor httpContextAccessor,
-            ICacheService cacheService)
-        {
-            _attachmentRepository = attachmentRepository;
-            _groupParticipantRepository = groupParticipantRepository;
-            _fileStorageService = fileStorageService;
-            _vectorDbService = vectorDbService;
-            _embeddingService = embeddingService;
-            _userRepository = userRepository;
-            _serviceScopeFactory = serviceScopeFactory;
-            _embeddingQueue = embeddingQueue;
-            _deleteQueue = deleteQueue;
-            _logger = logger;
-            _groupRepository = groupRepository;
-            _userSubscriptionRepository = userSubscriptionRepository;
-            _httpContextAccessor = httpContextAccessor;
-            _cacheService = cacheService;
-        }
 
         /// <summary>
         /// STEP 1: Request upload URL

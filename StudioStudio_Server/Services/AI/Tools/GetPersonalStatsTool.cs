@@ -1,11 +1,9 @@
 using System.Diagnostics;
-using System.Text.Json;
 using System.Text.Json.Nodes;
 using StudioStudio_Server.Repositories.Interfaces;
 using StudioStudio_Server.Services.AI.Models;
-using StudioStudio_Server.Services.AI.Tools.Interfaces;
-using StudioStudio_Server.Models.Entities;
 using StudioStudio_Server.Models.Enums;
+using StudioStudio_Server.Services.AI.Interfaces;
 
 namespace StudioStudio_Server.Services.AI.Tools;
 
@@ -13,13 +11,12 @@ namespace StudioStudio_Server.Services.AI.Tools;
 /// Tool để lấy thống kê cá nhân của user (từ AnalyticsRepository)
 /// Scope: Personal AI (UserId only)
 /// </summary>
-public class GetPersonalStatsTool : IAITool
+public class GetPersonalStatsTool(
+    ITaskRepository taskRepository,
+    IGroupRepository groupRepository,
+    IAnalyticsRepository analyticsRepository,
+    ILogger<GetPersonalStatsTool> logger) : IAITool
 {
-    private readonly ITaskRepository _taskRepository;
-    private readonly IGroupRepository _groupRepository;
-    private readonly IAnalyticsRepository _analyticsRepository;
-    private readonly ILogger<GetPersonalStatsTool> _logger;
-
     public string Name => "get_personal_stats";
     public string Description => "Lay thong ke nang suất ca nhan: task hoan thanh, ti le hoan thanh, muc do hoat dong. Khong can tham so.";
 
@@ -29,18 +26,6 @@ public class GetPersonalStatsTool : IAITool
         ["properties"] = new JsonObject { },
         ["required"] = new JsonArray()
     };
-
-    public GetPersonalStatsTool(
-        ITaskRepository taskRepository,
-        IGroupRepository groupRepository,
-        IAnalyticsRepository analyticsRepository,
-        ILogger<GetPersonalStatsTool> logger)
-    {
-        _taskRepository = taskRepository;
-        _groupRepository = groupRepository;
-        _analyticsRepository = analyticsRepository;
-        _logger = logger;
-    }
 
     public bool ValidateParameters(JsonObject parameters) => true;
 
@@ -53,7 +38,7 @@ public class GetPersonalStatsTool : IAITool
             var weekStart = DateOnly.FromDateTime(now.AddDays(-(int)now.DayOfWeek));
 
             // Get personal tasks
-            var allTasks = await _taskRepository.GetPersonalTasksByOwnerAsync(context.UserId);
+            var allTasks = await taskRepository.GetPersonalTasksByOwnerAsync(context.UserId);
 
             // Dung Progress>=100 lam dinh nghia "hoan thanh" (thong nhat voi GroupAnalyticsJob)
             var completedTasks = allTasks.Where(t => t.Progress >= 100).ToList();
@@ -68,7 +53,7 @@ public class GetPersonalStatsTool : IAITool
                 .ToList();
 
             // Get group memberships for context
-            var userGroups = await _groupRepository.GetUserGroupsAsync(context.UserId);
+            var userGroups = await groupRepository.GetUserGroupsAsync(context.UserId);
 
             // Calculate completion rate
             double completionRate = allTasks.Count > 0
@@ -85,7 +70,7 @@ public class GetPersonalStatsTool : IAITool
             var userGroupIds = userGroups.Select(g => g.GroupId).ToList();
             if (userGroupIds.Count > 0)
             {
-                var activityScores = await _analyticsRepository.GetUserGroupActivityScoresAsync(userGroupIds, context.UserId, now.AddDays(-7), now);
+                var activityScores = await analyticsRepository.GetUserGroupActivityScoresAsync(userGroupIds, context.UserId, now.AddDays(-7), now);
                 productivityScore = activityScores.Values.Sum();
             }
 
@@ -127,7 +112,7 @@ public class GetPersonalStatsTool : IAITool
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "GetPersonalStatsTool error for UserId={UserId}", context.UserId);
+            logger.LogError(ex, "GetPersonalStatsTool error for UserId={UserId}", context.UserId);
             return AIQueryResult.Error("Da xay ra loi khi lay thong ke ca nhan.");
         }
     }

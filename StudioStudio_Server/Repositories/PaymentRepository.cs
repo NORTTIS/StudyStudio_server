@@ -6,14 +6,9 @@ using PaymentStatusEnum = StudioStudio_Server.Models.Enums.PaymentStatus;
 
 namespace StudioStudio_Server.Repositories
 {
-    public class PaymentRepository : IPaymentRepository
+    public class PaymentRepository(StudioDbContext db) : IPaymentRepository
     {
-        private readonly StudioDbContext _db;
-
-        public PaymentRepository(StudioDbContext db)
-        {
-            _db = db;
-        }
+        private readonly StudioDbContext _db = db;
 
         public async Task<Payment?> GetByOrderCodeAsync(long orderCode)
         {

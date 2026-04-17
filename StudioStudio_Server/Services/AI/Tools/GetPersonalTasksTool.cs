@@ -1,10 +1,8 @@
 using System.Diagnostics;
-using System.Text.Json;
 using System.Text.Json.Nodes;
-using StudioStudio_Server.Models.Entities;
 using StudioStudio_Server.Repositories.Interfaces;
+using StudioStudio_Server.Services.AI.Interfaces;
 using StudioStudio_Server.Services.AI.Models;
-using StudioStudio_Server.Services.AI.Tools.Interfaces;
 
 namespace StudioStudio_Server.Services.AI.Tools;
 
@@ -12,12 +10,11 @@ namespace StudioStudio_Server.Services.AI.Tools;
 /// Tool để lấy công việc của user (cá nhân + được assign từ active groups)
 /// Scope: Personal AI (UserId only)
 /// </summary>
-public class GetPersonalTasksTool : IAITool
+public class GetPersonalTasksTool(
+    ITaskRepository taskRepository,
+    IGroupRepository groupRepository,
+    ILogger<GetPersonalTasksTool> logger) : IAITool
 {
-    private readonly ITaskRepository _taskRepository;
-    private readonly IGroupRepository _groupRepository;
-    private readonly ILogger<GetPersonalTasksTool> _logger;
-
     public string Name => "get_personal_tasks";
     public string Description => "Lay danh sach tat ca cong viec cua nguoi dung (ca nhan va duoc assign tu nhom). Khong can group_id.";
 
@@ -30,16 +27,6 @@ public class GetPersonalTasksTool : IAITool
         },
         ["required"] = new JsonArray()
     };
-
-    public GetPersonalTasksTool(
-        ITaskRepository taskRepository,
-        IGroupRepository groupRepository,
-        ILogger<GetPersonalTasksTool> logger)
-    {
-        _taskRepository = taskRepository;
-        _groupRepository = groupRepository;
-        _logger = logger;
-    }
 
     private static string? Js(JsonNode? n) => n?.GetValue<string>();
     private static int Ji(JsonNode? n) => n == null ? 0 : n.GetValue<int>();
@@ -57,11 +44,11 @@ public class GetPersonalTasksTool : IAITool
             var now = DateTime.UtcNow;
 
             // 1. Personal tasks with limit (OwnerId = userId, GroupId = null)
-            var personalTasks = await _taskRepository.GetPersonalTasksByOwnerAsync(context.UserId, limit);
+            var personalTasks = await taskRepository.GetPersonalTasksByOwnerAsync(context.UserId, limit);
 
             // 2. Assigned group tasks from active groups with limit
-            var assignedTasks = await _taskRepository.GetAssignedGroupTasksByUserAsync(context.UserId, limit);
-            var userGroups = await _groupRepository.GetUserGroupsAsync(context.UserId);
+            var assignedTasks = await taskRepository.GetAssignedGroupTasksByUserAsync(context.UserId, limit);
+            var userGroups = await groupRepository.GetUserGroupsAsync(context.UserId);
             var activeGroupIds = userGroups.Where(g => g.IsActive).Select(g => g.GroupId).ToHashSet();
 
             var groupTasks = assignedTasks
@@ -113,7 +100,7 @@ public class GetPersonalTasksTool : IAITool
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "GetPersonalTasksTool error for UserId={UserId}", context.UserId);
+            logger.LogError(ex, "GetPersonalTasksTool error for UserId={UserId}", context.UserId);
             return AIQueryResult.Error("Da xay ra loi khi lay danh sach cong viec.");
         }
     }

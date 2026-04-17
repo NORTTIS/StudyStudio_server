@@ -8,14 +8,9 @@ namespace StudioStudio_Server.Repositories
     /// <summary>
     /// Repository implementation cho AI Request Log tracking
     /// </summary>
-    public class AIRequestLogRepository : IAIRequestLogRepository
+    public class AIRequestLogRepository(StudioDbContext context) : IAIRequestLogRepository
     {
-        private readonly StudioDbContext _context;
-
-        public AIRequestLogRepository(StudioDbContext context)
-        {
-            _context = context;
-        }
+        private readonly StudioDbContext _context = context;
 
         /// <summary>
         /// Log m?t AI request vào database

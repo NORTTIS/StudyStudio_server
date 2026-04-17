@@ -6,19 +6,14 @@ using StudioStudio_Server.Repositories.Interfaces;
 namespace StudioStudio_Server.Repositories
 {
     /// <summary>
-    /// Repository x? l? các thao tác CRUD v?i TaskComment entity
+    /// Repository x? l? cï¿½c thao tï¿½c CRUD v?i TaskComment entity
     /// </summary>
-    public class TaskCommentRepository : ITaskCommentRepository
+    public class TaskCommentRepository(StudioDbContext context) : ITaskCommentRepository
     {
-        private readonly StudioDbContext _context;
-
-        public TaskCommentRepository(StudioDbContext context)
-        {
-            _context = context;
-        }
+        private readonly StudioDbContext _context = context;
 
         /// <summary>
-        /// Thêm m?i m?t comment vào database
+        /// Thï¿½m m?i m?t comment vï¿½o database
         /// </summary>
         public async Task<TaskComment> AddAsync(TaskComment comment)
         {
@@ -28,8 +23,8 @@ namespace StudioStudio_Server.Repositories
         }
 
         /// <summary>
-        /// L?y comment theo ID (không load replies)
-        /// Ði?u ki?n: CommentId = {commentId}
+        /// L?y comment theo ID (khï¿½ng load replies)
+        /// ï¿½i?u ki?n: CommentId = {commentId}
         /// Include: User info
         /// </summary>
         public async Task<TaskComment?> GetByIdAsync(Guid commentId)
@@ -41,10 +36,10 @@ namespace StudioStudio_Server.Repositories
         }
 
         /// <summary>
-        /// L?y comment theo ID kèm t?t c? replies (nested up to 2 levels)
-        /// Ði?u ki?n: CommentId = {commentId}
+        /// L?y comment theo ID kï¿½m t?t c? replies (nested up to 2 levels)
+        /// ï¿½i?u ki?n: CommentId = {commentId}
         /// Include: User info, Replies ? User, Replies ? Replies ? User
-        /// Use case: Load full comment thread khi delete (ð? delete t?t c? replies)
+        /// Use case: Load full comment thread khi delete (ï¿½? delete t?t c? replies)
         /// </summary>
         public async Task<TaskComment?> GetByIdWithRepliesAsync(Guid commentId)
         {
@@ -60,10 +55,10 @@ namespace StudioStudio_Server.Repositories
         }
 
         /// <summary>
-        /// L?y danh sách parent comments c?a task (pagination)
-        /// Ði?u ki?n: TaskId = {taskId} AND IsDeleted = false AND ParentCommentId = null
-        /// Include: User info, Replies (1 level, ch? replies không b? xóa)
-        /// S?p x?p: CreatedAt DESC (comment m?i nh?t trý?c)
+        /// L?y danh sï¿½ch parent comments c?a task (pagination)
+        /// ï¿½i?u ki?n: TaskId = {taskId} AND IsDeleted = false AND ParentCommentId = null
+        /// Include: User info, Replies (1 level, ch? replies khï¿½ng b? xï¿½a)
+        /// S?p x?p: CreatedAt DESC (comment m?i nh?t trï¿½?c)
         /// Pagination: Skip({offset}).Take({limit})
         /// </summary>
         public async Task<List<TaskComment>> GetByTaskIdAsync(Guid taskId, int limit = 100, int offset = 0)
@@ -81,8 +76,8 @@ namespace StudioStudio_Server.Repositories
         }
 
         /// <summary>
-        /// Ð?m t?ng s? parent comments c?a task
-        /// Ði?u ki?n: TaskId = {taskId} AND IsDeleted = false AND ParentCommentId = null
+        /// ï¿½?m t?ng s? parent comments c?a task
+        /// ï¿½i?u ki?n: TaskId = {taskId} AND IsDeleted = false AND ParentCommentId = null
         /// </summary>
         public async Task<int> GetCountByTaskIdAsync(Guid taskId)
         {
@@ -92,8 +87,8 @@ namespace StudioStudio_Server.Repositories
         }
 
         /// <summary>
-        /// Ð?m s? replies c?a m?t comment
-        /// Ði?u ki?n: ParentCommentId = {commentId} AND IsDeleted = false
+        /// ï¿½?m s? replies c?a m?t comment
+        /// ï¿½i?u ki?n: ParentCommentId = {commentId} AND IsDeleted = false
         /// </summary>
         public async Task<int> GetReplyCountAsync(Guid commentId)
         {
@@ -103,8 +98,8 @@ namespace StudioStudio_Server.Repositories
         }
 
         /// <summary>
-        /// Soft delete comment và t?t c? replies (recursive)
-        /// Set IsDeleted = true cho comment và t?t c? replies nested
+        /// Soft delete comment vï¿½ t?t c? replies (recursive)
+        /// Set IsDeleted = true cho comment vï¿½ t?t c? replies nested
         /// Update UpdatedAt = UtcNow
         /// </summary>
         public async Task SoftDeleteWithRepliesAsync(Guid commentId)

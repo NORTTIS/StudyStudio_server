@@ -14,41 +14,28 @@ using PaymentStatusEnum = StudioStudio_Server.Models.Enums.PaymentStatus;
 
 namespace StudioStudio_Server.Services
 {
-    public class PaymentService : IPaymentService
+    public class PaymentService(
+        PayOSClient payOSClient,
+        IPaymentRepository paymentRepository,
+        IUserSubscriptionRepository subscriptionRepository,
+        IUserRepository userRepository,
+        IEmailService emailService,
+        StudioDbContext db,
+        IConfiguration configuration,
+        ILogger<PaymentService> logger,
+        ICacheService cacheService) : IPaymentService
     {
         private const int PAYOS_CANCEL_TIME = 15;
 
-        private readonly PayOSClient _payOSClient;
-        private readonly IPaymentRepository _paymentRepository;
-        private readonly IUserSubscriptionRepository _subscriptionRepository;
-        private readonly IUserRepository _userRepository;
-        private readonly IEmailService _emailService;
-        private readonly StudioDbContext _db;
-        private readonly IConfiguration _configuration;
-        private readonly ILogger<PaymentService> _logger;
-        private readonly ICacheService _cacheService;
-
-        public PaymentService(
-            PayOSClient payOSClient,
-            IPaymentRepository paymentRepository,
-            IUserSubscriptionRepository subscriptionRepository,
-            IUserRepository userRepository,
-            IEmailService emailService,
-            StudioDbContext db,
-            IConfiguration configuration,
-            ILogger<PaymentService> logger,
-            ICacheService cacheService)
-        {
-            _payOSClient = payOSClient;
-            _paymentRepository = paymentRepository;
-            _subscriptionRepository = subscriptionRepository;
-            _userRepository = userRepository;
-            _emailService = emailService;
-            _db = db;
-            _configuration = configuration;
-            _logger = logger;
-            _cacheService = cacheService;
-        }
+        private readonly PayOSClient _payOSClient = payOSClient;
+        private readonly IPaymentRepository _paymentRepository = paymentRepository;
+        private readonly IUserSubscriptionRepository _subscriptionRepository = subscriptionRepository;
+        private readonly IUserRepository _userRepository = userRepository;
+        private readonly IEmailService _emailService = emailService;
+        private readonly StudioDbContext _db = db;
+        private readonly IConfiguration _configuration = configuration;
+        private readonly ILogger<PaymentService> _logger = logger;
+        private readonly ICacheService _cacheService = cacheService;
 
         public async Task<CreatePaymentResponse> CreatePaymentLinkAsync(Guid userId, CreatePaymentRequest request)
         {

@@ -15,11 +15,13 @@ namespace StudioStudio_Server.Services
     /// Rate limit: 5 reset emails per 15 minutes per email address
     /// Storage: Redis with key prefixes for token data and rate limiting
     /// </summary>
-    public class PasswordResetCacheService : IPasswordResetCacheService
+    public class PasswordResetCacheService(
+        IConnectionMultiplexer redis,
+        ILogger<PasswordResetCacheService> logger) : IPasswordResetCacheService
     {
-        private readonly IConnectionMultiplexer _redis;
-        private readonly IDatabase _database;
-        private readonly ILogger<PasswordResetCacheService> _logger;
+        private readonly IConnectionMultiplexer _redis = redis;
+        private readonly IDatabase _database = redis.GetDatabase();
+        private readonly ILogger<PasswordResetCacheService> _logger = logger;
 
         // Redis key prefixes
         private const string TOKEN_BY_EMAIL_PREFIX = "reset_password:token_by_email:";
@@ -29,15 +31,6 @@ namespace StudioStudio_Server.Services
         // Rate limit settings
         private const int MAX_REQUESTS_PER_WINDOW = 5;
         private static readonly TimeSpan RATE_LIMIT_WINDOW = TimeSpan.FromMinutes(15);
-
-        public PasswordResetCacheService(
-            IConnectionMultiplexer redis,
-            ILogger<PasswordResetCacheService> logger)
-        {
-            _redis = redis;
-            _database = redis.GetDatabase();
-            _logger = logger;
-        }
 
         /// <summary>
         /// Retrieve password reset data by token from Redis

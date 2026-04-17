@@ -16,19 +16,10 @@ namespace StudioStudio_Server.Controllers.Admin
     [Route("api/admin/billing")]
     [ApiController]
     [Authorize]
-    public class AdminBillingController : ControllerBase
+    public class AdminBillingController(
+        IPaymentService paymentService,
+        IMessageService messageService) : ControllerBase
     {
-        private readonly IPaymentService _paymentService;
-        private readonly IMessageService _messageService;
-
-        public AdminBillingController(
-            IPaymentService paymentService,
-            IMessageService messageService)
-        {
-            _paymentService = paymentService;
-            _messageService = messageService;
-        }
-
         /// <summary>
         /// [ADMIN] GET /api/admin/billing/history
         /// Get paginated billing history with filters
@@ -51,8 +42,8 @@ namespace StudioStudio_Server.Controllers.Admin
             if (request.PageSize < 1) request.PageSize = 10;
             if (request.PageSize > 100) request.PageSize = 100;
 
-            var response = await _paymentService.GetBillingHistoryAsync(request);
-            var message = _messageService.GetMessage(ErrorCodes.SuccessGetData);
+            var response = await paymentService.GetBillingHistoryAsync(request);
+            var message = messageService.GetMessage(ErrorCodes.SuccessGetData);
 
             return Ok(ApiResponse<BillingHistoryResponse>.Success(
                 ErrorCodes.SuccessGetData,

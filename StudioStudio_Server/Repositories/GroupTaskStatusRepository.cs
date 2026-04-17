@@ -10,16 +10,11 @@ namespace StudioStudio_Server.Repositories
     /// Note: GroupTaskStatus = Kanban columns (To Do, In Progress, Done, etc.)
     /// Uses index-based position with midpoint ranking strategy
     /// </summary>
-    public class GroupTaskStatusRepository : IGroupTaskStatusRepository
+    public class GroupTaskStatusRepository(StudioDbContext context) : IGroupTaskStatusRepository
     {
-        private readonly StudioDbContext _context;
+        private readonly StudioDbContext _context = context;
         private const int MAX_RETRY = 3;
         private const long STEP = 1000;
-
-        public GroupTaskStatusRepository(StudioDbContext context)
-        {
-            _context = context;
-        }
 
         /// <summary>
         /// Get list of task statuses for group

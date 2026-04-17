@@ -7,7 +7,6 @@ using StudioStudio_Server.Models.Caches;
 using StudioStudio_Server.Models.DTOs.Request;
 using StudioStudio_Server.Models.DTOs.Response;
 using StudioStudio_Server.Models.Entities;
-using StudioStudio_Server.Models.Enums;
 using StudioStudio_Server.Repositories.Interfaces;
 using StudioStudio_Server.Services.Interfaces;
 using System.Security.Claims;
@@ -22,43 +21,18 @@ namespace StudioStudio_Server.Controllers
     [Route("api/invite")]
     [ApiController]
     [Authorize]
-    public class GroupInviteController : ControllerBase
+    public class GroupInviteController(
+        IGroupInviteService groupInviteService,
+        IGroupRepository groupRepository,
+        IGroupParticipantRepository groupParticipantRepository,
+        IStudioParticipantRepository studioParticipantRepository,
+        IUserSubscriptionRepository userSubscriptionRepository,
+        IEmailService emailService,
+        IUserRepository userRepository,
+        IMessageService messageService,
+        IConfiguration configuration,
+        ILogger<GroupInviteController> logger) : ControllerBase
     {
-        private readonly IGroupInviteService _groupInviteService;
-        private readonly IGroupRepository _groupRepository;
-        private readonly IGroupParticipantRepository _groupParticipantRepository;
-        private readonly IStudioParticipantRepository _studioParticipantRepository;
-        private readonly IUserSubscriptionRepository _userSubscriptionRepository;
-        private readonly IEmailService _emailService;
-        private readonly IUserRepository _userRepository;
-        private readonly IMessageService _messageService;
-        private readonly IConfiguration _configuration;
-        private readonly ILogger<GroupInviteController> _logger;
-
-        public GroupInviteController(
-            IGroupInviteService groupInviteService,
-            IGroupRepository groupRepository,
-            IGroupParticipantRepository groupParticipantRepository,
-            IStudioParticipantRepository studioParticipantRepository,
-            IUserSubscriptionRepository userSubscriptionRepository,
-            IEmailService emailService,
-            IUserRepository userRepository,
-            IMessageService messageService,
-            IConfiguration configuration,
-            ILogger<GroupInviteController> logger)
-        {
-            _groupInviteService = groupInviteService;
-            _groupRepository = groupRepository;
-            _groupParticipantRepository = groupParticipantRepository;
-            _studioParticipantRepository = studioParticipantRepository;
-            _userSubscriptionRepository = userSubscriptionRepository;
-            _emailService = emailService;
-            _userRepository = userRepository;
-            _messageService = messageService;
-            _configuration = configuration;
-            _logger = logger;
-        }
-
         /// <summary>
         /// Authenticate and get userId from JWT token
         /// Validate: User must not be admin
@@ -95,18 +69,16 @@ namespace StudioStudio_Server.Controllers
         /// </summary>
         private GroupRole ValidateAndParseRole(string roleString)
         {
-            if (!Enum.TryParse<GroupRole>(roleString, true, out GroupRole role))
+            if (!Enum.TryParse(roleString, true, out GroupRole role))
             {
                 throw new AppException(
-                    ErrorCodes.InviteInvalidRole,
-                    StatusCodes.Status400BadRequest);
+                    ErrorCodes.InviteInvalidRole);
             }
 
             if (role == GroupRole.Owner)
             {
                 throw new AppException(
-                    ErrorCodes.InviteInvalidRole,
-                    StatusCodes.Status400BadRequest);
+                    ErrorCodes.InviteInvalidRole);
             }
 
             return role;
@@ -117,7 +89,7 @@ namespace StudioStudio_Server.Controllers
         /// </summary>
         private async Task ValidateInvitePermissionAsync(Guid groupId, Guid userId)
         {
-            var userParticipant = await _groupParticipantRepository
+            var userParticipant = await groupParticipantRepository
                 .GetByGroupAndUserAsync(groupId, userId);
 
             if (userParticipant == null ||
@@ -137,18 +109,17 @@ namespace StudioStudio_Server.Controllers
         {
             if (role == GroupRole.Moderator)
             {
-                int moderatorCount = await _groupParticipantRepository
+                int moderatorCount = await groupParticipantRepository
                     .GetRoleCountByGroupIdAsync(groupId, GroupRole.Moderator);
 
                 if (moderatorCount > 0)
                 {
-                    _logger.LogWarning(
+                    logger.LogWarning(
                         "Attempt to invite Moderator for group {GroupId} that already has a Moderator",
                         groupId);
 
                     throw new AppException(
-                        ErrorCodes.GroupOnlyOneModerator,
-                        StatusCodes.Status400BadRequest);
+                        ErrorCodes.GroupOnlyOneModerator);
                 }
             }
         }
@@ -170,7 +141,7 @@ namespace StudioStudio_Server.Controllers
             var userId = ValidateAndGetUserId();
             var role = ValidateAndParseRole(request.Role);
 
-            var group = await _groupRepository.GetByIdAsync(request.GroupId);
+            var group = await groupRepository.GetByIdAsync(request.GroupId);
             if (group == null)
             {
                 throw new AppException(
@@ -188,7 +159,7 @@ namespace StudioStudio_Server.Controllers
             await ValidateInvitePermissionAsync(request.GroupId, userId);
             await ValidateModeratorRoleAsync(request.GroupId, role);
 
-            bool canCreate = await _groupInviteService
+            bool canCreate = await groupInviteService
                 .CheckInviteCreationRateLimitAsync(request.GroupId, userId);
 
             if (!canCreate)
@@ -198,7 +169,7 @@ namespace StudioStudio_Server.Controllers
                     StatusCodes.Status429TooManyRequests);
             }
 
-            string token = await _groupInviteService.GenerateInviteTokenAsync();
+            string token = await groupInviteService.GenerateInviteTokenAsync();
 
             var inviteData = new GroupInviteToken
             {
@@ -208,7 +179,7 @@ namespace StudioStudio_Server.Controllers
                 CreatedAt = DateTime.UtcNow
             };
 
-            bool stored = await _groupInviteService.StoreInviteTokenAsync(token, inviteData);
+            bool stored = await groupInviteService.StoreInviteTokenAsync(token, inviteData);
             if (!stored)
             {
                 throw new AppException(
@@ -216,7 +187,7 @@ namespace StudioStudio_Server.Controllers
                     StatusCodes.Status500InternalServerError);
             }
 
-            string frontendUrl = _configuration["Frontend:BaseUrl"] ?? "http://localhost:3000";
+            string frontendUrl = configuration["Frontend:BaseUrl"] ?? "http://localhost:3000";
             string inviteUrl = $"{frontendUrl}/invite/{token}";
 
             var response = new CreateInviteLinkResponse
@@ -228,11 +199,11 @@ namespace StudioStudio_Server.Controllers
                 CreatedAt = inviteData.CreatedAt
             };
 
-            _logger.LogInformation(
+            logger.LogInformation(
                 "Invite link created for group {GroupId} with role {Role} by user {UserId}",
                 request.GroupId, role, userId);
 
-            var message = _messageService.GetMessage(ErrorCodes.SuccessCreateInvite);
+            var message = messageService.GetMessage(ErrorCodes.SuccessCreateInvite);
             return Ok(ApiResponse<CreateInviteLinkResponse>.Success(
                 ErrorCodes.SuccessCreateInvite,
                 message,
@@ -255,7 +226,7 @@ namespace StudioStudio_Server.Controllers
             var userId = ValidateAndGetUserId();
             var role = ValidateAndParseRole(request.Role);
 
-            var group = await _groupRepository.GetByIdAsync(request.GroupId);
+            var group = await groupRepository.GetByIdAsync(request.GroupId);
             if (group == null)
             {
                 throw new AppException(
@@ -273,7 +244,7 @@ namespace StudioStudio_Server.Controllers
             await ValidateInvitePermissionAsync(request.GroupId, userId);
             await ValidateModeratorRoleAsync(request.GroupId, role);
 
-            bool canCreate = await _groupInviteService
+            bool canCreate = await groupInviteService
                 .CheckInviteCreationRateLimitAsync(request.GroupId, userId);
 
             if (!canCreate)
@@ -283,7 +254,7 @@ namespace StudioStudio_Server.Controllers
                     StatusCodes.Status429TooManyRequests);
             }
 
-            var inviter = await _userRepository.GetByIdAsync(userId);
+            var inviter = await userRepository.GetByIdAsync(userId);
             if (inviter == null)
             {
                 throw new AppException(
@@ -291,7 +262,7 @@ namespace StudioStudio_Server.Controllers
                     StatusCodes.Status404NotFound);
             }
 
-            string token = await _groupInviteService.GenerateInviteTokenAsync();
+            string token = await groupInviteService.GenerateInviteTokenAsync();
 
             var inviteData = new GroupInviteToken
             {
@@ -301,7 +272,7 @@ namespace StudioStudio_Server.Controllers
                 CreatedAt = DateTime.UtcNow
             };
 
-            bool stored = await _groupInviteService.StoreInviteTokenAsync(token, inviteData);
+            bool stored = await groupInviteService.StoreInviteTokenAsync(token, inviteData);
             if (!stored)
             {
                 throw new AppException(
@@ -309,7 +280,7 @@ namespace StudioStudio_Server.Controllers
                     StatusCodes.Status500InternalServerError);
             }
 
-            string frontendUrl = _configuration["Frontend:BaseUrl"] ?? "http://localhost:3000";
+            string frontendUrl = configuration["Frontend:BaseUrl"] ?? "http://localhost:3000";
             string inviteUrl = $"{frontendUrl}/invite/{token}";
 
             string inviterName = $"{inviter.FirstName} {inviter.LastName}";
@@ -322,22 +293,22 @@ namespace StudioStudio_Server.Controllers
                 group.Description);
 
             // Check email notification preference if invitee is an existing user
-            var invitee = await _userRepository.GetByEmailAsync(request.Email);
+            var invitee = await userRepository.GetByEmailAsync(request.Email);
             if (invitee != null)
             {
-                await _emailService.SendEmailWithPreferenceCheckAsync(request.Email, subject, body, invitee.UserId);
+                await emailService.SendEmailWithPreferenceCheckAsync(request.Email, subject, body, invitee.UserId);
             }
             else
             {
                 // Invite to non-existing user - send email directly
-                await _emailService.SendLinkAsync(request.Email, subject, body);
+                await emailService.SendLinkAsync(request.Email, subject, body);
             }
 
-            _logger.LogInformation(
+            logger.LogInformation(
                 "Invite email sent to {Email} for group {GroupId} with role {Role} by user {UserId}",
                 request.Email, request.GroupId, role, userId);
 
-            var message = _messageService.GetMessage(ErrorCodes.SuccessSendInviteEmail);
+            var message = messageService.GetMessage(ErrorCodes.SuccessSendInviteEmail);
             return Ok(ApiResponse<object>.Success(
                 ErrorCodes.SuccessSendInviteEmail,
                 message,
@@ -366,15 +337,14 @@ namespace StudioStudio_Server.Controllers
         {
             var userId = ValidateAndGetUserId();
 
-            var inviteData = await _groupInviteService.GetInviteTokenDataAsync(request.Token);
+            var inviteData = await groupInviteService.GetInviteTokenDataAsync(request.Token);
             if (inviteData == null)
             {
                 throw new AppException(
-                    ErrorCodes.InviteTokenInvalid,
-                    StatusCodes.Status400BadRequest);
+                    ErrorCodes.InviteTokenInvalid);
             }
 
-            var group = await _groupRepository.GetByIdAsync(inviteData.GroupId);
+            var group = await groupRepository.GetByIdAsync(inviteData.GroupId);
             if (group == null)
             {
                 throw new AppException(
@@ -389,43 +359,39 @@ namespace StudioStudio_Server.Controllers
                     StatusCodes.Status403Forbidden);
             }
 
-            bool isAlreadyMember = await _groupParticipantRepository
+            bool isAlreadyMember = await groupParticipantRepository
                 .IsUserInGroupAsync(inviteData.GroupId, userId);
 
             if (isAlreadyMember)
             {
                 throw new AppException(
-                    ErrorCodes.GroupAlreadyMember,
-                    StatusCodes.Status400BadRequest);
+                    ErrorCodes.GroupAlreadyMember);
             }
 
-            if (!Enum.TryParse<GroupRole>(inviteData.Role, true, out GroupRole role))
+            if (!Enum.TryParse(inviteData.Role, true, out GroupRole role))
             {
                 throw new AppException(
-                    ErrorCodes.InviteInvalidRole,
-                    StatusCodes.Status400BadRequest);
+                    ErrorCodes.InviteInvalidRole);
             }
 
             if (role == GroupRole.Owner)
             {
                 throw new AppException(
-                    ErrorCodes.GroupOnlyOneOwner,
-                    StatusCodes.Status400BadRequest);
+                    ErrorCodes.GroupOnlyOneOwner);
             }
             else if (role == GroupRole.Moderator)
             {
-                int moderatorCount = await _groupParticipantRepository
+                int moderatorCount = await groupParticipantRepository
                     .GetRoleCountByGroupIdAsync(inviteData.GroupId, GroupRole.Moderator);
 
                 if (moderatorCount > 0)
                 {
-                    _logger.LogWarning(
+                    logger.LogWarning(
                         "Attempt to add second Moderator to group {GroupId}. Invite rejected for user {UserId}",
                         inviteData.GroupId, userId);
 
                     throw new AppException(
-                        ErrorCodes.GroupOnlyOneModerator,
-                        StatusCodes.Status400BadRequest);
+                        ErrorCodes.GroupOnlyOneModerator);
                 }
             }
 
@@ -439,11 +405,11 @@ namespace StudioStudio_Server.Controllers
                     StatusCodes.Status500InternalServerError);
             }
 
-            var subscriptionPlan = await _userSubscriptionRepository
+            var subscriptionPlan = await userSubscriptionRepository
                 .GetSubscriptionPlanByUserIdAsync(ownerParticipant.UserId);
 
             int memberLimit = subscriptionPlan?.MaxMembersPerGroup ?? 10;
-            int currentMemberCount = await _groupParticipantRepository
+            int currentMemberCount = await groupParticipantRepository
                 .GetParticipantCountByGroupIdAsync(inviteData.GroupId);
 
             if (currentMemberCount >= memberLimit)
@@ -468,11 +434,11 @@ namespace StudioStudio_Server.Controllers
 
             try
             {
-                await _groupParticipantRepository.AddAsync(participant);
+                await groupParticipantRepository.AddAsync(participant);
 
                 if (group.StudioId.HasValue)
                 {
-                    var isAlreadyStudioMember = await _studioParticipantRepository
+                    var isAlreadyStudioMember = await studioParticipantRepository
                         .IsUserInStudioAsync(group.StudioId.Value, userId);
 
                     if (!isAlreadyStudioMember && isApproved)
@@ -489,31 +455,30 @@ namespace StudioStudio_Server.Controllers
 
                         try
                         {
-                            await _studioParticipantRepository.AddAsync(studioParticipant);
+                            await studioParticipantRepository.AddAsync(studioParticipant);
 
-                            _logger.LogInformation(
+                            logger.LogInformation(
                                 "User {UserId} auto-added to studio {StudioId} via group {GroupId} join, IsApproved={IsApproved}",
                                 userId, group.StudioId.Value, inviteData.GroupId, isApproved);
                         }
                         catch (DbUpdateException ex) when (ex.InnerException?.Message.Contains("IX_StudioParticipants_StudioId_UserId") == true)
                         {
                             // User already in studio (duplicate), ignore
-                            _logger.LogWarning(
+                            logger.LogWarning(
                                 "User {UserId} already exists in studio {StudioId} when joining group {GroupId}",
                                 userId, group.StudioId.Value, inviteData.GroupId);
                         }
                     }
                 }
 
-                _logger.LogInformation(
+                logger.LogInformation(
                     "User {UserId} accepted invite for group {GroupId} with role {Role}, IsApproved={IsApproved}",
                     userId, inviteData.GroupId, role, isApproved);
             }
             catch (DbUpdateException ex) when (ex.InnerException?.Message.Contains("IX_GroupParticipants_GroupId_UserId") == true)
             {
                 throw new AppException(
-                    ErrorCodes.GroupAlreadyMember,
-                    StatusCodes.Status400BadRequest);
+                    ErrorCodes.GroupAlreadyMember);
             }
 
             var response = new AcceptInviteLinkResponse
@@ -525,7 +490,7 @@ namespace StudioStudio_Server.Controllers
                 JoinedAt = participant.CreatedAt
             };
 
-            var message = _messageService.GetMessage(ErrorCodes.SuccessAcceptInvite);
+            var message = messageService.GetMessage(ErrorCodes.SuccessAcceptInvite);
             return Ok(ApiResponse<AcceptInviteLinkResponse>.Success(
                 ErrorCodes.SuccessAcceptInvite,
                 message,

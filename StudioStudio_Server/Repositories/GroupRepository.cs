@@ -9,14 +9,9 @@ namespace StudioStudio_Server.Repositories
     /// <summary>
     /// Repository xử lý các thao tác CRUD với Group entity
     /// </summary>
-    public class GroupRepository : IGroupRepository
+    public class GroupRepository(StudioDbContext db) : IGroupRepository
     {
-        private readonly StudioDbContext _db;
-
-        public GroupRepository(StudioDbContext db)
-        {
-            _db = db;
-        }
+        private readonly StudioDbContext _db = db;
 
         /// <summary>
         /// Get list of groups user is member of

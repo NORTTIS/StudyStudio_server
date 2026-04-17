@@ -13,25 +13,17 @@ namespace StudioStudio_Server.Services
     /// Manages CRUD operations for task status columns in groups
     /// Permission: Viewer and Commenter can only view, Member/Moderator/Owner can create/update/delete
     /// </summary>
-    public class GroupTaskStatusService : IGroupTaskStatusService
+    public class GroupTaskStatusService(
+        IGroupTaskStatusRepository groupTaskStatusRepository,
+        IGroupParticipantRepository participantRepository,
+        IGroupRepository groupRepository,
+        ITaskRepository taskRepository) : IGroupTaskStatusService
     {
-        private readonly IGroupTaskStatusRepository _groupTaskStatusRepository;
-        private readonly IGroupParticipantRepository _participantRepository;
-        private readonly IGroupRepository _groupRepository;
-        private readonly ITaskRepository _taskRepository;
+        private readonly IGroupTaskStatusRepository _groupTaskStatusRepository = groupTaskStatusRepository;
+        private readonly IGroupParticipantRepository _participantRepository = participantRepository;
+        private readonly IGroupRepository _groupRepository = groupRepository;
+        private readonly ITaskRepository _taskRepository = taskRepository;
 
-        public GroupTaskStatusService(
-            IGroupTaskStatusRepository groupTaskStatusRepository,
-            IGroupParticipantRepository participantRepository,
-            IGroupRepository groupRepository,
-            ITaskRepository taskRepository)
-        {
-            _groupTaskStatusRepository = groupTaskStatusRepository;
-            _participantRepository = participantRepository;
-            _groupRepository = groupRepository;
-            _taskRepository = taskRepository;
-        }
-        
         /// <summary>
         /// Create new task status column for group
         /// Validate:

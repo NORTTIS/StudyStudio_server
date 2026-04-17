@@ -1,24 +1,14 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using StudioStudio_Server.Data;
-using System.Data.Common;
 
 namespace StudioStudio_Server.HealthChecks;
 
 /// <summary>
 /// Health check for PostgreSQL database connectivity
 /// </summary>
-public class DatabaseHealthCheck : IHealthCheck
+public class DatabaseHealthCheck(StudioDbContext dbContext, ILogger<DatabaseHealthCheck> logger) : IHealthCheck
 {
-    private readonly StudioDbContext _dbContext;
-    private readonly ILogger<DatabaseHealthCheck> _logger;
-
-    public DatabaseHealthCheck(StudioDbContext dbContext, ILogger<DatabaseHealthCheck> logger)
-    {
-        _dbContext = dbContext;
-        _logger = logger;
-    }
-
     public async Task<HealthCheckResult> CheckHealthAsync(
         HealthCheckContext context,
         CancellationToken cancellationToken = default)
@@ -28,11 +18,11 @@ public class DatabaseHealthCheck : IHealthCheck
             var startTime = DateTime.UtcNow;
 
             // Test database connectivity
-            var connection = _dbContext.Database.GetDbConnection();
+            var connection = dbContext.Database.GetDbConnection();
             await connection.OpenAsync(cancellationToken);
 
             // Execute a simple query to test read capability
-            using var command = connection.CreateCommand();
+            await using var command = connection.CreateCommand();
             command.CommandText = "SELECT 1";
             await command.ExecuteScalarAsync(cancellationToken);
 
@@ -40,7 +30,7 @@ public class DatabaseHealthCheck : IHealthCheck
 
             await connection.CloseAsync();
 
-            _logger.LogDebug("Database health check passed. Latency: {Latency}ms", latency);
+            logger.LogDebug("Database health check passed. Latency: {Latency}ms", latency);
 
             return HealthCheckResult.Healthy(
                 $"Database is healthy. Latency: {latency:F2}ms",
@@ -52,7 +42,7 @@ public class DatabaseHealthCheck : IHealthCheck
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Database health check failed");
+            logger.LogError(ex, "Database health check failed");
 
             return HealthCheckResult.Unhealthy(
                 $"Database health check failed: {ex.Message}",

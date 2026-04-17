@@ -8,14 +8,9 @@ namespace StudioStudio_Server.Repositories
     /// <summary>
     /// Repository xử lý các thao tác CRUD với UserAnnouncement entity
     /// </summary>
-    public class UserAnnouncementRepository : IUserAnnouccementRepository
+    public class UserAnnouncementRepository(StudioDbContext context) : IUserAnnouccementRepository
     {
-        private readonly StudioDbContext _context;
-
-        public UserAnnouncementRepository(StudioDbContext context)
-        {
-            _context = context;
-        }
+        private readonly StudioDbContext _context = context;
 
         /// <summary>
         /// Thêm mới một UserAnnouncement vào database

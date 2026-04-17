@@ -16,22 +16,10 @@ namespace StudioStudio_Server.Controllers
     [Route("api/group")]
     [ApiController]
     [Authorize]
-    public class GroupController : ControllerBase
+    public class GroupController(
+        IGroupService groupService,
+        IMessageService messageService) : ControllerBase
     {
-        private readonly IGroupService _groupService;
-        private readonly IGroupMemberService _groupMemberService;
-        private readonly IMessageService _messageService;
-
-        public GroupController(
-            IGroupService groupService,
-            IGroupMemberService groupMemberService,
-            IMessageService messageService)
-        {
-            _groupService = groupService;
-            _groupMemberService = groupMemberService;
-            _messageService = messageService;
-        }
-
         /// <summary>
         /// Authenticate and get userId from JWT token
         /// Validate: User must not be admin (admin cannot use user APIs)
@@ -72,8 +60,8 @@ namespace StudioStudio_Server.Controllers
         public async Task<ActionResult<ApiResponse<GroupListResponse>>> GetGroups()
         {
             var userId = ValidateAndGetUserId();
-            var result = await _groupService.GetGroupsAsync(userId);
-            var message = _messageService.GetMessage(ErrorCodes.SuccessGetGroup);
+            var result = await groupService.GetGroupsAsync(userId);
+            var message = messageService.GetMessage(ErrorCodes.SuccessGetGroup);
 
             return Ok(ApiResponse<GroupListResponse>.Success(
                 ErrorCodes.SuccessGetGroup,
@@ -91,8 +79,8 @@ namespace StudioStudio_Server.Controllers
         public async Task<ActionResult<ApiResponse<GroupDetailResponse>>> GetGroupDetail(Guid groupId)
         {
             var userId = ValidateAndGetUserId();
-            var result = await _groupService.GetGroupDetailAsync(userId, groupId);
-            var message = _messageService.GetMessage(ErrorCodes.SuccessGetData);
+            var result = await groupService.GetGroupDetailAsync(userId, groupId);
+            var message = messageService.GetMessage(ErrorCodes.SuccessGetData);
 
             return Ok(ApiResponse<GroupDetailResponse>.Success(
                 ErrorCodes.SuccessGetData,
@@ -143,7 +131,7 @@ namespace StudioStudio_Server.Controllers
             [FromQuery] bool sortAscending = true)
         {
             var userId = ValidateAndGetUserId();
-            var result = await _groupService.GetGroupTasksAsync(
+            var result = await groupService.GetGroupTasksAsync(
                 userId,
                 groupId,
                 page,
@@ -164,7 +152,7 @@ namespace StudioStudio_Server.Controllers
                 sortBy,
                 sortAscending);
 
-            var message = _messageService.GetMessage(ErrorCodes.SuccessGetData);
+            var message = messageService.GetMessage(ErrorCodes.SuccessGetData);
 
             return Ok(ApiResponse<GroupTaskListResponse>.Success(
                 ErrorCodes.SuccessGetData,
@@ -183,8 +171,8 @@ namespace StudioStudio_Server.Controllers
         public async Task<ActionResult<ApiResponse<GroupMemberListResponse>>> GetGroupMembers(Guid groupId)
         {
             var userId = ValidateAndGetUserId();
-            var result = await _groupService.GetGroupMembersAsync(userId, groupId);
-            var message = _messageService.GetMessage(ErrorCodes.SuccessGetData);
+            var result = await groupService.GetGroupMembersAsync(userId, groupId);
+            var message = messageService.GetMessage(ErrorCodes.SuccessGetData);
 
             return Ok(ApiResponse<GroupMemberListResponse>.Success(
                 ErrorCodes.SuccessGetData,
@@ -205,8 +193,8 @@ namespace StudioStudio_Server.Controllers
             [FromBody] CreateGroupRequest request)
         {
             var userId = ValidateAndGetUserId();
-            var result = await _groupService.CreateGroupAsync(userId, request);
-            var message = _messageService.GetMessage(ErrorCodes.SuccessCreateGroup);
+            var result = await groupService.CreateGroupAsync(userId, request);
+            var message = messageService.GetMessage(ErrorCodes.SuccessCreateGroup);
 
             return Ok(ApiResponse<CreateGroupResponse>.Success(
                 ErrorCodes.SuccessCreateGroup,
@@ -228,8 +216,8 @@ namespace StudioStudio_Server.Controllers
             [FromBody] CreateStudioGroupsRequest request)
         {
             var userId = ValidateAndGetUserId();
-            var result = await _groupService.CreateStudioGroupAsync(userId, request);
-            var message = _messageService.GetMessage(ErrorCodes.SuccessCreateGroup);
+            var result = await groupService.CreateStudioGroupAsync(userId, request);
+            var message = messageService.GetMessage(ErrorCodes.SuccessCreateGroup);
 
             return Ok(ApiResponse<CreateStudioGroupsResponse>.Success(
                 ErrorCodes.SuccessCreateGroup,
@@ -250,8 +238,8 @@ namespace StudioStudio_Server.Controllers
             [FromBody] UpdateGroupRequest request)
         {
             var userId = ValidateAndGetUserId();
-            var result = await _groupService.UpdateGroupAsync(userId, request);
-            var message = _messageService.GetMessage(ErrorCodes.SuccessUpdateGroup);
+            var result = await groupService.UpdateGroupAsync(userId, request);
+            var message = messageService.GetMessage(ErrorCodes.SuccessUpdateGroup);
 
             return Ok(ApiResponse<UpdateGroupResponse>.Success(
                 ErrorCodes.SuccessUpdateGroup,
@@ -269,13 +257,12 @@ namespace StudioStudio_Server.Controllers
         public async Task<ActionResult<ApiResponse<object>>> DeleteGroup(Guid groupId)
         {
             var userId = ValidateAndGetUserId();
-            await _groupService.DeleteGroupAsync(userId, groupId);
-            var message = _messageService.GetMessage(ErrorCodes.SuccessDeleteGroup);
+            await groupService.DeleteGroupAsync(userId, groupId);
+            var message = messageService.GetMessage(ErrorCodes.SuccessDeleteGroup);
 
             return Ok(ApiResponse<object>.Success(
                 ErrorCodes.SuccessDeleteGroup,
-                message,
-                null));
+                message));
         }
 
         // Toggle IsOpen setting (Owner/Moderator only)
@@ -290,8 +277,8 @@ namespace StudioStudio_Server.Controllers
             [FromBody] ToggleIsOpenRequest request)
         {
             var userId = ValidateAndGetUserId();
-            var result = await _groupService.ToggleIsOpenAsync(userId, groupId, request.IsOpen);
-            var message = _messageService.GetMessage(ErrorCodes.SuccessUpdateGroup);
+            var result = await groupService.ToggleIsOpenAsync(userId, groupId, request.IsOpen);
+            var message = messageService.GetMessage(ErrorCodes.SuccessUpdateGroup);
 
             return Ok(ApiResponse<ToggleIsOpenResponse>.Success(
                 ErrorCodes.SuccessUpdateGroup,
@@ -309,8 +296,8 @@ namespace StudioStudio_Server.Controllers
         public async Task<ActionResult<ApiResponse<PendingMemberListResponse>>> GetPendingMembers(Guid groupId)
         {
             var userId = ValidateAndGetUserId();
-            var result = await _groupService.GetPendingMembersAsync(userId, groupId);
-            var message = _messageService.GetMessage(ErrorCodes.SuccessGetData);
+            var result = await groupService.GetPendingMembersAsync(userId, groupId);
+            var message = messageService.GetMessage(ErrorCodes.SuccessGetData);
 
             return Ok(ApiResponse<PendingMemberListResponse>.Success(
                 ErrorCodes.SuccessGetData,
@@ -330,8 +317,8 @@ namespace StudioStudio_Server.Controllers
             [FromBody] ApproveMemberRequest request)
         {
             var userId = ValidateAndGetUserId();
-            var result = await _groupService.ApproveMemberAsync(userId, groupId, request.UserId);
-            var message = _messageService.GetMessage(ErrorCodes.SuccessUpdateData);
+            var result = await groupService.ApproveMemberAsync(userId, groupId, request.UserId);
+            var message = messageService.GetMessage(ErrorCodes.SuccessUpdateData);
 
             return Ok(ApiResponse<ApproveMemberResponse>.Success(
                 ErrorCodes.SuccessUpdateData,
@@ -352,8 +339,8 @@ namespace StudioStudio_Server.Controllers
             [FromBody] ToggleArchiveRequest request)
         {
             var userId = ValidateAndGetUserId();
-            var result = await _groupService.ToggleArchiveGroupAsync(userId, groupId, request.IsArchived);
-            var message = _messageService.GetMessage(ErrorCodes.SuccessUpdateGroup);
+            var result = await groupService.ToggleArchiveGroupAsync(userId, groupId, request.IsArchived);
+            var message = messageService.GetMessage(ErrorCodes.SuccessUpdateGroup);
 
             return Ok(ApiResponse<ArchiveGroupResponse>.Success(
                 ErrorCodes.SuccessUpdateGroup,

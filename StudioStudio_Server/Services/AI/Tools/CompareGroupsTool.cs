@@ -3,20 +3,18 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using StudioStudio_Server.Models.Entities;
 using StudioStudio_Server.Repositories.Interfaces;
+using StudioStudio_Server.Services.AI.Interfaces;
 using StudioStudio_Server.Services.AI.Models;
-using StudioStudio_Server.Services.AI.Tools.Interfaces;
 
 namespace StudioStudio_Server.Services.AI.Tools;
 
 [DebuggerStepThrough]
-public class CompareGroupsTool : IAITool
+public class CompareGroupsTool(
+    IStudioRepository studioRepository,
+    ITaskRepository taskRepository,
+    IGroupParticipantRepository participantRepository,
+    ILogger<CompareGroupsTool> logger) : IAITool
 {
-    private readonly IStudioRepository _studioRepository;
-    private readonly ITaskRepository _taskRepository;
-    private readonly IGroupParticipantRepository _participantRepository;
-    private readonly IAnalyticsRepository _analyticsRepository;
-    private readonly ILogger<CompareGroupsTool> _logger;
-
     public string Name => "compare_groups";
     public string Description => "So sanh hieu suat giua cac nhom. Parameters: studio_id (required), group_ids (optional array of guids), metrics (optional array: completion_rate/velocity/overdue_count/active_members)";
     public JsonObject ParametersSchema => new JsonObject
@@ -30,20 +28,6 @@ public class CompareGroupsTool : IAITool
         },
         ["required"] = new JsonArray { "studio_id" }
     };
-
-    public CompareGroupsTool(
-        IStudioRepository studioRepository,
-        ITaskRepository taskRepository,
-        IGroupParticipantRepository participantRepository,
-        IAnalyticsRepository analyticsRepository,
-        ILogger<CompareGroupsTool> logger)
-    {
-        _studioRepository = studioRepository;
-        _taskRepository = taskRepository;
-        _participantRepository = participantRepository;
-        _analyticsRepository = analyticsRepository;
-        _logger = logger;
-    }
 
     private static string? Js(JsonNode? n) => n?.GetValue<string>();
     private static int Ji(JsonNode? n) => n?.GetValue<int>() ?? 0;
@@ -60,7 +44,7 @@ public class CompareGroupsTool : IAITool
 
             var studioId = context.StudioId.Value;
 
-            var studio = await _studioRepository.GetByIdAsync(studioId);
+            var studio = await studioRepository.GetByIdAsync(studioId);
             if (studio == null)
                 return AIQueryResult.Error("Khong tim thay studio");
 
@@ -76,23 +60,22 @@ public class CompareGroupsTool : IAITool
             }
             else
             {
-                var groups = await _studioRepository.GetGroupsByStudioIdAsync(studioId);
+                var groups = await studioRepository.GetGroupsByStudioIdAsync(studioId);
                 groupIds = groups.Select(g => g.GroupId).ToList();
             }
 
             var defaultMetrics = new[] { "completion_rate", "velocity", "overdue_count", "active_members" };
-            var metricsArray = parameters["metrics"] as JsonArray;
-            var activeMetrics = metricsArray != null && metricsArray.Count > 0
+            var activeMetrics = parameters["metrics"] is JsonArray metricsArray && metricsArray.Count > 0
                 ? metricsArray.Select(m => Js(m) ?? "").Where(m => !string.IsNullOrEmpty(m)).ToArray()
                 : defaultMetrics;
 
             var groupMetricsList = new List<JsonObject>();
             foreach (var groupId in groupIds)
             {
-                var group = await _studioRepository.GetGroupsByStudioIdAsync(studioId)
+                var group = await studioRepository.GetGroupsByStudioIdAsync(studioId)
                     .ContinueWith(t => t.Result.FirstOrDefault(g => g.GroupId == groupId));
-                var taskStats = await _taskRepository.GetGroupTaskStatisticsAsync(groupId);
-                var members = await _participantRepository.GetAllByGroupIdAsync(groupId);
+                var taskStats = await taskRepository.GetGroupTaskStatisticsAsync(groupId);
+                var members = await participantRepository.GetAllByGroupIdAsync(groupId);
 
                 var totalTasks = taskStats.TotalTasks;
                 var completedTasks = taskStats.CompletedTasks;
@@ -162,7 +145,7 @@ public class CompareGroupsTool : IAITool
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "CompareGroupsTool error");
+            logger.LogError(ex, "CompareGroupsTool error");
             return AIQueryResult.Error("Da xay ra loi khi so sanh cac nhom");
         }
     }

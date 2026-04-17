@@ -11,14 +11,9 @@ namespace StudioStudio_Server.Repositories
     /// <summary>
     /// Repository for analytics data operations
     /// </summary>
-    public class AnalyticsRepository : IAnalyticsRepository
+    public class AnalyticsRepository(StudioDbContext context) : IAnalyticsRepository
     {
-        private readonly StudioDbContext _context;
-
-        public AnalyticsRepository(StudioDbContext context)
-        {
-            _context = context;
-        }
+        private readonly StudioDbContext _context = context;
 
         // ==================== GROUP ANALYTICS ====================
 

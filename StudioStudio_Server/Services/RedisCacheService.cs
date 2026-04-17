@@ -15,11 +15,13 @@ namespace StudioStudio_Server.Services
     /// - Atomic batch operations
     /// - Better performance than IDistributedCache
     /// </summary>
-    public class RedisCacheService : ICacheService
+    public class RedisCacheService(
+        IConnectionMultiplexer redis,
+        ILogger<RedisCacheService> logger) : ICacheService
     {
-        private readonly IConnectionMultiplexer _redis;
-        private readonly IDatabase _database;
-        private readonly ILogger<RedisCacheService> _logger;
+        private readonly IConnectionMultiplexer _redis = redis;
+        private readonly IDatabase _database = redis.GetDatabase();
+        private readonly ILogger<RedisCacheService> _logger = logger;
 
         // Instance name for all cache keys (same as existing Redis usage)
         private const string INSTANCE_PREFIX = "StudyStudio:Cache:";
@@ -38,15 +40,6 @@ namespace StudioStudio_Server.Services
         private static readonly TimeSpan AnnouncementExpiration = TimeSpan.FromMinutes(5);
         private static readonly TimeSpan AiRequestCountExpiration = TimeSpan.FromMinutes(1);
         private static readonly TimeSpan UserGroupsExpiration = TimeSpan.FromMinutes(10);
-
-        public RedisCacheService(
-            IConnectionMultiplexer redis,
-            ILogger<RedisCacheService> logger)
-        {
-            _redis = redis;
-            _database = redis.GetDatabase();
-            _logger = logger;
-        }
 
         /// <summary>
         /// Get cached value or set it using factory function if not exists

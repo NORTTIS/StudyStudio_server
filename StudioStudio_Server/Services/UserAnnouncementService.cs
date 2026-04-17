@@ -11,15 +11,10 @@ namespace StudioStudio_Server.Services
     /// Manages announcements targeted to specific users (mentions/notifications)
     /// Note: This is different from general Announcements - these are user-specific
     /// </summary>
-    public class UserAnnouncementService : IUserAnnouncementService
+    public class UserAnnouncementService(IUserAnnouccementRepository userAnnouccementRepository) : IUserAnnouncementService
     {
-        private readonly IUserAnnouccementRepository _userAnnouccementRepository;
-        
-        public UserAnnouncementService(IUserAnnouccementRepository userAnnouccementRepository)
-        {
-            _userAnnouccementRepository = userAnnouccementRepository;
-        }
-        
+        private readonly IUserAnnouccementRepository _userAnnouccementRepository = userAnnouccementRepository;
+
         /// <summary>
         /// Add new user announcement (mention/notification)
         /// Creates a personalized announcement record for specific user

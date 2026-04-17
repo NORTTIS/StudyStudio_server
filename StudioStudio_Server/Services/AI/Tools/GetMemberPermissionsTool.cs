@@ -1,19 +1,17 @@
 using System.Diagnostics;
-using System.Text.Json;
 using System.Text.Json.Nodes;
 using StudioStudio_Server.Repositories.Interfaces;
+using StudioStudio_Server.Services.AI.Interfaces;
 using StudioStudio_Server.Services.AI.Models;
-using StudioStudio_Server.Services.AI.Tools.Interfaces;
 
 namespace StudioStudio_Server.Services.AI.Tools;
 
 [DebuggerStepThrough]
-public class GetMemberPermissionsTool : IAITool
+public class GetMemberPermissionsTool(
+    IStudioRepository studioRepository,
+    IStudioParticipantRepository participantRepository,
+    ILogger<GetMemberPermissionsTool> logger) : IAITool
 {
-    private readonly IStudioRepository _studioRepository;
-    private readonly IStudioParticipantRepository _participantRepository;
-    private readonly ILogger<GetMemberPermissionsTool> _logger;
-
     public string Name => "get_member_permissions";
     public string Description => "Kiem tra quyen cua thanh vien trong Studio. Khong can tham so (studio_id tu dong lay tu context).";
     public JsonObject ParametersSchema => new JsonObject
@@ -25,16 +23,6 @@ public class GetMemberPermissionsTool : IAITool
         },
         ["required"] = new JsonArray()
     };
-
-    public GetMemberPermissionsTool(
-        IStudioRepository studioRepository,
-        IStudioParticipantRepository participantRepository,
-        ILogger<GetMemberPermissionsTool> logger)
-    {
-        _studioRepository = studioRepository;
-        _participantRepository = participantRepository;
-        _logger = logger;
-    }
 
     private static string? Js(JsonNode? n) => n?.GetValue<string>();
 
@@ -54,7 +42,7 @@ public class GetMemberPermissionsTool : IAITool
                 ? Guid.Parse(Js(parameters["user_id"])! )
                 : context.UserId;
 
-            var studio = await _studioRepository.GetByIdAsync(studioId);
+            var studio = await studioRepository.GetByIdAsync(studioId);
             if (studio == null)
                 return AIQueryResult.Error("Khong tim thay Studio");
 
@@ -63,7 +51,7 @@ public class GetMemberPermissionsTool : IAITool
 
             if (!isOwner)
             {
-                var participant = await _participantRepository.GetByStudioAndUserAsync(studioId, targetUserId);
+                var participant = await participantRepository.GetByStudioAndUserAsync(studioId, targetUserId);
                 if (participant != null && participant.Role != null)
                 {
                     role = participant.Role.ToString()?.ToLower() ?? "member";
@@ -86,7 +74,7 @@ public class GetMemberPermissionsTool : IAITool
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "GetMemberPermissionsTool error");
+            logger.LogError(ex, "GetMemberPermissionsTool error");
             return AIQueryResult.Error("Da xay ra loi khi kiem tra quyen thanh vien");
         }
     }

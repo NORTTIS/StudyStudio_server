@@ -7,30 +7,20 @@ using StudioStudio_Server.Services.Interfaces;
 
 namespace StudioStudio_Server.Services
 {
-    public class NotificationService : INotificationService
+    public class NotificationService(
+        IAnnouncementRepository announcementRepository,
+        IUserAnnouncementService userAnnouncementService,
+        IEmailService emailService,
+        ITaskRepository taskRepository,
+        IConfiguration configuration,
+        ILogger<NotificationService> logger) : INotificationService
     {
-        private readonly IAnnouncementRepository _announcementRepository;
-        private readonly IUserAnnouncementService _userAnnouncementService;
-        private readonly IEmailService _emailService;
-        private readonly ITaskRepository _taskRepository;
-        private readonly IConfiguration _configuration;
-        private readonly ILogger<NotificationService> _logger;
-
-        public NotificationService(
-            IAnnouncementRepository announcementRepository,
-            IUserAnnouncementService userAnnouncementService,
-            IEmailService emailService,
-            ITaskRepository taskRepository,
-            IConfiguration configuration,
-            ILogger<NotificationService> logger)
-        {
-            _announcementRepository = announcementRepository;
-            _userAnnouncementService = userAnnouncementService;
-            _emailService = emailService;
-            _taskRepository = taskRepository;
-            _configuration = configuration;
-            _logger = logger;
-        }
+        private readonly IAnnouncementRepository _announcementRepository = announcementRepository;
+        private readonly IUserAnnouncementService _userAnnouncementService = userAnnouncementService;
+        private readonly IEmailService _emailService = emailService;
+        private readonly ITaskRepository _taskRepository = taskRepository;
+        private readonly IConfiguration _configuration = configuration;
+        private readonly ILogger<NotificationService> _logger = logger;
 
         /// <summary>
         /// Notify the assignee about a newly assigned task.
@@ -67,6 +57,7 @@ namespace StudioStudio_Server.Services
         {
             var actorName = BuildUserName(actor);
             var groupId = await _getGroupIdForTaskAsync(taskId);
+            
 
             if (newAssignee.UserId != actor.UserId)
             {
@@ -89,8 +80,9 @@ namespace StudioStudio_Server.Services
                     GetLanguage(newAssignee));
                 await _emailService.SendEmailWithPreferenceCheckAsync(newAssignee.Email, "Task Reassigned - Study Studio", body, newAssignee);
             }
-
-            if (oldAssignee.UserId != actor.UserId)
+            //Check old member is deleted or not, if deleted, only notify new member
+            bool isOldAssigneeDeleted = oldAssignee.Status == UserStatus.Deleted;
+            if (oldAssignee.UserId != actor.UserId && !isOldAssigneeDeleted)
             {
                 var oldAssigneeTaskUrl = groupId.HasValue ? BuildTaskUrl(taskId, GetLanguage(oldAssignee)) : "";
                 await CreateInAppAsync(
@@ -122,7 +114,12 @@ namespace StudioStudio_Server.Services
         {
             var groupId = await _getGroupIdForTaskAsync(taskId);
             var language = GetLanguage(user);
-
+            //check meber is deleted or not, if deleted, only notify new member
+            bool isUserDeleted = user.Status == UserStatus.Deleted;
+            if (isUserDeleted)
+            {
+                return;
+            }
             await CreateInAppAsync(
                 user.UserId,
                 actor.UserId,
@@ -149,9 +146,15 @@ namespace StudioStudio_Server.Services
             var groupId = await _getGroupIdForTaskAsync(taskId);
             var language = GetLanguage(assignee);
 
+            // Check if the assignee is deleted
+            if (assignee.Status == UserStatus.Deleted)
+            {
+                return;
+            }
+
             await CreateInAppAsync(
                 assignee.UserId,
-                completedBy.UserId,
+                assignee.UserId,
                 "Task completed",
                 $"{actorName} completed task: {taskTitle}",
                 AnnouncementType.TaskCompleted,

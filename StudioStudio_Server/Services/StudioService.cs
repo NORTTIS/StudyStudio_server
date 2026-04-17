@@ -14,45 +14,30 @@ using System.Security.Claims;
 
 namespace StudioStudio_Server.Services
 {
-    public class StudioService : IStudioService
+    public class StudioService(
+        IStudioRepository studioRepository,
+        IGroupRepository groupRepository,
+        IUserSubscriptionRepository userSubscriptionRepository,
+        IStudioParticipantRepository studioParticipantRepository,
+        IGroupParticipantRepository groupParticipantRepository,
+        IUserRepository userRepository,
+        IEmailService emailService,
+        IHttpContextAccessor httpContextAccessor,
+        ILogger<StudioService> logger,
+        IConfiguration configuration,
+        ICacheService cacheService) : IStudioService
     {
-        private readonly IStudioRepository _studioRepository;
-        private readonly IGroupRepository _groupRepository;
-        private readonly IUserSubscriptionRepository _userSubscriptionRepository;
-        private readonly IStudioParticipantRepository _studioParticipantRepository;
-        private readonly IGroupParticipantRepository _groupParticipantRepository;
-        private readonly IUserRepository _userRepository;
-        private readonly IEmailService _emailService;
-        private readonly IHttpContextAccessor _httpContextAccessor;
-        private readonly ILogger<StudioService> _logger;
-        private readonly IConfiguration _configuration;
-        private readonly ICacheService _cacheService;
-
-        public StudioService(
-            IStudioRepository studioRepository,
-            IGroupRepository groupRepository,
-            IUserSubscriptionRepository userSubscriptionRepository,
-            IStudioParticipantRepository studioParticipantRepository,
-            IGroupParticipantRepository groupParticipantRepository,
-            IUserRepository userRepository,
-            IEmailService emailService,
-            IHttpContextAccessor httpContextAccessor,
-            ILogger<StudioService> logger,
-            IConfiguration configuration,
-            ICacheService cacheService)
-        {
-            _studioRepository = studioRepository;
-            _groupRepository = groupRepository;
-            _userSubscriptionRepository = userSubscriptionRepository;
-            _studioParticipantRepository = studioParticipantRepository;
-            _groupParticipantRepository = groupParticipantRepository;
-            _userRepository = userRepository;
-            _emailService = emailService;
-            _httpContextAccessor = httpContextAccessor;
-            _logger = logger;
-            _configuration = configuration;
-            _cacheService = cacheService;
-        }
+        private readonly IStudioRepository _studioRepository = studioRepository;
+        private readonly IGroupRepository _groupRepository = groupRepository;
+        private readonly IUserSubscriptionRepository _userSubscriptionRepository = userSubscriptionRepository;
+        private readonly IStudioParticipantRepository _studioParticipantRepository = studioParticipantRepository;
+        private readonly IGroupParticipantRepository _groupParticipantRepository = groupParticipantRepository;
+        private readonly IUserRepository _userRepository = userRepository;
+        private readonly IEmailService _emailService = emailService;
+        private readonly IHttpContextAccessor _httpContextAccessor = httpContextAccessor;
+        private readonly ILogger<StudioService> _logger = logger;
+        private readonly IConfiguration _configuration = configuration;
+        private readonly ICacheService _cacheService = cacheService;
 
         public async Task<StudioListResponse> GetUserStudiosAsync(Guid userId)
         {

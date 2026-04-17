@@ -7,19 +7,13 @@ namespace StudioStudio_Server.Services.BackgroundServices
     /// Runs every 24 hours to prevent database bloat
     /// Removes tokens where: IsRevoked = true OR ExpiresAt < UtcNow
     /// </summary>
-    public class RefreshTokenCleanupService : BackgroundService
+    public class RefreshTokenCleanupService(
+        IServiceProvider serviceProvider,
+        ILogger<RefreshTokenCleanupService> logger) : BackgroundService
     {
-        private readonly IServiceProvider _serviceProvider;
-        private readonly ILogger<RefreshTokenCleanupService> _logger;
+        private readonly IServiceProvider _serviceProvider = serviceProvider;
+        private readonly ILogger<RefreshTokenCleanupService> _logger = logger;
         private static readonly TimeSpan CleanupInterval = TimeSpan.FromHours(24);
-
-        public RefreshTokenCleanupService(
-            IServiceProvider serviceProvider,
-            ILogger<RefreshTokenCleanupService> logger)
-        {
-            _serviceProvider = serviceProvider;
-            _logger = logger;
-        }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {

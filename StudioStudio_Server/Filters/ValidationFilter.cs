@@ -1,28 +1,19 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Filters;
 using StudioStudio_Server.Exceptions;
-using StudioStudio_Server.Localization;
 using StudioStudio_Server.Models.DTOs.Response;
+using StudioStudio_Server.Resources.Localization;
 
 namespace StudioStudio_Server.Filters
 {
-    public class ValidationFilter : IAsyncActionFilter
+    public class ValidationFilter(IWebHostEnvironment env, IHttpContextAccessor httpContextAccessor) : IAsyncActionFilter
     {
-        private readonly IWebHostEnvironment _env;
-        private readonly IHttpContextAccessor _httpContextAccessor;
-
-        public ValidationFilter(IWebHostEnvironment env, IHttpContextAccessor httpContextAccessor)
-        {
-            _env = env;
-            _httpContextAccessor = httpContextAccessor;
-        }
-
         public async Task OnActionExecutionAsync(ActionExecutingContext context, ActionExecutionDelegate next)
         {
             if (!context.ModelState.IsValid)
             {
                 var culture = GetCulture();
-                var localizer = new JsonStringLocalizer(_env, culture);
+                var localizer = new JsonStringLocalizer(env, culture);
 
                 var errors = new Dictionary<string, List<string>>();
                 var firstErrorCode = ErrorCodes.ValidationRequiredField;
@@ -74,7 +65,7 @@ namespace StudioStudio_Server.Filters
 
         private string GetCulture()
         {
-            var context = _httpContextAccessor.HttpContext;
+            var context = httpContextAccessor.HttpContext;
             if (context == null) return "vi";
 
             var lang = context.Request.Headers["Accept-Language"].FirstOrDefault();

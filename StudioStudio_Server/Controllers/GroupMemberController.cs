@@ -15,19 +15,10 @@ namespace StudioStudio_Server.Controllers
     [Route("api/group/member")]
     [ApiController]
     [Authorize]
-    public class GroupMemberController : ControllerBase
+    public class GroupMemberController(
+        IGroupMemberService groupMemberService,
+        IMessageService messageService) : ControllerBase
     {
-        private readonly IGroupMemberService _groupMemberService;
-        private readonly IMessageService _messageService;
-
-        public GroupMemberController(
-            IGroupMemberService groupMemberService,
-            IMessageService messageService)
-        {
-            _groupMemberService = groupMemberService;
-            _messageService = messageService;
-        }
-
         /// <summary>
         /// Authenticate and get userId from JWT token
         /// Validate: User must not be admin
@@ -72,8 +63,8 @@ namespace StudioStudio_Server.Controllers
             [FromBody] RemoveMemberRequest request)
         {
             var userId = ValidateAndGetUserId();
-            var result = await _groupMemberService.RemoveMemberAsync(userId, request);
-            var message = _messageService.GetMessage(ErrorCodes.SuccessRemoveMember);
+            var result = await groupMemberService.RemoveMemberAsync(userId, request);
+            var message = messageService.GetMessage(ErrorCodes.SuccessRemoveMember);
 
             return Ok(ApiResponse<RemoveMemberResponse>.Success(
                 ErrorCodes.SuccessRemoveMember,
@@ -92,8 +83,8 @@ namespace StudioStudio_Server.Controllers
         public async Task<ActionResult<ApiResponse<LeaveGroupResponse>>> LeaveGroup(Guid groupId)
         {
             var userId = ValidateAndGetUserId();
-            var result = await _groupMemberService.LeaveGroupAsync(userId, groupId);
-            var message = _messageService.GetMessage(ErrorCodes.SuccessLeaveGroup);
+            var result = await groupMemberService.LeaveGroupAsync(userId, groupId);
+            var message = messageService.GetMessage(ErrorCodes.SuccessLeaveGroup);
 
             return Ok(ApiResponse<LeaveGroupResponse>.Success(
                 ErrorCodes.SuccessLeaveGroup,
@@ -115,8 +106,8 @@ namespace StudioStudio_Server.Controllers
             [FromBody] AssignRoleRequest request)
         {
             var userId = ValidateAndGetUserId();
-            var result = await _groupMemberService.AssignRoleAsync(userId, request);
-            var message = _messageService.GetMessage(ErrorCodes.SuccessAssignRole);
+            var result = await groupMemberService.AssignRoleAsync(userId, request);
+            var message = messageService.GetMessage(ErrorCodes.SuccessAssignRole);
 
             return Ok(ApiResponse<AssignRoleResponse>.Success(
                 ErrorCodes.SuccessAssignRole,

@@ -1,5 +1,5 @@
+using StudioStudio_Server.Services.AI.Interfaces;
 using StudioStudio_Server.Services.AI.Models;
-using StudioStudio_Server.Services.AI.Tools.Interfaces;
 using StudioStudio_Server.Services.Interfaces;
 using System.Security.Cryptography;
 using System.Text;
@@ -12,10 +12,10 @@ namespace StudioStudio_Server.Services.AI
     /// Automatically caches tool results with a short TTL only.
     /// Freshness is handled by expiration (30s), not by active invalidation in this class.
     /// </summary>
-    public class AIToolCacheService
+    public class AIToolCacheService(ICacheService cacheService, ILogger<AIToolCacheService> logger)
     {
-        private readonly ICacheService _cacheService;
-        private readonly ILogger<AIToolCacheService> _logger;
+        private readonly ICacheService _cacheService = cacheService;
+        private readonly ILogger<AIToolCacheService> _logger = logger;
 
         // Short TTL for AI tool cache - balances performance with data freshness
         private static readonly TimeSpan ToolCacheTtl = TimeSpan.FromSeconds(30);
@@ -26,11 +26,6 @@ namespace StudioStudio_Server.Services.AI
             "get_tasks", "get_personal_tasks", "get_deadlines", "get_personal_deadlines"
         };
 
-        public AIToolCacheService(ICacheService cacheService, ILogger<AIToolCacheService> logger)
-        {
-            _cacheService = cacheService;
-            _logger = logger;
-        }
 
         /// <summary>
         /// Execute a tool with caching. Results are cached for short duration.

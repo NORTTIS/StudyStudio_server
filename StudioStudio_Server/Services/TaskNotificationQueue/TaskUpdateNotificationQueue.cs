@@ -5,21 +5,15 @@ using StudioStudio_Server.Services.Interfaces;
 
 namespace StudioStudio_Server.Services.TaskNotificationQueue
 {
-    public class TaskUpdateNotificationQueue : ITaskUpdateNotificationQueue
+    public class TaskUpdateNotificationQueue(
+        IConnectionMultiplexer redis,
+        ILogger<TaskUpdateNotificationQueue> logger) : ITaskUpdateNotificationQueue
     {
         private const string PendingQueueKey = "queue:task-update-notification:pending";
         private const string InflightQueueKey = "queue:task-update-notification:inflight";
-        private readonly IConnectionMultiplexer _redis;
-        private readonly ILogger<TaskUpdateNotificationQueue> _logger;
+        private readonly IConnectionMultiplexer _redis = redis;
+        private readonly ILogger<TaskUpdateNotificationQueue> _logger = logger;
         private readonly JsonSerializerOptions _serializerOptions = new(JsonSerializerDefaults.Web);
-
-        public TaskUpdateNotificationQueue(
-            IConnectionMultiplexer redis,
-            ILogger<TaskUpdateNotificationQueue> logger)
-        {
-            _redis = redis;
-            _logger = logger;
-        }
 
         public async ValueTask EnqueueAsync(TaskUpdateNotificationJob job, CancellationToken cancellationToken = default)
         {

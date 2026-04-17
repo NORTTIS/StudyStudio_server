@@ -3,11 +3,9 @@ using Microsoft.AspNetCore.Mvc;
 using Newtonsoft.Json;
 using StudioStudio_Server.Exceptions;
 using StudioStudio_Server.Models;
-using StudioStudio_Server.Models.DTOs.Request;
 using StudioStudio_Server.Repositories.Interfaces;
 using StudioStudio_Server.Services.AI;
 using StudioStudio_Server.Services.AI.Models;
-using StudioStudio_Server.Services.Interfaces;
 using System.Security.Claims;
 
 namespace StudioStudio_Server.Controllers;
@@ -21,31 +19,13 @@ namespace StudioStudio_Server.Controllers;
 [Route("api/ai/master")]
 [ApiController]
 [Authorize]
-public class MasterAIController : ControllerBase
+public class MasterAIController(
+    AIAgent aiAgent,
+    IStudioRepository studioRepository,
+    IAIRequestLogRepository aiRequestLogRepository,
+    IUserSubscriptionRepository userSubscriptionRepository,
+    ILogger<MasterAIController> logger) : ControllerBase
 {
-    private readonly AIAgent _aiAgent;
-    private readonly IStudioRepository _studioRepository;
-    private readonly IStudioParticipantRepository _studioParticipantRepository;
-    private readonly IAIRequestLogRepository _aiRequestLogRepository;
-    private readonly IUserSubscriptionRepository _userSubscriptionRepository;
-    private readonly ILogger<MasterAIController> _logger;
-
-    public MasterAIController(
-        AIAgent aiAgent,
-        IStudioRepository studioRepository,
-        IStudioParticipantRepository studioParticipantRepository,
-        IAIRequestLogRepository aiRequestLogRepository,
-        IUserSubscriptionRepository userSubscriptionRepository,
-        ILogger<MasterAIController> logger)
-    {
-        _aiAgent = aiAgent;
-        _studioRepository = studioRepository;
-        _studioParticipantRepository = studioParticipantRepository;
-        _aiRequestLogRepository = aiRequestLogRepository;
-        _userSubscriptionRepository = userSubscriptionRepository;
-        _logger = logger;
-    }
-
     /// <summary>
     /// Ask Master AI - AI quản lý toàn Studio
     /// Chỉ Owner của Studio mới có quyền sử dụng
@@ -63,7 +43,7 @@ public class MasterAIController : ControllerBase
         }
 
         // Validate: User phải là Owner của Studio
-        var studio = await _studioRepository.GetByIdAsync(request.StudioId);
+        var studio = await studioRepository.GetByIdAsync(request.StudioId);
         if (studio == null)
         {
             throw new AppException(ErrorCodes.StudioNotFound, StatusCodes.Status404NotFound);
@@ -82,7 +62,7 @@ public class MasterAIController : ControllerBase
             throw new AppException(ErrorCodes.AIRateLimitExceeded, StatusCodes.Status429TooManyRequests);
         }
 
-        _logger.LogInformation(
+        logger.LogInformation(
             "Master AI Question: UserId={UserId}, StudioId={StudioId}, Question={Question}",
             userId, request.StudioId,
             request.Question.Length > 100 ? request.Question[..100] + "..." : request.Question);
@@ -99,7 +79,7 @@ public class MasterAIController : ControllerBase
             };
 
             // Process với AIAgent
-            var result = await _aiAgent.ProcessAsync(request.Question, context, cancellationToken);
+            var result = await aiAgent.ProcessAsync(request.Question, context, cancellationToken);
 
             // Log AI request with actual token usage from Gemini
             var tokenUsage = result.TokenUsage;
@@ -120,9 +100,9 @@ public class MasterAIController : ControllerBase
                 {
                     result.ToolCallCount,
                     result.ProcessingTimeMs,
-                    ReasoningSteps = result.ReasoningSteps,
-                    RemainingRequests = rateLimitResult.RemainingRequests,
-                    DailyLimit = rateLimitResult.DailyLimit
+                    result.ReasoningSteps,
+                    rateLimitResult.RemainingRequests,
+                    rateLimitResult.DailyLimit
                 },
                 Message = result.Success ? "Success" : result.ErrorMessage
             });
@@ -133,7 +113,7 @@ public class MasterAIController : ControllerBase
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Master AI error");
+            logger.LogError(ex, "Master AI error");
             throw new AppException(
                 ErrorCodes.UnexpectedError,
                 StatusCodes.Status500InternalServerError);
@@ -154,26 +134,26 @@ public class MasterAIController : ControllerBase
         if (userId == null)
         {
             Response.StatusCode = StatusCodes.Status401Unauthorized;
-            await Response.WriteAsync("Unauthorized");
-            await Response.Body.FlushAsync();
+            await Response.WriteAsync("Unauthorized", cancellationToken: cancellationToken);
+            await Response.Body.FlushAsync(cancellationToken);
             return;
         }
 
         // Validate Studio Owner
-        var studio = await _studioRepository.GetByIdAsync(request.StudioId);
+        var studio = await studioRepository.GetByIdAsync(request.StudioId);
         if (studio == null)
         {
             Response.StatusCode = StatusCodes.Status404NotFound;
-            await Response.WriteAsync("Studio not found");
-            await Response.Body.FlushAsync();
+            await Response.WriteAsync("Studio not found", cancellationToken: cancellationToken);
+            await Response.Body.FlushAsync(cancellationToken);
             return;
         }
 
         if (studio.OwnerId != userId.Value)
         {
             Response.StatusCode = StatusCodes.Status403Forbidden;
-            await Response.WriteAsync("Forbidden: Only Studio Owner can use Master AI");
-            await Response.Body.FlushAsync();
+            await Response.WriteAsync("Forbidden: Only Studio Owner can use Master AI", cancellationToken: cancellationToken);
+            await Response.Body.FlushAsync(cancellationToken);
             return;
         }
 
@@ -182,12 +162,12 @@ public class MasterAIController : ControllerBase
         if (!rateLimitResult.Allowed)
         {
             Response.StatusCode = StatusCodes.Status429TooManyRequests;
-            await Response.WriteAsync("Rate limit exceeded");
-            await Response.Body.FlushAsync();
+            await Response.WriteAsync("Rate limit exceeded", cancellationToken: cancellationToken);
+            await Response.Body.FlushAsync(cancellationToken);
             return;
         }
 
-        _logger.LogInformation(
+        logger.LogInformation(
             "Master AI Stream: UserId={UserId}, StudioId={StudioId}, Question={Question}",
             userId, request.StudioId,
             request.Question.Length > 100 ? request.Question[..100] + "..." : request.Question);
@@ -210,7 +190,7 @@ public class MasterAIController : ControllerBase
             };
 
             // Stream chunks from AIAgent
-            await foreach (var chunk in _aiAgent.ProcessStreamAsync(request.Question, context, cancellationToken))
+            await foreach (var chunk in aiAgent.ProcessStreamAsync(request.Question, context, cancellationToken))
             {
                 switch (chunk.Type)
                 {
@@ -255,11 +235,11 @@ public class MasterAIController : ControllerBase
         }
         catch (OperationCanceledException)
         {
-            _logger.LogInformation("Master AI stream cancelled by client");
+            logger.LogInformation("Master AI stream cancelled by client");
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Master AI stream error");
+            logger.LogError(ex, "Master AI stream error");
             await SendSSEvent(new { type = "error", message = "Đã xảy ra lỗi khi xử lý yêu cầu. Vui lòng thử lại sau." });
         }
         finally
@@ -289,7 +269,7 @@ public class MasterAIController : ControllerBase
         if (userId == null)
             throw new AppException(ErrorCodes.AuthForbidden, StatusCodes.Status401Unauthorized);
 
-        var studio = await _studioRepository.GetByIdAsync(studioId);
+        var studio = await studioRepository.GetByIdAsync(studioId);
         if (studio == null)
             throw new AppException(ErrorCodes.StudioNotFound, StatusCodes.Status404NotFound);
 
@@ -299,7 +279,7 @@ public class MasterAIController : ControllerBase
         var rateLimitResult = await CheckRateLimitAsync(userId.Value);
 
         // Get groups to count members
-        var groups = await _studioRepository.GetGroupsByStudioIdAsync(studioId);
+        var groups = await studioRepository.GetGroupsByStudioIdAsync(studioId);
         var totalMembers = groups.Sum(g => g.Participants?.Count ?? 0);
 
         return Ok(new AIResponse
@@ -308,7 +288,7 @@ public class MasterAIController : ControllerBase
             Data = new
             {
                 StudioId = studioId,
-                StudioName = studio.StudioName,
+                studio.StudioName,
                 AIType = "Master AI",
                 Description = "Trợ lý AI quản lý toàn Studio - chỉ dành cho Owner",
                 Capabilities = new[]
@@ -326,9 +306,9 @@ public class MasterAIController : ControllerBase
                 },
                 RateLimit = new
                 {
-                    RemainingRequests = rateLimitResult.RemainingRequests,
-                    DailyLimit = rateLimitResult.DailyLimit,
-                    Plan = rateLimitResult.Plan
+                    rateLimitResult.RemainingRequests,
+                    rateLimitResult.DailyLimit,
+                    rateLimitResult.Plan
                 },
                 StudioStats = new
                 {
@@ -351,7 +331,7 @@ public class MasterAIController : ControllerBase
         if (userId == null)
             throw new AppException(ErrorCodes.AuthForbidden, StatusCodes.Status401Unauthorized);
 
-        var studio = await _studioRepository.GetByIdAsync(studioId);
+        var studio = await studioRepository.GetByIdAsync(studioId);
         if (studio == null)
             throw new AppException(ErrorCodes.StudioNotFound, StatusCodes.Status404NotFound);
 
@@ -362,10 +342,10 @@ public class MasterAIController : ControllerBase
         var startOfDay = now.Date;
 
         // Get owner's AI usage
-        var todayRequests = await _aiRequestLogRepository.CountTodayRequestsAsync(userId.Value, startOfDay);
-        var todayTokens = await _aiRequestLogRepository.GetTodayTokenUsageAsync(userId.Value, startOfDay);
+        var todayRequests = await aiRequestLogRepository.CountTodayRequestsAsync(userId.Value, startOfDay);
+        var todayTokens = await aiRequestLogRepository.GetTodayTokenUsageAsync(userId.Value, startOfDay);
 
-        var subscription = await _userSubscriptionRepository.GetSubscriptionPlanByUserIdAsync(userId.Value);
+        var subscription = await userSubscriptionRepository.GetSubscriptionPlanByUserIdAsync(userId.Value);
         var dailyLimit = subscription?.MaxAiRequestsPerDay ?? 20;
 
         return Ok(new AIResponse
@@ -393,8 +373,8 @@ public class MasterAIController : ControllerBase
 
     private async Task<RateLimitResult> CheckRateLimitAsync(Guid userId)
     {
-        var todayRequests = await _aiRequestLogRepository.CountTodayRequestsAsync(userId, DateTime.UtcNow.Date);
-        var subscription = await _userSubscriptionRepository.GetSubscriptionPlanByUserIdAsync(userId);
+        var todayRequests = await aiRequestLogRepository.CountTodayRequestsAsync(userId, DateTime.UtcNow.Date);
+        var subscription = await userSubscriptionRepository.GetSubscriptionPlanByUserIdAsync(userId);
         var dailyLimit = subscription?.MaxAiRequestsPerDay ?? 20;
 
         return new RateLimitResult
@@ -410,7 +390,7 @@ public class MasterAIController : ControllerBase
     {
         try
         {
-            await _aiRequestLogRepository.AddAsync(new Models.Entities.AIRequestLog
+            await aiRequestLogRepository.AddAsync(new Models.Entities.AIRequestLog
             {
                 RequestId = Guid.NewGuid(),
                 UserId = userId,
@@ -427,7 +407,7 @@ public class MasterAIController : ControllerBase
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Failed to log AI request for UserId={UserId}", userId);
+            logger.LogWarning(ex, "Failed to log AI request for UserId={UserId}", userId);
         }
     }
 

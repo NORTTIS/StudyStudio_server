@@ -10,16 +10,10 @@ using StudioStudio_Server.Utils;
 
 namespace StudioStudio_Server.Services
 {
-    public class AdminUserService : IAdminUserService
+    public class AdminUserService(IUserRepository userRepository, IHttpContextAccessor httpContextAccessor) : IAdminUserService
     {
-        private readonly IUserRepository _userRepository;
-        private readonly IHttpContextAccessor _httpContextAccessor;
-
-        public AdminUserService(IUserRepository userRepository, IHttpContextAccessor httpContextAccessor)
-        {
-            _userRepository = userRepository;
-            _httpContextAccessor = httpContextAccessor;
-        }
+        private readonly IUserRepository _userRepository = userRepository;
+        private readonly IHttpContextAccessor _httpContextAccessor = httpContextAccessor;
 
         /// <summary>
         /// Get paginated list of users with filters

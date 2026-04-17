@@ -2,18 +2,17 @@ using System.Diagnostics;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using StudioStudio_Server.Repositories.Interfaces;
+using StudioStudio_Server.Services.AI.Interfaces;
 using StudioStudio_Server.Services.AI.Models;
-using StudioStudio_Server.Services.AI.Tools.Interfaces;
 
 namespace StudioStudio_Server.Services.AI.Tools;
 
 [DebuggerStepThrough]
-public class GetStudioGroupsTool : IAITool
+public class GetStudioGroupsTool(
+    IStudioRepository studioRepository,
+    ITaskRepository taskRepository,
+    ILogger<GetStudioGroupsTool> logger) : IAITool
 {
-    private readonly IStudioRepository _studioRepository;
-    private readonly ITaskRepository _taskRepository;
-    private readonly IGroupParticipantRepository _participantRepository;
-    private readonly ILogger<GetStudioGroupsTool> _logger;
 
     public string Name => "get_studio_groups";
     public string Description => "Lay danh sach tat ca cac nhom trong Studio. Khong can tham so (studio_id tu dong lay tu context).";
@@ -26,18 +25,6 @@ public class GetStudioGroupsTool : IAITool
         },
         ["required"] = new JsonArray()
     };
-
-    public GetStudioGroupsTool(
-        IStudioRepository studioRepository,
-        ITaskRepository taskRepository,
-        IGroupParticipantRepository participantRepository,
-        ILogger<GetStudioGroupsTool> logger)
-    {
-        _studioRepository = studioRepository;
-        _taskRepository = taskRepository;
-        _participantRepository = participantRepository;
-        _logger = logger;
-    }
 
     private static string? Js(JsonNode? n) => n?.GetValue<string>();
 
@@ -55,11 +42,11 @@ public class GetStudioGroupsTool : IAITool
 
             var includeStats = parameters["include_stats"]?.GetValue<bool>() ?? true;
 
-            var groups = await _studioRepository.GetGroupsByStudioIdAsync(studioId);
+            var groups = await studioRepository.GetGroupsByStudioIdAsync(studioId);
 
             var groupIds = groups.Select(g => g.GroupId).ToList();
             var taskStatsMap = groupIds.Count > 0
-                ? await _taskRepository.GetGroupTaskStatisticsBatchAsync(groupIds)
+                ? await taskRepository.GetGroupTaskStatisticsBatchAsync(groupIds)
                 : new Dictionary<Guid, global::StudioStudio_Server.Models.DTOs.Response.TaskSummaryResponse>();
 
             var groupsArray = new JsonArray();
@@ -100,7 +87,7 @@ public class GetStudioGroupsTool : IAITool
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "GetStudioGroupsTool error");
+            logger.LogError(ex, "GetStudioGroupsTool error");
             return AIQueryResult.Error("Da xay ra loi khi lay danh sach nhom");
         }
     }

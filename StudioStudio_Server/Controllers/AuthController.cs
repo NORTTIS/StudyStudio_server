@@ -13,18 +13,8 @@ namespace StudioStudio_Server.Controllers
     /// </summary>
     [Route("api/auth")]
     [ApiController]
-    public class AuthController : ControllerBase
+    public class AuthController(IAuthService authService, IMessageService messageService) : ControllerBase
     {
-        private readonly IAuthService _authService;
-        private readonly IMessageService _messageService;
-
-        public AuthController(IAuthService authService, IMessageService messageService)
-        {
-            _authService = authService;
-            _messageService = messageService;
-        }
-
-
         /// <summary>
         /// [PUBLIC] POST /api/auth/register
         /// Register new user account
@@ -34,13 +24,12 @@ namespace StudioStudio_Server.Controllers
         [HttpPost("register")]
         public async Task<IActionResult> Register([FromBody] RegisterRequests request)
         {
-            await _authService.RegisterAsync(request);
-            var message = _messageService.GetMessage(ErrorCodes.SuccessRegister);
+            await authService.RegisterAsync(request);
+            var message = messageService.GetMessage(ErrorCodes.SuccessRegister);
 
             return Ok(ApiResponse<object>.Success(
                 ErrorCodes.SuccessRegister,
-                message,
-                null));
+                message));
         }
 
         /// <summary>
@@ -52,8 +41,8 @@ namespace StudioStudio_Server.Controllers
         [HttpPost("login")]
         public async Task<ActionResult<ApiResponse<LoginResponse>>> Login([FromBody] LoginRequests request)
         {
-            var loginResponse = await _authService.LoginAsync(request, Response);
-            var message = _messageService.GetMessage(ErrorCodes.SuccessLogin);
+            var loginResponse = await authService.LoginAsync(request, Response);
+            var message = messageService.GetMessage(ErrorCodes.SuccessLogin);
 
             return Ok(ApiResponse<LoginResponse>.Success(
                 ErrorCodes.SuccessLogin,
@@ -70,8 +59,8 @@ namespace StudioStudio_Server.Controllers
         [HttpPost("google")]
         public async Task<IActionResult> GoogleLogin([FromBody] GoogleLoginRequest request)
         {
-            var loginResponse = await _authService.GoogleLoginAsync(request, Response);
-            var message = _messageService.GetMessage(ErrorCodes.SuccessLogin);
+            var loginResponse = await authService.GoogleLoginAsync(request, Response);
+            var message = messageService.GetMessage(ErrorCodes.SuccessLogin);
 
             return Ok(ApiResponse<LoginResponse>.Success(
                 ErrorCodes.SuccessLogin,
@@ -88,8 +77,8 @@ namespace StudioStudio_Server.Controllers
         [HttpPost("refresh")]
         public async Task<ActionResult<ApiResponse<LoginResponse>>> Refresh([FromBody] RefreshTokenRequest request)
         {
-            var refreshResponse = await _authService.RefreshTokenAsync(request.RefreshToken, Response);
-            var message = _messageService.GetMessage(ErrorCodes.SuccessRefreshToken);
+            var refreshResponse = await authService.RefreshTokenAsync(request.RefreshToken, Response);
+            var message = messageService.GetMessage(ErrorCodes.SuccessRefreshToken);
 
             return Ok(ApiResponse<LoginResponse>.Success(
                 ErrorCodes.SuccessRefreshToken,
@@ -109,15 +98,14 @@ namespace StudioStudio_Server.Controllers
 
             if (!string.IsNullOrEmpty(refreshToken))
             {
-                await _authService.LogoutAsync(refreshToken, Response);
+                await authService.LogoutAsync(refreshToken, Response);
             }
 
-            var message = _messageService.GetMessage(ErrorCodes.SuccessLogout);
+            var message = messageService.GetMessage(ErrorCodes.SuccessLogout);
 
             return Ok(ApiResponse<object>.Success(
                 ErrorCodes.SuccessLogout,
-                message,
-                null));
+                message));
         }
 
         /// <summary>
@@ -132,17 +120,15 @@ namespace StudioStudio_Server.Controllers
             if (string.IsNullOrEmpty(token))
             {
                 throw new AppException(
-                    ErrorCodes.ValidationRequiredField,
-                    StatusCodes.Status400BadRequest);
+                    ErrorCodes.ValidationRequiredField);
             }
 
-            await _authService.VerifyEmailLinkAsync(token);
-            var message = _messageService.GetMessage(ErrorCodes.SuccessVerifyEmail);
+            await authService.VerifyEmailLinkAsync(token);
+            var message = messageService.GetMessage(ErrorCodes.SuccessVerifyEmail);
 
             return Ok(ApiResponse<object>.Success(
                 ErrorCodes.SuccessVerifyEmail,
-                message,
-                null));
+                message));
         }
 
         /// <summary>
@@ -156,13 +142,12 @@ namespace StudioStudio_Server.Controllers
         [HttpPost("resend-email-verify")]
         public async Task<IActionResult> ResendEmailVerify([FromBody] ResendVerifyEmailRequest request)
         {
-            await _authService.ResendVerifyEmailAsync(request);
-            var message = _messageService.GetMessage(ErrorCodes.SuccessResendEmailVerify);
+            await authService.ResendVerifyEmailAsync(request);
+            var message = messageService.GetMessage(ErrorCodes.SuccessResendEmailVerify);
 
             return Ok(ApiResponse<object>.Success(
                 ErrorCodes.SuccessResendEmailVerify,
-                message,
-                null));
+                message));
         }
 
         /// <summary>
@@ -174,13 +159,12 @@ namespace StudioStudio_Server.Controllers
         [HttpPost("forgot")]
         public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordRequest request)
         {
-            await _authService.SendResetPasswordLinkAsync(request.Email);
-            var message = _messageService.GetMessage(ErrorCodes.SuccessSendForgotLink);
+            await authService.SendResetPasswordLinkAsync(request.Email);
+            var message = messageService.GetMessage(ErrorCodes.SuccessSendForgotLink);
 
             return Ok(ApiResponse<object>.Success(
                 ErrorCodes.SuccessSendForgotLink,
-                message,
-                null));
+                message));
         }
 
         /// <summary>
@@ -195,25 +179,22 @@ namespace StudioStudio_Server.Controllers
             if (string.IsNullOrEmpty(token))
             {
                 throw new AppException(
-                    ErrorCodes.ValidationRequiredField,
-                    StatusCodes.Status400BadRequest);
+                    ErrorCodes.ValidationRequiredField);
             }
 
-            var isValid = await _authService.VerifyResetTokenAsync(token);
+            var isValid = await authService.VerifyResetTokenAsync(token);
 
             if (!isValid)
             {
                 throw new AppException(
-                    ErrorCodes.ValidationInvalidToken,
-                    StatusCodes.Status400BadRequest);
+                    ErrorCodes.ValidationInvalidToken);
             }
 
-            var message = _messageService.GetMessage(ErrorCodes.SuccessVerifyEmail);
+            var message = messageService.GetMessage(ErrorCodes.SuccessVerifyEmail);
 
             return Ok(ApiResponse<object>.Success(
                 ErrorCodes.SuccessVerifyEmail,
-                message,
-                null));
+                message));
         }
 
         /// <summary>
@@ -227,13 +208,12 @@ namespace StudioStudio_Server.Controllers
         [HttpPost("reset-password")]
         public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordRequest request)
         {
-            await _authService.ResetPasswordAsync(request.Token, request.NewPassword);
-            var message = _messageService.GetMessage(ErrorCodes.SuccessResetPassword);
+            await authService.ResetPasswordAsync(request.Token, request.NewPassword);
+            var message = messageService.GetMessage(ErrorCodes.SuccessResetPassword);
 
             return Ok(ApiResponse<object>.Success(
                 ErrorCodes.SuccessResetPassword,
-                message,
-                null));
+                message));
         }
     }
 }

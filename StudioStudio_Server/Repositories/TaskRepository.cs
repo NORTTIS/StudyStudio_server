@@ -11,15 +11,11 @@ namespace StudioStudio_Server.Repositories
     /// <summary>
     /// Repository handling CRUD operations with TaskItem entity
     /// </summary>
-    public class TaskRepository : ITaskRepository
+    public class TaskRepository(StudioDbContext context) : ITaskRepository
     {
-        private readonly StudioDbContext _context;
+        private readonly StudioDbContext _context = context;
         private const int STEP = 1000;
         private const int MAX_TRY = 3;
-        public TaskRepository(StudioDbContext context)
-        {
-            _context = context;
-        }
 
         /// <summary>
         /// Get task by ID

@@ -8,14 +8,9 @@ namespace StudioStudio_Server.Repositories
     /// <summary>
     /// Repository handling operations with StudioParticipant entity (members in studio)
     /// </summary>
-    public class StudioParticipantRepository : IStudioParticipantRepository
+    public class StudioParticipantRepository(StudioDbContext context) : IStudioParticipantRepository
     {
-        private readonly StudioDbContext _context;
-
-        public StudioParticipantRepository(StudioDbContext context)
-        {
-            _context = context;
-        }
+        private readonly StudioDbContext _context = context;
 
         /// <summary>
         /// Add new participant to studio

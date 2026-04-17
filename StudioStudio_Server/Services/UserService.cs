@@ -17,39 +17,27 @@ namespace StudioStudio_Server.Services
     /// Also provides AI request usage information for rate limiting display
     /// OPTIMIZED: Uses caching and automatic cache invalidation
     /// </summary>
-    public class UserService : IUserService
+    public class UserService(
+        IUserRepository userRepository,
+        IPasswordHasher<User> passwordHasher,
+        IConfiguration configuration,
+        IHttpContextAccessor httpContextAccessor,
+        IWebHostEnvironment environment,
+        IUserSubscriptionRepository userSubscriptionRepository,
+        IAIRequestLogRepository aiRequestLogRepository,
+        ICacheService cacheService) : IUserService
     {
-        private readonly IUserRepository _userRepository;
-        private readonly IPasswordHasher<User> _passwordHasher;
-        private readonly IConfiguration _configuration;
-        private readonly IHttpContextAccessor _httpContextAccessor;
-        private readonly IWebHostEnvironment _environment;
-        private readonly IUserSubscriptionRepository _userSubscriptionRepository;
-        private readonly IAIRequestLogRepository _aiRequestLogRepository;
-        private readonly ICacheService _cacheService;
+        private readonly IUserRepository _userRepository = userRepository;
+        private readonly IPasswordHasher<User> _passwordHasher = passwordHasher;
+        private readonly IConfiguration _configuration = configuration;
+        private readonly IHttpContextAccessor _httpContextAccessor = httpContextAccessor;
+        private readonly IWebHostEnvironment _environment = environment;
+        private readonly IUserSubscriptionRepository _userSubscriptionRepository = userSubscriptionRepository;
+        private readonly IAIRequestLogRepository _aiRequestLogRepository = aiRequestLogRepository;
+        private readonly ICacheService _cacheService = cacheService;
 
         // Password must be 10-20 characters long, contain at least one uppercase letter, one lowercase letter, and one digit
         private readonly Regex PasswordRegex = new(@"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)[A-Za-z\d@$!%*?&]{10,20}$", RegexOptions.Compiled);
-
-        public UserService(
-            IUserRepository userRepository,
-            IPasswordHasher<User> passwordHasher,
-            IConfiguration configuration,
-            IHttpContextAccessor httpContextAccessor,
-            IWebHostEnvironment environment,
-            IUserSubscriptionRepository userSubscriptionRepository,
-            IAIRequestLogRepository aiRequestLogRepository,
-            ICacheService cacheService)
-        {
-            _userRepository = userRepository;
-            _passwordHasher = passwordHasher;
-            _configuration = configuration;
-            _httpContextAccessor = httpContextAccessor;
-            _environment = environment;
-            _userSubscriptionRepository = userSubscriptionRepository;
-            _aiRequestLogRepository = aiRequestLogRepository;
-            _cacheService = cacheService;
-        }
 
         /// <summary>
         /// Get user by ID

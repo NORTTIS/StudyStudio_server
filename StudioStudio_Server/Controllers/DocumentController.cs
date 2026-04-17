@@ -16,19 +16,10 @@ namespace StudioStudio_Server.Controllers
     [Route("api/documents")]
     [ApiController]
     [Authorize]
-    public class DocumentController : ControllerBase
+    public class DocumentController(
+        IDocumentService documentService,
+        IMessageService messageService) : ControllerBase
     {
-        private readonly IDocumentService _documentService;
-        private readonly IMessageService _messageService;
-
-        public DocumentController(
-            IDocumentService documentService,
-            IMessageService messageService)
-        {
-            _documentService = documentService;
-            _messageService = messageService;
-        }
-
         /// <summary>
         /// Authenticate and get userId from JWT token
         /// Validate: User must not be admin (admin cannot use user APIs)
@@ -72,11 +63,11 @@ namespace StudioStudio_Server.Controllers
         {
             Guid userId = ValidateAndGetUserId();
 
-            RequestDocumentUploadResponse result = await _documentService.RequestUploadAsync(
+            RequestDocumentUploadResponse result = await documentService.RequestUploadAsync(
                 userId,
                 request);
 
-            string message = _messageService.GetMessage(ErrorCodes.SuccessGetData);
+            string message = messageService.GetMessage(ErrorCodes.SuccessGetData);
 
             return Ok(ApiResponse<RequestDocumentUploadResponse>.Success(
                 ErrorCodes.SuccessGetData,
@@ -96,14 +87,13 @@ namespace StudioStudio_Server.Controllers
         {
             Guid userId = ValidateAndGetUserId();
 
-            await _documentService.CompleteUploadAsync(userId, attachmentId);
+            await documentService.CompleteUploadAsync(userId, attachmentId);
 
-            string message = _messageService.GetMessage(ErrorCodes.SuccessGetData);
+            string message = messageService.GetMessage(ErrorCodes.SuccessGetData);
 
             return Ok(ApiResponse<object>.Success(
                 ErrorCodes.SuccessGetData,
-                message,
-                null));
+                message));
         }
 
         /// <summary>
@@ -118,11 +108,11 @@ namespace StudioStudio_Server.Controllers
         {
             Guid userId = ValidateAndGetUserId();
 
-            DocumentStatusResponse result = await _documentService.GetDocumentStatusAsync(
+            DocumentStatusResponse result = await documentService.GetDocumentStatusAsync(
                 userId,
                 attachmentId);
 
-            string message = _messageService.GetMessage(ErrorCodes.SuccessGetData);
+            string message = messageService.GetMessage(ErrorCodes.SuccessGetData);
 
             return Ok(ApiResponse<DocumentStatusResponse>.Success(
                 ErrorCodes.SuccessGetData,
@@ -142,11 +132,11 @@ namespace StudioStudio_Server.Controllers
         {
             Guid userId = ValidateAndGetUserId();
 
-            GroupDocumentsResponse result = await _documentService.GetGroupDocumentsAsync(
+            GroupDocumentsResponse result = await documentService.GetGroupDocumentsAsync(
                 userId,
                 groupId);
 
-            string message = _messageService.GetMessage(ErrorCodes.SuccessGetData);
+            string message = messageService.GetMessage(ErrorCodes.SuccessGetData);
 
             return Ok(ApiResponse<GroupDocumentsResponse>.Success(
                 ErrorCodes.SuccessGetData,
@@ -168,14 +158,13 @@ namespace StudioStudio_Server.Controllers
         {
             Guid userId = ValidateAndGetUserId();
 
-            await _documentService.DeleteDocumentAsync(userId, attachmentId);
+            await documentService.DeleteDocumentAsync(userId, attachmentId);
 
-            string message = _messageService.GetMessage(ErrorCodes.SuccessDeleteGroup);
+            string message = messageService.GetMessage(ErrorCodes.SuccessDeleteGroup);
 
             return Ok(ApiResponse<object>.Success(
                 ErrorCodes.SuccessDeleteGroup,
-                message,
-                null));
+                message));
         }
 
         /// <summary>
@@ -196,16 +185,15 @@ namespace StudioStudio_Server.Controllers
             if (expirationMinutes < 1 || expirationMinutes > 1440)
             {
                 throw new AppException(
-                    ErrorCodes.ValidationRequiredField,
-                    StatusCodes.Status400BadRequest);
+                    ErrorCodes.ValidationRequiredField);
             }
 
-            string downloadUrl = await _documentService.GetDocumentDownloadUrlAsync(
+            string downloadUrl = await documentService.GetDocumentDownloadUrlAsync(
                 userId,
                 attachmentId,
                 expirationMinutes);
 
-            string message = _messageService.GetMessage(ErrorCodes.SuccessGetData);
+            string message = messageService.GetMessage(ErrorCodes.SuccessGetData);
 
             var response = new DocumentDownloadUrlResponse
             {

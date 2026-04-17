@@ -6,22 +6,16 @@ using StudioStudio_Server.Repositories.Interfaces;
 namespace StudioStudio_Server.Repositories
 {
     /// <summary>
-    /// Repository x? l? các thao tác CRUD v?i GroupMessage entity
+    /// Repository x? l? cï¿½c thao tï¿½c CRUD v?i GroupMessage entity
     /// </summary>
-    public class GroupMessageRepository : IGroupMessageRepository
+    public class GroupMessageRepository(StudioDbContext context, ILogger<GroupMessageRepository> logger) : IGroupMessageRepository
     {
-        private readonly StudioDbContext _context;
-        private readonly ILogger<GroupMessageRepository> _logger;
-
-        public GroupMessageRepository(StudioDbContext context, ILogger<GroupMessageRepository> logger)
-        {
-            _context = context;
-            _logger = logger;
-        }
+        private readonly StudioDbContext _context = context;
+        private readonly ILogger<GroupMessageRepository> _logger = logger;
 
         /// <summary>
-        /// Thêm m?i m?t message vào database
-        /// Include logging ð? track message creation và threading
+        /// Thï¿½m m?i m?t message vï¿½o database
+        /// Include logging ï¿½? track message creation vï¿½ threading
         /// </summary>
         public async Task<GroupMessage> AddAsync(GroupMessage message)
         {
@@ -50,8 +44,8 @@ namespace StudioStudio_Server.Repositories
         }
 
         /// <summary>
-        /// L?y message theo ID (không load replies)
-        /// Ði?u ki?n: MessageId = {messageId}
+        /// L?y message theo ID (khï¿½ng load replies)
+        /// ï¿½i?u ki?n: MessageId = {messageId}
         /// Include: User info
         /// </summary>
         public async Task<GroupMessage?> GetByIdAsync(Guid messageId)
@@ -63,8 +57,8 @@ namespace StudioStudio_Server.Repositories
         }
 
         /// <summary>
-        /// L?y message theo ID kèm t?t c? replies (nested up to 2 levels)
-        /// Ði?u ki?n: MessageId = {messageId}
+        /// L?y message theo ID kï¿½m t?t c? replies (nested up to 2 levels)
+        /// ï¿½i?u ki?n: MessageId = {messageId}
         /// Include: User info, Replies ? User, Replies ? Replies ? User
         /// Use case: Load full conversation thread
         /// </summary>
@@ -82,10 +76,10 @@ namespace StudioStudio_Server.Repositories
         }
 
         /// <summary>
-        /// L?y danh sách parent messages trong group (pagination)
-        /// Ði?u ki?n: GroupId = {groupId} AND IsDeleted = false AND ParentMessageId = null
-        /// Include: User info, Replies (1 level, ch? replies không b? xóa)
-        /// S?p x?p: CreatedAt DESC (tin nh?n m?i nh?t trý?c)
+        /// L?y danh sï¿½ch parent messages trong group (pagination)
+        /// ï¿½i?u ki?n: GroupId = {groupId} AND IsDeleted = false AND ParentMessageId = null
+        /// Include: User info, Replies (1 level, ch? replies khï¿½ng b? xï¿½a)
+        /// S?p x?p: CreatedAt DESC (tin nh?n m?i nh?t trï¿½?c)
         /// Pagination: Skip({offset}).Take({limit})
         /// </summary>
         public async Task<List<GroupMessage>> GetByGroupIdAsync(Guid groupId, int limit = 100, int offset = 0)
@@ -116,8 +110,8 @@ namespace StudioStudio_Server.Repositories
         }
 
         /// <summary>
-        /// Ð?m t?ng s? parent messages trong group
-        /// Ði?u ki?n: GroupId = {groupId} AND IsDeleted = false AND ParentMessageId = null
+        /// ï¿½?m t?ng s? parent messages trong group
+        /// ï¿½i?u ki?n: GroupId = {groupId} AND IsDeleted = false AND ParentMessageId = null
         /// </summary>
         public async Task<int> GetCountByGroupIdAsync(Guid groupId)
         {
@@ -127,8 +121,8 @@ namespace StudioStudio_Server.Repositories
         }
 
         /// <summary>
-        /// Ð?m s? replies c?a m?t message
-        /// Ði?u ki?n: ParentMessageId = {messageId} AND IsDeleted = false
+        /// ï¿½?m s? replies c?a m?t message
+        /// ï¿½i?u ki?n: ParentMessageId = {messageId} AND IsDeleted = false
         /// </summary>
         public async Task<int> GetReplyCountAsync(Guid messageId)
         {
@@ -138,8 +132,8 @@ namespace StudioStudio_Server.Repositories
         }
 
         /// <summary>
-        /// Soft delete message và t?t c? replies (recursive)
-        /// Set IsDeleted = true cho message và t?t c? replies nested
+        /// Soft delete message vï¿½ t?t c? replies (recursive)
+        /// Set IsDeleted = true cho message vï¿½ t?t c? replies nested
         /// Update UpdatedAt = UtcNow
         /// </summary>
         public async Task SoftDeleteWithRepliesAsync(Guid messageId)

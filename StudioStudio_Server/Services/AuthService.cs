@@ -27,38 +27,27 @@ namespace StudioStudio_Server.Services
     /// Supports: Register, Login, Logout, Google OAuth, Password Reset, Email Verification
     /// Security: JWT (Access Token) + Refresh Token with HttpOnly Cookies
     /// </summary>
-    public class AuthService : IAuthService
+    public class AuthService(
+        IUserRepository userRepository,
+        IPasswordHasher<User> passwordHasher,
+        IConfiguration configuration,
+        IRefreshTokenRepository refreshTokenRepository,
+        IEmailService emailService,
+        IEmailVerificationCacheService emailVerificationCache,
+        IPasswordResetCacheService resetCache) : IAuthService
     {
         private readonly Regex EmailRegex = new(@"^[^@\s]+@[^@\s]+\.[^@\s]+$", RegexOptions.Compiled);
 
         // Password must be 10-20 characters long, contain at least one uppercase letter, one lowercase letter, and one digit
         private readonly Regex PasswordRegex = new(@"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)[A-Za-z\d@$!%*?&]{10,20}$", RegexOptions.Compiled);
 
-        private readonly IUserRepository _userRepository;
-        private readonly IRefreshTokenRepository _refreshTokenRepository;
-        private readonly IPasswordHasher<User> _passwordHasher;
-        private readonly IConfiguration _configuration;
-        private readonly IEmailService _emailService;
-        private readonly IEmailVerificationCacheService _emailVerificationCache;
-        private readonly IPasswordResetCacheService _resetCache;
-
-        public AuthService(
-            IUserRepository userRepository,
-            IPasswordHasher<User> passwordHasher,
-            IConfiguration configuration,
-            IRefreshTokenRepository refreshTokenRepository,
-            IEmailService emailService,
-            IEmailVerificationCacheService emailVerificationCache,
-            IPasswordResetCacheService resetCache)
-        {
-            _userRepository = userRepository;
-            _passwordHasher = passwordHasher;
-            _configuration = configuration;
-            _refreshTokenRepository = refreshTokenRepository;
-            _emailService = emailService;
-            _emailVerificationCache = emailVerificationCache;
-            _resetCache = resetCache;
-        }
+        private readonly IUserRepository _userRepository = userRepository;
+        private readonly IRefreshTokenRepository _refreshTokenRepository = refreshTokenRepository;
+        private readonly IPasswordHasher<User> _passwordHasher = passwordHasher;
+        private readonly IConfiguration _configuration = configuration;
+        private readonly IEmailService _emailService = emailService;
+        private readonly IEmailVerificationCacheService _emailVerificationCache = emailVerificationCache;
+        private readonly IPasswordResetCacheService _resetCache = resetCache;
 
         /// <summary>
         /// Register new user account
@@ -413,6 +402,10 @@ namespace StudioStudio_Server.Services
                 }
                 else
                 {
+                    if(user.Status == UserStatus.Inactive)
+                    {
+                        throw new AppException(ErrorCodes.AuthAccountInactive);
+                    }
 
                     user.GoogleId ??= googleId;
                     user.AvatarUrl ??= imgURL;
@@ -446,6 +439,10 @@ namespace StudioStudio_Server.Services
                     IsAdmin = user.IsAdmin,
                     AvatarUrl = user.AvatarUrl
                 };
+            }
+            catch (AppException)
+            {
+                throw;
             }
             catch (Exception)
             {

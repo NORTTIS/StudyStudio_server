@@ -1,22 +1,19 @@
 using System.Diagnostics;
-using System.Text.Json;
 using System.Text.Json.Nodes;
-using StudioStudio_Server.Models.Enums;
 using StudioStudio_Server.Repositories.Interfaces;
+using StudioStudio_Server.Services.AI.Interfaces;
 using StudioStudio_Server.Services.AI.Models;
-using StudioStudio_Server.Services.AI.Tools.Interfaces;
 
 namespace StudioStudio_Server.Services.AI.Tools;
 
-public class GetDeadlinesTool : IAITool
+public class GetDeadlinesTool(
+    ITaskRepository taskRepository,
+    IGroupParticipantRepository participantRepository,
+    IUserRepository userRepository,
+    ILogger<GetDeadlinesTool> logger) : IAITool
 {
     private const int DefaultDaysAhead = 30;
     private const int DefaultLimit = 10;
-
-    private readonly ITaskRepository _taskRepository;
-    private readonly IGroupParticipantRepository _participantRepository;
-    private readonly IUserRepository _userRepository;
-    private readonly ILogger<GetDeadlinesTool> _logger;
 
     public string Name => "get_deadlines";
     public string Description => "Lay danh sach deadline sap toi cua nhom. "
@@ -35,18 +32,6 @@ public class GetDeadlinesTool : IAITool
         ["required"] = new JsonArray()
     };
 
-    public GetDeadlinesTool(
-        ITaskRepository taskRepository,
-        IGroupParticipantRepository participantRepository,
-        IUserRepository userRepository,
-        ILogger<GetDeadlinesTool> logger)
-    {
-        _taskRepository = taskRepository;
-        _participantRepository = participantRepository;
-        _userRepository = userRepository;
-        _logger = logger;
-    }
-
     private static string? Js(JsonNode? n) => n?.GetValue<string>();
     private static int Ji(JsonNode? n) => n == null ? 0 : n.GetValue<int>();
 
@@ -62,11 +47,11 @@ public class GetDeadlinesTool : IAITool
 
             var groupId = context.GroupId.Value;
 
-            if (!await _participantRepository.IsUserInGroupAsync(groupId, context.UserId))
+            if (!await participantRepository.IsUserInGroupAsync(groupId, context.UserId))
                 return AIQueryResult.Error("Ban khong co quyen");
 
             // Role check
-            var role = await _participantRepository.GetGroupRoleByUserIdAsync(context.UserId, groupId);
+            var role = await participantRepository.GetGroupRoleByUserIdAsync(context.UserId, groupId);
             if (role == GroupRole.Commenter || role == GroupRole.Viewer)
                 return AIQueryResult.Error("Ban khong co quyen su dung AI nhom nay");
 
@@ -82,7 +67,7 @@ public class GetDeadlinesTool : IAITool
             // Owner/Moderator: lay tat ca task; Member: chi task duoc assign
             Guid? assigneeId = (role == GroupRole.Owner || role == GroupRole.Moderator) ? null : context.UserId;
 
-            var (tasks, _) = await _taskRepository.GetGroupTasksWithFiltersAsync(
+            var (tasks, _) = await taskRepository.GetGroupTasksWithFiltersAsync(
                 groupId, 1, 200, null, assigneeId, null, null, null, null, null,
                 now,                   // dueDateFrom
                 endDate,               // dueDateTo
@@ -102,7 +87,7 @@ public class GetDeadlinesTool : IAITool
                 .ToList();
 
             // Overdue: load separately with a bounded look-back window
-            var (allOverdue, _) = await _taskRepository.GetGroupTasksWithFiltersAsync(
+            var (allOverdue, _) = await taskRepository.GetGroupTasksWithFiltersAsync(
                 groupId, 1, 50, null, assigneeId, null, null, null, null, null,
                 now.AddDays(-30),     // look back 30 days max
                 null,                  // no upper bound
@@ -123,7 +108,7 @@ public class GetDeadlinesTool : IAITool
                 .Concat(overdueTasks.Select(t => t.OwnerId))
                 .Distinct()
                 .ToList();
-            var owners = await _userRepository.GetByIdsAsync(ownerIds);
+            var owners = await userRepository.GetByIdsAsync(ownerIds);
             var ownerDict = owners.ToDictionary(o => o.UserId);
 
             var deadlines = deadlineTasks.Select(t =>
@@ -186,7 +171,7 @@ public class GetDeadlinesTool : IAITool
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "GetDeadlinesTool error");
+            logger.LogError(ex, "GetDeadlinesTool error");
             return AIQueryResult.Error("Da xay ra loi");
         }
     }

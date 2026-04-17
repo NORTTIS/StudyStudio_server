@@ -6,24 +6,16 @@ using StudioStudio_Server.Services.Interfaces;
 
 namespace StudioStudio_Server.Services
 {
-    public class SubscriptionPlanService : ISubscriptionPlanService
+    public class SubscriptionPlanService(
+        ISubscriptionPlanRepository subscriptionPlanRepository,
+        IUserRepository userRepository,
+        IUserSubscriptionRepository userSubscriptionRepository,
+        ICacheService cacheService) : ISubscriptionPlanService
     {
-        private readonly ISubscriptionPlanRepository _subscriptionPlanRepository;
-        private readonly IUserRepository _userRepository;
-        private readonly IUserSubscriptionRepository _userSubscriptionRepository;
-        private readonly ICacheService _cacheService;
-
-        public SubscriptionPlanService(
-            ISubscriptionPlanRepository subscriptionPlanRepository,
-            IUserRepository userRepository,
-            IUserSubscriptionRepository userSubscriptionRepository,
-            ICacheService cacheService)
-        {
-            _subscriptionPlanRepository = subscriptionPlanRepository;
-            _userRepository = userRepository;
-            _userSubscriptionRepository = userSubscriptionRepository;
-            _cacheService = cacheService;
-        }
+        private readonly ISubscriptionPlanRepository _subscriptionPlanRepository = subscriptionPlanRepository;
+        private readonly IUserRepository _userRepository = userRepository;
+        private readonly IUserSubscriptionRepository _userSubscriptionRepository = userSubscriptionRepository;
+        private readonly ICacheService _cacheService = cacheService;
 
         public async Task<SubscriptionPlanResponse> GetAllAsync()
         {

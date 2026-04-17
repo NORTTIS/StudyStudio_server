@@ -1,12 +1,10 @@
 using Microsoft.EntityFrameworkCore;
 using StudioStudio_Server.Data;
 using StudioStudio_Server.Exceptions;
-using StudioStudio_Server.Localization;
 using StudioStudio_Server.Models.DTOs.Response;
-using StudioStudio_Server.Models.Entities;
 using StudioStudio_Server.Models.Enums;
+using StudioStudio_Server.Resources.Localization;
 using StudioStudio_Server.Utils;
-using System.Security.Claims;
 
 namespace StudioStudio_Server.Middlewares
 {
@@ -16,22 +14,11 @@ namespace StudioStudio_Server.Middlewares
     /// - Check if user has not been deleted
     /// - Apply rate limiting for API calls
     /// </summary>
-    public class TokenValidationMiddleware
+    public class TokenValidationMiddleware(
+        RequestDelegate next,
+        ILogger<TokenValidationMiddleware> logger,
+        IWebHostEnvironment env)
     {
-        private readonly RequestDelegate _next;
-        private readonly ILogger<TokenValidationMiddleware> _logger;
-        private readonly IWebHostEnvironment _env;
-
-        public TokenValidationMiddleware(
-            RequestDelegate next,
-            ILogger<TokenValidationMiddleware> logger,
-            IWebHostEnvironment env)
-        {
-            _next = next;
-            _logger = logger;
-            _env = env;
-        }
-
         public async Task InvokeAsync(HttpContext context, StudioDbContext dbContext)
         {
             // Skip validation for:
@@ -45,7 +32,7 @@ namespace StudioStudio_Server.Middlewares
                 path.StartsWith("/hubs") ||
                 !path.StartsWith("/api"))
             {
-                await _next(context);
+                await next(context);
                 return;
             }
 
@@ -66,7 +53,7 @@ namespace StudioStudio_Server.Middlewares
 
                         if (user == null)
                         {
-                            _logger.LogWarning("User {UserId} not found in database but has valid token", userId.Value);
+                            logger.LogWarning("User {UserId} not found in database but has valid token", userId.Value);
                             await HandleUnauthorized(context, ErrorCodes.UserNotFound);
                             return;
                         }
@@ -74,7 +61,7 @@ namespace StudioStudio_Server.Middlewares
                         // Check if user account has been deleted
                         if (user.Status == UserStatus.Deleted)
                         {
-                            _logger.LogWarning("User {UserId} account is deleted but attempting to access API", userId.Value);
+                            logger.LogWarning("User {UserId} account is deleted but attempting to access API", userId.Value);
                             await HandleUnauthorized(context, ErrorCodes.UserAccountAlreadyDeleted);
                             return;
                         }
@@ -82,7 +69,7 @@ namespace StudioStudio_Server.Middlewares
                         // Check if user account is inactive (disabled by admin)
                         if (user.Status == UserStatus.Inactive)
                         {
-                            _logger.LogWarning("User {UserId} account is inactive but attempting to access API", userId.Value);
+                            logger.LogWarning("User {UserId} account is inactive but attempting to access API", userId.Value);
                             await HandleUnauthorized(context, ErrorCodes.AuthAccountInactive);
                             return;
                         }
@@ -94,18 +81,18 @@ namespace StudioStudio_Server.Middlewares
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "Error validating token in middleware");
+                    logger.LogError(ex, "Error validating token in middleware");
                     // Continue to next middleware - let controller handle if needed
                 }
             }
 
-            await _next(context);
+            await next(context);
         }
 
         private async Task HandleUnauthorized(HttpContext context, string errorCode)
         {
             var culture = HttpContextHelper.GetCultureFromHeader(context);
-            var localizer = new JsonStringLocalizer(_env, culture);
+            var localizer = new JsonStringLocalizer(env, culture);
 
             context.Response.StatusCode = StatusCodes.Status401Unauthorized;
             context.Response.ContentType = "application/json";

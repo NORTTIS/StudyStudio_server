@@ -15,19 +15,10 @@ namespace StudioStudio_Server.Controllers.Admin
     [Route("api/admin/announcements")]
     [ApiController]
     [Authorize]
-    public class AdminAnnouncementController : ControllerBase
+    public class AdminAnnouncementController(
+        IAdminAnnouncementService adminAnnouncementService,
+        IMessageService messageService) : ControllerBase
     {
-        private readonly IAdminAnnouncementService _adminAnnouncementService;
-        private readonly IMessageService _messageService;
-
-        public AdminAnnouncementController(
-            IAdminAnnouncementService adminAnnouncementService,
-            IMessageService messageService)
-        {
-            _adminAnnouncementService = adminAnnouncementService;
-            _messageService = messageService;
-        }
-
         /// <summary>
         /// Validate user is admin
         /// Throw 403 if not admin
@@ -68,8 +59,8 @@ namespace StudioStudio_Server.Controllers.Admin
         {
             ValidateAdminUser();
 
-            var response = await _adminAnnouncementService.GetAllAnnouncementsAsync();
-            var message = _messageService.GetMessage(ErrorCodes.SuccessGetData);
+            var response = await adminAnnouncementService.GetAllAnnouncementsAsync();
+            var message = messageService.GetMessage(ErrorCodes.SuccessGetData);
 
             return Ok(ApiResponse<List<AnnouncementResponse>>.Success(
                 ErrorCodes.SuccessGetData,
@@ -87,8 +78,8 @@ namespace StudioStudio_Server.Controllers.Admin
         {
             ValidateAdminUser();
 
-            var response = await _adminAnnouncementService.GetAnnouncementByIdAsync(id);
-            var message = _messageService.GetMessage(ErrorCodes.SuccessGetData);
+            var response = await adminAnnouncementService.GetAnnouncementByIdAsync(id);
+            var message = messageService.GetMessage(ErrorCodes.SuccessGetData);
 
             return Ok(ApiResponse<AnnouncementResponse>.Success(
                 ErrorCodes.SuccessGetData,
@@ -107,8 +98,8 @@ namespace StudioStudio_Server.Controllers.Admin
         {
             var userId = ValidateAdminUser();
 
-            var response = await _adminAnnouncementService.CreateAnnouncementAsync(userId, request);
-            var message = _messageService.GetMessage(ErrorCodes.SuccessGetData);
+            var response = await adminAnnouncementService.CreateAnnouncementAsync(userId, request);
+            var message = messageService.GetMessage(ErrorCodes.SuccessGetData);
 
             return Ok(ApiResponse<AnnouncementResponse>.Success(
                 ErrorCodes.SuccessGetData,
@@ -127,8 +118,8 @@ namespace StudioStudio_Server.Controllers.Admin
         {
             var userId = ValidateAdminUser();
 
-            var response = await _adminAnnouncementService.UpdateAnnouncementAsync(userId, request);
-            var message = _messageService.GetMessage(ErrorCodes.SuccessGetData);
+            var response = await adminAnnouncementService.UpdateAnnouncementAsync(userId, request);
+            var message = messageService.GetMessage(ErrorCodes.SuccessGetData);
 
             return Ok(ApiResponse<AnnouncementResponse>.Success(
                 ErrorCodes.SuccessGetData,
@@ -146,13 +137,12 @@ namespace StudioStudio_Server.Controllers.Admin
         {
             var userId = ValidateAdminUser();
 
-            await _adminAnnouncementService.DeleteAnnouncementAsync(userId, id);
-            var message = _messageService.GetMessage(ErrorCodes.SuccessGetData);
+            await adminAnnouncementService.DeleteAnnouncementAsync(userId, id);
+            var message = messageService.GetMessage(ErrorCodes.SuccessGetData);
 
             return Ok(ApiResponse<object>.Success(
                 ErrorCodes.SuccessGetData,
-                message,
-                null));
+                message));
         }
     }
 }

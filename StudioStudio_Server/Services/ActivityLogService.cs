@@ -9,14 +9,9 @@ namespace StudioStudio_Server.Services
     /// <summary>
     /// Service for logging user activities
     /// </summary>
-    public class ActivityLogService : IActivityLogService
+    public class ActivityLogService(StudioDbContext context) : IActivityLogService
     {
-        private readonly StudioDbContext _context;
-
-        public ActivityLogService(StudioDbContext context)
-        {
-            _context = context;
-        }
+        private readonly StudioDbContext _context = context;
 
         /// <summary>
         /// Log a general user action with context

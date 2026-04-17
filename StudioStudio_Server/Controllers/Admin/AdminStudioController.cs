@@ -16,19 +16,10 @@ namespace StudioStudio_Server.Controllers.Admin
     [Route("api/admin/studios")]
     [ApiController]
     [Authorize]
-    public class AdminStudioController : ControllerBase
+    public class AdminStudioController(
+        IAdminStudioService adminStudioService,
+        IMessageService messageService) : ControllerBase
     {
-        private readonly IAdminStudioService _adminStudioService;
-        private readonly IMessageService _messageService;
-
-        public AdminStudioController(
-            IAdminStudioService adminStudioService,
-            IMessageService messageService)
-        {
-            _adminStudioService = adminStudioService;
-            _messageService = messageService;
-        }
-
         /// <summary>
         /// [ADMIN] GET /api/admin/studios
         /// Get paginated list of studios with filters
@@ -42,8 +33,8 @@ namespace StudioStudio_Server.Controllers.Admin
         {
             JwtHelper.ValidateAdminUser(User);
 
-            var response = await _adminStudioService.GetStudiosAsync(request);
-            var message = _messageService.GetMessage(ErrorCodes.SuccessGetData);
+            var response = await adminStudioService.GetStudiosAsync(request);
+            var message = messageService.GetMessage(ErrorCodes.SuccessGetData);
 
             return Ok(ApiResponse<AdminStudioListResponse>.Success(
                 ErrorCodes.SuccessGetData,
@@ -63,9 +54,9 @@ namespace StudioStudio_Server.Controllers.Admin
         {
             JwtHelper.ValidateAdminUser(User);
 
-            await _adminStudioService.UpdateStudioStatusAsync(id, request.IsActive);
+            await adminStudioService.UpdateStudioStatusAsync(id, request.IsActive);
 
-            var message = _messageService.GetMessage(ErrorCodes.SuccessUpdateData);
+            var message = messageService.GetMessage(ErrorCodes.SuccessUpdateData);
 
             return Ok(ApiResponse<string>.Success(
                 ErrorCodes.SuccessUpdateData,

@@ -7,21 +7,14 @@ using System.Net.Mail;
 
 namespace StudioStudio_Server.Services
 {
-    public class SMTPEmailService : IEmailService
+    public class SMTPEmailService(
+        IOptions<EmailOptions> emailOptions,
+        IUserRepository userRepository,
+        ILogger<SMTPEmailService> logger) : IEmailService
     {
-        private readonly EmailOptions _emailOptions;
-        private readonly IUserRepository _userRepository;
-        private readonly ILogger<SMTPEmailService> _logger;
-
-        public SMTPEmailService(
-            IOptions<EmailOptions> emailOptions,
-            IUserRepository userRepository,
-            ILogger<SMTPEmailService> logger)
-        {
-            _emailOptions = emailOptions.Value;
-            _userRepository = userRepository;
-            _logger = logger;
-        }
+        private readonly EmailOptions _emailOptions = emailOptions.Value;
+        private readonly IUserRepository _userRepository = userRepository;
+        private readonly ILogger<SMTPEmailService> _logger = logger;
 
         public async Task SendLinkAsync(string to, string subject, string body)
         {

@@ -1,6 +1,4 @@
-﻿using System.Text.Json;
-
-namespace StudioStudio_Server.Models.Entities
+﻿namespace StudioStudio_Server.Models.Entities
 {
     public class ActivityLog
     {

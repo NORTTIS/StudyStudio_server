@@ -3,12 +3,9 @@ using Microsoft.AspNetCore.Mvc;
 using Newtonsoft.Json;
 using StudioStudio_Server.Exceptions;
 using StudioStudio_Server.Models;
-using StudioStudio_Server.Models.DTOs.Request;
-using StudioStudio_Server.Models.DTOs.Response;
 using StudioStudio_Server.Repositories.Interfaces;
 using StudioStudio_Server.Services.AI;
 using StudioStudio_Server.Services.AI.Models;
-using StudioStudio_Server.Services.Interfaces;
 using System.Security.Claims;
 
 namespace StudioStudio_Server.Controllers;
@@ -21,28 +18,12 @@ namespace StudioStudio_Server.Controllers;
 [Route("api/ai/personal")]
 [ApiController]
 [Authorize]
-public class PersonalAIController : ControllerBase
+public class PersonalAIController(
+    AIAgent aiAgent,
+    IAIRequestLogRepository aiRequestLogRepository,
+    IUserSubscriptionRepository userSubscriptionRepository,
+    ILogger<PersonalAIController> logger) : ControllerBase
 {
-    private readonly AIAgent _aiAgent;
-    private readonly IUserService _userService;
-    private readonly IAIRequestLogRepository _aiRequestLogRepository;
-    private readonly IUserSubscriptionRepository _userSubscriptionRepository;
-    private readonly ILogger<PersonalAIController> _logger;
-
-    public PersonalAIController(
-        AIAgent aiAgent,
-        IUserService userService,
-        IAIRequestLogRepository aiRequestLogRepository,
-        IUserSubscriptionRepository userSubscriptionRepository,
-        ILogger<PersonalAIController> logger)
-    {
-        _aiAgent = aiAgent;
-        _userService = userService;
-        _aiRequestLogRepository = aiRequestLogRepository;
-        _userSubscriptionRepository = userSubscriptionRepository;
-        _logger = logger;
-    }
-
     /// <summary>
     /// Ask Personal AI - AI cá nhân về công việc và tiến độ của mình
     /// </summary>
@@ -65,7 +46,7 @@ public class PersonalAIController : ControllerBase
             throw new AppException(ErrorCodes.AIRateLimitExceeded, StatusCodes.Status429TooManyRequests);
         }
 
-        _logger.LogInformation(
+        logger.LogInformation(
             "Personal AI Question: UserId={UserId}, Question={Question}, Language={Language}",
             userId, request.Question.Length > 100 ? request.Question[..100] + "..." : request.Question, language);
 
@@ -80,7 +61,7 @@ public class PersonalAIController : ControllerBase
             };
 
             // Process với AIAgent
-            var result = await _aiAgent.ProcessAsync(request.Question, context, cancellationToken);
+            var result = await aiAgent.ProcessAsync(request.Question, context, cancellationToken);
 
             // Log AI request with actual token usage from Gemini
             var tokenUsage = result.TokenUsage;
@@ -101,9 +82,9 @@ public class PersonalAIController : ControllerBase
                 {
                     result.ToolCallCount,
                     result.ProcessingTimeMs,
-                    ReasoningSteps = result.ReasoningSteps,
-                    RemainingRequests = rateLimitResult.RemainingRequests,
-                    DailyLimit = rateLimitResult.DailyLimit
+                    result.ReasoningSteps,
+                    rateLimitResult.RemainingRequests,
+                    rateLimitResult.DailyLimit
                 },
                 Message = result.Success ? "Success" : result.ErrorMessage
             });
@@ -114,7 +95,7 @@ public class PersonalAIController : ControllerBase
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Personal AI error");
+            logger.LogError(ex, "Personal AI error");
             throw new AppException(
                 ErrorCodes.UnexpectedError,
                 StatusCodes.Status500InternalServerError);
@@ -135,8 +116,8 @@ public class PersonalAIController : ControllerBase
         if (userId == null)
         {
             Response.StatusCode = StatusCodes.Status401Unauthorized;
-            await Response.WriteAsync("Unauthorized");
-            await Response.Body.FlushAsync();
+            await Response.WriteAsync("Unauthorized", cancellationToken: cancellationToken);
+            await Response.Body.FlushAsync(cancellationToken);
             return;
         }
 
@@ -145,12 +126,12 @@ public class PersonalAIController : ControllerBase
         if (!rateLimitResult.Allowed)
         {
             Response.StatusCode = StatusCodes.Status429TooManyRequests;
-            await Response.WriteAsync("Rate limit exceeded");
-            await Response.Body.FlushAsync();
+            await Response.WriteAsync("Rate limit exceeded", cancellationToken: cancellationToken);
+            await Response.Body.FlushAsync(cancellationToken);
             return;
         }
 
-        _logger.LogInformation(
+        logger.LogInformation(
             "Personal AI Stream: UserId={UserId}, Question={Question}",
             userId, request.Question.Length > 100 ? request.Question[..100] + "..." : request.Question);
 
@@ -172,7 +153,7 @@ public class PersonalAIController : ControllerBase
             };
 
             // Stream chunks from AIAgent
-            await foreach (var chunk in _aiAgent.ProcessStreamAsync(request.Question, context, cancellationToken))
+            await foreach (var chunk in aiAgent.ProcessStreamAsync(request.Question, context, cancellationToken))
             {
                 switch (chunk.Type)
                 {
@@ -197,42 +178,42 @@ public class PersonalAIController : ControllerBase
                             cachedTokens = chunk.CachedTokens,
                             thinkingTokens = chunk.ThinkingTokens
                         });
-                        await Response.WriteAsync($"data: {metadata}\n\n");
-                        await Response.Body.FlushAsync();
+                        await Response.WriteAsync($"data: {metadata}\n\n", cancellationToken: cancellationToken);
+                        await Response.Body.FlushAsync(cancellationToken);
                         break;
 
                     case "chunk":
                         if (!string.IsNullOrWhiteSpace(chunk.Content))
                         {
                             var chunkData = JsonConvert.SerializeObject(new { type = "chunk", content = chunk.Content });
-                            await Response.WriteAsync($"data: {chunkData}\n\n");
-                            await Response.Body.FlushAsync();
+                            await Response.WriteAsync($"data: {chunkData}\n\n", cancellationToken: cancellationToken);
+                            await Response.Body.FlushAsync(cancellationToken);
                         }
                         break;
 
                     case "done":
-                        await Response.WriteAsync("data: {\"type\":\"done\"}\n\n");
-                        await Response.Body.FlushAsync();
+                        await Response.WriteAsync("data: {\"type\":\"done\"}\n\n", cancellationToken: cancellationToken);
+                        await Response.Body.FlushAsync(cancellationToken);
                         break;
 
                     case "error":
                         var error = JsonConvert.SerializeObject(new { type = "error", message = chunk.ErrorMessage });
-                        await Response.WriteAsync($"data: {error}\n\n");
-                        await Response.Body.FlushAsync();
+                        await Response.WriteAsync($"data: {error}\n\n", cancellationToken: cancellationToken);
+                        await Response.Body.FlushAsync(cancellationToken);
                         break;
                 }
             }
         }
         catch (OperationCanceledException)
         {
-            _logger.LogInformation("Personal AI stream cancelled by client");
+            logger.LogInformation("Personal AI stream cancelled by client");
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Personal AI stream error");
+            logger.LogError(ex, "Personal AI stream error");
             var error = JsonConvert.SerializeObject(new { type = "error", message = "Đã xảy ra lỗi khi xử lý yêu cầu. Vui lòng thử lại sau." });
-            await Response.WriteAsync($"data: {error}\n\n");
-            await Response.Body.FlushAsync();
+            await Response.WriteAsync($"data: {error}\n\n", cancellationToken: cancellationToken);
+            await Response.Body.FlushAsync(cancellationToken);
         }
         finally
         {
@@ -257,8 +238,8 @@ public class PersonalAIController : ControllerBase
 
     private async Task<RateLimitResult> CheckRateLimitAsync(Guid userId)
     {
-        var todayRequests = await _aiRequestLogRepository.CountTodayRequestsAsync(userId, DateTime.UtcNow.Date);
-        var subscription = await _userSubscriptionRepository.GetSubscriptionPlanByUserIdAsync(userId);
+        var todayRequests = await aiRequestLogRepository.CountTodayRequestsAsync(userId, DateTime.UtcNow.Date);
+        var subscription = await userSubscriptionRepository.GetSubscriptionPlanByUserIdAsync(userId);
         var dailyLimit = subscription?.MaxAiRequestsPerDay ?? 20;
 
         return new RateLimitResult
@@ -274,7 +255,7 @@ public class PersonalAIController : ControllerBase
     {
         try
         {
-            await _aiRequestLogRepository.AddAsync(new Models.Entities.AIRequestLog
+            await aiRequestLogRepository.AddAsync(new Models.Entities.AIRequestLog
             {
                 RequestId = Guid.NewGuid(),
                 UserId = userId,
@@ -293,7 +274,7 @@ public class PersonalAIController : ControllerBase
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Failed to log AI request for UserId={UserId}", userId);
+            logger.LogWarning(ex, "Failed to log AI request for UserId={UserId}", userId);
         }
     }
 }

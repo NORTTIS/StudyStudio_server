@@ -14,25 +14,17 @@ namespace StudioStudio_Server.Services
     /// <summary>
     /// Service handling business logic for Reports
     /// </summary>
-    public class ReportService : IReportService
+    public class ReportService(
+        IReportRepository reportRepository,
+        IEmailService emailService,
+        IConfiguration configuration,
+        ILogger<ReportService> logger) : IReportService
     {
-        private readonly IReportRepository _reportRepository;
-        private readonly IEmailService _emailService;
-        private readonly IConfiguration _configuration;
-        private readonly ILogger<ReportService> _logger;
+        private readonly IReportRepository _reportRepository = reportRepository;
+        private readonly IEmailService _emailService = emailService;
+        private readonly IConfiguration _configuration = configuration;
+        private readonly ILogger<ReportService> _logger = logger;
         private readonly Regex _emailRegex = new(@"^[^@\s]+@[^@\s]+\.[^@\s]+$", RegexOptions.Compiled);
-
-        public ReportService(
-            IReportRepository reportRepository,
-            IEmailService emailService,
-            IConfiguration configuration,
-            ILogger<ReportService> logger)
-        {
-            _reportRepository = reportRepository;
-            _emailService = emailService;
-            _configuration = configuration;
-            _logger = logger;
-        }
 
         /// <summary>
         /// Send report/feedback

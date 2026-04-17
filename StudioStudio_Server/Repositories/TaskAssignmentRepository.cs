@@ -10,15 +10,10 @@ namespace StudioStudio_Server.Repositories
     /// Manages task-to-user assignments for group tasks
     /// Note: Personal tasks don't have assignments (owner = assignee by default)
     /// </summary>
-    public class TaskAssignmentRepository : ITaskAssignmentRepository
+    public class TaskAssignmentRepository(StudioDbContext db) : ITaskAssignmentRepository
     {
-        private readonly StudioDbContext _db;
-        
-        public TaskAssignmentRepository(StudioDbContext db)
-        {
-            _db = db;
-        }
-        
+        private readonly StudioDbContext _db = db;
+
         /// <summary>
         /// Add new task assignment to database
         /// Creates assignment record linking task to assignee

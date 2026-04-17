@@ -7,21 +7,14 @@ using StudioStudio_Server.Services.Interfaces;
 
 namespace StudioStudio_Server.Services.BackgroundServices
 {
-    public class TaskUpdateNotificationBackgroundService : BackgroundService
+    public class TaskUpdateNotificationBackgroundService(
+        ITaskUpdateNotificationQueue queue,
+        IServiceScopeFactory serviceScopeFactory,
+        ILogger<TaskUpdateNotificationBackgroundService> logger) : BackgroundService
     {
-        private readonly ITaskUpdateNotificationQueue _queue;
-        private readonly IServiceScopeFactory _serviceScopeFactory;
-        private readonly ILogger<TaskUpdateNotificationBackgroundService> _logger;
-
-        public TaskUpdateNotificationBackgroundService(
-            ITaskUpdateNotificationQueue queue,
-            IServiceScopeFactory serviceScopeFactory,
-            ILogger<TaskUpdateNotificationBackgroundService> logger)
-        {
-            _queue = queue;
-            _serviceScopeFactory = serviceScopeFactory;
-            _logger = logger;
-        }
+        private readonly ITaskUpdateNotificationQueue _queue = queue;
+        private readonly IServiceScopeFactory _serviceScopeFactory = serviceScopeFactory;
+        private readonly ILogger<TaskUpdateNotificationBackgroundService> _logger = logger;
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {

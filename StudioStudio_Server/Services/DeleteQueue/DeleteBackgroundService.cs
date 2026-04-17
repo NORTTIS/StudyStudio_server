@@ -20,25 +20,18 @@ namespace StudioStudio_Server.Services.DeleteQueue
     /// - Exponential backoff: 1s ? 2s ? 4s
     /// - Timeouts and HTTP errors trigger retry
     /// </summary>
-    public class DeleteBackgroundService : BackgroundService
+    public class DeleteBackgroundService(
+        IDeleteQueue queue,
+        IServiceScopeFactory serviceScopeFactory,
+        ILogger<DeleteBackgroundService> logger) : BackgroundService
     {
-        private readonly IDeleteQueue _queue;
-        private readonly IServiceScopeFactory _serviceScopeFactory;
-        private readonly ILogger<DeleteBackgroundService> _logger;
+        private readonly IDeleteQueue _queue = queue;
+        private readonly IServiceScopeFactory _serviceScopeFactory = serviceScopeFactory;
+        private readonly ILogger<DeleteBackgroundService> _logger = logger;
 
         private int _processedJobsCount = 0;
         private int _failedJobsCount = 0;
         private int _partialJobsCount = 0;
-
-        public DeleteBackgroundService(
-            IDeleteQueue queue,
-            IServiceScopeFactory serviceScopeFactory,
-            ILogger<DeleteBackgroundService> logger)
-        {
-            _queue = queue;
-            _serviceScopeFactory = serviceScopeFactory;
-            _logger = logger;
-        }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {

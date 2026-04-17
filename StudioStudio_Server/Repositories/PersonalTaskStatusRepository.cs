@@ -11,16 +11,11 @@ namespace StudioStudio_Server.Repositories
     /// Manages personal Kanban columns for individual users
     /// Uses index-based position with midpoint ranking strategy
     /// </summary>
-    public class PersonalTaskStatusRepository : IPersonalTaskStatusRepository
+    public class PersonalTaskStatusRepository(StudioDbContext db) : IPersonalTaskStatusRepository
     {
-        private readonly StudioDbContext _db;
+        private readonly StudioDbContext _db = db;
         private const int MAX_RETRY = 3;
         private const long STEP = 1000;
-        
-        public PersonalTaskStatusRepository(StudioDbContext db)
-        {
-            _db = db;
-        }
 
         /// <summary>
         /// Add new personal task status to database

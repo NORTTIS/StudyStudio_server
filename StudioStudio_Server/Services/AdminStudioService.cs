@@ -9,14 +9,9 @@ namespace StudioStudio_Server.Services
     /// <summary>
     /// Service xử lý các thao tác admin với studio
     /// </summary>
-    public class AdminStudioService : IAdminStudioService
+    public class AdminStudioService(IStudioRepository studioRepository) : IAdminStudioService
     {
-        private readonly IStudioRepository _studioRepository;
-
-        public AdminStudioService(IStudioRepository studioRepository)
-        {
-            _studioRepository = studioRepository;
-        }
+        private readonly IStudioRepository _studioRepository = studioRepository;
 
         /// <summary>
         /// Get paginated list of studios with filters for admin

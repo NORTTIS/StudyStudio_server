@@ -1,5 +1,4 @@
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.IdentityModel.Tokens;
 using StudioStudio_Server.Exceptions;
@@ -13,7 +12,6 @@ using StudioStudio_Server.Services.Interfaces;
 using StudioStudio_Server.Utils;
 using System.Security.Claims;
 using System.Text.RegularExpressions;
-using System.Text.RegularExpressions;
 
 namespace StudioStudio_Server.Hubs
 {
@@ -23,46 +21,19 @@ namespace StudioStudio_Server.Hubs
     /// Features: Join/Leave group, Send message, Reply to message, Delete message, @mentions
     /// </summary>
     [Authorize]
-    public class GroupDiscussHub : Hub
+    public class GroupDiscussHub(
+        IGroupMessageRepository messageRepository,
+        IGroupParticipantRepository groupParticipantRepository,
+        IUserRepository userRepository,
+        IMessageService messageService,
+        IAnnouncementRepository announcementRepository,
+        IUserAnnouncementService userAnnouncementService,
+        IGroupRepository groupRepository,
+        INotificationService notificationService,
+        ILogger<GroupDiscussHub> logger,
+        IHttpContextAccessor httpContextAccessor,
+        IActivityLogService activityLogService) : Hub
     {
-        private readonly IGroupMessageRepository _messageRepository;
-        private readonly IGroupParticipantRepository _groupParticipantRepository;
-        private readonly IUserRepository _userRepository;
-        private readonly IMessageService _messageService;
-        private readonly IAnnouncementRepository _announcementRepository;
-        private readonly IUserAnnouncementService _userAnnouncementService;
-        private readonly IGroupRepository _groupRepository;
-        private readonly INotificationService _notificationService;
-        private readonly ILogger<GroupDiscussHub> _logger;
-        private readonly IHttpContextAccessor _httpContextAccessor;
-        private readonly IActivityLogService _activityLogService;
-
-        public GroupDiscussHub(
-            IGroupMessageRepository messageRepository,
-            IGroupParticipantRepository groupParticipantRepository,
-            IUserRepository userRepository,
-            IMessageService messageService,
-            IAnnouncementRepository announcementRepository,
-            IUserAnnouncementService userAnnouncementService,
-            IGroupRepository groupRepository,
-            INotificationService notificationService,
-            ILogger<GroupDiscussHub> logger,
-            IHttpContextAccessor httpContextAccessor,
-            IActivityLogService activityLogService)
-        {
-            _messageRepository = messageRepository;
-            _groupParticipantRepository = groupParticipantRepository;
-            _userRepository = userRepository;
-            _messageService = messageService;
-            _announcementRepository = announcementRepository;
-            _userAnnouncementService = userAnnouncementService;
-            _groupRepository = groupRepository;
-            _notificationService = notificationService;
-            _logger = logger;
-            _httpContextAccessor = httpContextAccessor;
-            _activityLogService = activityLogService;
-        }
-
         /// <summary>
         /// Get userId from SignalR Context
         /// </summary>
@@ -88,7 +59,7 @@ namespace StudioStudio_Server.Hubs
             try
             {
                 var userId = GetUserId();
-                var user = await _userRepository.GetByIdAsync(userId);
+                var user = await userRepository.GetByIdAsync(userId);
 
                 if (user != null && !string.IsNullOrEmpty(user.Language))
                 {
@@ -99,11 +70,11 @@ namespace StudioStudio_Server.Hubs
                     }
                 }
 
-                return _messageService.GetMessage(errorCode);
+                return messageService.GetMessage(errorCode);
             }
             catch
             {
-                return _messageService.GetMessage(errorCode);
+                return messageService.GetMessage(errorCode);
             }
         }
 
@@ -137,7 +108,7 @@ namespace StudioStudio_Server.Hubs
                 return true;
             }
 
-            var participant = await _groupParticipantRepository
+            var participant = await groupParticipantRepository
                 .GetByUserAndGroupAsync(userId, message.GroupId);
 
             return participant != null &&
@@ -150,7 +121,7 @@ namespace StudioStudio_Server.Hubs
         /// </summary>
         private async Task<bool> IsGroupArchivedAsync(Guid groupId)
         {
-            var group = await _groupRepository.GetByIdAsync(groupId);
+            var group = await groupRepository.GetByIdAsync(groupId);
             return group?.IsArchived ?? false;
         }
 
@@ -171,12 +142,12 @@ namespace StudioStudio_Server.Hubs
             }
 
             var now = DateTime.UtcNow;
-            var sender = await _userRepository.GetByIdAsync(senderId);
-            var group = await _groupRepository.GetByIdAsync(groupId);
+            var sender = await userRepository.GetByIdAsync(senderId);
+            var group = await groupRepository.GetByIdAsync(groupId);
 
             if (sender == null || group == null)
             {
-                _logger.LogWarning("Cannot send mention notification: sender={SenderId} or group={GroupId} not found",
+                logger.LogWarning("Cannot send mention notification: sender={SenderId} or group={GroupId} not found",
                     senderId, groupId);
                 return;
             }
@@ -198,7 +169,7 @@ namespace StudioStudio_Server.Hubs
                 SourceType = "discuss"
             };
 
-            await _announcementRepository.AddAsync(announcement);
+            await announcementRepository.AddAsync(announcement);
 
             foreach (var taggedUserId in taggedUserIds)
             {
@@ -211,11 +182,11 @@ namespace StudioStudio_Server.Hubs
                     CreatedAt = now
                 };
 
-                await _userAnnouncementService.AddAnnouncementAsync(userAnnouncement);
+                await userAnnouncementService.AddAnnouncementAsync(userAnnouncement);
                 await Clients.User(taggedUserId.ToString()).SendAsync("ReceiveAnnouncement", announcement);
             }
 
-            _logger.LogInformation(
+            logger.LogInformation(
                 "Mention notifications sent to {Count} users in group {GroupId}",
                 taggedUserIds.Count, groupId);
         }
@@ -231,7 +202,7 @@ namespace StudioStudio_Server.Hubs
             {
                 var userId = GetUserId();
 
-                var isUserInGroup = await _groupParticipantRepository.IsUserInGroupAsync(groupId, userId);
+                var isUserInGroup = await groupParticipantRepository.IsUserInGroupAsync(groupId, userId);
                 if (!isUserInGroup)
                 {
                     var errorMsg = await GetLocalizedMessageAsync(ErrorCodes.GroupPermissionDenied);
@@ -247,7 +218,7 @@ namespace StudioStudio_Server.Hubs
                 }
 
                 await Groups.AddToGroupAsync(Context.ConnectionId, groupId.ToString());
-                _logger.LogInformation("User {UserId} joined group {GroupId}", userId, groupId);
+                logger.LogInformation("User {UserId} joined group {GroupId}", userId, groupId);
 
                 await Clients.Group(groupId.ToString()).SendAsync("UserJoined", new
                 {
@@ -257,7 +228,7 @@ namespace StudioStudio_Server.Hubs
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error joining group");
+                logger.LogError(ex, "Error joining group");
                 var errorMsg = await GetLocalizedMessageAsync(ErrorCodes.UnexpectedError);
                 await Clients.Caller.SendAsync("Error", errorMsg);
             }
@@ -274,7 +245,7 @@ namespace StudioStudio_Server.Hubs
                 var userId = GetUserId();
 
                 await Groups.RemoveFromGroupAsync(Context.ConnectionId, groupId.ToString());
-                _logger.LogInformation("User {UserId} left group {GroupId}", userId, groupId);
+                logger.LogInformation("User {UserId} left group {GroupId}", userId, groupId);
 
                 await Clients.Group(groupId.ToString()).SendAsync("UserLeft", new
                 {
@@ -284,7 +255,7 @@ namespace StudioStudio_Server.Hubs
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error leaving group");
+                logger.LogError(ex, "Error leaving group");
                 var errorMsg = await GetLocalizedMessageAsync(ErrorCodes.UnexpectedError);
                 await Clients.Caller.SendAsync("Error", errorMsg);
             }
@@ -304,7 +275,7 @@ namespace StudioStudio_Server.Hubs
             {
                 var userId = GetUserId();
 
-                var isUserInGroup = await _groupParticipantRepository.IsUserInGroupAsync(request.GroupId, userId);
+                var isUserInGroup = await groupParticipantRepository.IsUserInGroupAsync(request.GroupId, userId);
                 if (!isUserInGroup)
                 {
                     var errorMsg = await GetLocalizedMessageAsync(ErrorCodes.GroupPermissionDenied);
@@ -330,13 +301,13 @@ namespace StudioStudio_Server.Hubs
                     IsDeleted = false
                 };
 
-                await _messageRepository.AddAsync(message);
+                await messageRepository.AddAsync(message);
 
                 // Log message creation activity
-                var group = await _groupRepository.GetByIdAsync(request.GroupId);
-                await _activityLogService.LogMessageCreateAsync(userId, message.MessageId, request.GroupId, group?.StudioId);
+                var group = await groupRepository.GetByIdAsync(request.GroupId);
+                await activityLogService.LogMessageCreateAsync(userId, message.MessageId, request.GroupId, group?.StudioId);
 
-                var user = await _userRepository.GetByIdAsync(userId);
+                var user = await userRepository.GetByIdAsync(userId);
 
                 var messageDto = new GroupMessageDto
                 {
@@ -354,7 +325,7 @@ namespace StudioStudio_Server.Hubs
                         Id = user!.UserId,
                         FirstName = user.FirstName,
                         LastName = user.LastName,
-                        AvatarUrl = AvatarUrlHelper.BuildAbsoluteAvatarUrl(user.AvatarUrl, _httpContextAccessor.HttpContext)
+                        AvatarUrl = AvatarUrlHelper.BuildAbsoluteAvatarUrl(user.AvatarUrl, httpContextAccessor.HttpContext)
                     }
                 };
 
@@ -363,7 +334,7 @@ namespace StudioStudio_Server.Hubs
                 // Record SignalR message metric
                 AppMetrics.SignalRMessagesTotal.WithLabels("group-discuss").Inc();
 
-                _logger.LogInformation(
+                logger.LogInformation(
                     "Message sent to group {GroupId} by user {UserId}",
                     request.GroupId, userId);
 
@@ -371,7 +342,7 @@ namespace StudioStudio_Server.Hubs
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error sending message");
+                logger.LogError(ex, "Error sending message");
                 var errorMsg = await GetLocalizedMessageAsync(ErrorCodes.UnexpectedError);
                 await Clients.Caller.SendAsync("Error", errorMsg);
             }
@@ -390,14 +361,14 @@ namespace StudioStudio_Server.Hubs
             {
                 var userId = GetUserId();
 
-                _logger.LogInformation(
+                logger.LogInformation(
                     "ReplyToMessage - Request: GroupId={GroupId}, ParentMessageId={ParentId}, UserId={UserId}, Content length={Length}",
                     request.GroupId, request.ParentMessageId, userId, request.Content?.Length ?? 0);
 
-                var isUserInGroup = await _groupParticipantRepository.IsUserInGroupAsync(request.GroupId, userId);
+                var isUserInGroup = await groupParticipantRepository.IsUserInGroupAsync(request.GroupId, userId);
                 if (!isUserInGroup)
                 {
-                    _logger.LogWarning("User {UserId} not authorized for group {GroupId}", userId, request.GroupId);
+                    logger.LogWarning("User {UserId} not authorized for group {GroupId}", userId, request.GroupId);
                     var errorMsg = await GetLocalizedMessageAsync(ErrorCodes.GroupPermissionDenied);
                     await Clients.Caller.SendAsync("Error", errorMsg);
                     return;
@@ -410,15 +381,15 @@ namespace StudioStudio_Server.Hubs
                     return;
                 }
 
-                var parentMessage = await _messageRepository.GetByIdAsync(request.ParentMessageId);
+                var parentMessage = await messageRepository.GetByIdAsync(request.ParentMessageId);
 
-                _logger.LogInformation(
+                logger.LogInformation(
                     "Parent message check: Found={Found}, IsDeleted={IsDeleted}, GroupId={GroupId}",
                     parentMessage != null, parentMessage?.IsDeleted, parentMessage?.GroupId);
 
                 if (parentMessage == null || parentMessage.IsDeleted)
                 {
-                    _logger.LogError(
+                    logger.LogError(
                         "Parent message not found or deleted: ParentMessageId={ParentMessageId}",
                         request.ParentMessageId);
                     var errorMsg = await GetLocalizedMessageAsync(ErrorCodes.MessageParentNotFound);
@@ -428,7 +399,7 @@ namespace StudioStudio_Server.Hubs
 
                 if (parentMessage.GroupId != request.GroupId)
                 {
-                    _logger.LogError(
+                    logger.LogError(
                         "Parent message GroupId mismatch: ParentGroupId={ParentGroupId}, RequestGroupId={RequestGroupId}",
                         parentMessage.GroupId, request.GroupId);
                     var errorMsg = await GetLocalizedMessageAsync(ErrorCodes.MessageParentNotFound);
@@ -447,15 +418,15 @@ namespace StudioStudio_Server.Hubs
                     IsDeleted = false
                 };
 
-                _logger.LogInformation(
+                logger.LogInformation(
                     "Attempting to save reply: ReplyId={ReplyId}, ParentId={ParentId}, GroupId={GroupId}",
                     reply.MessageId, reply.ParentMessageId, reply.GroupId);
 
-                await _messageRepository.AddAsync(reply);
+                await messageRepository.AddAsync(reply);
 
-                _logger.LogInformation("Reply saved successfully: ReplyId={ReplyId}", reply.MessageId);
+                logger.LogInformation("Reply saved successfully: ReplyId={ReplyId}", reply.MessageId);
 
-                var user = await _userRepository.GetByIdAsync(userId);
+                var user = await userRepository.GetByIdAsync(userId);
 
                 var replyDto = new GroupMessageDto
                 {
@@ -473,19 +444,19 @@ namespace StudioStudio_Server.Hubs
                         Id = user!.UserId,
                         FirstName = user.FirstName,
                         LastName = user.LastName,
-                        AvatarUrl = AvatarUrlHelper.BuildAbsoluteAvatarUrl(user.AvatarUrl, _httpContextAccessor.HttpContext)
+                        AvatarUrl = AvatarUrlHelper.BuildAbsoluteAvatarUrl(user.AvatarUrl, httpContextAccessor.HttpContext)
                     }
                 };
 
                 await Clients.Group(request.GroupId.ToString()).SendAsync("MessageReplied", replyDto);
 
-                _logger.LogInformation(
+                logger.LogInformation(
                     "Reply broadcasted to group {GroupId} for message {ParentMessageId}",
                     request.GroupId, request.ParentMessageId);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex,
+                logger.LogError(ex,
                     "Error replying to message - GroupId={GroupId}, ParentMessageId={ParentMessageId}",
                     request.GroupId, request.ParentMessageId);
                 var errorMsg = await GetLocalizedMessageAsync(ErrorCodes.UnexpectedError);
@@ -507,7 +478,7 @@ namespace StudioStudio_Server.Hubs
             {
                 var userId = GetUserId();
 
-                var message = await _messageRepository.GetByIdWithRepliesAsync(request.MessageId);
+                var message = await messageRepository.GetByIdWithRepliesAsync(request.MessageId);
                 if (message == null)
                 {
                     var errorMsg = await GetLocalizedMessageAsync(ErrorCodes.MessageNotFound);
@@ -515,7 +486,7 @@ namespace StudioStudio_Server.Hubs
                     return;
                 }
 
-                var isUserInGroup = await _groupParticipantRepository.IsUserInGroupAsync(message.GroupId, userId);
+                var isUserInGroup = await groupParticipantRepository.IsUserInGroupAsync(message.GroupId, userId);
                 if (!isUserInGroup)
                 {
                     var errorMsg = await GetLocalizedMessageAsync(ErrorCodes.GroupPermissionDenied);
@@ -538,9 +509,9 @@ namespace StudioStudio_Server.Hubs
                     return;
                 }
 
-                var replyCount = await _messageRepository.GetReplyCountAsync(request.MessageId);
+                var replyCount = await messageRepository.GetReplyCountAsync(request.MessageId);
 
-                await _messageRepository.SoftDeleteWithRepliesAsync(request.MessageId);
+                await messageRepository.SoftDeleteWithRepliesAsync(request.MessageId);
 
                 await Clients.Group(message.GroupId.ToString()).SendAsync("MessageDeleted", new
                 {
@@ -551,13 +522,13 @@ namespace StudioStudio_Server.Hubs
                     Timestamp = DateTime.UtcNow
                 });
 
-                _logger.LogInformation(
+                logger.LogInformation(
                     "Message {MessageId} and {ReplyCount} replies deleted by user {UserId}",
                     request.MessageId, replyCount, userId);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error deleting message");
+                logger.LogError(ex, "Error deleting message");
                 var errorMsg = await GetLocalizedMessageAsync(ErrorCodes.UnexpectedError);
                 await Clients.Caller.SendAsync("Error", errorMsg);
             }
@@ -569,7 +540,7 @@ namespace StudioStudio_Server.Hubs
         /// </summary>
         public override async Task OnDisconnectedAsync(Exception? exception)
         {
-            _logger.LogInformation("Client disconnected: {ConnectionId}", Context.ConnectionId);
+            logger.LogInformation("Client disconnected: {ConnectionId}", Context.ConnectionId);
 
             // Update SignalR connection metrics
             AppMetrics.SignalRConnections.WithLabels("group-discuss").Dec();

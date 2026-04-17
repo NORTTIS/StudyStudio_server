@@ -8,14 +8,9 @@ namespace StudioStudio_Server.Repositories
     /// <summary>
     /// Repository handling operations with Favourite entity (user's favourite groups)
     /// </summary>
-    public class FavouriteRepository : IFavouriteRepository
+    public class FavouriteRepository(StudioDbContext context) : IFavouriteRepository
     {
-        private readonly StudioDbContext _context;
-
-        public FavouriteRepository(StudioDbContext context)
-        {
-            _context = context;
-        }
+        private readonly StudioDbContext _context = context;
 
         /// <summary>
         /// Get favourite record of user and group

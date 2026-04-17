@@ -1,5 +1,3 @@
-using System;
-
 namespace StudioStudio_Server.Models.Entities
 {
     public class UserAnnouncement

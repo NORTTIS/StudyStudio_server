@@ -1,30 +1,21 @@
-﻿using System.Net;
-using StudioStudio_Server.Exceptions;
-using StudioStudio_Server.Localization;
+﻿using StudioStudio_Server.Exceptions;
 using StudioStudio_Server.Models.DTOs.Response;
+using StudioStudio_Server.Resources.Localization;
 using StudioStudio_Server.Utils;
+using System.Net;
 
-public class ExceptionHandlingMiddleware
+namespace StudioStudio_Server.Middlewares;
+
+public class ExceptionHandlingMiddleware(
+    RequestDelegate next,
+    ILogger<ExceptionHandlingMiddleware> logger,
+    IWebHostEnvironment env)
 {
-    private readonly RequestDelegate _next;
-    private readonly ILogger<ExceptionHandlingMiddleware> _logger;
-    private readonly IWebHostEnvironment _env;
-
-    public ExceptionHandlingMiddleware(
-        RequestDelegate next,
-        ILogger<ExceptionHandlingMiddleware> logger,
-        IWebHostEnvironment env)
-    {
-        _next = next;
-        _logger = logger;
-        _env = env;
-    }
-
     public async Task InvokeAsync(HttpContext context)
     {
         try
         {
-            await _next(context);
+            await next(context);
         }
         catch (AppException ex)
         {
@@ -39,7 +30,7 @@ public class ExceptionHandlingMiddleware
     private async Task HandleAppException(HttpContext context, AppException ex)
     {
         var culture = HttpContextHelper.GetCultureFromHeader(context);
-        var localizer = new JsonStringLocalizer(_env, culture);
+        var localizer = new JsonStringLocalizer(env, culture);
 
         context.Response.StatusCode = ex.HttpStatus;
         context.Response.ContentType = "application/json";
@@ -54,10 +45,10 @@ public class ExceptionHandlingMiddleware
 
     private async Task HandleUnexpectedException(HttpContext context, Exception ex)
     {
-        _logger.LogError(ex, "Unhandled exception");
+        logger.LogError(ex, "Unhandled exception");
 
         var culture = HttpContextHelper.GetCultureFromHeader(context);
-        var localizer = new JsonStringLocalizer(_env, culture);
+        var localizer = new JsonStringLocalizer(env, culture);
 
         context.Response.StatusCode = (int)HttpStatusCode.InternalServerError;
         context.Response.ContentType = "application/json";

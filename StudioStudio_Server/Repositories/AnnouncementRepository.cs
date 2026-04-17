@@ -9,14 +9,9 @@ namespace StudioStudio_Server.Repositories
     /// <summary>
     /// Repository handling CRUD operations with Announcement entity
     /// </summary>
-    public class AnnouncementRepository : IAnnouncementRepository
+    public class AnnouncementRepository(StudioDbContext context) : IAnnouncementRepository
     {
-        private readonly StudioDbContext _context;
-
-        public AnnouncementRepository(StudioDbContext context)
-        {
-            _context = context;
-        }
+        private readonly StudioDbContext _context = context;
 
         /// <summary>
         /// Add new announcement to database

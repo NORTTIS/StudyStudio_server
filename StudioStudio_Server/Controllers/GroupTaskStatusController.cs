@@ -1,10 +1,8 @@
 ﻿using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using StudioStudio_Server.Exceptions;
 using StudioStudio_Server.Models.DTOs.Request;
 using StudioStudio_Server.Models.DTOs.Response;
-using StudioStudio_Server.Services;
 using StudioStudio_Server.Services.Interfaces;
 using System.Security.Claims;
 
@@ -13,18 +11,10 @@ namespace StudioStudio_Server.Controllers
     [Route("api/[controller]")]
     [ApiController]
     [Authorize]
-    public class GroupTaskStatusController : ControllerBase
+    public class GroupTaskStatusController(
+        IGroupTaskStatusService groupTaskStatusService,
+        IMessageService messageService) : ControllerBase
     {
-        private readonly IGroupTaskStatusService _groupTaskStatusService;
-        private readonly IMessageService _messageService;
-        public GroupTaskStatusController(
-            IGroupTaskStatusService groupTaskStatusService,
-            IMessageService messageService)
-        {
-            _groupTaskStatusService = groupTaskStatusService;
-            _messageService = messageService;
-        }
-
         private Guid ValidateAndGetUserId()
         {
             var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
@@ -55,8 +45,8 @@ namespace StudioStudio_Server.Controllers
         public async Task<ActionResult<ApiResponse<GroupTaskStatusResponse>>> GetTaskStatusDetail(Guid taskStatusId)
         {
             ValidateAndGetUserId();
-            var result = await _groupTaskStatusService.GetGroupTaskStatusDetail(taskStatusId);
-            var message = _messageService.GetMessage(ErrorCodes.SuccessGetData);
+            var result = await groupTaskStatusService.GetGroupTaskStatusDetail(taskStatusId);
+            var message = messageService.GetMessage(ErrorCodes.SuccessGetData);
 
             return Ok(ApiResponse<GroupTaskStatusResponse>.Success(
                 ErrorCodes.SuccessGetData,
@@ -69,8 +59,8 @@ namespace StudioStudio_Server.Controllers
            Guid groupId, [FromBody] GroupTaskStatusRequest request)
         {
             var userId = ValidateAndGetUserId();
-            var result = await _groupTaskStatusService.CreateNewGroupTaskStatus(userId, groupId, request);
-            var message = _messageService.GetMessage(ErrorCodes.SuccessCreateTaskStatus);
+            var result = await groupTaskStatusService.CreateNewGroupTaskStatus(userId, groupId, request);
+            var message = messageService.GetMessage(ErrorCodes.SuccessCreateTaskStatus);
 
             return Ok(ApiResponse<GroupTaskStatusResponse>.Success(
                 ErrorCodes.SuccessCreateTaskStatus,
@@ -83,13 +73,12 @@ namespace StudioStudio_Server.Controllers
             Guid groupId, [FromBody] ReorderGroupTaskStatusRequest request)
         {
             var userId = ValidateAndGetUserId();
-            await _groupTaskStatusService.ReorderGroupTaskStatus(userId, groupId, request);
-            var message = _messageService.GetMessage(ErrorCodes.SuccessUpdateTaskStatus);
+            await groupTaskStatusService.ReorderGroupTaskStatus(userId, groupId, request);
+            var message = messageService.GetMessage(ErrorCodes.SuccessUpdateTaskStatus);
 
             return Ok(ApiResponse<object>.Success(
                 ErrorCodes.SuccessUpdateTaskStatus,
-                message,
-                null));
+                message));
         }
 
         [HttpPut("{groupId}/{statusId}")]
@@ -97,26 +86,24 @@ namespace StudioStudio_Server.Controllers
             [FromBody] GroupTaskStatusRequest request, Guid groupId, Guid statusId)
         {
             var userId = ValidateAndGetUserId();
-            await _groupTaskStatusService.UpdateGroupTaskStatus(userId, groupId, statusId, request);
-            var message = _messageService.GetMessage(ErrorCodes.SuccessUpdateTaskStatus);
+            await groupTaskStatusService.UpdateGroupTaskStatus(userId, groupId, statusId, request);
+            var message = messageService.GetMessage(ErrorCodes.SuccessUpdateTaskStatus);
 
             return Ok(ApiResponse<object>.Success(
                 ErrorCodes.SuccessUpdateTaskStatus,
-                message,
-                null));
+                message));
         }
 
         [HttpDelete("{statusId}/group/{groupId}")]
         public async Task<ActionResult<ApiResponse<object>>> DeleteGroup(Guid statusId, Guid groupId)
         {
             var userId = ValidateAndGetUserId();
-            await _groupTaskStatusService.DeleteGroupTaskStatus(userId, groupId, statusId);
-            var message = _messageService.GetMessage(ErrorCodes.SuccessDeleteTaskStatus);
+            await groupTaskStatusService.DeleteGroupTaskStatus(userId, groupId, statusId);
+            var message = messageService.GetMessage(ErrorCodes.SuccessDeleteTaskStatus);
 
             return Ok(ApiResponse<object>.Success(
                 ErrorCodes.SuccessDeleteTaskStatus,
-                message,
-                null));
+                message));
         }
     }
 }

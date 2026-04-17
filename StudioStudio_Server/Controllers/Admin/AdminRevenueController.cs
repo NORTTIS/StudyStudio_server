@@ -16,19 +16,10 @@ namespace StudioStudio_Server.Controllers.Admin
     [Route("api/admin/revenue")]
     [ApiController]
     [Authorize]
-    public class AdminRevenueController : ControllerBase
+    public class AdminRevenueController(
+        IRevenueService revenueService,
+        IMessageService messageService) : ControllerBase
     {
-        private readonly IRevenueService _revenueService;
-        private readonly IMessageService _messageService;
-
-        public AdminRevenueController(
-            IRevenueService revenueService,
-            IMessageService messageService)
-        {
-            _revenueService = revenueService;
-            _messageService = messageService;
-        }
-
         /// <summary>
         /// [ADMIN] GET /api/admin/revenue/overview
         /// Get revenue overview with key metrics:
@@ -48,8 +39,8 @@ namespace StudioStudio_Server.Controllers.Admin
         {
             JwtHelper.ValidateAdminUser(User);
 
-            var response = await _revenueService.GetRevenueOverviewAsync();
-            var message = _messageService.GetMessage(ErrorCodes.SuccessGetData);
+            var response = await revenueService.GetRevenueOverviewAsync();
+            var message = messageService.GetMessage(ErrorCodes.SuccessGetData);
 
             return Ok(ApiResponse<RevenueOverviewResponse>.Success(
                 ErrorCodes.SuccessGetData,
@@ -82,8 +73,8 @@ namespace StudioStudio_Server.Controllers.Admin
                 throw new AppException(ErrorCodes.RevenueInvalidDateRange, StatusCodes.Status400BadRequest);
             }
 
-            var response = await _revenueService.GetRevenueByPeriodAsync(request);
-            var message = _messageService.GetMessage(ErrorCodes.SuccessGetData);
+            var response = await revenueService.GetRevenueByPeriodAsync(request);
+            var message = messageService.GetMessage(ErrorCodes.SuccessGetData);
 
             return Ok(ApiResponse<RevenueByPeriodResponse>.Success(
                 ErrorCodes.SuccessGetData,
@@ -104,8 +95,8 @@ namespace StudioStudio_Server.Controllers.Admin
         {
             JwtHelper.ValidateAdminUser(User);
 
-            var response = await _revenueService.GetRevenueByPlanAsync(request);
-            var message = _messageService.GetMessage(ErrorCodes.SuccessGetData);
+            var response = await revenueService.GetRevenueByPlanAsync(request);
+            var message = messageService.GetMessage(ErrorCodes.SuccessGetData);
 
             return Ok(ApiResponse<RevenueByPlanResponse>.Success(
                 ErrorCodes.SuccessGetData,
@@ -136,8 +127,8 @@ namespace StudioStudio_Server.Controllers.Admin
                 }
             }
 
-            var response = await _revenueService.GetRevenueTrendsAsync(request);
-            var message = _messageService.GetMessage(ErrorCodes.SuccessGetData);
+            var response = await revenueService.GetRevenueTrendsAsync(request);
+            var message = messageService.GetMessage(ErrorCodes.SuccessGetData);
 
             return Ok(ApiResponse<RevenueTrendsResponse>.Success(
                 ErrorCodes.SuccessGetData,
@@ -165,8 +156,8 @@ namespace StudioStudio_Server.Controllers.Admin
                 throw new AppException(ErrorCodes.RevenueInvalidLimit, StatusCodes.Status400BadRequest);
             }
 
-            var response = await _revenueService.GetTopPlansAsync(request);
-            var message = _messageService.GetMessage(ErrorCodes.SuccessGetData);
+            var response = await revenueService.GetTopPlansAsync(request);
+            var message = messageService.GetMessage(ErrorCodes.SuccessGetData);
 
             return Ok(ApiResponse<TopPlansResponse>.Success(
                 ErrorCodes.SuccessGetData,
@@ -192,8 +183,8 @@ namespace StudioStudio_Server.Controllers.Admin
         {
             JwtHelper.ValidateAdminUser(User);
 
-            var response = await _revenueService.GetRevenueTransactionsAsync(request);
-            var message = _messageService.GetMessage(ErrorCodes.SuccessGetData);
+            var response = await revenueService.GetRevenueTransactionsAsync(request);
+            var message = messageService.GetMessage(ErrorCodes.SuccessGetData);
 
             return Ok(ApiResponse<RevenueTransactionsResponse>.Success(
                 ErrorCodes.SuccessGetData,
@@ -213,8 +204,8 @@ namespace StudioStudio_Server.Controllers.Admin
         {
             JwtHelper.ValidateAdminUser(User);
 
-            var response = await _revenueService.GetMRRBreakdownAsync(request);
-            var message = _messageService.GetMessage(ErrorCodes.SuccessGetData);
+            var response = await revenueService.GetMRRBreakdownAsync(request);
+            var message = messageService.GetMessage(ErrorCodes.SuccessGetData);
 
             return Ok(ApiResponse<MRRBreakdownResponse>.Success(
                 ErrorCodes.SuccessGetData,
@@ -237,7 +228,7 @@ namespace StudioStudio_Server.Controllers.Admin
         {
             JwtHelper.ValidateAdminUser(User);
 
-            var response = await _revenueService.ExportRevenueReportAsync(request);
+            var response = await revenueService.ExportRevenueReportAsync(request);
 
             return File(
                 response.FileContent,

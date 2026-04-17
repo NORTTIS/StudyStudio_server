@@ -8,14 +8,9 @@ namespace StudioStudio_Server.Repositories
     /// <summary>
     /// Repository handling operations with GroupParticipant entity (members in group)
     /// </summary>
-    public class GroupParticipantRepository : IGroupParticipantRepository
+    public class GroupParticipantRepository(StudioDbContext context) : IGroupParticipantRepository
     {
-        private readonly StudioDbContext _context;
-
-        public GroupParticipantRepository(StudioDbContext context)
-        {
-            _context = context;
-        }
+        private readonly StudioDbContext _context = context;
 
         /// <summary>
         /// Get participant record by GroupId and UserId

@@ -13,19 +13,10 @@ namespace StudioStudio_Server.Controllers
     /// </summary>
     [Route("api/announcements")]
     [ApiController]
-    public class AnnouncementController : ControllerBase
+    public class AnnouncementController(
+        IAnnouncementService announcementService,
+        IMessageService messageService) : ControllerBase
     {
-        private readonly IAnnouncementService _announcementService;
-        private readonly IMessageService _messageService;
-
-        public AnnouncementController(
-            IAnnouncementService announcementService,
-            IMessageService messageService)
-        {
-            _announcementService = announcementService;
-            _messageService = messageService;
-        }
-
         /// <summary>
         /// Authenticate and get userId from JWT token
         /// Validate: User must not be admin
@@ -66,8 +57,8 @@ namespace StudioStudio_Server.Controllers
         public async Task<ActionResult<ApiResponse<List<AnnouncementResponse>>>> GetAnnouncements()
         {
             var userId = ValidateAndGetUserId();
-            var response = await _announcementService.GetAllActiveAnnouncementsAsync(userId);
-            var message = _messageService.GetMessage(ErrorCodes.SuccessGetData);
+            var response = await announcementService.GetAllActiveAnnouncementsAsync(userId);
+            var message = messageService.GetMessage(ErrorCodes.SuccessGetData);
 
             return Ok(ApiResponse<List<AnnouncementResponse>>.Success(
                 ErrorCodes.SuccessGetData,
@@ -84,8 +75,8 @@ namespace StudioStudio_Server.Controllers
         public async Task<ActionResult<ApiResponse<AnnouncementResponse>>> GetAnnouncementById(Guid id)
         {
             var userId = ValidateAndGetUserId();
-            var response = await _announcementService.GetAnnouncementByIdAsync(id, userId);
-            var message = _messageService.GetMessage(ErrorCodes.SuccessGetData);
+            var response = await announcementService.GetAnnouncementByIdAsync(id, userId);
+            var message = messageService.GetMessage(ErrorCodes.SuccessGetData);
 
             return Ok(ApiResponse<AnnouncementResponse>.Success(
                 ErrorCodes.SuccessGetData,
@@ -103,13 +94,12 @@ namespace StudioStudio_Server.Controllers
             Guid announcementId)
         {
             var userId = ValidateAndGetUserId();
-            await _announcementService.MarkAnnouncementAsReadAsync(announcementId, userId);
-            var message = _messageService.GetMessage(ErrorCodes.SuccessGetData);
+            await announcementService.MarkAnnouncementAsReadAsync(announcementId, userId);
+            var message = messageService.GetMessage(ErrorCodes.SuccessGetData);
 
             return Ok(ApiResponse<object>.Success(
                 ErrorCodes.SuccessGetData,
-                message,
-                null));
+                message));
         }
 
         /// <summary>
@@ -122,13 +112,12 @@ namespace StudioStudio_Server.Controllers
             Guid announcementId)
         {
             var userId = ValidateAndGetUserId();
-            await _announcementService.DeleteAnnouncementAsync(announcementId, userId);
-            var message = _messageService.GetMessage(ErrorCodes.SuccessGetData);
+            await announcementService.DeleteAnnouncementAsync(announcementId, userId);
+            var message = messageService.GetMessage(ErrorCodes.SuccessGetData);
 
             return Ok(ApiResponse<object>.Success(
                 ErrorCodes.SuccessGetData,
-                message,
-                null));
+                message));
         }
     }
 }

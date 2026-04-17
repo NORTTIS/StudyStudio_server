@@ -13,21 +13,15 @@ namespace StudioStudio_Server.Services
     /// Token lifetime: 15 minutes
     /// Rate limit: 5 invite links per 15 minutes per user per studio
     /// </summary>
-    public class StudioInviteService : IStudioInviteService
+    public class StudioInviteService(
+        IConnectionMultiplexer redis,
+        ILogger<StudioInviteService> logger) : IStudioInviteService
     {
-        private readonly IConnectionMultiplexer _redis;
-        private readonly ILogger<StudioInviteService> _logger;
+        private readonly IConnectionMultiplexer _redis = redis;
+        private readonly ILogger<StudioInviteService> _logger = logger;
         private const int TOKEN_LIFETIME_MINUTES = 15;
         private const int RATE_LIMIT_WINDOW_MINUTES = 15;
         private const int MAX_LINKS_PER_WINDOW = 5;
-
-        public StudioInviteService(
-            IConnectionMultiplexer redis,
-            ILogger<StudioInviteService> logger)
-        {
-            _redis = redis;
-            _logger = logger;
-        }
 
         /// <summary>
         /// Generate cryptographically secure random invite token

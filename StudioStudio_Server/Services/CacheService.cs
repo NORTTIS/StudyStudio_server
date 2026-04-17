@@ -9,10 +9,10 @@ namespace StudioStudio_Server.Services
     /// Manages cache keys and expiration policies for all cached data
     /// Provides methods to invalidate cache when data changes (e.g., admin updates)
     /// </summary>
-    public class CacheService : ICacheService
+    public class CacheService(IMemoryCache cache, ILogger<CacheService> logger) : ICacheService
     {
-        private readonly IMemoryCache _cache;
-        private readonly ILogger<CacheService> _logger;
+        private readonly IMemoryCache _cache = cache;
+        private readonly ILogger<CacheService> _logger = logger;
         
         // Default cache durations
         private static readonly TimeSpan DefaultExpiration = TimeSpan.FromMinutes(10);
@@ -22,12 +22,6 @@ namespace StudioStudio_Server.Services
         private static readonly TimeSpan AnnouncementExpiration = TimeSpan.FromMinutes(5);
         private static readonly TimeSpan AiRequestCountExpiration = TimeSpan.FromMinutes(1);
         private static readonly TimeSpan UserGroupsExpiration = TimeSpan.FromMinutes(10);
-
-        public CacheService(IMemoryCache cache, ILogger<CacheService> logger)
-        {
-            _cache = cache;
-            _logger = logger;
-        }
 
         /// <summary>
         /// Get cached value or set it using factory function if not exists

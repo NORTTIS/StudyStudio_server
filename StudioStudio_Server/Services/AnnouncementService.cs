@@ -11,21 +11,14 @@ namespace StudioStudio_Server.Services
     /// Users can view active announcements and manage their personal announcement notifications
     /// OPTIMIZED: Uses caching to reduce database queries
     /// </summary>
-    public class AnnouncementService : IAnnouncementService
+    public class AnnouncementService(
+        IAnnouncementRepository announcementRepository,
+        IUserAnnouccementRepository userAnnouncementRepository,
+        ICacheService cacheService) : IAnnouncementService
     {
-        private readonly IAnnouncementRepository _announcementRepository;
-        private readonly IUserAnnouccementRepository _userAnnouncementRepository;
-        private readonly ICacheService _cacheService;
-
-        public AnnouncementService(
-            IAnnouncementRepository announcementRepository,
-            IUserAnnouccementRepository userAnnouncementRepository,
-            ICacheService cacheService)
-        {
-            _announcementRepository = announcementRepository;
-            _userAnnouncementRepository = userAnnouncementRepository;
-            _cacheService = cacheService;
-        }
+        private readonly IAnnouncementRepository _announcementRepository = announcementRepository;
+        private readonly IUserAnnouccementRepository _userAnnouncementRepository = userAnnouncementRepository;
+        private readonly ICacheService _cacheService = cacheService;
 
         /// <summary>
         /// Get list of all announcements for user (both types combined)

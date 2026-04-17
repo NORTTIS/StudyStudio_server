@@ -1,21 +1,18 @@
 using System.Diagnostics;
-using System.Text.Json;
 using System.Text.Json.Nodes;
 using StudioStudio_Server.Repositories.Interfaces;
+using StudioStudio_Server.Services.AI.Interfaces;
 using StudioStudio_Server.Services.AI.Models;
-using StudioStudio_Server.Services.AI.Tools.Interfaces;
 
 namespace StudioStudio_Server.Services.AI.Tools;
 
 [DebuggerStepThrough]
-public class GetStudioAnalyticsTool : IAITool
+public class GetStudioAnalyticsTool(
+    IStudioRepository studioRepository,
+    IAnalyticsRepository analyticsRepository,
+    ITaskRepository taskRepository,
+    ILogger<GetStudioAnalyticsTool> logger) : IAITool
 {
-    private readonly IStudioRepository _studioRepository;
-    private readonly IAnalyticsRepository _analyticsRepository;
-    private readonly ITaskRepository _taskRepository;
-    private readonly IGroupParticipantRepository _participantRepository;
-    private readonly ILogger<GetStudioAnalyticsTool> _logger;
-
     public string Name => "get_studio_analytics";
     public string Description => "Lay thong ke tong the cua Studio. Khong can tham so (studio_id tu dong lay tu context).";
     public JsonObject ParametersSchema => new JsonObject
@@ -27,20 +24,6 @@ public class GetStudioAnalyticsTool : IAITool
         },
         ["required"] = new JsonArray()
     };
-
-    public GetStudioAnalyticsTool(
-        IStudioRepository studioRepository,
-        IAnalyticsRepository analyticsRepository,
-        ITaskRepository taskRepository,
-        IGroupParticipantRepository participantRepository,
-        ILogger<GetStudioAnalyticsTool> logger)
-    {
-        _studioRepository = studioRepository;
-        _analyticsRepository = analyticsRepository;
-        _taskRepository = taskRepository;
-        _participantRepository = participantRepository;
-        _logger = logger;
-    }
 
     private static string? Js(JsonNode? n) => n?.GetValue<string>();
 
@@ -61,17 +44,17 @@ public class GetStudioAnalyticsTool : IAITool
             if (!validPeriods.Contains(period))
                 return AIQueryResult.Error("Period phai la mot trong: week, month, all");
 
-            var studio = await _studioRepository.GetByIdAsync(studioId);
+            var studio = await studioRepository.GetByIdAsync(studioId);
             if (studio == null)
                 return AIQueryResult.Error("Khong tim thay Studio");
 
-            var groups = await _studioRepository.GetGroupsByStudioIdAsync(studioId);
+            var groups = await studioRepository.GetGroupsByStudioIdAsync(studioId);
             var totalGroups = groups.Count;
             var allGroupIds = groups.Select(g => g.GroupId).ToList();
 
             // Batch: all task stats in 1 query
             var taskStatsMap = allGroupIds.Count > 0
-                ? await _taskRepository.GetGroupTaskStatisticsBatchAsync(allGroupIds)
+                ? await taskRepository.GetGroupTaskStatisticsBatchAsync(allGroupIds)
                 : new Dictionary<Guid, global::StudioStudio_Server.Models.DTOs.Response.TaskSummaryResponse>();
 
             int totalMembers = 0;
@@ -128,10 +111,10 @@ public class GetStudioAnalyticsTool : IAITool
                 var tasksCompletedTotal = 0;
                 foreach (var g in groups)
                 {
-                    var created = await _analyticsRepository.AggregateTasksByGroupAsync(g.GroupId, fromDate, toDate);
+                    var created = await analyticsRepository.AggregateTasksByGroupAsync(g.GroupId, fromDate, toDate);
                     tasksCreatedTotal += created.GetValueOrDefault(g.GroupId, 0);
 
-                    var completed = await _analyticsRepository.AggregateCompletedTasksByGroupAsync(g.GroupId, fromDate, toDate);
+                    var completed = await analyticsRepository.AggregateCompletedTasksByGroupAsync(g.GroupId, fromDate, toDate);
                     tasksCompletedTotal += completed.GetValueOrDefault(g.GroupId, 0);
                 }
 
@@ -149,7 +132,7 @@ public class GetStudioAnalyticsTool : IAITool
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "GetStudioAnalyticsTool error");
+            logger.LogError(ex, "GetStudioAnalyticsTool error");
             return AIQueryResult.Error("Da xay ra loi khi lay thong ke Studio");
         }
     }

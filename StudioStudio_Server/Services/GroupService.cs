@@ -16,25 +16,42 @@ using StudioStudio_Server.Utils;
 
 namespace StudioStudio_Server.Services
 {
-    public class GroupService : IGroupService
+    public class GroupService(
+        ILogger<GroupService> logger,
+        IMessageService messageService,
+        IGroupRepository groupRepository,
+        IUserSubscriptionRepository userSubscriptionRepository,
+        IFavouriteRepository favouriteRepository,
+        IUserRepository userRepository,
+        IStudioRepository studioRepository,
+        IGroupParticipantRepository groupParticipantRepository,
+        ITaskRepository taskRepository,
+        ITemplateRepository templateRepository,
+        IGroupTaskStatusRepository groupTaskStatusRepository,
+        ITaskAssignmentRepository taskAssignmentRepository,
+        IStudioParticipantRepository studioParticipantRepository,
+        IEmailService emailService,
+        IHttpContextAccessor httpContextAccessor,
+        IConfiguration configuration,
+        ICacheService cacheService) : IGroupService
     {
-        private readonly ILogger<GroupService> _logger;
-        private readonly IMessageService _messageService;
-        private readonly IGroupRepository _groupRepository;
-        private readonly IUserSubscriptionRepository _userSubscriptionRepository;
-        private readonly IFavouriteRepository _favouriteRepository;
-        private readonly IUserRepository _userRepository;
-        private readonly IStudioRepository _studioRepository;
-        private readonly IGroupParticipantRepository _groupParticipantRepository;
-        private readonly ITaskRepository _taskRepository;
-        private readonly ITemplateRepository _templateRepository;
-        private readonly IGroupTaskStatusRepository _groupTaskStatusRepository;
-        private readonly ITaskAssignmentRepository _taskAssignmentRepository;
-        private readonly IStudioParticipantRepository _studioParticipantRepository;
-        private readonly IEmailService _emailService;
-        private readonly IHttpContextAccessor _httpContextAccessor;
-        private readonly IConfiguration _configuration;
-        private readonly ICacheService _cacheService;
+        private readonly ILogger<GroupService> _logger = logger;
+        private readonly IMessageService _messageService = messageService;
+        private readonly IGroupRepository _groupRepository = groupRepository;
+        private readonly IUserSubscriptionRepository _userSubscriptionRepository = userSubscriptionRepository;
+        private readonly IFavouriteRepository _favouriteRepository = favouriteRepository;
+        private readonly IUserRepository _userRepository = userRepository;
+        private readonly IStudioRepository _studioRepository = studioRepository;
+        private readonly IGroupParticipantRepository _groupParticipantRepository = groupParticipantRepository;
+        private readonly ITaskRepository _taskRepository = taskRepository;
+        private readonly ITemplateRepository _templateRepository = templateRepository;
+        private readonly IGroupTaskStatusRepository _groupTaskStatusRepository = groupTaskStatusRepository;
+        private readonly ITaskAssignmentRepository _taskAssignmentRepository = taskAssignmentRepository;
+        private readonly IStudioParticipantRepository _studioParticipantRepository = studioParticipantRepository;
+        private readonly IEmailService _emailService = emailService;
+        private readonly IHttpContextAccessor _httpContextAccessor = httpContextAccessor;
+        private readonly IConfiguration _configuration = configuration;
+        private readonly ICacheService _cacheService = cacheService;
 
         private static readonly string[] BrandColors = new[]
         {
@@ -42,44 +59,6 @@ namespace StudioStudio_Server.Services
             "#7C3AED", "#4F46E5", "#2563EB", "#06B6D4",
             "#10B981", "#84CC16", "#F59E0B", "#F43F5E"
         };
-
-        public GroupService(
-            ILogger<GroupService> logger,
-            IMessageService messageService,
-            IGroupRepository groupRepository,
-            IUserSubscriptionRepository userSubscriptionRepository,
-            IFavouriteRepository favouriteRepository,
-            IUserRepository userRepository,
-            IStudioRepository studioRepository,
-            IGroupParticipantRepository groupParticipantRepository,
-            ITaskRepository taskRepository,
-            ITemplateRepository templateRepository,
-            IGroupTaskStatusRepository groupTaskStatusRepository,
-            ITaskAssignmentRepository taskAssignmentRepository,
-            IStudioParticipantRepository studioParticipantRepository,
-            IEmailService emailService,
-            IHttpContextAccessor httpContextAccessor,
-            IConfiguration configuration,
-            ICacheService cacheService)
-        {
-            _logger = logger;
-            _messageService = messageService;
-            _groupRepository = groupRepository;
-            _userSubscriptionRepository = userSubscriptionRepository;
-            _favouriteRepository = favouriteRepository;
-            _userRepository = userRepository;
-            _studioRepository = studioRepository;
-            _groupParticipantRepository = groupParticipantRepository;
-            _taskRepository = taskRepository;
-            _templateRepository = templateRepository;
-            _groupTaskStatusRepository = groupTaskStatusRepository;
-            _taskAssignmentRepository = taskAssignmentRepository;
-            _studioParticipantRepository = studioParticipantRepository;
-            _emailService = emailService;
-            _httpContextAccessor = httpContextAccessor;
-            _configuration = configuration;
-            _cacheService = cacheService;
-        }
 
         /// <summary>
         /// Get all groups that the current user can access and split them by UI sections.

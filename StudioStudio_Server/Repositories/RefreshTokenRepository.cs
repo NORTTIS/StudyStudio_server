@@ -8,14 +8,9 @@ namespace StudioStudio_Server.Repositories
     /// <summary>
     /// Repository handling operations with RefreshToken entity
     /// </summary>
-    public class RefreshTokenRepository : IRefreshTokenRepository
+    public class RefreshTokenRepository(StudioDbContext context) : IRefreshTokenRepository
     {
-        private readonly StudioDbContext _context;
-
-        public RefreshTokenRepository(StudioDbContext context)
-        {
-            _context = context;
-        }
+        private readonly StudioDbContext _context = context;
 
         /// <summary>
         /// Get valid refresh token

@@ -9,6 +9,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Polly;
 using Polly.CircuitBreaker;
 using Polly.Retry;
+using StudioStudio_Server.Services.AI.Interfaces;
 
 namespace StudioStudio_Server.Services
 {
@@ -439,8 +440,8 @@ namespace StudioStudio_Server.Services
             try
             {
                 using var scope = _serviceProvider.CreateScope();
-                var registry = scope.ServiceProvider.GetService(typeof(StudioStudio_Server.Services.AI.Tools.Interfaces.IAIToolRegistry))
-                    as StudioStudio_Server.Services.AI.Tools.Interfaces.IAIToolRegistry;
+                var registry = scope.ServiceProvider.GetService(typeof(IAIToolRegistry))
+                    as IAIToolRegistry;
 
                 if (registry != null)
                 {

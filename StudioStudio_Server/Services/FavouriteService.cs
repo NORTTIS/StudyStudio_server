@@ -12,24 +12,16 @@ namespace StudioStudio_Server.Services
     /// Allows users to mark groups as favourites for quick access
     /// Only group members can add group to favourites
     /// </summary>
-    public class FavouriteService : IFavouriteService
+    public class FavouriteService(
+        IFavouriteRepository favouriteRepository,
+        IGroupRepository groupRepository,
+        IGroupParticipantRepository groupParticipantRepository,
+        ILogger<FavouriteService> logger) : IFavouriteService
     {
-        private readonly IFavouriteRepository _favouriteRepository;
-        private readonly IGroupRepository _groupRepository;
-        private readonly IGroupParticipantRepository _groupParticipantRepository;
-        private readonly ILogger<FavouriteService> _logger;
-
-        public FavouriteService(
-            IFavouriteRepository favouriteRepository,
-            IGroupRepository groupRepository,
-            IGroupParticipantRepository groupParticipantRepository,
-            ILogger<FavouriteService> logger)
-        {
-            _favouriteRepository = favouriteRepository;
-            _groupRepository = groupRepository;
-            _groupParticipantRepository = groupParticipantRepository;
-            _logger = logger;
-        }
+        private readonly IFavouriteRepository _favouriteRepository = favouriteRepository;
+        private readonly IGroupRepository _groupRepository = groupRepository;
+        private readonly IGroupParticipantRepository _groupParticipantRepository = groupParticipantRepository;
+        private readonly ILogger<FavouriteService> _logger = logger;
 
         /// <summary>
         /// Add group to user's favourites

@@ -12,11 +12,13 @@ namespace StudioStudio_Server.Services
     /// Rate limit: 5 verification emails per 15 minutes per email address
     /// Storage: Redis with key prefixes for token data and rate limiting
     /// </summary>
-    public class EmailVerificationCacheService : IEmailVerificationCacheService
+    public class EmailVerificationCacheService(
+        IConnectionMultiplexer redis,
+        ILogger<EmailVerificationCacheService> logger) : IEmailVerificationCacheService
     {
-        private readonly IConnectionMultiplexer _redis;
-        private readonly IDatabase _database;
-        private readonly ILogger<EmailVerificationCacheService> _logger;
+        private readonly IConnectionMultiplexer _redis = redis;
+        private readonly IDatabase _database = redis.GetDatabase();
+        private readonly ILogger<EmailVerificationCacheService> _logger = logger;
 
         // Redis key prefixes
         private const string TOKEN_BY_EMAIL_PREFIX = "email_verification:token_by_email:";
@@ -26,15 +28,6 @@ namespace StudioStudio_Server.Services
         // Rate limit settings
         private const int MAX_REQUESTS_PER_WINDOW = 5;
         private static readonly TimeSpan RATE_LIMIT_WINDOW = TimeSpan.FromMinutes(15);
-
-        public EmailVerificationCacheService(
-            IConnectionMultiplexer redis,
-            ILogger<EmailVerificationCacheService> logger)
-        {
-            _redis = redis;
-            _database = redis.GetDatabase();
-            _logger = logger;
-        }
 
         /// <summary>
         /// Retrieve email verification data by token from Redis

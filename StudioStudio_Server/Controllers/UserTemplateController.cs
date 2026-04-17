@@ -16,25 +16,12 @@ namespace StudioStudio_Server.Controllers
     [Route("api/templates")]
     [ApiController]
     [Authorize]
-    public class UserTemplateController : ControllerBase
+    public class UserTemplateController(
+        ITemplateService templateService,
+        IMessageService messageService,
+        IUserService userService,
+        IGroupRepository groupRepository) : ControllerBase
     {
-        private readonly ITemplateService _templateService;
-        private readonly IMessageService _messageService;
-        private readonly IUserService _userService;
-        private readonly IGroupRepository _groupRepository;
-
-        public UserTemplateController(
-            ITemplateService templateService,
-            IMessageService messageService,
-            IUserService userService,
-            IGroupRepository groupRepository)
-        {
-            _templateService = templateService;
-            _messageService = messageService;
-            _userService = userService;
-            _groupRepository = groupRepository;
-        }
-
         /// <summary>
         /// Authenticate and get userId from JWT token
         /// </summary>
@@ -65,14 +52,14 @@ namespace StudioStudio_Server.Controllers
             var userId = ValidateAndGetUserId();
 
             // Get user's subscription plan
-            var subscriptionPlan = await _userService.GetUserSubscriptionPlan(userId);
+            var subscriptionPlan = await userService.GetUserSubscriptionPlan(userId);
             var groupLimit = subscriptionPlan?.MaxGroups ?? 5;
             var memberLimit = subscriptionPlan?.MaxMembersPerGroup ?? 10;
 
             // Get current group count
-            var groupCreated = await _groupRepository.CountGroupsCreatedByUserAsync(userId);
+            var groupCreated = await groupRepository.CountGroupsCreatedByUserAsync(userId);
 
-            var templates = await _templateService.GetAvailableTemplatesForUserAsync(userId);
+            var templates = await templateService.GetAvailableTemplatesForUserAsync(userId);
 
             var response = new TemplateListResponse
             {
@@ -85,7 +72,7 @@ namespace StudioStudio_Server.Controllers
                 Templates = templates
             };
 
-            var message = _messageService.GetMessage(ErrorCodes.SuccessGetData);
+            var message = messageService.GetMessage(ErrorCodes.SuccessGetData);
 
             return Ok(ApiResponse<TemplateListResponse>.Success(
                 ErrorCodes.SuccessGetData,
@@ -105,7 +92,7 @@ namespace StudioStudio_Server.Controllers
         public async Task<ActionResult<ApiResponse<TemplateResponse>>> GetTemplateById(Guid templateId)
         {
             var userId = ValidateAndGetUserId();
-            var template = await _templateService.GetTemplateByIdAsync(templateId);
+            var template = await templateService.GetTemplateByIdAsync(templateId);
 
             if (template == null)
             {
@@ -121,7 +108,7 @@ namespace StudioStudio_Server.Controllers
                     StatusCodes.Status403Forbidden);
             }
 
-            var message = _messageService.GetMessage(ErrorCodes.SuccessGetData);
+            var message = messageService.GetMessage(ErrorCodes.SuccessGetData);
 
             return Ok(ApiResponse<TemplateResponse>.Success(
                 ErrorCodes.SuccessGetData,

@@ -8,14 +8,9 @@ namespace StudioStudio_Server.Repositories
     /// <summary>
     /// Repository handling CRUD operations with Studio entity
     /// </summary>
-    public class StudioRepository : IStudioRepository
+    public class StudioRepository(StudioDbContext context) : IStudioRepository
     {
-        private readonly StudioDbContext _context;
-
-        public StudioRepository(StudioDbContext context)
-        {
-            _context = context;
-        }
+        private readonly StudioDbContext _context = context;
 
         /// <summary>
         /// Get studio by ID

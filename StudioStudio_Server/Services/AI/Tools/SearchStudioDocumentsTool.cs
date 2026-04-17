@@ -1,10 +1,8 @@
 using System.Diagnostics;
-using System.Text.Json;
 using System.Text.Json.Nodes;
-using StudioStudio_Server.Models.Entities;
 using StudioStudio_Server.Repositories.Interfaces;
+using StudioStudio_Server.Services.AI.Interfaces;
 using StudioStudio_Server.Services.AI.Models;
-using StudioStudio_Server.Services.AI.Tools.Interfaces;
 using StudioStudio_Server.Services.Interfaces;
 
 namespace StudioStudio_Server.Services.AI.Tools;
@@ -14,13 +12,12 @@ namespace StudioStudio_Server.Services.AI.Tools;
 /// Validates: query not empty, studio exists
 /// Returns: Top-K relevant document chunks from all studio groups with group info
 /// </summary>
-public class SearchStudioDocumentsTool : IAITool
+public class SearchStudioDocumentsTool(
+    IVectorDatabaseService qdrantService,
+    IEmbeddingService embeddingService,
+    IStudioRepository studioRepository,
+    ILogger<SearchStudioDocumentsTool> logger) : IAITool
 {
-    private readonly IVectorDatabaseService _qdrantService;
-    private readonly IEmbeddingService _embeddingService;
-    private readonly IStudioRepository _studioRepository;
-    private readonly ILogger<SearchStudioDocumentsTool> _logger;
-
     public string Name => "search_studio_documents";
     public string Description => "Tim kiem tai lieu tren toan bo studio (tat ca cac nhom). "
         + "Parameters: query (bat buoc), studio_id (bat buoc), top_k (optional, mac dinh 5), document_id (optional)";
@@ -37,18 +34,6 @@ public class SearchStudioDocumentsTool : IAITool
         },
         ["required"] = new JsonArray { "query", "studio_id" }
     };
-
-    public SearchStudioDocumentsTool(
-        IVectorDatabaseService qdrantService,
-        IEmbeddingService embeddingService,
-        IStudioRepository studioRepository,
-        ILogger<SearchStudioDocumentsTool> logger)
-    {
-        _qdrantService = qdrantService;
-        _embeddingService = embeddingService;
-        _studioRepository = studioRepository;
-        _logger = logger;
-    }
 
     private static string? Js(JsonNode? n) => n?.GetValue<string>();
     private static int Ji(JsonNode? n) => n == null ? 0 : n.GetValue<int>();
@@ -71,16 +56,16 @@ public class SearchStudioDocumentsTool : IAITool
             var documentId = Jg(parameters["document_id"]);
             if (topK <= 0) topK = 5;
 
-            _logger.LogInformation("[TOOL-START] search_studio_documents | query={Query} studioId={StudioId} topK={TopK}",
+            logger.LogInformation("[TOOL-START] search_studio_documents | query={Query} studioId={StudioId} topK={TopK}",
                 query, studioId, topK);
 
             // Get all groups in this studio
-            var groups = await _studioRepository.GetGroupsByStudioIdAsync(studioId);
+            var groups = await studioRepository.GetGroupsByStudioIdAsync(studioId);
 
             if (groups.Count == 0)
             {
                 sw.Stop();
-                _logger.LogWarning("[TOOL-EMPTY] search_studio_documents | query={Query} studioId={StudioId} — No groups in studio",
+                logger.LogWarning("[TOOL-EMPTY] search_studio_documents | query={Query} studioId={StudioId} — No groups in studio",
                     query, studioId);
                 return AIQueryResult.Success(new JsonObject
                 {
@@ -99,13 +84,13 @@ public class SearchStudioDocumentsTool : IAITool
             var groupDict = groups.ToDictionary(g => g.GroupId);
 
             // Embed query
-            var queryVector = await _embeddingService.GenerateEmbeddingAsync(query);
+            var queryVector = await embeddingService.GenerateEmbeddingAsync(query);
 
             // Search across all studio groups
-            var results = await _qdrantService.SearchVectorsMultiGroupAsync(
+            var results = await qdrantService.SearchVectorsMultiGroupAsync(
                 queryVector, topK, groupIds, documentId, cancellationToken);
 
-            _logger.LogInformation("[TOOL-QDRANT] search_studio_documents | resultsCount={Count} elapsedMs={Ms}",
+            logger.LogInformation("[TOOL-QDRANT] search_studio_documents | resultsCount={Count} elapsedMs={Ms}",
                 results.Count, sw.ElapsedMilliseconds);
 
             // Build response with group info
@@ -131,12 +116,12 @@ public class SearchStudioDocumentsTool : IAITool
 
             if (docs.Count == 0)
             {
-                _logger.LogWarning("[TOOL-EMPTY] search_studio_documents | query={Query} studioId={StudioId} — No documents found across {GroupCount} groups",
+                logger.LogWarning("[TOOL-EMPTY] search_studio_documents | query={Query} studioId={StudioId} — No documents found across {GroupCount} groups",
                     query, studioId, groups.Count);
             }
             else
             {
-                _logger.LogInformation("[TOOL-SUCCESS] search_studio_documents | docsReturned={Count} elapsedMs={Ms}",
+                logger.LogInformation("[TOOL-SUCCESS] search_studio_documents | docsReturned={Count} elapsedMs={Ms}",
                     docs.Count, sw.ElapsedMilliseconds);
             }
 
@@ -155,7 +140,7 @@ public class SearchStudioDocumentsTool : IAITool
         catch (Exception ex)
         {
             sw.Stop();
-            _logger.LogError(ex, "[TOOL-ERROR] search_studio_documents | query={Query} — Unexpected error", Js(parameters["query"]));
+            logger.LogError(ex, "[TOOL-ERROR] search_studio_documents | query={Query} — Unexpected error", Js(parameters["query"]));
             return AIQueryResult.Error($"search_studio_documents failed: {ex.Message}");
         }
     }

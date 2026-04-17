@@ -15,19 +15,10 @@ namespace StudioStudio_Server.Controllers.Admin
     [Route("api/admin/reports")]
     [ApiController]
     [Authorize]
-    public class AdminReportController : ControllerBase
+    public class AdminReportController(
+        IReportService reportService,
+        IMessageService messageService) : ControllerBase
     {
-        private readonly IReportService _reportService;
-        private readonly IMessageService _messageService;
-
-        public AdminReportController(
-            IReportService reportService,
-            IMessageService messageService)
-        {
-            _reportService = reportService;
-            _messageService = messageService;
-        }
-
         /// <summary>
         /// [ADMIN] GET /api/admin/reports
         /// Get all reports with filtering, pagination and summary
@@ -47,8 +38,8 @@ namespace StudioStudio_Server.Controllers.Admin
         {
             JwtHelper.ValidateAdminUser(User);
 
-            var response = await _reportService.GetReportsAsync(request);
-            var message = _messageService.GetMessage(ErrorCodes.SuccessGetData);
+            var response = await reportService.GetReportsAsync(request);
+            var message = messageService.GetMessage(ErrorCodes.SuccessGetData);
 
             return Ok(ApiResponse<ReportListResponse>.Success(
                 ErrorCodes.SuccessGetData,
@@ -68,8 +59,8 @@ namespace StudioStudio_Server.Controllers.Admin
         {
             var adminUserId = JwtHelper.ValidateAdminUser(User);
 
-            var response = await _reportService.UpdateReportAsync(adminUserId, request);
-            var message = _messageService.GetMessage(ErrorCodes.SuccessUpdateReport);
+            var response = await reportService.UpdateReportAsync(adminUserId, request);
+            var message = messageService.GetMessage(ErrorCodes.SuccessUpdateReport);
 
             return Ok(ApiResponse<ReportItemResponse>.Success(
                 ErrorCodes.SuccessUpdateReport,

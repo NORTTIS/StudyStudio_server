@@ -1,5 +1,5 @@
-using StudioStudio_Server.Localization;
 using StudioStudio_Server.Models.Enums;
+using StudioStudio_Server.Resources.Localization;
 
 namespace StudioStudio_Server.Services.Interfaces
 {
@@ -16,16 +16,10 @@ namespace StudioStudio_Server.Services.Interfaces
     /// Supported languages: Vietnamese (default), English
     /// Language detection: Uses Accept-Language header from HTTP request
     /// </summary>
-    public class MessageService : IMessageService
+    public class MessageService(IWebHostEnvironment env, IHttpContextAccessor httpContextAccessor) : IMessageService
     {
-        private readonly IWebHostEnvironment _env;
-        private readonly IHttpContextAccessor _httpContextAccessor;
-
-        public MessageService(IWebHostEnvironment env, IHttpContextAccessor httpContextAccessor)
-        {
-            _env = env;
-            _httpContextAccessor = httpContextAccessor;
-        }
+        private readonly IWebHostEnvironment _env = env;
+        private readonly IHttpContextAccessor _httpContextAccessor = httpContextAccessor;
 
         /// <summary>
         /// Get localized message by code

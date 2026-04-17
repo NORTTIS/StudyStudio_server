@@ -1,7 +1,7 @@
+using StudioStudio_Server.Services.AI.Interfaces;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using StudioStudio_Server.Services.AI.Models;
-using StudioStudio_Server.Services.AI.Tools.Interfaces;
 
 namespace StudioStudio_Server.Services.AI;
 
@@ -10,13 +10,13 @@ namespace StudioStudio_Server.Services.AI;
 /// Singleton pattern - nhưng lưu TOOL TYPE chứ không phải instance
 /// để resolve fresh instance trong request scope tránh DbContext disposed
 /// </summary>
-public class AIToolRegistry : IAIToolRegistry
+public class AIToolRegistry(ILogger<AIToolRegistry> logger) : IAIToolRegistry
 {
     // Lưu tool TYPE để resolve fresh instance (tránh DbContext disposed)
     private readonly Dictionary<string, Type> _toolTypes = new();
     // Giữ instance để generate manifest (manifest chỉ cần metadata, không cần DbContext)
     private readonly Dictionary<string, IAITool> _toolInstances = new();
-    private readonly ILogger<AIToolRegistry> _logger;
+    private readonly ILogger<AIToolRegistry> _logger = logger;
 
     // Tool categories for role-based filtering
     private static readonly HashSet<string> PersonalTools = new(StringComparer.OrdinalIgnoreCase)
@@ -37,11 +37,6 @@ public class AIToolRegistry : IAIToolRegistry
         "get_storage_usage", "get_member_permissions", "get_risk_groups",
         "get_studio_health", "compare_groups"
     };
-
-    public AIToolRegistry(ILogger<AIToolRegistry> logger)
-    {
-        _logger = logger;
-    }
 
     /// <summary>
     /// Lấy tool instance (dùng cho manifest - không gọi ExecuteAsync ở đây)

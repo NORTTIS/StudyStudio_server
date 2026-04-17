@@ -1,7 +1,7 @@
 using System.Collections.Concurrent;
 using System.Text.Json;
 
-namespace StudioStudio_Server.Localization
+namespace StudioStudio_Server.Resources.Localization
 {
     public class JsonStringLocalizer
     {

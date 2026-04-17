@@ -15,48 +15,32 @@ namespace StudioStudio_Server.Services
     /// Service x? l? business logic cho Task Comments
     /// Handle: Send comment, Reply, Delete, Get history
     /// </summary>
-    public class TaskCommentService : ITaskCommentService
+    public class TaskCommentService(
+        ITaskCommentRepository commentRepository,
+        ITaskRepository taskRepository,
+        IGroupParticipantRepository groupParticipantRepository,
+        IUserRepository userRepository,
+        IAnnouncementRepository announcementRepository,
+        IUserAnnouncementService userAnnouncementService,
+        IGroupRepository groupRepository,
+        IMessageService messageService,
+        INotificationService notificationService,
+        ILogger<TaskCommentService> logger,
+        IHttpContextAccessor httpContextAccessor,
+        IActivityLogService activityLogService) : ITaskCommentService
     {
-        private readonly ITaskCommentRepository _commentRepository;
-        private readonly ITaskRepository _taskRepository;
-        private readonly IGroupParticipantRepository _groupParticipantRepository;
-        private readonly IGroupRepository _groupRepository;
-        private readonly IUserRepository _userRepository;
-        private readonly IAnnouncementRepository _announcementRepository;
-        private readonly IUserAnnouncementService _userAnnouncementService;
-        private readonly IMessageService _messageService;
-        private readonly INotificationService _notificationService;
-        private readonly ILogger<TaskCommentService> _logger;
-        private readonly IHttpContextAccessor _httpContextAccessor;
-        private readonly IActivityLogService _activityLogService;
-
-        public TaskCommentService(
-            ITaskCommentRepository commentRepository,
-            ITaskRepository taskRepository,
-            IGroupParticipantRepository groupParticipantRepository,
-            IUserRepository userRepository,
-            IAnnouncementRepository announcementRepository,
-            IUserAnnouncementService userAnnouncementService,
-            IGroupRepository groupRepository,
-            IMessageService messageService,
-            INotificationService notificationService,
-            ILogger<TaskCommentService> logger,
-            IHttpContextAccessor httpContextAccessor,
-            IActivityLogService activityLogService)
-        {
-            _commentRepository = commentRepository;
-            _taskRepository = taskRepository;
-            _groupParticipantRepository = groupParticipantRepository;
-            _userRepository = userRepository;
-            _announcementRepository = announcementRepository;
-            _userAnnouncementService = userAnnouncementService;
-            _groupRepository = groupRepository;
-            _messageService = messageService;
-            _notificationService = notificationService;
-            _logger = logger;
-            _httpContextAccessor = httpContextAccessor;
-            _activityLogService = activityLogService;
-        }
+        private readonly ITaskCommentRepository _commentRepository = commentRepository;
+        private readonly ITaskRepository _taskRepository = taskRepository;
+        private readonly IGroupParticipantRepository _groupParticipantRepository = groupParticipantRepository;
+        private readonly IGroupRepository _groupRepository = groupRepository;
+        private readonly IUserRepository _userRepository = userRepository;
+        private readonly IAnnouncementRepository _announcementRepository = announcementRepository;
+        private readonly IUserAnnouncementService _userAnnouncementService = userAnnouncementService;
+        private readonly IMessageService _messageService = messageService;
+        private readonly INotificationService _notificationService = notificationService;
+        private readonly ILogger<TaskCommentService> _logger = logger;
+        private readonly IHttpContextAccessor _httpContextAccessor = httpContextAccessor;
+        private readonly IActivityLogService _activityLogService = activityLogService;
 
         /// <summary>
         /// Get comment history for task (pagination)

@@ -2,12 +2,9 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using StudioStudio_Server.Exceptions;
 using StudioStudio_Server.Models;
-using StudioStudio_Server.Models.DTOs.Request;
-using StudioStudio_Server.Models.Enums;
 using StudioStudio_Server.Repositories.Interfaces;
 using StudioStudio_Server.Services.AI;
 using StudioStudio_Server.Services.AI.Models;
-using StudioStudio_Server.Services.Interfaces;
 using System.Security.Claims;
 
 namespace StudioStudio_Server.Controllers;
@@ -20,28 +17,13 @@ namespace StudioStudio_Server.Controllers;
 [Route("api/ai/group")]
 [ApiController]
 [Authorize]
-public class GroupAIController : ControllerBase
+public class GroupAIController(
+    AIAgent aiAgent,
+    IGroupParticipantRepository participantRepository,
+    IAIRequestLogRepository aiRequestLogRepository,
+    IUserSubscriptionRepository userSubscriptionRepository,
+    ILogger<GroupAIController> logger) : ControllerBase
 {
-    private readonly AIAgent _aiAgent;
-    private readonly IGroupParticipantRepository _participantRepository;
-    private readonly IAIRequestLogRepository _aiRequestLogRepository;
-    private readonly IUserSubscriptionRepository _userSubscriptionRepository;
-    private readonly ILogger<GroupAIController> _logger;
-
-    public GroupAIController(
-        AIAgent aiAgent,
-        IGroupParticipantRepository participantRepository,
-        IAIRequestLogRepository aiRequestLogRepository,
-        IUserSubscriptionRepository userSubscriptionRepository,
-        ILogger<GroupAIController> logger)
-    {
-        _aiAgent = aiAgent;
-        _participantRepository = participantRepository;
-        _aiRequestLogRepository = aiRequestLogRepository;
-        _userSubscriptionRepository = userSubscriptionRepository;
-        _logger = logger;
-    }
-
     /// <summary>
     /// Ask Group AI - AI hỗ trợ nhóm học tập
     /// </summary>
@@ -58,11 +40,11 @@ public class GroupAIController : ControllerBase
         }
 
         // Validate: phải là thành viên, và không phải Viewer/Commenter
-        if (!await _participantRepository.IsUserInGroupAsync(request.GroupId, userId.Value))
+        if (!await participantRepository.IsUserInGroupAsync(request.GroupId, userId.Value))
         {
             throw new AppException(ErrorCodes.GroupPermissionDenied, StatusCodes.Status403Forbidden);
         }
-        var role = await _participantRepository.GetGroupRoleByUserIdAsync(userId.Value, request.GroupId);
+        var role = await participantRepository.GetGroupRoleByUserIdAsync(userId.Value, request.GroupId);
         if (role == GroupRole.Viewer || role == GroupRole.Commenter)
         {
             throw new AppException(ErrorCodes.GroupPermissionDenied, StatusCodes.Status403Forbidden);
@@ -75,7 +57,7 @@ public class GroupAIController : ControllerBase
             throw new AppException(ErrorCodes.AIRateLimitExceeded, StatusCodes.Status429TooManyRequests);
         }
 
-        _logger.LogInformation(
+        logger.LogInformation(
             "Group AI Question: UserId={UserId}, GroupId={GroupId}, Question={Question}",
             userId, request.GroupId,
             string.IsNullOrEmpty(request.Question)
@@ -94,7 +76,7 @@ public class GroupAIController : ControllerBase
             };
 
             // Process với AIAgent
-            var result = await _aiAgent.ProcessAsync(request.Question, context, cancellationToken);
+            var result = await aiAgent.ProcessAsync(request.Question, context, cancellationToken);
 
             // Log AI request with actual token usage from Gemini
             var tokenUsage = result.TokenUsage;
@@ -115,9 +97,9 @@ public class GroupAIController : ControllerBase
                 {
                     result.ToolCallCount,
                     result.ProcessingTimeMs,
-                    ReasoningSteps = result.ReasoningSteps,
-                    RemainingRequests = rateLimitResult.RemainingRequests,
-                    DailyLimit = rateLimitResult.DailyLimit
+                    result.ReasoningSteps,
+                    rateLimitResult.RemainingRequests,
+                    rateLimitResult.DailyLimit
                 },
                 Message = result.Success ? "Success" : result.ErrorMessage
             });
@@ -128,7 +110,7 @@ public class GroupAIController : ControllerBase
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Group AI error");
+            logger.LogError(ex, "Group AI error");
             throw new AppException(
                 ErrorCodes.UnexpectedError,
                 StatusCodes.Status500InternalServerError);
@@ -149,25 +131,25 @@ public class GroupAIController : ControllerBase
         if (userId == null)
         {
             Response.StatusCode = StatusCodes.Status401Unauthorized;
-            await Response.WriteAsync("Unauthorized");
-            await Response.Body.FlushAsync();
+            await Response.WriteAsync("Unauthorized", cancellationToken: cancellationToken);
+            await Response.Body.FlushAsync(cancellationToken);
             return;
         }
 
         // Validate: phải là thành viên, và không phải Viewer/Commenter
-        if (!await _participantRepository.IsUserInGroupAsync(request.GroupId, userId.Value))
+        if (!await participantRepository.IsUserInGroupAsync(request.GroupId, userId.Value))
         {
             Response.StatusCode = StatusCodes.Status403Forbidden;
-            await Response.WriteAsync("Forbidden: Not a group member");
-            await Response.Body.FlushAsync();
+            await Response.WriteAsync("Forbidden: Not a group member", cancellationToken: cancellationToken);
+            await Response.Body.FlushAsync(cancellationToken);
             return;
         }
-        var streamRole = await _participantRepository.GetGroupRoleByUserIdAsync(userId.Value, request.GroupId);
+        var streamRole = await participantRepository.GetGroupRoleByUserIdAsync(userId.Value, request.GroupId);
         if (streamRole == GroupRole.Viewer || streamRole == GroupRole.Commenter)
         {
             Response.StatusCode = StatusCodes.Status403Forbidden;
-            await Response.WriteAsync("Forbidden: You do not have permission to use Group AI");
-            await Response.Body.FlushAsync();
+            await Response.WriteAsync("Forbidden: You do not have permission to use Group AI", cancellationToken: cancellationToken);
+            await Response.Body.FlushAsync(cancellationToken);
             return;
         }
 
@@ -176,12 +158,12 @@ public class GroupAIController : ControllerBase
         if (!rateLimitResult.Allowed)
         {
             Response.StatusCode = StatusCodes.Status429TooManyRequests;
-            await Response.WriteAsync("Rate limit exceeded");
-            await Response.Body.FlushAsync();
+            await Response.WriteAsync("Rate limit exceeded", cancellationToken: cancellationToken);
+            await Response.Body.FlushAsync(cancellationToken);
             return;
         }
 
-        _logger.LogInformation(
+        logger.LogInformation(
             "Group AI Stream: UserId={UserId}, GroupId={GroupId}, Question={Question}",
             userId, request.GroupId,
             string.IsNullOrEmpty(request.Question)
@@ -207,7 +189,7 @@ public class GroupAIController : ControllerBase
             };
 
             // Stream chunks from AIAgent
-            await foreach (var chunk in _aiAgent.ProcessStreamAsync(request.Question, context, cancellationToken))
+            await foreach (var chunk in aiAgent.ProcessStreamAsync(request.Question, context, cancellationToken))
             {
                 switch (chunk.Type)
                 {
@@ -252,11 +234,11 @@ public class GroupAIController : ControllerBase
         }
         catch (OperationCanceledException)
         {
-            _logger.LogInformation("Group AI stream cancelled by client");
+            logger.LogInformation("Group AI stream cancelled by client");
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Group AI stream error");
+            logger.LogError(ex, "Group AI stream error");
             await SendSSEvent(new { type = "error", message = "Đã xảy ra lỗi khi xử lý yêu cầu. Vui lòng thử lại sau." });
         }
         finally
@@ -289,7 +271,7 @@ public class GroupAIController : ControllerBase
         }
 
         // Validate membership
-        var isMember = await _participantRepository.IsUserInGroupAsync(groupId, userId.Value);
+        var isMember = await participantRepository.IsUserInGroupAsync(groupId, userId.Value);
         if (!isMember)
         {
             throw new AppException(ErrorCodes.GroupPermissionDenied, StatusCodes.Status403Forbidden);
@@ -314,9 +296,9 @@ public class GroupAIController : ControllerBase
                 },
                 RateLimit = new
                 {
-                    RemainingRequests = rateLimitResult.RemainingRequests,
-                    DailyLimit = rateLimitResult.DailyLimit,
-                    Plan = rateLimitResult.Plan
+                    rateLimitResult.RemainingRequests,
+                    rateLimitResult.DailyLimit,
+                    rateLimitResult.Plan
                 }
             }
         });
@@ -324,8 +306,8 @@ public class GroupAIController : ControllerBase
 
     private async Task<RateLimitResult> CheckRateLimitAsync(Guid userId)
     {
-        var todayRequests = await _aiRequestLogRepository.CountTodayRequestsAsync(userId, DateTime.UtcNow.Date);
-        var subscription = await _userSubscriptionRepository.GetSubscriptionPlanByUserIdAsync(userId);
+        var todayRequests = await aiRequestLogRepository.CountTodayRequestsAsync(userId, DateTime.UtcNow.Date);
+        var subscription = await userSubscriptionRepository.GetSubscriptionPlanByUserIdAsync(userId);
         var dailyLimit = subscription?.MaxAiRequestsPerDay ?? 20;
 
         return new RateLimitResult
@@ -341,7 +323,7 @@ public class GroupAIController : ControllerBase
     {
         try
         {
-            await _aiRequestLogRepository.AddAsync(new Models.Entities.AIRequestLog
+            await aiRequestLogRepository.AddAsync(new Models.Entities.AIRequestLog
             {
                 RequestId = Guid.NewGuid(),
                 UserId = userId,
@@ -358,7 +340,7 @@ public class GroupAIController : ControllerBase
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Failed to log AI request for UserId={UserId}", userId);
+            logger.LogWarning(ex, "Failed to log AI request for UserId={UserId}", userId);
         }
     }
 

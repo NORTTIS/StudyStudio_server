@@ -1,23 +1,13 @@
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using StackExchange.Redis;
-using System.Reflection;
 
 namespace StudioStudio_Server.HealthChecks;
 
 /// <summary>
 /// Health check for Redis cache connectivity
 /// </summary>
-public class RedisHealthCheck : IHealthCheck
+public class RedisHealthCheck(IConnectionMultiplexer redis, ILogger<RedisHealthCheck> logger) : IHealthCheck
 {
-    private readonly IConnectionMultiplexer _redis;
-    private readonly ILogger<RedisHealthCheck> _logger;
-
-    public RedisHealthCheck(IConnectionMultiplexer redis, ILogger<RedisHealthCheck> logger)
-    {
-        _redis = redis;
-        _logger = logger;
-    }
-
     public async Task<HealthCheckResult> CheckHealthAsync(
         HealthCheckContext context,
         CancellationToken cancellationToken = default)
@@ -26,16 +16,16 @@ public class RedisHealthCheck : IHealthCheck
         {
             var startTime = DateTime.UtcNow;
 
-            var db = _redis.GetDatabase();
+            var db = redis.GetDatabase();
             await db.PingAsync();
 
             var latency = (DateTime.UtcNow - startTime).TotalMilliseconds;
 
             // Get server info
-            var server = _redis.GetServer(_redis.GetEndPoints().First());
+            var server = redis.GetServer(redis.GetEndPoints().First());
             var serverInfo = await server.InfoAsync("server");
 
-            _logger.LogDebug("Redis health check passed. Latency: {Latency}ms", latency);
+            logger.LogDebug("Redis health check passed. Latency: {Latency}ms", latency);
 
             // Get redis version from server info
             var redisVersion = "unknown";
@@ -59,7 +49,7 @@ public class RedisHealthCheck : IHealthCheck
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Redis health check failed");
+            logger.LogError(ex, "Redis health check failed");
 
             return HealthCheckResult.Unhealthy(
                 $"Redis health check failed: {ex.Message}",

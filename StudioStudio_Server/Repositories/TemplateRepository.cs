@@ -8,14 +8,9 @@ namespace StudioStudio_Server.Repositories
     /// <summary>
     /// Repository handling CRUD operations with Template entity
     /// </summary>
-    public class TemplateRepository : ITemplateRepository
+    public class TemplateRepository(StudioDbContext context) : ITemplateRepository
     {
-        private readonly StudioDbContext _context;
-
-        public TemplateRepository(StudioDbContext context)
-        {
-            _context = context;
-        }
+        private readonly StudioDbContext _context = context;
 
         /// <summary>
         /// Get template by ID

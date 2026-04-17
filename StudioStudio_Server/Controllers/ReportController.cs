@@ -14,19 +14,10 @@ namespace StudioStudio_Server.Controllers
     /// </summary>
     [Route("api/reports")]
     [ApiController]
-    public class ReportController : ControllerBase
+    public class ReportController(
+        IReportService reportService,
+        IMessageService messageService) : ControllerBase
     {
-        private readonly IReportService _reportService;
-        private readonly IMessageService _messageService;
-
-        public ReportController(
-            IReportService reportService,
-            IMessageService messageService)
-        {
-            _reportService = reportService;
-            _messageService = messageService;
-        }
-
         /// <summary>
         /// Get userId from claims (nullable - public API)
         /// Return: userId if user is logged in, null if anonymous
@@ -53,13 +44,12 @@ namespace StudioStudio_Server.Controllers
         public async Task<IActionResult> SendReport([FromBody] ReportRequest request)
         {
             var userId = GetUserIdOrNull();
-            await _reportService.SendReportAsync(userId, request);
-            var message = _messageService.GetMessage(ErrorCodes.SuccessReportSent);
+            await reportService.SendReportAsync(userId, request);
+            var message = messageService.GetMessage(ErrorCodes.SuccessReportSent);
 
             return Ok(ApiResponse<object>.Success(
                 ErrorCodes.SuccessReportSent,
-                message,
-                null));
+                message));
         }
     }
 }

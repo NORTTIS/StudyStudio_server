@@ -1,9 +1,8 @@
 using System.Diagnostics;
-using System.Text.Json;
 using System.Text.Json.Nodes;
 using StudioStudio_Server.Repositories.Interfaces;
+using StudioStudio_Server.Services.AI.Interfaces;
 using StudioStudio_Server.Services.AI.Models;
-using StudioStudio_Server.Services.AI.Tools.Interfaces;
 using StudioStudio_Server.Services.Interfaces;
 
 namespace StudioStudio_Server.Services.AI.Tools;
@@ -13,13 +12,12 @@ namespace StudioStudio_Server.Services.AI.Tools;
 /// Validates: group membership, query not empty
 /// Returns: Top-K relevant document chunks with relevance scores
 /// </summary>
-public class SearchDocumentsTool : IAITool
+public class SearchDocumentsTool(
+    IVectorDatabaseService qdrantService,
+    IEmbeddingService embeddingService,
+    IGroupParticipantRepository participantRepository,
+    ILogger<SearchDocumentsTool> logger) : IAITool
 {
-    private readonly IVectorDatabaseService _qdrantService;
-    private readonly IEmbeddingService _embeddingService;
-    private readonly IGroupParticipantRepository _participantRepository;
-    private readonly ILogger<SearchDocumentsTool> _logger;
-
     public string Name => "search_documents";
     public string Description => "Tim kiem noi dung trong tai lieu cua nhom. "
         + "IMPORTANT: query la tham so BAT BUOC (bat buoc phai co). "
@@ -37,18 +35,6 @@ public class SearchDocumentsTool : IAITool
         },
         ["required"] = new JsonArray { "query" }
     };
-
-    public SearchDocumentsTool(
-        IVectorDatabaseService qdrantService,
-        IEmbeddingService embeddingService,
-        IGroupParticipantRepository participantRepository,
-        ILogger<SearchDocumentsTool> logger)
-    {
-        _qdrantService = qdrantService;
-        _embeddingService = embeddingService;
-        _participantRepository = participantRepository;
-        _logger = logger;
-    }
 
     private static string? Js(JsonNode? n) => n?.GetValue<string>();
     private static int Ji(JsonNode? n) => n == null ? 0 : n.GetValue<int>();
@@ -73,21 +59,21 @@ public class SearchDocumentsTool : IAITool
             var documentId = Jg(parameters["document_id"]);
             if (topK <= 0) topK = 3;
 
-            _logger.LogInformation("[TOOL-START] search_documents | query={Query} groupId={GroupId} topK={TopK}",
+            logger.LogInformation("[TOOL-START] search_documents | query={Query} groupId={GroupId} topK={TopK}",
                 query, groupId, topK);
 
             // Permission check
-            if (!await _participantRepository.IsUserInGroupAsync(groupId, context.UserId))
+            if (!await participantRepository.IsUserInGroupAsync(groupId, context.UserId))
                 return AIQueryResult.Error("Ban khong co quyen truy cap nhom nay");
 
             // Embed query
-            var queryVector = await _embeddingService.GenerateEmbeddingAsync(query);
+            var queryVector = await embeddingService.GenerateEmbeddingAsync(query);
 
             // Search Qdrant
-            var results = await _qdrantService.SearchVectorsAsync(
+            var results = await qdrantService.SearchVectorsAsync(
                 queryVector, topK, groupId, documentId, cancellationToken);
 
-            _logger.LogInformation("[TOOL-QDRANT] search_documents | resultsCount={Count} elapsedMs={Ms}",
+            logger.LogInformation("[TOOL-QDRANT] search_documents | resultsCount={Count} elapsedMs={Ms}",
                 results.Count, sw.ElapsedMilliseconds);
 
             // Build response
@@ -105,12 +91,12 @@ public class SearchDocumentsTool : IAITool
 
             if (docs.Count == 0)
             {
-                _logger.LogWarning("[TOOL-EMPTY] search_documents | query={Query} — No documents found (Qdrant returned 0 results)",
+                logger.LogWarning("[TOOL-EMPTY] search_documents | query={Query} — No documents found (Qdrant returned 0 results)",
                     query);
             }
             else
             {
-                _logger.LogInformation("[TOOL-SUCCESS] search_documents | docsReturned={Count} elapsedMs={Ms}",
+                logger.LogInformation("[TOOL-SUCCESS] search_documents | docsReturned={Count} elapsedMs={Ms}",
                     docs.Count, sw.ElapsedMilliseconds);
             }
 
@@ -128,7 +114,7 @@ public class SearchDocumentsTool : IAITool
             // Log data size info for context tracking
             var resultJson = result.ToJson();
             
-            _logger.LogInformation(
+            logger.LogInformation(
                 "[SEARCH-RESULT] query={Query} docsFound={Total} contextSize={CharCount} (full data included)",
                 query, docs.Count, resultJson.Length);
             
@@ -137,7 +123,7 @@ public class SearchDocumentsTool : IAITool
         catch (Exception ex)
         {
             sw.Stop();
-            _logger.LogError(ex, "[TOOL-ERROR] search_documents | query={Query} — Unexpected error", Js(parameters["query"]));
+            logger.LogError(ex, "[TOOL-ERROR] search_documents | query={Query} — Unexpected error", Js(parameters["query"]));
             return AIQueryResult.Error($"search_documents failed: {ex.Message}");
         }
     }

@@ -10,24 +10,16 @@ namespace StudioStudio_Server.Services
     /// <summary>
     /// Service for handling business logic for Group Members
     /// </summary>
-    public class GroupMemberService : IGroupMemberService
+    public class GroupMemberService(
+        IGroupRepository groupRepository,
+        IGroupParticipantRepository groupParticipantRepository,
+        IUserRepository userRepository,
+        ILogger<GroupMemberService> logger) : IGroupMemberService
     {
-        private readonly IGroupRepository _groupRepository;
-        private readonly IGroupParticipantRepository _groupParticipantRepository;
-        private readonly IUserRepository _userRepository;
-        private readonly ILogger<GroupMemberService> _logger;
-
-        public GroupMemberService(
-            IGroupRepository groupRepository,
-            IGroupParticipantRepository groupParticipantRepository,
-            IUserRepository userRepository,
-            ILogger<GroupMemberService> logger)
-        {
-            _groupRepository = groupRepository;
-            _groupParticipantRepository = groupParticipantRepository;
-            _userRepository = userRepository;
-            _logger = logger;
-        }
+        private readonly IGroupRepository _groupRepository = groupRepository;
+        private readonly IGroupParticipantRepository _groupParticipantRepository = groupParticipantRepository;
+        private readonly IUserRepository _userRepository = userRepository;
+        private readonly ILogger<GroupMemberService> _logger = logger;
 
         /// <summary>
         /// Remove member from group

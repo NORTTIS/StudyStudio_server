@@ -1,21 +1,18 @@
 using System.Diagnostics;
-using System.Text.Json;
 using System.Text.Json.Nodes;
 using StudioStudio_Server.Repositories.Interfaces;
+using StudioStudio_Server.Services.AI.Interfaces;
 using StudioStudio_Server.Services.AI.Models;
-using StudioStudio_Server.Services.AI.Tools.Interfaces;
 
 namespace StudioStudio_Server.Services.AI.Tools;
 
 [DebuggerStepThrough]
-public class GetRiskGroupsTool : IAITool
+public class GetRiskGroupsTool(
+    IStudioRepository studioRepository,
+    ITaskRepository taskRepository,
+    IAnalyticsRepository analyticsRepository,
+    ILogger<GetRiskGroupsTool> logger) : IAITool
 {
-    private readonly IStudioRepository _studioRepository;
-    private readonly ITaskRepository _taskRepository;
-    private readonly IGroupParticipantRepository _participantRepository;
-    private readonly IAnalyticsRepository _analyticsRepository;
-    private readonly ILogger<GetRiskGroupsTool> _logger;
-
     public string Name => "get_risk_groups";
     public string Description => "Xac dinh cac nhom co nguy co. Khong can tham so (studio_id tu dong lay tu context).";
     public JsonObject ParametersSchema => new JsonObject
@@ -27,20 +24,6 @@ public class GetRiskGroupsTool : IAITool
         },
         ["required"] = new JsonArray()
     };
-
-    public GetRiskGroupsTool(
-        IStudioRepository studioRepository,
-        ITaskRepository taskRepository,
-        IGroupParticipantRepository participantRepository,
-        IAnalyticsRepository analyticsRepository,
-        ILogger<GetRiskGroupsTool> logger)
-    {
-        _studioRepository = studioRepository;
-        _taskRepository = taskRepository;
-        _participantRepository = participantRepository;
-        _analyticsRepository = analyticsRepository;
-        _logger = logger;
-    }
 
     private static string? Js(JsonNode? n) => n?.GetValue<string>();
     private static double Jd(JsonNode? n) => n?.GetValue<double>() ?? 60.0;
@@ -57,12 +40,12 @@ public class GetRiskGroupsTool : IAITool
 
             var studioId = context.StudioId.Value;
 
-            var studio = await _studioRepository.GetByIdAsync(studioId);
+            var studio = await studioRepository.GetByIdAsync(studioId);
             if (studio == null)
                 return AIQueryResult.Error("Khong tim thay studio");
 
             var threshold = Jd(parameters["threshold"]);
-            var groups = await _studioRepository.GetGroupsByStudioIdAsync(studioId);
+            var groups = await studioRepository.GetGroupsByStudioIdAsync(studioId);
 
             var riskGroups = new List<JsonObject>();
             var now = DateTime.UtcNow;
@@ -71,10 +54,10 @@ public class GetRiskGroupsTool : IAITool
             // Batch: all task stats in 1 query + all analytics in 1 query
             var groupIds = groups.Select(g => g.GroupId).ToList();
             var taskStatsMap = groupIds.Count > 0
-                ? await _taskRepository.GetGroupTaskStatisticsBatchAsync(groupIds)
+                ? await taskRepository.GetGroupTaskStatisticsBatchAsync(groupIds)
                 : new Dictionary<Guid, global::StudioStudio_Server.Models.DTOs.Response.TaskSummaryResponse>();
             var analyticsMap = groupIds.Count > 0
-                ? await _analyticsRepository.GetGroupAnalyticsRangeBatchAsync(groupIds, sevenDaysAgo, DateOnly.FromDateTime(now))
+                ? await analyticsRepository.GetGroupAnalyticsRangeBatchAsync(groupIds, sevenDaysAgo, DateOnly.FromDateTime(now))
                 : new Dictionary<Guid, global::System.Collections.Generic.List<global::StudioStudio_Server.Models.Entities.GroupAnalytics>>();
 
             foreach (var group in groups)
@@ -138,7 +121,7 @@ public class GetRiskGroupsTool : IAITool
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "GetRiskGroupsTool error");
+            logger.LogError(ex, "GetRiskGroupsTool error");
             return AIQueryResult.Error("Da xay ra loi khi xac dinh nhom nguy co");
         }
     }

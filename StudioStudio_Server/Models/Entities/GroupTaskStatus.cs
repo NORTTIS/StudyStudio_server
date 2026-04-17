@@ -1,6 +1,4 @@
-﻿using System.ComponentModel.DataAnnotations;
-
-namespace StudioStudio_Server.Models.Entities
+﻿namespace StudioStudio_Server.Models.Entities
 {
     public class GroupTaskStatus
     {

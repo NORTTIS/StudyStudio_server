@@ -9,14 +9,9 @@ namespace StudioStudio_Server.Repositories
     /// <summary>
     /// Repository implementation cho Group Attachments
     /// </summary>
-    public class GroupAttachmentRepository : IGroupAttachmentRepository
+    public class GroupAttachmentRepository(StudioDbContext context) : IGroupAttachmentRepository
     {
-        private readonly StudioDbContext _context;
-
-        public GroupAttachmentRepository(StudioDbContext context)
-        {
-            _context = context;
-        }
+        private readonly StudioDbContext _context = context;
 
         public async Task<GroupAttachment?> GetByIdAsync(Guid attachmentId)
         {

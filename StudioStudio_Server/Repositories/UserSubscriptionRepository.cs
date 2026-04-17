@@ -8,14 +8,9 @@ namespace StudioStudio_Server.Repositories
     /// <summary>
     /// Repository xử lý các thao tác với UserSubscription entity
     /// </summary>
-    public class UserSubscriptionRepository : IUserSubscriptionRepository
+    public class UserSubscriptionRepository(StudioDbContext db) : IUserSubscriptionRepository
     {
-        private readonly StudioDbContext _db;
-
-        public UserSubscriptionRepository(StudioDbContext db)
-        {
-            _db = db;
-        }
+        private readonly StudioDbContext _db = db;
 
         /// <summary>
         /// Lấy subscription plan của user

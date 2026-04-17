@@ -1,10 +1,8 @@
 ﻿using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using StudioStudio_Server.Exceptions;
 using StudioStudio_Server.Models.DTOs.Request;
 using StudioStudio_Server.Models.DTOs.Response;
-using StudioStudio_Server.Services;
 using StudioStudio_Server.Services.Interfaces;
 using System.Security.Claims;
 
@@ -13,19 +11,10 @@ namespace StudioStudio_Server.Controllers
     [Route("api/[controller]")]
     [ApiController]
     [Authorize]
-    public class HomeController : ControllerBase
+    public class HomeController(
+        IHomeService homeService,
+        IMessageService messageService) : ControllerBase
     {
-        private readonly IHomeService _homeService;
-        private readonly IMessageService _messageService;
-
-        public HomeController(
-            IHomeService homeService,
-            IMessageService messageService)
-        {
-            _homeService = homeService;
-            _messageService = messageService;
-        }
-
         /// <summary>
         /// Authenticate and get userId from JWT token
         /// Validate: User must not be admin (admin cannot use user APIs)
@@ -63,8 +52,8 @@ namespace StudioStudio_Server.Controllers
         public async Task<ActionResult<ApiResponse<HomeSummaryResponse>>> GetSummary()
         {
             var userId = ValidateAndGetUserId();
-            var result = await _homeService.GetHomeSummaryAsync(userId);
-            var message = _messageService.GetMessage(ErrorCodes.SuccessGetData);
+            var result = await homeService.GetHomeSummaryAsync(userId);
+            var message = messageService.GetMessage(ErrorCodes.SuccessGetData);
 
             return Ok(ApiResponse<HomeSummaryResponse>.Success(
                 ErrorCodes.SuccessGetData,
@@ -85,8 +74,8 @@ namespace StudioStudio_Server.Controllers
             [FromQuery] string? sortBy = "asc")
         {
             var userId = ValidateAndGetUserId();
-            var result = await _homeService.GetHomeTaskListAsync(userId, page, pageSize, search, groupId, sortBy);
-            var message = _messageService.GetMessage(ErrorCodes.SuccessGetData);
+            var result = await homeService.GetHomeTaskListAsync(userId, page, pageSize, search, groupId, sortBy);
+            var message = messageService.GetMessage(ErrorCodes.SuccessGetData);
 
             return Ok(ApiResponse<HomeTaskListResponse>.Success(
                 ErrorCodes.SuccessGetData,
@@ -102,8 +91,8 @@ namespace StudioStudio_Server.Controllers
         public async Task<ActionResult<ApiResponse<PersonalTaskBoardResponse>>> GetPersonalTaskBoard()
         {
             var userId = ValidateAndGetUserId();
-            var result = await _homeService.GetPersonalTaskBoardAsync(userId);
-            var message = _messageService.GetMessage(ErrorCodes.SuccessGetData);
+            var result = await homeService.GetPersonalTaskBoardAsync(userId);
+            var message = messageService.GetMessage(ErrorCodes.SuccessGetData);
 
             return Ok(ApiResponse<PersonalTaskBoardResponse>.Success(
                 ErrorCodes.SuccessGetData,
@@ -119,8 +108,8 @@ namespace StudioStudio_Server.Controllers
             [FromBody] PersonalTaskStatusRequest request)
         {
             var userId = ValidateAndGetUserId();
-            var result = await _homeService.CreateNewPersonalTaskStatus(userId, request);
-            var message = _messageService.GetMessage(ErrorCodes.SuccessCreateTaskStatus);
+            var result = await homeService.CreateNewPersonalTaskStatus(userId, request);
+            var message = messageService.GetMessage(ErrorCodes.SuccessCreateTaskStatus);
 
             return Ok(ApiResponse<PersonalTaskStatusResponse>.Success(
                 ErrorCodes.SuccessCreateTaskStatus,
@@ -136,13 +125,12 @@ namespace StudioStudio_Server.Controllers
             [FromBody] ReorderPersonalTaskStatusRequest request)
         {
             var userId = ValidateAndGetUserId();
-            await _homeService.ReorderPersonalTaskStatus(userId, request);
-            var message = _messageService.GetMessage(ErrorCodes.SuccessUpdateTaskStatus);
+            await homeService.ReorderPersonalTaskStatus(userId, request);
+            var message = messageService.GetMessage(ErrorCodes.SuccessUpdateTaskStatus);
 
             return Ok(ApiResponse<object>.Success(
                 ErrorCodes.SuccessUpdateTaskStatus,
-                message,
-                null));
+                message));
         }
 
         /// <summary>
@@ -153,13 +141,12 @@ namespace StudioStudio_Server.Controllers
             [FromBody] PersonalTaskStatusRequest request, Guid statusId)
         {
             var userId = ValidateAndGetUserId();
-            await _homeService.UpdatePersonalTaskStatus(userId, statusId, request);
-            var message = _messageService.GetMessage(ErrorCodes.SuccessUpdateTaskStatus);
+            await homeService.UpdatePersonalTaskStatus(userId, statusId, request);
+            var message = messageService.GetMessage(ErrorCodes.SuccessUpdateTaskStatus);
 
             return Ok(ApiResponse<object>.Success(
                 ErrorCodes.SuccessUpdateTaskStatus,
-                message,
-                null));
+                message));
         }
 
         /// <summary>
@@ -169,13 +156,12 @@ namespace StudioStudio_Server.Controllers
         public async Task<ActionResult<ApiResponse<object>>> DeletePersonalTaskStatus(Guid statusId)
         {
             var userId = ValidateAndGetUserId();
-            await _homeService.DeletePersonalTaskStatus(userId, statusId);
-            var message = _messageService.GetMessage(ErrorCodes.SuccessDeleteTaskStatus);
+            await homeService.DeletePersonalTaskStatus(userId, statusId);
+            var message = messageService.GetMessage(ErrorCodes.SuccessDeleteTaskStatus);
 
             return Ok(ApiResponse<object>.Success(
                 ErrorCodes.SuccessDeleteTaskStatus,
-                message,
-                null));
+                message));
         }
     }
 }

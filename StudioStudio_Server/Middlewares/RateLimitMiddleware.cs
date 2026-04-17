@@ -1,7 +1,7 @@
 using StackExchange.Redis;
 using StudioStudio_Server.Exceptions;
-using StudioStudio_Server.Localization;
 using StudioStudio_Server.Models.DTOs.Response;
+using StudioStudio_Server.Resources.Localization;
 using StudioStudio_Server.Utils;
 
 namespace StudioStudio_Server.Middlewares
@@ -11,28 +11,15 @@ namespace StudioStudio_Server.Middlewares
     /// - Limit API calls per user per minute
     /// - Prevent abuse and DDoS attacks
     /// </summary>
-    public class RateLimitMiddleware
+    public class RateLimitMiddleware(
+        RequestDelegate next,
+        ILogger<RateLimitMiddleware> logger,
+        IWebHostEnvironment env,
+        IConnectionMultiplexer redis)
     {
-        private readonly RequestDelegate _next;
-        private readonly ILogger<RateLimitMiddleware> _logger;
-        private readonly IWebHostEnvironment _env;
-        private readonly IConnectionMultiplexer _redis;
-
         // Configuration: Max requests per minute per user
         private const int MAX_REQUESTS_PER_MINUTE = 300;
         private const int RATE_LIMIT_WINDOW_SECONDS = 60;
-
-        public RateLimitMiddleware(
-            RequestDelegate next,
-            ILogger<RateLimitMiddleware> logger,
-            IWebHostEnvironment env,
-            IConnectionMultiplexer redis)
-        {
-            _next = next;
-            _logger = logger;
-            _env = env;
-            _redis = redis;
-        }
 
         public async Task InvokeAsync(HttpContext context)
         {
@@ -48,7 +35,7 @@ namespace StudioStudio_Server.Middlewares
                 path.StartsWith("/hubs") ||
                 !path.StartsWith("/api"))
             {
-                await _next(context);
+                await next(context);
                 return;
             }
 
@@ -58,7 +45,7 @@ namespace StudioStudio_Server.Middlewares
                 // Admin traffic is bypassed entirely and should not be wrapped by rate-limit error logging.
                 if (JwtHelper.IsAdmin(context.User))
                 {
-                    await _next(context);
+                    await next(context);
                     return;
                 }
 
@@ -69,7 +56,7 @@ namespace StudioStudio_Server.Middlewares
                     if (userId.HasValue)
                     {
                         // Check rate limit
-                        var db = _redis.GetDatabase();
+                        var db = redis.GetDatabase();
                         var key = $"ratelimit:user:{userId.Value}";
 
                         // Get current request count
@@ -79,7 +66,7 @@ namespace StudioStudio_Server.Middlewares
                         {
                             if (count >= MAX_REQUESTS_PER_MINUTE)
                             {
-                                _logger.LogWarning(
+                                logger.LogWarning(
                                     "Rate limit exceeded for user {UserId}. Count: {Count}, Path: {Path}", 
                                     userId.Value, 
                                     count,
@@ -101,18 +88,18 @@ namespace StudioStudio_Server.Middlewares
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "Error in rate limit middleware");
+                    logger.LogError(ex, "Error in rate limit middleware");
                     // Don't block request if Redis fails
                 }
             }
 
-            await _next(context);
+            await next(context);
         }
 
         private async Task HandleRateLimitExceeded(HttpContext context)
         {
             var culture = HttpContextHelper.GetCultureFromHeader(context);
-            var localizer = new JsonStringLocalizer(_env, culture);
+            var localizer = new JsonStringLocalizer(env, culture);
 
             context.Response.StatusCode = StatusCodes.Status429TooManyRequests;
             context.Response.ContentType = "application/json";

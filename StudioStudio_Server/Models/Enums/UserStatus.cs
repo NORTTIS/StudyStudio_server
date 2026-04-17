@@ -1,6 +1,9 @@
-﻿public enum UserStatus
+﻿namespace StudioStudio_Server.Models.Enums
 {
-    Active,
-    Inactive,
-    Deleted
+    public enum UserStatus
+    {
+        Active,
+        Inactive,
+        Deleted
+    }
 }

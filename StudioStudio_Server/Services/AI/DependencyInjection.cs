@@ -1,6 +1,6 @@
 using StudioStudio_Server.Services.AI;
+using StudioStudio_Server.Services.AI.Interfaces;
 using StudioStudio_Server.Services.AI.Tools;
-using StudioStudio_Server.Services.AI.Tools.Interfaces;
 using StudioStudio_Server.Services.Interfaces;
 
 namespace Microsoft.Extensions.DependencyInjection;

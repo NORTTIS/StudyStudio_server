@@ -1,20 +1,18 @@
 using System.Diagnostics;
-using System.Text.Json;
 using System.Text.Json.Nodes;
 using StudioStudio_Server.Repositories.Interfaces;
+using StudioStudio_Server.Services.AI.Interfaces;
 using StudioStudio_Server.Services.AI.Models;
-using StudioStudio_Server.Services.AI.Tools.Interfaces;
 
 namespace StudioStudio_Server.Services.AI.Tools;
 
 [DebuggerStepThrough]
-public class GetGroupDocumentsTool : IAITool
+public class GetGroupDocumentsTool(
+    IGroupParticipantRepository participantRepository,
+    IGroupRepository groupRepository,
+    IGroupAttachmentRepository attachmentRepository,
+    ILogger<GetGroupDocumentsTool> logger) : IAITool
 {
-    private readonly IGroupParticipantRepository _participantRepository;
-    private readonly IGroupRepository _groupRepository;
-    private readonly IGroupAttachmentRepository _attachmentRepository;
-    private readonly ILogger<GetGroupDocumentsTool> _logger;
-
     public string Name => "get_group_documents";
     public string Description => "Lay danh sach tai lieu da tai len cua nhom. Khong can tham so (group_id tu dong lay tu context).";
     public JsonObject ParametersSchema => new JsonObject
@@ -26,18 +24,6 @@ public class GetGroupDocumentsTool : IAITool
         },
         ["required"] = new JsonArray()
     };
-
-    public GetGroupDocumentsTool(
-        IGroupParticipantRepository participantRepository,
-        IGroupRepository groupRepository,
-        IGroupAttachmentRepository attachmentRepository,
-        ILogger<GetGroupDocumentsTool> logger)
-    {
-        _participantRepository = participantRepository;
-        _groupRepository = groupRepository;
-        _attachmentRepository = attachmentRepository;
-        _logger = logger;
-    }
 
     private static string? Js(JsonNode? n) => n?.GetValue<string>();
     private static int Ji(JsonNode? n) => n?.GetValue<int>() ?? 0;
@@ -54,17 +40,17 @@ public class GetGroupDocumentsTool : IAITool
 
             var groupId = context.GroupId.Value;
 
-            if (!await _participantRepository.IsUserInGroupAsync(groupId, context.UserId))
+            if (!await participantRepository.IsUserInGroupAsync(groupId, context.UserId))
                 return AIQueryResult.Error("Ban khong co quyen truy cap tai lieu nhom nay");
 
-            var group = await _groupRepository.GetByIdAsync(groupId);
+            var group = await groupRepository.GetByIdAsync(groupId);
             if (group == null)
                 return AIQueryResult.Error("Khong tim thay nhom");
 
             var rawLimit = Ji(parameters["limit"]);
             var limit = rawLimit > 0 ? Math.Clamp(rawLimit, 1, 100) : 20;
-            var totalCount = await _attachmentRepository.CountByGroupIdAsync(groupId);
-            var shownAttachments = await _attachmentRepository.GetByGroupIdPagedAsync(groupId, 0, limit);
+            var totalCount = await attachmentRepository.CountByGroupIdAsync(groupId);
+            var shownAttachments = await attachmentRepository.GetByGroupIdPagedAsync(groupId, 0, limit);
 
             var shownList = shownAttachments
                 .Select(a => new JsonObject
@@ -93,7 +79,7 @@ public class GetGroupDocumentsTool : IAITool
 
             var resultJson = result.ToJson();
 
-            _logger.LogInformation(
+            logger.LogInformation(
                 "[DOCS-RESULT] totalCount={Total} shownCount={Shown} contextSize={CharCount} (full data included)",
                 totalCount, shownList.Count, resultJson.Length);
             
@@ -101,7 +87,7 @@ public class GetGroupDocumentsTool : IAITool
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "GetGroupDocumentsTool error");
+            logger.LogError(ex, "GetGroupDocumentsTool error");
             return AIQueryResult.Error("Da xay ra loi khi lay danh sach tai lieu");
         }
     }

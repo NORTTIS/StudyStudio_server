@@ -8,18 +8,12 @@ using StudioStudio_Server.Services.Interfaces;
 
 namespace StudioStudio_Server.Services
 {
-    public class AdminStatisticsService : IAdminStatisticsService
+    public class AdminStatisticsService(
+        IAdminStatisticsRepository repository,
+        ILogger<AdminStatisticsService> logger) : IAdminStatisticsService
     {
-        private readonly IAdminStatisticsRepository _repository;
-        private readonly ILogger<AdminStatisticsService> _logger;
-
-        public AdminStatisticsService(
-            IAdminStatisticsRepository repository,
-            ILogger<AdminStatisticsService> logger)
-        {
-            _repository = repository;
-            _logger = logger;
-        }
+        private readonly IAdminStatisticsRepository _repository = repository;
+        private readonly ILogger<AdminStatisticsService> _logger = logger;
 
         public async Task<HourlyActivityResponse> GetHourlyActivityAsync(HourlyActivityRequest request)
         {

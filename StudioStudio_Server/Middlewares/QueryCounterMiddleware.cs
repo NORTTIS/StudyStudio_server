@@ -7,23 +7,14 @@ namespace StudioStudio_Server.Middlewares;
 /// Logs: method, path, query count, duration.
 /// Targets specific slow paths for Phase 1 baseline measurement.
 /// </summary>
-public class QueryCounterMiddleware
+public class QueryCounterMiddleware(RequestDelegate next, ILogger<QueryCounterMiddleware> logger)
 {
-    private readonly RequestDelegate _next;
-    private readonly ILogger<QueryCounterMiddleware> _logger;
-
     // Baseline paths to measure
     private static readonly string[] TrackedPaths = new[]
     {
         "/api/group/",    // GetGroupDetailAsync
         "/api/Task/"      // Task update/reorder
     };
-
-    public QueryCounterMiddleware(RequestDelegate next, ILogger<QueryCounterMiddleware> logger)
-    {
-        _next = next;
-        _logger = logger;
-    }
 
     public async Task InvokeAsync(HttpContext context)
     {
@@ -37,7 +28,7 @@ public class QueryCounterMiddleware
 
             try
             {
-                await _next(context);
+                await next(context);
             }
             finally
             {
@@ -45,7 +36,7 @@ public class QueryCounterMiddleware
                 var info = QueryCounterInterceptor.EndRequest();
                 if (info != null)
                 {
-                    _logger.LogInformation(
+                    logger.LogInformation(
                         "[QUERY-METRIC] {Method} {Path} => {StatusCode} | Queries: {QueryCount} | Duration: {DurationMs}ms | Summary: {Summary}",
                         context.Request.Method,
                         path,
@@ -58,7 +49,7 @@ public class QueryCounterMiddleware
         }
         else
         {
-            await _next(context);
+            await next(context);
         }
     }
 }

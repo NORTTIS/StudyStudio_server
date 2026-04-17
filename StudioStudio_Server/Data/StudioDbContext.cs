@@ -1,16 +1,10 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using StudioStudio_Server.Models.Entities;
-using StudioStudio_Server.Models.Enums;
 
 namespace StudioStudio_Server.Data
 {
-    public class StudioDbContext : DbContext
+    public class StudioDbContext(DbContextOptions<StudioDbContext> options) : DbContext(options)
     {
-        public StudioDbContext(DbContextOptions<StudioDbContext> options)
-            : base(options)
-        {
-        }
-
         public DbSet<User> Users => Set<User>();
         public DbSet<Studio> Studios => Set<Studio>();
         public DbSet<Group> Groups => Set<Group>();

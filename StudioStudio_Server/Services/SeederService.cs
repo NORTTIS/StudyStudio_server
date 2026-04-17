@@ -2,28 +2,21 @@
 using Microsoft.EntityFrameworkCore;
 using StudioStudio_Server.Data;
 using StudioStudio_Server.Models.Entities;
+using StudioStudio_Server.Models.Enums;
 using StudioStudio_Server.Services.Interfaces;
 
 namespace StudioStudio_Server.Services
 {
-    public class SeederService : ISeederService
+    public class SeederService(
+        StudioDbContext context,
+        IPasswordHasher<User> passwordHasher,
+        ILogger<SeederService> logger,
+        IConfiguration configuration) : ISeederService
     {
-        private readonly StudioDbContext _context;
-        private readonly IPasswordHasher<User> _passwordHasher;
-        private readonly ILogger<SeederService> _logger;
-        private readonly IConfiguration _configuration;
-
-        public SeederService(
-            StudioDbContext context,
-            IPasswordHasher<User> passwordHasher,
-            ILogger<SeederService> logger,
-            IConfiguration configuration)
-        {
-            _context = context;
-            _passwordHasher = passwordHasher;
-            _logger = logger;
-            _configuration = configuration;
-        }
+        private readonly StudioDbContext _context = context;
+        private readonly IPasswordHasher<User> _passwordHasher = passwordHasher;
+        private readonly ILogger<SeederService> _logger = logger;
+        private readonly IConfiguration _configuration = configuration;
 
         public async Task SeedInitialDataAsync()
         {

@@ -8,19 +8,13 @@ namespace StudioStudio_Server.Services.BackgroundServices
     /// Background job to aggregate group daily analytics metrics
     /// Runs every 10 minutes to process activity from the last interval
     /// </summary>
-    public class GroupAnalyticsJob : BackgroundService
+    public class GroupAnalyticsJob(
+        IServiceProvider serviceProvider,
+        ILogger<GroupAnalyticsJob> logger) : BackgroundService
     {
-        private readonly IServiceProvider _serviceProvider;
-        private readonly ILogger<GroupAnalyticsJob> _logger;
+        private readonly IServiceProvider _serviceProvider = serviceProvider;
+        private readonly ILogger<GroupAnalyticsJob> _logger = logger;
         private static readonly TimeSpan Interval = TimeSpan.FromMinutes(10);
-
-        public GroupAnalyticsJob(
-            IServiceProvider serviceProvider,
-            ILogger<GroupAnalyticsJob> logger)
-        {
-            _serviceProvider = serviceProvider;
-            _logger = logger;
-        }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {

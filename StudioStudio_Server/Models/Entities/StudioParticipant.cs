@@ -1,5 +1,3 @@
-using StudioStudio_Server.Models.Enums;
-
 namespace StudioStudio_Server.Models.Entities
 {
     public class StudioParticipant

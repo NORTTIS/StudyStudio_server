@@ -16,22 +16,11 @@ namespace StudioStudio_Server.Controllers
     [Route("api/task-comments")]
     [ApiController]
     [Authorize]
-    public class TaskCommentController : ControllerBase
+    public class TaskCommentController(
+        ITaskCommentService taskCommentService,
+        IMessageService messageService,
+        ILogger<TaskCommentController> logger) : ControllerBase
     {
-        private readonly ITaskCommentService _taskCommentService;
-        private readonly IMessageService _messageService;
-        private readonly ILogger<TaskCommentController> _logger;
-
-        public TaskCommentController(
-            ITaskCommentService taskCommentService,
-            IMessageService messageService,
-            ILogger<TaskCommentController> logger)
-        {
-            _taskCommentService = taskCommentService;
-            _messageService = messageService;
-            _logger = logger;
-        }
-
         /// <summary>
         /// Authenticate and get userId from JWT token
         /// </summary>
@@ -70,8 +59,8 @@ namespace StudioStudio_Server.Controllers
             try
             {
                 var userId = ValidateAndGetUserId();
-                var result = await _taskCommentService.GetTaskCommentsAsync(userId, taskId, limit, offset);
-                var message = _messageService.GetMessage(ErrorCodes.SuccessGetData);
+                var result = await taskCommentService.GetTaskCommentsAsync(userId, taskId, limit, offset);
+                var message = messageService.GetMessage(ErrorCodes.SuccessGetData);
 
                 return Ok(ApiResponse<TaskCommentListResponse>.Success(
                     ErrorCodes.SuccessGetData,
@@ -80,13 +69,13 @@ namespace StudioStudio_Server.Controllers
             }
             catch (AppException ex)
             {
-                _logger.LogWarning("Error getting task comments: {Message}", ex.Message);
+                logger.LogWarning("Error getting task comments: {Message}", ex.Message);
                 return StatusCode(ex.HttpStatus, ApiResponse<object>.Error(ex.Code, ex.Message));
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Unexpected error getting task comments");
-                var message = _messageService.GetMessage(ErrorCodes.UnexpectedError);
+                logger.LogError(ex, "Unexpected error getting task comments");
+                var message = messageService.GetMessage(ErrorCodes.UnexpectedError);
                 return StatusCode(StatusCodes.Status500InternalServerError,
                     ApiResponse<object>.Error(ErrorCodes.UnexpectedError, message));
             }
@@ -106,8 +95,8 @@ namespace StudioStudio_Server.Controllers
             try
             {
                 var userId = ValidateAndGetUserId();
-                var result = await _taskCommentService.SendCommentAsync(userId, request);
-                var message = _messageService.GetMessage(ErrorCodes.SuccessGetData);
+                var result = await taskCommentService.SendCommentAsync(userId, request);
+                var message = messageService.GetMessage(ErrorCodes.SuccessGetData);
 
                 return Ok(ApiResponse<TaskCommentDto>.Success(
                     ErrorCodes.SuccessGetData,
@@ -116,13 +105,13 @@ namespace StudioStudio_Server.Controllers
             }
             catch (AppException ex)
             {
-                _logger.LogWarning("Error sending comment: {Message}", ex.Message);
+                logger.LogWarning("Error sending comment: {Message}", ex.Message);
                 return StatusCode(ex.HttpStatus, ApiResponse<object>.Error(ex.Code, ex.Message));
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Unexpected error sending comment");
-                var message = _messageService.GetMessage(ErrorCodes.UnexpectedError);
+                logger.LogError(ex, "Unexpected error sending comment");
+                var message = messageService.GetMessage(ErrorCodes.UnexpectedError);
                 return StatusCode(StatusCodes.Status500InternalServerError,
                     ApiResponse<object>.Error(ErrorCodes.UnexpectedError, message));
             }
@@ -144,8 +133,8 @@ namespace StudioStudio_Server.Controllers
             try
             {
                 var userId = ValidateAndGetUserId();
-                var result = await _taskCommentService.ReplyToCommentAsync(userId, request);
-                var message = _messageService.GetMessage(ErrorCodes.SuccessGetData);
+                var result = await taskCommentService.ReplyToCommentAsync(userId, request);
+                var message = messageService.GetMessage(ErrorCodes.SuccessGetData);
 
                 return Ok(ApiResponse<TaskCommentDto>.Success(
                     ErrorCodes.SuccessGetData,
@@ -154,13 +143,13 @@ namespace StudioStudio_Server.Controllers
             }
             catch (AppException ex)
             {
-                _logger.LogWarning("Error replying to comment: {Message}", ex.Message);
+                logger.LogWarning("Error replying to comment: {Message}", ex.Message);
                 return StatusCode(ex.HttpStatus, ApiResponse<object>.Error(ex.Code, ex.Message));
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Unexpected error replying to comment");
-                var message = _messageService.GetMessage(ErrorCodes.UnexpectedError);
+                logger.LogError(ex, "Unexpected error replying to comment");
+                var message = messageService.GetMessage(ErrorCodes.UnexpectedError);
                 return StatusCode(StatusCodes.Status500InternalServerError,
                     ApiResponse<object>.Error(ErrorCodes.UnexpectedError, message));
             }
@@ -182,8 +171,8 @@ namespace StudioStudio_Server.Controllers
             {
                 var userId = ValidateAndGetUserId();
                 var request = new DeleteTaskCommentRequest { CommentId = commentId };
-                await _taskCommentService.DeleteCommentAsync(userId, request);
-                var message = _messageService.GetMessage(ErrorCodes.SuccessDeleteComment);
+                await taskCommentService.DeleteCommentAsync(userId, request);
+                var message = messageService.GetMessage(ErrorCodes.SuccessDeleteComment);
 
                 return Ok(ApiResponse<object>.Success(
                     ErrorCodes.SuccessDeleteComment,
@@ -191,13 +180,13 @@ namespace StudioStudio_Server.Controllers
             }
             catch (AppException ex)
             {
-                _logger.LogWarning("Error deleting comment: {Message}", ex.Message);
+                logger.LogWarning("Error deleting comment: {Message}", ex.Message);
                 return StatusCode(ex.HttpStatus, ApiResponse<object>.Error(ex.Code, ex.Message));
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Unexpected error deleting comment");
-                var message = _messageService.GetMessage(ErrorCodes.UnexpectedError);
+                logger.LogError(ex, "Unexpected error deleting comment");
+                var message = messageService.GetMessage(ErrorCodes.UnexpectedError);
                 return StatusCode(StatusCodes.Status500InternalServerError,
                     ApiResponse<object>.Error(ErrorCodes.UnexpectedError, message));
             }

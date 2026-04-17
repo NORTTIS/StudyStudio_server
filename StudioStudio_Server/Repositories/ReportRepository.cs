@@ -9,14 +9,9 @@ namespace StudioStudio_Server.Repositories
     /// <summary>
     /// Repository handling operations with Report entity
     /// </summary>
-    public class ReportRepository : IReportRepository
+    public class ReportRepository(StudioDbContext context) : IReportRepository
     {
-        private readonly StudioDbContext _context;
-
-        public ReportRepository(StudioDbContext context)
-        {
-            _context = context;
-        }
+        private readonly StudioDbContext _context = context;
 
         /// <summary>
         /// Add report to database

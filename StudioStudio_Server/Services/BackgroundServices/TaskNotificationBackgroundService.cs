@@ -9,24 +9,17 @@ namespace StudioStudio_Server.Services.BackgroundServices
     /// Background job to send daily deadline reminder and overdue notifications for assigned tasks.
     /// Runs once daily at 7:00 AM UTC+7 (0:00 UTC) with Redis deduplication keys (24h TTL).
     /// </summary>
-    public class TaskNotificationBackgroundService : BackgroundService
+    public class TaskNotificationBackgroundService(
+        IServiceProvider serviceProvider,
+        IConnectionMultiplexer redis,
+        ILogger<TaskNotificationBackgroundService> logger) : BackgroundService
     {
-        private readonly IServiceProvider _serviceProvider;
-        private readonly ILogger<TaskNotificationBackgroundService> _logger;
-        private readonly IConnectionMultiplexer _redis;
+        private readonly IServiceProvider _serviceProvider = serviceProvider;
+        private readonly ILogger<TaskNotificationBackgroundService> _logger = logger;
+        private readonly IConnectionMultiplexer _redis = redis;
 
         // 7:00 AM UTC+7 = 0:00 UTC (Vietnam is UTC+7)
         private static readonly TimeSpan TargetTimeUtc = TimeSpan.Zero;
-
-        public TaskNotificationBackgroundService(
-            IServiceProvider serviceProvider,
-            IConnectionMultiplexer redis,
-            ILogger<TaskNotificationBackgroundService> logger)
-        {
-            _serviceProvider = serviceProvider;
-            _redis = redis;
-            _logger = logger;
-        }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {

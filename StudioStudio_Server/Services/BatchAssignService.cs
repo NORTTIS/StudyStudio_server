@@ -4,12 +4,12 @@ using System.Text;
 using Microsoft.EntityFrameworkCore;
 using StudioStudio_Server.Data;
 using StudioStudio_Server.Exceptions;
-using StudioStudio_Server.Localization;
 using StudioStudio_Server.Models.DTOs.Request;
 using StudioStudio_Server.Models.DTOs.Response;
 using StudioStudio_Server.Models.Entities;
 using StudioStudio_Server.Models.Enums;
 using StudioStudio_Server.Repositories.Interfaces;
+using StudioStudio_Server.Resources.Localization;
 using StudioStudio_Server.Services.ExcelParsing;
 using StudioStudio_Server.Services.Interfaces;
 using StudioStudio_Server.Utils;
@@ -19,48 +19,34 @@ namespace StudioStudio_Server.Services
     /// <summary>
     /// Service for batch member assignment to groups within a studio
     /// </summary>
-    public class BatchAssignService : IBatchAssignService
+    public class BatchAssignService(
+        StudioDbContext db,
+        IGroupRepository groupRepository,
+        IGroupParticipantRepository groupParticipantRepository,
+        IStudioRepository studioRepository,
+        IStudioParticipantRepository studioParticipantRepository,
+        IUserSubscriptionRepository userSubscriptionRepository,
+        IExcelParser excelParser,
+        ILogger<BatchAssignService> logger,
+        IHttpContextAccessor httpContextAccessor,
+        IWebHostEnvironment env) : IBatchAssignService
     {
-        private readonly StudioDbContext _db;
-        private readonly IGroupRepository _groupRepository;
-        private readonly IGroupParticipantRepository _groupParticipantRepository;
-        private readonly IStudioRepository _studioRepository;
-        private readonly IStudioParticipantRepository _studioParticipantRepository;
-        private readonly IUserSubscriptionRepository _userSubscriptionRepository;
-        private readonly IExcelParser _excelParser;
-        private readonly ILogger<BatchAssignService> _logger;
-        private readonly IHttpContextAccessor _httpContextAccessor;
-        private readonly IWebHostEnvironment _env;
+        private readonly StudioDbContext _db = db;
+        private readonly IGroupRepository _groupRepository = groupRepository;
+        private readonly IGroupParticipantRepository _groupParticipantRepository = groupParticipantRepository;
+        private readonly IStudioRepository _studioRepository = studioRepository;
+        private readonly IStudioParticipantRepository _studioParticipantRepository = studioParticipantRepository;
+        private readonly IUserSubscriptionRepository _userSubscriptionRepository = userSubscriptionRepository;
+        private readonly IExcelParser _excelParser = excelParser;
+        private readonly ILogger<BatchAssignService> _logger = logger;
+        private readonly IHttpContextAccessor _httpContextAccessor = httpContextAccessor;
+        private readonly IWebHostEnvironment _env = env;
 
         // Valid roles for batch assignment (Owner not allowed)
         private static readonly HashSet<string> ValidRoles = new(StringComparer.OrdinalIgnoreCase)
         {
             "Member", "Moderator", "Commenter", "Viewer"
         };
-
-        public BatchAssignService(
-            StudioDbContext db,
-            IGroupRepository groupRepository,
-            IGroupParticipantRepository groupParticipantRepository,
-            IStudioRepository studioRepository,
-            IStudioParticipantRepository studioParticipantRepository,
-            IUserSubscriptionRepository userSubscriptionRepository,
-            IExcelParser excelParser,
-            ILogger<BatchAssignService> logger,
-            IHttpContextAccessor httpContextAccessor,
-            IWebHostEnvironment env)
-        {
-            _db = db;
-            _groupRepository = groupRepository;
-            _groupParticipantRepository = groupParticipantRepository;
-            _studioRepository = studioRepository;
-            _studioParticipantRepository = studioParticipantRepository;
-            _userSubscriptionRepository = userSubscriptionRepository;
-            _excelParser = excelParser;
-            _logger = logger;
-            _httpContextAccessor = httpContextAccessor;
-            _env = env;
-        }
 
         /// <summary>
         /// Create a new group when group name is not found in batch assign

@@ -1,46 +1,26 @@
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using StudioStudio_Server.Configurations;
 using StudioStudio_Server.Services.Interfaces;
-using System.Net.Http;
 
 namespace StudioStudio_Server.HealthChecks;
 
 /// <summary>
 /// Health check for external services: Backblaze B2, Qdrant, Gemini AI, PayOS, SMTP
 /// </summary>
-public class ExternalServicesHealthCheck : IHealthCheck
+public class ExternalServicesHealthCheck(
+    IFileStorageService fileStorageService,
+    IVectorDatabaseService vectorDatabaseService,
+    IEmbeddingService embeddingService,
+    IHttpClientFactory httpClientFactory,
+    IConfiguration configuration,
+    ILogger<ExternalServicesHealthCheck> logger) : IHealthCheck
 {
-    private readonly IFileStorageService _fileStorageService;
-    private readonly IVectorDatabaseService _vectorDatabaseService;
-    private readonly IEmbeddingService _embeddingService;
-    private readonly IHttpClientFactory _httpClientFactory;
-    private readonly ILogger<ExternalServicesHealthCheck> _logger;
+    private readonly IHttpClientFactory _httpClientFactory = httpClientFactory;
 
     // Service-specific configs
-    private readonly BackblazeConfig _backblazeConfig;
-    private readonly QdrantConfig _qdrantConfig;
-    private readonly GeminiConfig _geminiConfig;
-    private readonly IConfiguration _configuration;
-
-    public ExternalServicesHealthCheck(
-        IFileStorageService fileStorageService,
-        IVectorDatabaseService vectorDatabaseService,
-        IEmbeddingService embeddingService,
-        IHttpClientFactory httpClientFactory,
-        IConfiguration configuration,
-        ILogger<ExternalServicesHealthCheck> logger)
-    {
-        _fileStorageService = fileStorageService;
-        _vectorDatabaseService = vectorDatabaseService;
-        _embeddingService = embeddingService;
-        _httpClientFactory = httpClientFactory;
-        _configuration = configuration;
-        _logger = logger;
-
-        _backblazeConfig = configuration.GetSection("Backblaze").Get<BackblazeConfig>() ?? new();
-        _qdrantConfig = configuration.GetSection("Qdrant").Get<QdrantConfig>() ?? new();
-        _geminiConfig = configuration.GetSection("Gemini").Get<GeminiConfig>() ?? new();
-    }
+    private readonly BackblazeConfig _backblazeConfig = configuration.GetSection("Backblaze").Get<BackblazeConfig>() ?? new();
+    private readonly QdrantConfig _qdrantConfig = configuration.GetSection("Qdrant").Get<QdrantConfig>() ?? new();
+    private readonly GeminiConfig _geminiConfig = configuration.GetSection("Gemini").Get<GeminiConfig>() ?? new();
 
     public async Task<HealthCheckResult> CheckHealthAsync(
         HealthCheckContext context,
@@ -51,7 +31,7 @@ public class ExternalServicesHealthCheck : IHealthCheck
         var errors = new List<string>();
 
         // Check Backblaze B2
-        var backblazeResult = await CheckBackblazeAsync(cancellationToken);
+        var backblazeResult = await CheckBackblazeAsync();
         results["backblaze_b2"] = backblazeResult;
         if (!backblazeResult.IsHealthy)
         {
@@ -60,7 +40,7 @@ public class ExternalServicesHealthCheck : IHealthCheck
         }
 
         // Check Qdrant
-        var qdrantResult = await CheckQdrantAsync(cancellationToken);
+        var qdrantResult = await CheckQdrantAsync();
         results["qdrant"] = qdrantResult;
         if (!qdrantResult.IsHealthy)
         {
@@ -69,7 +49,7 @@ public class ExternalServicesHealthCheck : IHealthCheck
         }
 
         // Check Gemini AI
-        var geminiResult = await CheckGeminiAsync(cancellationToken);
+        var geminiResult = await CheckGeminiAsync();
         results["gemini_ai"] = geminiResult;
         if (!geminiResult.IsHealthy)
         {
@@ -107,7 +87,7 @@ public class ExternalServicesHealthCheck : IHealthCheck
             data: results);
     }
 
-    private async Task<ServiceHealthResult> CheckBackblazeAsync(CancellationToken cancellationToken)
+    private async Task<ServiceHealthResult> CheckBackblazeAsync()
     {
         try
         {
@@ -120,7 +100,7 @@ public class ExternalServicesHealthCheck : IHealthCheck
             }
 
             // Test bucket access by listing files
-            await _fileStorageService.TestConnectionAsync();
+            await fileStorageService.TestConnectionAsync();
 
             var latency = (DateTime.UtcNow - startTime).TotalMilliseconds;
 
@@ -133,7 +113,7 @@ public class ExternalServicesHealthCheck : IHealthCheck
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Backblaze health check failed");
+            logger.LogWarning(ex, "Backblaze health check failed");
             return new ServiceHealthResult
             {
                 IsHealthy = false,
@@ -143,7 +123,7 @@ public class ExternalServicesHealthCheck : IHealthCheck
         }
     }
 
-    private async Task<ServiceHealthResult> CheckQdrantAsync(CancellationToken cancellationToken)
+    private async Task<ServiceHealthResult> CheckQdrantAsync()
     {
         try
         {
@@ -156,7 +136,7 @@ public class ExternalServicesHealthCheck : IHealthCheck
             }
 
             // Test Qdrant connection
-            await _vectorDatabaseService.TestConnectionAsync();
+            await vectorDatabaseService.TestConnectionAsync();
 
             var latency = (DateTime.UtcNow - startTime).TotalMilliseconds;
 
@@ -169,7 +149,7 @@ public class ExternalServicesHealthCheck : IHealthCheck
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Qdrant health check failed");
+            logger.LogWarning(ex, "Qdrant health check failed");
             return new ServiceHealthResult
             {
                 IsHealthy = false,
@@ -179,7 +159,7 @@ public class ExternalServicesHealthCheck : IHealthCheck
         }
     }
 
-    private async Task<ServiceHealthResult> CheckGeminiAsync(CancellationToken cancellationToken)
+    private async Task<ServiceHealthResult> CheckGeminiAsync()
     {
         try
         {
@@ -192,7 +172,7 @@ public class ExternalServicesHealthCheck : IHealthCheck
             }
 
             // Test Gemini by generating a simple embedding
-            await _embeddingService.TestConnectionAsync();
+            await embeddingService.TestConnectionAsync();
 
             var latency = (DateTime.UtcNow - startTime).TotalMilliseconds;
 
@@ -205,7 +185,7 @@ public class ExternalServicesHealthCheck : IHealthCheck
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Gemini health check failed");
+            logger.LogWarning(ex, "Gemini health check failed");
             return new ServiceHealthResult
             {
                 IsHealthy = false,
@@ -222,8 +202,8 @@ public class ExternalServicesHealthCheck : IHealthCheck
             var startTime = DateTime.UtcNow;
 
             // Check if PayOS is configured
-            var clientId = _configuration["PayOS:ClientId"];
-            var apiKey = _configuration["PayOS:ApiKey"];
+            var clientId = configuration["PayOS:ClientId"];
+            var apiKey = configuration["PayOS:ApiKey"];
 
             if (string.IsNullOrEmpty(clientId) || string.IsNullOrEmpty(apiKey))
             {
@@ -247,7 +227,7 @@ public class ExternalServicesHealthCheck : IHealthCheck
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "PayOS health check failed");
+            logger.LogWarning(ex, "PayOS health check failed");
             return new ServiceHealthResult
             {
                 IsHealthy = false,
@@ -264,14 +244,14 @@ public class ExternalServicesHealthCheck : IHealthCheck
             var startTime = DateTime.UtcNow;
 
             // Check if SMTP is configured
-            var smtpHost = _configuration["Email:Host"];
+            var smtpHost = configuration["Email:Host"];
             if (string.IsNullOrEmpty(smtpHost))
             {
                 return new ServiceHealthResult { IsHealthy = true, Message = "Not configured (skipped)" };
             }
 
             // Test SMTP connection by trying to connect
-            var smtpPort = _configuration["Email:Port"];
+            var smtpPort = configuration["Email:Port"];
             var port = int.TryParse(smtpPort, out var p) ? p : 587;
 
             using var client = new System.Net.Mail.SmtpClient(smtpHost, port)
@@ -294,7 +274,7 @@ public class ExternalServicesHealthCheck : IHealthCheck
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "SMTP health check failed");
+            logger.LogWarning(ex, "SMTP health check failed");
             return new ServiceHealthResult
             {
                 IsHealthy = false,

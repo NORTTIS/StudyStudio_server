@@ -1,20 +1,17 @@
 using System.Diagnostics;
-using System.Text.Json;
 using System.Text.Json.Nodes;
-using StudioStudio_Server.Models.Enums;
 using StudioStudio_Server.Repositories.Interfaces;
+using StudioStudio_Server.Services.AI.Interfaces;
 using StudioStudio_Server.Services.AI.Models;
-using StudioStudio_Server.Services.AI.Tools.Interfaces;
 
 namespace StudioStudio_Server.Services.AI.Tools;
 
-public class GetGroupStatsTool : IAITool
+public class GetGroupStatsTool(
+    ITaskRepository taskRepository,
+    IGroupParticipantRepository participantRepository,
+    IGroupRepository groupRepository,
+    ILogger<GetGroupStatsTool> logger) : IAITool
 {
-    private readonly ITaskRepository _taskRepository;
-    private readonly IGroupParticipantRepository _participantRepository;
-    private readonly IGroupRepository _groupRepository;
-    private readonly ILogger<GetGroupStatsTool> _logger;
-
     public string Name => "get_group_stats";
     public string Description => "Lay thong ke cua nhom: tong so task, da hoan thanh, dang lam, chua lam, qua han. Khong can tham so.";
     public JsonObject ParametersSchema => new JsonObject
@@ -23,18 +20,6 @@ public class GetGroupStatsTool : IAITool
         ["properties"] = new JsonObject { },
         ["required"] = new JsonArray()
     };
-
-    public GetGroupStatsTool(
-        ITaskRepository taskRepository,
-        IGroupParticipantRepository participantRepository,
-        IGroupRepository groupRepository,
-        ILogger<GetGroupStatsTool> logger)
-    {
-        _taskRepository = taskRepository;
-        _participantRepository = participantRepository;
-        _groupRepository = groupRepository;
-        _logger = logger;
-    }
 
     private static string? Js(JsonNode? n) => n?.GetValue<string>();
 
@@ -50,15 +35,15 @@ public class GetGroupStatsTool : IAITool
 
             var groupId = context.GroupId.Value;
 
-            if (!await _participantRepository.IsUserInGroupAsync(groupId, context.UserId))
+            if (!await participantRepository.IsUserInGroupAsync(groupId, context.UserId))
                 return AIQueryResult.Error("Ban khong co quyen");
 
-            var group = await _groupRepository.GetByIdAsync(groupId);
+            var group = await groupRepository.GetByIdAsync(groupId);
             if (group == null)
                 return AIQueryResult.Error("Khong tim thay nhom");
 
-            var taskSummary = await _taskRepository.GetGroupTaskStatisticsAsync(groupId);
-            var members = await _participantRepository.GetAllByGroupIdAsync(groupId);
+            var taskSummary = await taskRepository.GetGroupTaskStatisticsAsync(groupId);
+            var members = await participantRepository.GetAllByGroupIdAsync(groupId);
 
             sw.Stop();
             return AIQueryResult.Success(new JsonObject
@@ -99,7 +84,7 @@ public class GetGroupStatsTool : IAITool
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "GetGroupStatsTool error");
+            logger.LogError(ex, "GetGroupStatsTool error");
             return AIQueryResult.Error("Da xay ra loi");
         }
     }

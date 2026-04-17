@@ -17,19 +17,10 @@ namespace StudioStudio_Server.Controllers.Admin
     [Route("api/admin/users")]
     [ApiController]
     [Authorize]
-    public class AdminUserController : ControllerBase
+    public class AdminUserController(
+        IAdminUserService adminUserService,
+        IMessageService messageService) : ControllerBase
     {
-        private readonly IAdminUserService _adminUserService;
-        private readonly IMessageService _messageService;
-
-        public AdminUserController(
-            IAdminUserService adminUserService,
-            IMessageService messageService)
-        {
-            _adminUserService = adminUserService;
-            _messageService = messageService;
-        }
-
         /// <summary>
         /// [ADMIN] GET /api/admin/users
         /// Get paginated list of users with filters
@@ -45,8 +36,8 @@ namespace StudioStudio_Server.Controllers.Admin
         {
             JwtHelper.ValidateAdminUser(User);
 
-            var response = await _adminUserService.GetUsersAsync(request);
-            var message = _messageService.GetMessage(ErrorCodes.SuccessGetData);
+            var response = await adminUserService.GetUsersAsync(request);
+            var message = messageService.GetMessage(ErrorCodes.SuccessGetData);
 
             return Ok(ApiResponse<UserListResponse>.Success(
                 ErrorCodes.SuccessGetData,
@@ -63,8 +54,8 @@ namespace StudioStudio_Server.Controllers.Admin
         {
             JwtHelper.ValidateAdminUser(User);
 
-            var response = await _adminUserService.GetUserDetailAsync(id);
-            var message = _messageService.GetMessage(ErrorCodes.SuccessGetData);
+            var response = await adminUserService.GetUserDetailAsync(id);
+            var message = messageService.GetMessage(ErrorCodes.SuccessGetData);
 
             return Ok(ApiResponse<UserDetailItem>.Success(
                 ErrorCodes.SuccessGetData,
@@ -85,12 +76,11 @@ namespace StudioStudio_Server.Controllers.Admin
             if (!Enum.TryParse<UserStatus>(request.Status, true, out var status))
             {
                 throw new AppException(
-                    ErrorCodes.UserInvalidStatus,
-                    StatusCodes.Status400BadRequest);
+                    ErrorCodes.UserInvalidStatus);
             }
-            await _adminUserService.UpdateUserStatusAsync(id, status);
+            await adminUserService.UpdateUserStatusAsync(id, status);
 
-            var message = _messageService.GetMessage(ErrorCodes.SuccessUpdateData);
+            var message = messageService.GetMessage(ErrorCodes.SuccessUpdateData);
 
             return Ok(ApiResponse<string>.Success(
                 ErrorCodes.SuccessUpdateData,

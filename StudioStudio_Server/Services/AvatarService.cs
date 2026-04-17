@@ -11,15 +11,22 @@ using StudioStudio_Server.Services.Interfaces;
 
 namespace StudioStudio_Server.Services
 {
-    public class AvatarService : IAvatarService
+    public class AvatarService(
+        ILogger<AvatarService> logger,
+        IGroupRepository groupRepository,
+        IStudioRepository studioRepository,
+        IGroupParticipantRepository groupParticipantRepository,
+        IStudioParticipantRepository studioParticipantRepository,
+        IFileStorageService fileStorageService,
+        IOptions<BackblazeConfig> backblazeConfig) : IAvatarService
     {
-        private readonly ILogger<AvatarService> _logger;
-        private readonly IGroupRepository _groupRepository;
-        private readonly IStudioRepository _studioRepository;
-        private readonly IGroupParticipantRepository _groupParticipantRepository;
-        private readonly IStudioParticipantRepository _studioParticipantRepository;
-        private readonly IFileStorageService _fileStorageService;
-        private readonly BackblazeConfig _backblazeConfig;
+        private readonly ILogger<AvatarService> _logger = logger;
+        private readonly IGroupRepository _groupRepository = groupRepository;
+        private readonly IStudioRepository _studioRepository = studioRepository;
+        private readonly IGroupParticipantRepository _groupParticipantRepository = groupParticipantRepository;
+        private readonly IStudioParticipantRepository _studioParticipantRepository = studioParticipantRepository;
+        private readonly IFileStorageService _fileStorageService = fileStorageService;
+        private readonly BackblazeConfig _backblazeConfig = backblazeConfig.Value;
 
         // Avatar upload settings
         private const long MaxAvatarFileSize = 5 * 1024 * 1024; // 5 MB
@@ -38,24 +45,6 @@ namespace StudioStudio_Server.Services
             { "image/webp", ".webp" },
             { "image/gif", ".gif" }
         };
-
-        public AvatarService(
-            ILogger<AvatarService> logger,
-            IGroupRepository groupRepository,
-            IStudioRepository studioRepository,
-            IGroupParticipantRepository groupParticipantRepository,
-            IStudioParticipantRepository studioParticipantRepository,
-            IFileStorageService fileStorageService,
-            IOptions<BackblazeConfig> backblazeConfig)
-        {
-            _logger = logger;
-            _groupRepository = groupRepository;
-            _studioRepository = studioRepository;
-            _groupParticipantRepository = groupParticipantRepository;
-            _studioParticipantRepository = studioParticipantRepository;
-            _fileStorageService = fileStorageService;
-            _backblazeConfig = backblazeConfig.Value;
-        }
 
         /// <summary>
         /// Build full B2 URL for avatar (uses public bucket)

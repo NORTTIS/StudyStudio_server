@@ -15,19 +15,10 @@ namespace StudioStudio_Server.Controllers
     [Route("api/group-messages")]
     [ApiController]
     [Authorize]
-    public class GroupMessageController : ControllerBase
+    public class GroupMessageController(
+        IGroupMessageService groupMessageService,
+        IMessageService messageService) : ControllerBase
     {
-        private readonly IGroupMessageService _groupMessageService;
-        private readonly IMessageService _messageService;
-
-        public GroupMessageController(
-            IGroupMessageService groupMessageService,
-            IMessageService messageService)
-        {
-            _groupMessageService = groupMessageService;
-            _messageService = messageService;
-        }
-
         /// <summary>
         /// Authenticate and get userId from JWT token
         /// </summary>
@@ -63,8 +54,8 @@ namespace StudioStudio_Server.Controllers
             [FromQuery] int offset = 0)
         {
             var userId = ValidateAndGetUserId();
-            var result = await _groupMessageService.GetGroupMessagesAsync(userId, groupId, limit, offset);
-            var message = _messageService.GetMessage(ErrorCodes.SuccessGetData);
+            var result = await groupMessageService.GetGroupMessagesAsync(userId, groupId, limit, offset);
+            var message = messageService.GetMessage(ErrorCodes.SuccessGetData);
 
             return Ok(ApiResponse<GroupMessageListResponse>.Success(
                 ErrorCodes.SuccessGetData,
