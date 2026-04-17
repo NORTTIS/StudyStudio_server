@@ -14,6 +14,11 @@ using Xunit;
 
 namespace StudioStudio_Server.Tests.Services
 {
+    /// <summary>
+    /// Unit tests cho StudioService.
+    /// Tests: studio CRUD, member management, permissions, archive operations.
+    /// Ref: Services/StudioService.cs
+    /// </summary>
     public class StudioServiceTests
     {
         private readonly Mock<IStudioRepository> _studioRepoMock;
@@ -29,7 +34,6 @@ namespace StudioStudio_Server.Tests.Services
         private readonly Mock<ICacheService> _cacheServiceMock;
         private StudioService _service = null!;
 
-        // Fixed test IDs
         private readonly Guid _userId = Guid.NewGuid();
         private readonly Guid _ownerId = Guid.NewGuid();
         private readonly Guid _studioId = Guid.NewGuid();
@@ -68,10 +72,13 @@ namespace StudioStudio_Server.Tests.Services
 
         #region GetUserStudiosAsync
 
+        /// <summary>
+        /// Branch: không có studio nào → trả về danh sách rỗng + Free plan (3 studios)
+        /// Ref: StudioService.GetUserStudiosAsync
+        /// </summary>
         [Fact]
         public async Task GetUserStudiosAsync_NoStudios_ReturnsEmptyList()
         {
-            // Arrange
             _subscriptionRepoMock.Setup(x => x.GetSubscriptionPlanByUserIdAsync(_userId))
                 .ReturnsAsync((SubscriptionPlan?)null);
             _studioRepoMock.Setup(x => x.CountStudioCreatedByUserAsync(_userId)).ReturnsAsync(0);
@@ -80,20 +87,21 @@ namespace StudioStudio_Server.Tests.Services
             _studioParticipantRepoMock.Setup(x => x.GetStudiosByUserIdAsync(_userId))
                 .ReturnsAsync(new List<StudioParticipant>());
 
-            // Act
             var result = await _service.GetUserStudiosAsync(_userId);
 
-            // Assert
             Assert.NotNull(result);
             Assert.Empty(result.Studios);
-            Assert.Equal(3, result.Subscription.StudioLimit); // Default Free plan
+            Assert.Equal(3, result.Subscription.StudioLimit);
             Assert.Equal(0, result.Subscription.StudioCreated);
         }
 
+        /// <summary>
+        /// Branch: có studio do user sở hữu → trả về studio với role Owner
+        /// Ref: StudioService.GetUserStudiosAsync
+        /// </summary>
         [Fact]
         public async Task GetUserStudiosAsync_WithOwnedStudios_ReturnsStudios()
         {
-            // Arrange
             var studio = new Studio
             {
                 StudioId = _studioId,
@@ -114,10 +122,8 @@ namespace StudioStudio_Server.Tests.Services
             _groupRepoMock.Setup(x => x.GetGroupCountByStudioIdAsync(_studioId)).ReturnsAsync(5);
             _studioParticipantRepoMock.Setup(x => x.GetParticipantCountByStudioIdAsync(_studioId)).ReturnsAsync(3);
 
-            // Act
             var result = await _service.GetUserStudiosAsync(_userId);
 
-            // Assert
             Assert.Single(result.Studios);
             Assert.Equal("My Studio", result.Studios[0].StudioName);
             Assert.Equal(StudioRole.Owner, result.Studios[0].StudioRole);
@@ -125,10 +131,13 @@ namespace StudioStudio_Server.Tests.Services
             Assert.Equal(3, result.Studios[0].MemberCount);
         }
 
+        /// <summary>
+        /// Branch: có studio mà user là member (không phải owner) → trả về studio với role Member
+        /// Ref: StudioService.GetUserStudiosAsync
+        /// </summary>
         [Fact]
         public async Task GetUserStudiosAsync_WithMemberStudios_ReturnsStudios()
         {
-            // Arrange
             var studio = new Studio
             {
                 StudioId = _studioId,
@@ -158,10 +167,8 @@ namespace StudioStudio_Server.Tests.Services
             _groupRepoMock.Setup(x => x.GetGroupCountByStudioIdAsync(_studioId)).ReturnsAsync(2);
             _studioParticipantRepoMock.Setup(x => x.GetParticipantCountByStudioIdAsync(_studioId)).ReturnsAsync(4);
 
-            // Act
             var result = await _service.GetUserStudiosAsync(_userId);
 
-            // Assert
             Assert.Single(result.Studios);
             Assert.Equal("Member Studio", result.Studios[0].StudioName);
             Assert.Equal(StudioRole.Member, result.Studios[0].StudioRole);
@@ -172,10 +179,13 @@ namespace StudioStudio_Server.Tests.Services
 
         #region CreateStudioAsync
 
+        /// <summary>
+        /// Branch: đã đạt giới hạn studio → throw AppException(StudioLimitReached, 403)
+        /// Ref: StudioService.CreateStudioAsync:limit check
+        /// </summary>
         [Fact]
         public async Task CreateStudioAsync_StudioLimitReached_ThrowsForbidden()
         {
-            // Arrange
             var plan = new SubscriptionPlan { MaxStudios = 1 };
             _subscriptionRepoMock.Setup(x => x.GetSubscriptionPlanByUserIdAsync(_ownerId))
                 .ReturnsAsync(plan);
@@ -183,17 +193,19 @@ namespace StudioStudio_Server.Tests.Services
 
             var request = new CreateStudioRequest { StudioName = "New Studio" };
 
-            // Act & Assert
             var ex = await Assert.ThrowsAsync<AppException>(() =>
                 _service.CreateStudioAsync(_ownerId, request));
             Assert.Equal(ErrorCodes.StudioLimitReached, ex.Code);
             Assert.Equal(403, ex.HttpStatus);
         }
 
+        /// <summary>
+        /// Branch: EndDate < StartDate → throw AppException(StudioInvalidDateRange)
+        /// Ref: StudioService.CreateStudioAsync:date validation
+        /// </summary>
         [Fact]
         public async Task CreateStudioAsync_InvalidDateRange_ThrowsBadRequest()
         {
-            // Arrange
             _subscriptionRepoMock.Setup(x => x.GetSubscriptionPlanByUserIdAsync(_ownerId))
                 .ReturnsAsync((SubscriptionPlan?)null);
             _studioRepoMock.Setup(x => x.CountStudioCreatedByUserAsync(_ownerId)).ReturnsAsync(0);
@@ -202,38 +214,42 @@ namespace StudioStudio_Server.Tests.Services
             {
                 StudioName = "Test Studio",
                 StartDate = new DateTime(2026, 4, 20),
-                EndDate = new DateTime(2026, 4, 10) // Before start
+                EndDate = new DateTime(2026, 4, 10)
             };
 
-            // Act & Assert
             var ex = await Assert.ThrowsAsync<AppException>(() =>
                 _service.CreateStudioAsync(_ownerId, request));
             Assert.Equal(ErrorCodes.StudioInvalidDateRange, ex.Code);
         }
 
+        /// <summary>
+        /// Branch: StudioName > 255 chars → throw AppException(StudioNameInvalid)
+        /// Ref: StudioService.CreateStudioAsync:name length validation
+        /// </summary>
         [Fact]
         public async Task CreateStudioAsync_NameTooLong_ThrowsBadRequest()
         {
-            // Arrange
             _subscriptionRepoMock.Setup(x => x.GetSubscriptionPlanByUserIdAsync(_ownerId))
                 .ReturnsAsync((SubscriptionPlan?)null);
             _studioRepoMock.Setup(x => x.CountStudioCreatedByUserAsync(_ownerId)).ReturnsAsync(0);
 
             var request = new CreateStudioRequest
             {
-                StudioName = new string('A', 256) // > 255 chars
+                StudioName = new string('A', 256)
             };
 
-            // Act & Assert
             var ex = await Assert.ThrowsAsync<AppException>(() =>
                 _service.CreateStudioAsync(_ownerId, request));
             Assert.Equal(ErrorCodes.StudioNameInvalid, ex.Code);
         }
 
+        /// <summary>
+        /// Branch: Description > 500 chars → throw AppException(StudioDescriptionInvalid)
+        /// Ref: StudioService.CreateStudioAsync:description length validation
+        /// </summary>
         [Fact]
         public async Task CreateStudioAsync_DescriptionTooLong_ThrowsBadRequest()
         {
-            // Arrange
             _subscriptionRepoMock.Setup(x => x.GetSubscriptionPlanByUserIdAsync(_ownerId))
                 .ReturnsAsync((SubscriptionPlan?)null);
             _studioRepoMock.Setup(x => x.CountStudioCreatedByUserAsync(_ownerId)).ReturnsAsync(0);
@@ -241,19 +257,21 @@ namespace StudioStudio_Server.Tests.Services
             var request = new CreateStudioRequest
             {
                 StudioName = "Test Studio",
-                Description = new string('A', 501) // > 500 chars
+                Description = new string('A', 501)
             };
 
-            // Act & Assert
             var ex = await Assert.ThrowsAsync<AppException>(() =>
                 _service.CreateStudioAsync(_ownerId, request));
             Assert.Equal(ErrorCodes.StudioDescriptionInvalid, ex.Code);
         }
 
+        /// <summary>
+        /// Branch: StudioName đã tồn tại với owner → throw AppException(StudioNameAlreadyExist)
+        /// Ref: StudioService.CreateStudioAsync:name exists check
+        /// </summary>
         [Fact]
         public async Task CreateStudioAsync_NameAlreadyExists_ThrowsBadRequest()
         {
-            // Arrange
             _subscriptionRepoMock.Setup(x => x.GetSubscriptionPlanByUserIdAsync(_ownerId))
                 .ReturnsAsync((SubscriptionPlan?)null);
             _studioRepoMock.Setup(x => x.CountStudioCreatedByUserAsync(_ownerId)).ReturnsAsync(0);
@@ -262,16 +280,18 @@ namespace StudioStudio_Server.Tests.Services
 
             var request = new CreateStudioRequest { StudioName = "Existing Studio" };
 
-            // Act & Assert
             var ex = await Assert.ThrowsAsync<AppException>(() =>
                 _service.CreateStudioAsync(_ownerId, request));
             Assert.Equal(ErrorCodes.StudioNameAlreadyExist, ex.Code);
         }
 
+        /// <summary>
+        /// Branch: valid request → tạo studio + tạo participant cho owner
+        /// Ref: StudioService.CreateStudioAsync:success path
+        /// </summary>
         [Fact]
         public async Task CreateStudioAsync_ValidRequest_CreatesStudioAndParticipant()
         {
-            // Arrange
             _subscriptionRepoMock.Setup(x => x.GetSubscriptionPlanByUserIdAsync(_ownerId))
                 .ReturnsAsync((SubscriptionPlan?)null);
             _studioRepoMock.Setup(x => x.CountStudioCreatedByUserAsync(_ownerId)).ReturnsAsync(0);
@@ -285,10 +305,8 @@ namespace StudioStudio_Server.Tests.Services
                 IsOpen = true
             };
 
-            // Act
             var result = await _service.CreateStudioAsync(_ownerId, request);
 
-            // Assert
             Assert.Equal("New Studio", result.StudioName);
             Assert.Equal(_ownerId, result.OwnerId);
             Assert.Equal(0, result.GroupCount);
@@ -302,38 +320,45 @@ namespace StudioStudio_Server.Tests.Services
 
         #region GetStudioDetailAsync
 
+        /// <summary>
+        /// Branch: studio không tồn tại → throw AppException(StudioNotFound)
+        /// Ref: StudioService.GetStudioDetailAsync:studio exists check
+        /// </summary>
         [Fact]
         public async Task GetStudioDetailAsync_StudioNotFound_ThrowsNotFound()
         {
-            // Arrange
             _studioRepoMock.Setup(x => x.GetByIdAsync(_studioId))
                 .ReturnsAsync((Studio?)null);
 
-            // Act & Assert
             var ex = await Assert.ThrowsAsync<AppException>(() =>
                 _service.GetStudioDetailAsync(_userId, _studioId));
             Assert.Equal(ErrorCodes.StudioNotFound, ex.Code);
         }
 
+        /// <summary>
+        /// Branch: user không phải owner và không phải member → throw AppException(AuthForbidden)
+        /// Ref: StudioService.GetStudioDetailAsync:permission check
+        /// </summary>
         [Fact]
         public async Task GetStudioDetailAsync_UserNotOwnerNorMember_ThrowsForbidden()
         {
-            // Arrange
             var studio = new Studio { StudioId = _studioId, OwnerId = _ownerId };
             _studioRepoMock.Setup(x => x.GetByIdAsync(_studioId)).ReturnsAsync(studio);
             _studioParticipantRepoMock.Setup(x => x.GetByStudioAndUserAsync(_studioId, _userId))
                 .ReturnsAsync((StudioParticipant?)null);
 
-            // Act & Assert
             var ex = await Assert.ThrowsAsync<AppException>(() =>
                 _service.GetStudioDetailAsync(_userId, _studioId));
             Assert.Equal(ErrorCodes.AuthForbidden, ex.Code);
         }
 
+        /// <summary>
+        /// Branch: user là owner → trả về chi tiết studio với role Owner
+        /// Ref: StudioService.GetStudioDetailAsync:owner path
+        /// </summary>
         [Fact]
         public async Task GetStudioDetailAsync_Owner_ReturnsStudioDetail()
         {
-            // Arrange
             var studio = new Studio
             {
                 StudioId = _studioId,
@@ -349,20 +374,21 @@ namespace StudioStudio_Server.Tests.Services
             _studioParticipantRepoMock.Setup(x => x.GetParticipantCountByStudioIdAsync(_studioId))
                 .ReturnsAsync(5);
 
-            // Act
             var result = await _service.GetStudioDetailAsync(_userId, _studioId);
 
-            // Assert
             Assert.Equal("Owner Studio", result.StudioName);
             Assert.Equal(StudioRole.Owner, result.StudioRole);
             Assert.Equal(7, result.GroupCount);
             Assert.Equal(5, result.MemberCount);
         }
 
+        /// <summary>
+        /// Branch: user là member → chỉ thấy groups mà mình tham gia
+        /// Ref: StudioService.GetStudioDetailAsync:member path
+        /// </summary>
         [Fact]
         public async Task GetStudioDetailAsync_Member_SeesOnlyTheirGroups()
         {
-            // Arrange
             var studio = new Studio
             {
                 StudioId = _studioId,
@@ -390,57 +416,60 @@ namespace StudioStudio_Server.Tests.Services
             _studioParticipantRepoMock.Setup(x => x.GetParticipantCountByStudioIdAsync(_studioId))
                 .ReturnsAsync(3);
 
-            // Act
             var result = await _service.GetStudioDetailAsync(_userId, _studioId);
 
-            // Assert
             Assert.Equal(StudioRole.Member, result.StudioRole);
-            Assert.Equal(1, result.GroupCount); // Only groups they participate in
+            Assert.Equal(1, result.GroupCount);
         }
 
         #endregion
 
         #region DeleteStudioAsync
 
+        /// <summary>
+        /// Branch: studio không tồn tại → throw AppException(StudioNotFound)
+        /// Ref: StudioService.DeleteStudioAsync:studio exists check
+        /// </summary>
         [Fact]
         public async Task DeleteStudioAsync_StudioNotFound_ThrowsNotFound()
         {
-            // Arrange
             _studioRepoMock.Setup(x => x.GetByIdAsync(_studioId))
                 .ReturnsAsync((Studio?)null);
 
-            // Act & Assert
             var ex = await Assert.ThrowsAsync<AppException>(() =>
                 _service.DeleteStudioAsync(_userId, _studioId));
             Assert.Equal(ErrorCodes.StudioNotFound, ex.Code);
         }
 
+        /// <summary>
+        /// Branch: user không phải owner → throw AppException(AuthForbidden)
+        /// Ref: StudioService.DeleteStudioAsync:owner check
+        /// </summary>
         [Fact]
         public async Task DeleteStudioAsync_NotOwner_ThrowsForbidden()
         {
-            // Arrange
             var studio = new Studio { StudioId = _studioId, OwnerId = _ownerId };
             _studioRepoMock.Setup(x => x.GetByIdAsync(_studioId)).ReturnsAsync(studio);
 
-            // Act & Assert
             var ex = await Assert.ThrowsAsync<AppException>(() =>
                 _service.DeleteStudioAsync(_userId, _studioId));
             Assert.Equal(ErrorCodes.AuthForbidden, ex.Code);
         }
 
+        /// <summary>
+        /// Branch: user là owner → xóa studio + các groups
+        /// Ref: StudioService.DeleteStudioAsync:success path
+        /// </summary>
         [Fact]
         public async Task DeleteStudioAsync_Owner_DeletesStudioAndGroups()
         {
-            // Arrange
             var studio = new Studio { StudioId = _studioId, OwnerId = _userId };
             _studioRepoMock.Setup(x => x.GetByIdAsync(_studioId)).ReturnsAsync(studio);
             _groupRepoMock.Setup(x => x.GetStudioGroupsAsync(_studioId))
                 .ReturnsAsync(new List<Group> { new Group { GroupId = _groupId, StudioId = _studioId } });
 
-            // Act
             await _service.DeleteStudioAsync(_userId, _studioId);
 
-            // Assert
             _groupRepoMock.Verify(x => x.SaveChangesAsync(), Times.Once);
             _studioRepoMock.Verify(x => x.DeleteStudioAsync(studio), Times.Once);
         }
@@ -449,40 +478,47 @@ namespace StudioStudio_Server.Tests.Services
 
         #region UpdateStudioAsync
 
+        /// <summary>
+        /// Branch: studio không tồn tại → throw AppException(StudioNotFound)
+        /// Ref: StudioService.UpdateStudioAsync:studio exists check
+        /// </summary>
         [Fact]
         public async Task UpdateStudioAsync_StudioNotFound_ThrowsNotFound()
         {
-            // Arrange
             _studioRepoMock.Setup(x => x.GetByIdAsync(_studioId))
                 .ReturnsAsync((Studio?)null);
 
             var request = new UpdateStudioRequest { Id = _studioId, StudioName = "Updated" };
 
-            // Act & Assert
             var ex = await Assert.ThrowsAsync<AppException>(() =>
                 _service.UpdateStudioAsync(_userId, request));
             Assert.Equal(ErrorCodes.StudioNotFound, ex.Code);
         }
 
+        /// <summary>
+        /// Branch: user không phải owner → throw AppException(AuthForbidden)
+        /// Ref: StudioService.UpdateStudioAsync:owner check
+        /// </summary>
         [Fact]
         public async Task UpdateStudioAsync_NotOwner_ThrowsForbidden()
         {
-            // Arrange
             var studio = new Studio { StudioId = _studioId, OwnerId = _ownerId };
             _studioRepoMock.Setup(x => x.GetByIdAsync(_studioId)).ReturnsAsync(studio);
 
             var request = new UpdateStudioRequest { Id = _studioId, StudioName = "Updated" };
 
-            // Act & Assert
             var ex = await Assert.ThrowsAsync<AppException>(() =>
                 _service.UpdateStudioAsync(_userId, request));
             Assert.Equal(ErrorCodes.AuthForbidden, ex.Code);
         }
 
+        /// <summary>
+        /// Branch: ColorHex không hợp lệ → throw AppException(ValidationInvalidColor)
+        /// Ref: StudioService.UpdateStudioAsync:color validation
+        /// </summary>
         [Fact]
         public async Task UpdateStudioAsync_InvalidColor_ThrowsBadRequest()
         {
-            // Arrange
             var studio = new Studio
             {
                 StudioId = _studioId,
@@ -501,16 +537,18 @@ namespace StudioStudio_Server.Tests.Services
                 ColorHex = "invalid-color"
             };
 
-            // Act & Assert
             var ex = await Assert.ThrowsAsync<AppException>(() =>
                 _service.UpdateStudioAsync(_userId, request));
             Assert.Equal(ErrorCodes.ValidationInvalidColor, ex.Code);
         }
 
+        /// <summary>
+        /// Branch: BannerUrl không hợp lệ → throw AppException(ValidationInvalidBannerUrl)
+        /// Ref: StudioService.UpdateStudioAsync:banner URL validation
+        /// </summary>
         [Fact]
         public async Task UpdateStudioAsync_InvalidBannerUrl_ThrowsBadRequest()
         {
-            // Arrange
             var studio = new Studio
             {
                 StudioId = _studioId,
@@ -528,16 +566,18 @@ namespace StudioStudio_Server.Tests.Services
                 BannerUrl = "not-a-valid-url"
             };
 
-            // Act & Assert
             var ex = await Assert.ThrowsAsync<AppException>(() =>
                 _service.UpdateStudioAsync(_userId, request));
             Assert.Equal(ErrorCodes.ValidationInvalidBannerUrl, ex.Code);
         }
 
+        /// <summary>
+        /// Branch: Alias chứa ký tự không hợp lệ → throw AppException(ValidationInvalidAlias)
+        /// Ref: StudioService.UpdateStudioAsync:alias validation
+        /// </summary>
         [Fact]
         public async Task UpdateStudioAsync_InvalidAlias_ThrowsBadRequest()
         {
-            // Arrange
             var studio = new Studio
             {
                 StudioId = _studioId,
@@ -552,19 +592,21 @@ namespace StudioStudio_Server.Tests.Services
             {
                 Id = _studioId,
                 StudioName = "Updated",
-                Alias = "invalid alias with spaces!" // Only alphanumeric, spaces, Vietnamese, _, -
+                Alias = "invalid alias with spaces!"
             };
 
-            // Act & Assert
             var ex = await Assert.ThrowsAsync<AppException>(() =>
                 _service.UpdateStudioAsync(_userId, request));
             Assert.Equal(ErrorCodes.ValidationInvalidAlias, ex.Code);
         }
 
+        /// <summary>
+        /// Branch: Alias > 50 chars → throw AppException(ValidationStringLength)
+        /// Ref: StudioService.UpdateStudioAsync:alias length validation
+        /// </summary>
         [Fact]
         public async Task UpdateStudioAsync_AliasTooLong_ThrowsBadRequest()
         {
-            // Arrange
             var studio = new Studio
             {
                 StudioId = _studioId,
@@ -579,19 +621,21 @@ namespace StudioStudio_Server.Tests.Services
             {
                 Id = _studioId,
                 StudioName = "Updated",
-                Alias = new string('A', 51) // > 50 chars
+                Alias = new string('A', 51)
             };
 
-            // Act & Assert
             var ex = await Assert.ThrowsAsync<AppException>(() =>
                 _service.UpdateStudioAsync(_userId, request));
             Assert.Equal(ErrorCodes.ValidationStringLength, ex.Code);
         }
 
+        /// <summary>
+        /// Branch: valid request → cập nhật studio + invalidate cache
+        /// Ref: StudioService.UpdateStudioAsync:success path
+        /// </summary>
         [Fact]
         public async Task UpdateStudioAsync_ValidRequest_UpdatesAndInvalidatesCache()
         {
-            // Arrange
             var studio = new Studio
             {
                 StudioId = _studioId,
@@ -615,10 +659,8 @@ namespace StudioStudio_Server.Tests.Services
                 IsOpen = true
             };
 
-            // Act
             var result = await _service.UpdateStudioAsync(_userId, request);
 
-            // Assert
             Assert.Equal("New Studio", result.StudioName);
             Assert.Equal("New description", result.Description);
             Assert.Equal("#FF0000", result.ColorHex);
@@ -631,23 +673,28 @@ namespace StudioStudio_Server.Tests.Services
 
         #region GetStudioMembersAsync
 
+        /// <summary>
+        /// Branch: user không phải member → throw AppException(AuthForbidden)
+        /// Ref: StudioService.GetStudioMembersAsync:member check
+        /// </summary>
         [Fact]
         public async Task GetStudioMembersAsync_UserNotMember_ThrowsForbidden()
         {
-            // Arrange
             _studioParticipantRepoMock.Setup(x => x.GetByStudioAndUserAsync(_studioId, _userId))
                 .ReturnsAsync((StudioParticipant?)null);
 
-            // Act & Assert
             var ex = await Assert.ThrowsAsync<AppException>(() =>
                 _service.GetStudioMembersAsync(_userId, _studioId));
             Assert.Equal(ErrorCodes.AuthForbidden, ex.Code);
         }
 
+        /// <summary>
+        /// Branch: user là member hợp lệ → trả về danh sách members
+        /// Ref: StudioService.GetStudioMembersAsync:success path
+        /// </summary>
         [Fact]
         public async Task GetStudioMembersAsync_ValidMember_ReturnsMembers()
         {
-            // Arrange
             var participant = new StudioParticipant
             {
                 StudioId = _studioId,
@@ -665,10 +712,8 @@ namespace StudioStudio_Server.Tests.Services
             _groupParticipantRepoMock.Setup(x => x.GetByGroupIdsAsync(It.IsAny<List<Guid>>()))
                 .ReturnsAsync(new List<GroupParticipant>());
 
-            // Act
             var result = await _service.GetStudioMembersAsync(_userId, _studioId);
 
-            // Assert
             Assert.Single(result);
             Assert.Equal(_userId, result[0].UserId);
             Assert.Equal(StudioRole.Member, result[0].StudioRole);
@@ -678,53 +723,62 @@ namespace StudioStudio_Server.Tests.Services
 
         #region LeaveStudioAsync
 
+        /// <summary>
+        /// Branch: studio không tồn tại → throw AppException(StudioNotFound)
+        /// Ref: StudioService.LeaveStudioAsync:studio exists check
+        /// </summary>
         [Fact]
         public async Task LeaveStudioAsync_StudioNotFound_ThrowsNotFound()
         {
-            // Arrange
             _studioRepoMock.Setup(x => x.GetByIdAsync(_studioId))
                 .ReturnsAsync((Studio?)null);
 
-            // Act & Assert
             var ex = await Assert.ThrowsAsync<AppException>(() =>
                 _service.LeaveStudioAsync(_userId, _studioId));
             Assert.Equal(ErrorCodes.StudioNotFound, ex.Code);
         }
 
+        /// <summary>
+        /// Branch: user không phải member → throw AppException(StudioNotFound)
+        /// Ref: StudioService.LeaveStudioAsync:member check
+        /// </summary>
         [Fact]
         public async Task LeaveStudioAsync_UserNotMember_ThrowsNotFound()
         {
-            // Arrange
             var studio = new Studio { StudioId = _studioId, OwnerId = _ownerId };
             _studioRepoMock.Setup(x => x.GetByIdAsync(_studioId)).ReturnsAsync(studio);
             _studioParticipantRepoMock.Setup(x => x.GetByStudioAndUserIncludeNonApprovedAsync(_studioId, _userId))
                 .ReturnsAsync((StudioParticipant?)null);
 
-            // Act & Assert
             var ex = await Assert.ThrowsAsync<AppException>(() =>
                 _service.LeaveStudioAsync(_userId, _studioId));
             Assert.Equal(ErrorCodes.StudioNotFound, ex.Code);
         }
 
+        /// <summary>
+        /// Branch: owner không thể leave → throw AppException(StudioCannotLeaveAsOwner)
+        /// Ref: StudioService.LeaveStudioAsync:owner cannot leave
+        /// </summary>
         [Fact]
         public async Task LeaveStudioAsync_OwnerCannotLeave_ThrowsForbidden()
         {
-            // Arrange
             var studio = new Studio { StudioId = _studioId, OwnerId = _userId };
             _studioRepoMock.Setup(x => x.GetByIdAsync(_studioId)).ReturnsAsync(studio);
             _studioParticipantRepoMock.Setup(x => x.GetByStudioAndUserIncludeNonApprovedAsync(_studioId, _userId))
                 .ReturnsAsync(new StudioParticipant { StudioId = _studioId, UserId = _userId, Role = StudioRole.Owner });
 
-            // Act & Assert
             var ex = await Assert.ThrowsAsync<AppException>(() =>
                 _service.LeaveStudioAsync(_userId, _studioId));
             Assert.Equal(ErrorCodes.StudioCannotLeaveAsOwner, ex.Code);
         }
 
+        /// <summary>
+        /// Branch: member hợp lệ → leave studio + leave các groups
+        /// Ref: StudioService.LeaveStudioAsync:success path
+        /// </summary>
         [Fact]
         public async Task LeaveStudioAsync_ValidMember_LeavesStudioAndGroups()
         {
-            // Arrange
             var studio = new Studio { StudioId = _studioId, OwnerId = _ownerId, StudioName = "Test Studio" };
             var participant = new StudioParticipant
             {
@@ -746,10 +800,8 @@ namespace StudioStudio_Server.Tests.Services
                     new() { GroupId = _groupId, UserId = _userId, Role = GroupRole.Member }
                 });
 
-            // Act
             var result = await _service.LeaveStudioAsync(_userId, _studioId);
 
-            // Assert
             Assert.Equal(_studioId, result.StudioId);
             Assert.Equal("Test Studio", result.StudioName);
             _studioParticipantRepoMock.Verify(x => x.RemoveAsync(participant), Times.Once);
@@ -760,36 +812,43 @@ namespace StudioStudio_Server.Tests.Services
 
         #region ToggleIsOpenAsync
 
+        /// <summary>
+        /// Branch: studio không tồn tại → throw AppException(StudioNotFound)
+        /// Ref: StudioService.ToggleIsOpenAsync:studio exists check
+        /// </summary>
         [Fact]
         public async Task ToggleIsOpenAsync_StudioNotFound_ThrowsNotFound()
         {
-            // Arrange
             _studioRepoMock.Setup(x => x.GetByIdAsync(_studioId))
                 .ReturnsAsync((Studio?)null);
 
-            // Act & Assert
             var ex = await Assert.ThrowsAsync<AppException>(() =>
                 _service.ToggleIsOpenAsync(_userId, _studioId, true));
             Assert.Equal(ErrorCodes.StudioNotFound, ex.Code);
         }
 
+        /// <summary>
+        /// Branch: user không phải owner → throw AppException(AuthForbidden)
+        /// Ref: StudioService.ToggleIsOpenAsync:owner check
+        /// </summary>
         [Fact]
         public async Task ToggleIsOpenAsync_NotOwner_ThrowsForbidden()
         {
-            // Arrange
             var studio = new Studio { StudioId = _studioId, OwnerId = _ownerId };
             _studioRepoMock.Setup(x => x.GetByIdAsync(_studioId)).ReturnsAsync(studio);
 
-            // Act & Assert
             var ex = await Assert.ThrowsAsync<AppException>(() =>
                 _service.ToggleIsOpenAsync(_userId, _studioId, true));
             Assert.Equal(ErrorCodes.AuthForbidden, ex.Code);
         }
 
+        /// <summary>
+        /// Branch: owner toggle isOpen → cập nhật + invalidate cache
+        /// Ref: StudioService.ToggleIsOpenAsync:success path
+        /// </summary>
         [Fact]
         public async Task ToggleIsOpenAsync_Owner_UpdatesAndInvalidatesCache()
         {
-            // Arrange
             var studio = new Studio
             {
                 StudioId = _studioId,
@@ -799,10 +858,8 @@ namespace StudioStudio_Server.Tests.Services
             };
             _studioRepoMock.Setup(x => x.GetByIdAsync(_studioId)).ReturnsAsync(studio);
 
-            // Act
             var result = await _service.ToggleIsOpenAsync(_userId, _studioId, true);
 
-            // Assert
             Assert.True(result.IsOpen);
             _studioRepoMock.Verify(x => x.UpdateStudioAsync(It.IsAny<Studio>()), Times.Once);
             _cacheServiceMock.Verify(x => x.InvalidateAIStudioCacheAsync(_studioId), Times.Once);
@@ -812,36 +869,43 @@ namespace StudioStudio_Server.Tests.Services
 
         #region GetPendingMembersAsync
 
+        /// <summary>
+        /// Branch: studio không tồn tại → throw AppException(StudioNotFound)
+        /// Ref: StudioService.GetPendingMembersAsync:studio exists check
+        /// </summary>
         [Fact]
         public async Task GetPendingMembersAsync_StudioNotFound_ThrowsNotFound()
         {
-            // Arrange
             _studioRepoMock.Setup(x => x.GetByIdAsync(_studioId))
                 .ReturnsAsync((Studio?)null);
 
-            // Act & Assert
             var ex = await Assert.ThrowsAsync<AppException>(() =>
                 _service.GetPendingMembersAsync(_userId, _studioId));
             Assert.Equal(ErrorCodes.StudioNotFound, ex.Code);
         }
 
+        /// <summary>
+        /// Branch: user không phải owner → throw AppException(AuthForbidden)
+        /// Ref: StudioService.GetPendingMembersAsync:owner check
+        /// </summary>
         [Fact]
         public async Task GetPendingMembersAsync_NotOwner_ThrowsForbidden()
         {
-            // Arrange
             var studio = new Studio { StudioId = _studioId, OwnerId = _ownerId };
             _studioRepoMock.Setup(x => x.GetByIdAsync(_studioId)).ReturnsAsync(studio);
 
-            // Act & Assert
             var ex = await Assert.ThrowsAsync<AppException>(() =>
                 _service.GetPendingMembersAsync(_userId, _studioId));
             Assert.Equal(ErrorCodes.AuthForbidden, ex.Code);
         }
 
+        /// <summary>
+        /// Branch: owner xem pending members → trả về danh sách
+        /// Ref: StudioService.GetPendingMembersAsync:success path
+        /// </summary>
         [Fact]
         public async Task GetPendingMembersAsync_Owner_ReturnsPendingMembers()
         {
-            // Arrange
             var studio = new Studio { StudioId = _studioId, OwnerId = _userId, StudioName = "Test" };
             var pendingUser = new User { UserId = _targetUserId, FirstName = "Jane", LastName = "Doe", Email = "jane@test.com" };
             var pending = new StudioParticipant
@@ -856,10 +920,8 @@ namespace StudioStudio_Server.Tests.Services
             _studioParticipantRepoMock.Setup(x => x.GetPendingByStudioIdAsync(_studioId))
                 .ReturnsAsync(new List<StudioParticipant> { pending });
 
-            // Act
             var result = await _service.GetPendingMembersAsync(_userId, _studioId);
 
-            // Assert
             Assert.Equal(_studioId, result.StudioId);
             Assert.Equal(1, result.TotalPending);
             Assert.Single(result.PendingMembers);
@@ -869,55 +931,64 @@ namespace StudioStudio_Server.Tests.Services
 
         #region RemoveMemberAsync
 
+        /// <summary>
+        /// Branch: studio không tồn tại → throw AppException(StudioNotFound)
+        /// Ref: StudioService.RemoveMemberAsync:studio exists check
+        /// </summary>
         [Fact]
         public async Task RemoveMemberAsync_StudioNotFound_ThrowsNotFound()
         {
-            // Arrange
             _studioRepoMock.Setup(x => x.GetByIdAsync(_studioId))
                 .ReturnsAsync((Studio?)null);
 
             var request = new RemoveStudioMemberRequest { StudioId = _studioId, UserId = _targetUserId };
 
-            // Act & Assert
             var ex = await Assert.ThrowsAsync<AppException>(() =>
                 _service.RemoveMemberAsync(_userId, request));
             Assert.Equal(ErrorCodes.StudioNotFound, ex.Code);
         }
 
+        /// <summary>
+        /// Branch: user không phải owner → throw AppException(AuthForbidden)
+        /// Ref: StudioService.RemoveMemberAsync:owner check
+        /// </summary>
         [Fact]
         public async Task RemoveMemberAsync_NotOwner_ThrowsForbidden()
         {
-            // Arrange
             var studio = new Studio { StudioId = _studioId, OwnerId = _ownerId };
             _studioRepoMock.Setup(x => x.GetByIdAsync(_studioId)).ReturnsAsync(studio);
 
             var request = new RemoveStudioMemberRequest { StudioId = _studioId, UserId = _targetUserId };
 
-            // Act & Assert
             var ex = await Assert.ThrowsAsync<AppException>(() =>
                 _service.RemoveMemberAsync(_userId, request));
             Assert.Equal(ErrorCodes.AuthForbidden, ex.Code);
         }
 
+        /// <summary>
+        /// Branch: owner tự xóa mình → throw AppException(StudioCannotRemoveSelf)
+        /// Ref: StudioService.RemoveMemberAsync:cannot remove self
+        /// </summary>
         [Fact]
         public async Task RemoveMemberAsync_RemoveSelf_ThrowsBadRequest()
         {
-            // Arrange
             var studio = new Studio { StudioId = _studioId, OwnerId = _userId };
             _studioRepoMock.Setup(x => x.GetByIdAsync(_studioId)).ReturnsAsync(studio);
 
             var request = new RemoveStudioMemberRequest { StudioId = _studioId, UserId = _userId };
 
-            // Act & Assert
             var ex = await Assert.ThrowsAsync<AppException>(() =>
                 _service.RemoveMemberAsync(_userId, request));
             Assert.Equal(ErrorCodes.StudioCannotRemoveSelf, ex.Code);
         }
 
+        /// <summary>
+        /// Branch: member không tồn tại → throw AppException(StudioMemberNotFound)
+        /// Ref: StudioService.RemoveMemberAsync:member exists check
+        /// </summary>
         [Fact]
         public async Task RemoveMemberAsync_MemberNotFound_ThrowsNotFound()
         {
-            // Arrange
             var studio = new Studio { StudioId = _studioId, OwnerId = _userId };
             _studioRepoMock.Setup(x => x.GetByIdAsync(_studioId)).ReturnsAsync(studio);
             _studioParticipantRepoMock.Setup(x => x.GetByStudioAndUserTrackedAsync(_studioId, _targetUserId))
@@ -925,16 +996,18 @@ namespace StudioStudio_Server.Tests.Services
 
             var request = new RemoveStudioMemberRequest { StudioId = _studioId, UserId = _targetUserId };
 
-            // Act & Assert
             var ex = await Assert.ThrowsAsync<AppException>(() =>
                 _service.RemoveMemberAsync(_userId, request));
             Assert.Equal(ErrorCodes.StudioMemberNotFound, ex.Code);
         }
 
+        /// <summary>
+        /// Branch: xóa owner khác → throw AppException(StudioCannotRemoveOwner)
+        /// Ref: StudioService.RemoveMemberAsync:cannot remove owner
+        /// </summary>
         [Fact]
         public async Task RemoveMemberAsync_RemoveOwner_ThrowsBadRequest()
         {
-            // Arrange
             var studio = new Studio { StudioId = _studioId, OwnerId = _userId };
             var targetMember = new StudioParticipant
             {
@@ -948,16 +1021,18 @@ namespace StudioStudio_Server.Tests.Services
 
             var request = new RemoveStudioMemberRequest { StudioId = _studioId, UserId = _targetUserId };
 
-            // Act & Assert
             var ex = await Assert.ThrowsAsync<AppException>(() =>
                 _service.RemoveMemberAsync(_userId, request));
             Assert.Equal(ErrorCodes.StudioCannotRemoveOwner, ex.Code);
         }
 
+        /// <summary>
+        /// Branch: xóa member hợp lệ → xóa + invalidate cache
+        /// Ref: StudioService.RemoveMemberAsync:success path
+        /// </summary>
         [Fact]
         public async Task RemoveMemberAsync_ValidMember_RemovesAndInvalidatesCache()
         {
-            // Arrange
             var studio = new Studio { StudioId = _studioId, OwnerId = _userId, StudioName = "Test Studio" };
             var targetMember = new StudioParticipant
             {
@@ -975,10 +1050,8 @@ namespace StudioStudio_Server.Tests.Services
 
             var request = new RemoveStudioMemberRequest { StudioId = _studioId, UserId = _targetUserId };
 
-            // Act
             var result = await _service.RemoveMemberAsync(_userId, request);
 
-            // Assert
             Assert.Equal(_targetUserId, result.RemovedUserId);
             Assert.Equal("Jane Doe", result.RemovedUserName);
             _studioParticipantRepoMock.Verify(x => x.RemoveAsync(targetMember), Times.Once);
@@ -988,51 +1061,60 @@ namespace StudioStudio_Server.Tests.Services
 
         #region ApproveMemberAsync
 
+        /// <summary>
+        /// Branch: studio không tồn tại → throw AppException(StudioNotFound)
+        /// Ref: StudioService.ApproveMemberAsync:studio exists check
+        /// </summary>
         [Fact]
         public async Task ApproveMemberAsync_StudioNotFound_ThrowsNotFound()
         {
-            // Arrange
             _studioRepoMock.Setup(x => x.GetByIdAsync(_studioId))
                 .ReturnsAsync((Studio?)null);
 
-            // Act & Assert
             var ex = await Assert.ThrowsAsync<AppException>(() =>
                 _service.ApproveMemberAsync(_userId, _studioId, _targetUserId));
             Assert.Equal(ErrorCodes.StudioNotFound, ex.Code);
         }
 
+        /// <summary>
+        /// Branch: user không phải owner → throw AppException(AuthForbidden)
+        /// Ref: StudioService.ApproveMemberAsync:owner check
+        /// </summary>
         [Fact]
         public async Task ApproveMemberAsync_NotOwner_ThrowsForbidden()
         {
-            // Arrange
             var studio = new Studio { StudioId = _studioId, OwnerId = _ownerId };
             _studioRepoMock.Setup(x => x.GetByIdAsync(_studioId)).ReturnsAsync(studio);
 
-            // Act & Assert
             var ex = await Assert.ThrowsAsync<AppException>(() =>
                 _service.ApproveMemberAsync(_userId, _studioId, _targetUserId));
             Assert.Equal(ErrorCodes.AuthForbidden, ex.Code);
         }
 
+        /// <summary>
+        /// Branch: pending member không tồn tại → throw AppException(StudioMemberNotFound)
+        /// Ref: StudioService.ApproveMemberAsync:pending member check
+        /// </summary>
         [Fact]
         public async Task ApproveMemberAsync_PendingMemberNotFound_ThrowsNotFound()
         {
-            // Arrange
             var studio = new Studio { StudioId = _studioId, OwnerId = _userId };
             _studioRepoMock.Setup(x => x.GetByIdAsync(_studioId)).ReturnsAsync(studio);
             _studioParticipantRepoMock.Setup(x => x.GetPendingByStudioAndUserAsync(_studioId, _targetUserId))
                 .ReturnsAsync((StudioParticipant?)null);
 
-            // Act & Assert
             var ex = await Assert.ThrowsAsync<AppException>(() =>
                 _service.ApproveMemberAsync(_userId, _studioId, _targetUserId));
             Assert.Equal(ErrorCodes.StudioMemberNotFound, ex.Code);
         }
 
+        /// <summary>
+        /// Branch: owner approve pending member → approve + gửi email
+        /// Ref: StudioService.ApproveMemberAsync:success path
+        /// </summary>
         [Fact]
         public async Task ApproveMemberAsync_ValidOwner_ApprovesAndSendsEmail()
         {
-            // Arrange
             var studio = new Studio { StudioId = _studioId, OwnerId = _userId, StudioName = "Test Studio" };
             var targetParticipant = new StudioParticipant
             {
@@ -1053,10 +1135,8 @@ namespace StudioStudio_Server.Tests.Services
                 .ReturnsAsync(targetParticipant);
             _userRepoMock.Setup(x => x.GetByIdAsync(_targetUserId)).ReturnsAsync(targetUser);
 
-            // Act
             var result = await _service.ApproveMemberAsync(_userId, _studioId, _targetUserId);
 
-            // Assert
             Assert.True(result.IsApproved);
             Assert.Equal("Jane Doe", result.UserName);
             _studioParticipantRepoMock.Verify(x => x.UpdateAsync(targetParticipant), Times.Once);
@@ -1070,36 +1150,43 @@ namespace StudioStudio_Server.Tests.Services
 
         #region ToggleArchiveStudioAsync
 
+        /// <summary>
+        /// Branch: studio không tồn tại → throw AppException(StudioNotFound)
+        /// Ref: StudioService.ToggleArchiveStudioAsync:studio exists check
+        /// </summary>
         [Fact]
         public async Task ToggleArchiveStudioAsync_StudioNotFound_ThrowsNotFound()
         {
-            // Arrange
             _studioRepoMock.Setup(x => x.GetByIdAsync(_studioId))
                 .ReturnsAsync((Studio?)null);
 
-            // Act & Assert
             var ex = await Assert.ThrowsAsync<AppException>(() =>
                 _service.ToggleArchiveStudioAsync(_userId, _studioId, true));
             Assert.Equal(ErrorCodes.StudioNotFound, ex.Code);
         }
 
+        /// <summary>
+        /// Branch: user không phải owner → throw AppException(AuthForbidden)
+        /// Ref: StudioService.ToggleArchiveStudioAsync:owner check
+        /// </summary>
         [Fact]
         public async Task ToggleArchiveStudioAsync_NotOwner_ThrowsForbidden()
         {
-            // Arrange
             var studio = new Studio { StudioId = _studioId, OwnerId = _ownerId };
             _studioRepoMock.Setup(x => x.GetByIdAsync(_studioId)).ReturnsAsync(studio);
 
-            // Act & Assert
             var ex = await Assert.ThrowsAsync<AppException>(() =>
                 _service.ToggleArchiveStudioAsync(_userId, _studioId, true));
             Assert.Equal(ErrorCodes.AuthForbidden, ex.Code);
         }
 
+        /// <summary>
+        /// Branch: archive=true → archive studio + các groups
+        /// Ref: StudioService.ToggleArchiveStudioAsync:archive path
+        /// </summary>
         [Fact]
         public async Task ToggleArchiveStudioAsync_Archive_ArchivesStudioAndGroups()
         {
-            // Arrange
             var studio = new Studio
             {
                 StudioId = _studioId,
@@ -1116,20 +1203,21 @@ namespace StudioStudio_Server.Tests.Services
             _groupRepoMock.Setup(x => x.GetStudioGroupsAsync(_studioId))
                 .ReturnsAsync(new List<Group> { group });
 
-            // Act
             var result = await _service.ToggleArchiveStudioAsync(_userId, _studioId, true);
 
-            // Assert
             Assert.True(result.IsArchived);
             Assert.True(group.IsArchived);
             _studioRepoMock.Verify(x => x.UpdateStudioAsync(It.IsAny<Studio>()), Times.Once);
             _groupRepoMock.Verify(x => x.SaveChangesAsync(), Times.Once);
         }
 
+        /// <summary>
+        /// Branch: archive=false → unarchive studio + các groups
+        /// Ref: StudioService.ToggleArchiveStudioAsync:unarchive path
+        /// </summary>
         [Fact]
         public async Task ToggleArchiveStudioAsync_Unarchive_UnarchivesStudioAndGroups()
         {
-            // Arrange
             var studio = new Studio
             {
                 StudioId = _studioId,
@@ -1146,10 +1234,8 @@ namespace StudioStudio_Server.Tests.Services
             _groupRepoMock.Setup(x => x.GetStudioGroupsAsync(_studioId))
                 .ReturnsAsync(new List<Group> { group });
 
-            // Act
             var result = await _service.ToggleArchiveStudioAsync(_userId, _studioId, false);
 
-            // Assert
             Assert.False(result.IsArchived);
             Assert.False(group.IsArchived);
         }

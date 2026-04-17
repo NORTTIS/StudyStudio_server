@@ -12,6 +12,11 @@ using Xunit;
 
 namespace StudioStudio_Server.Tests.Services
 {
+    /// <summary>
+    /// Unit tests cho TaskService.
+    /// Tests: task CRUD, personal/group tasks, assignments, status management.
+    /// Ref: Services/TaskService.cs
+    /// </summary>
     public class TaskServiceTests
     {
         private readonly Mock<ILogger<TaskService>> _loggerMock;

@@ -13,6 +13,11 @@ using Xunit;
 
 namespace StudioStudio_Server.Tests.Services
 {
+    /// <summary>
+    /// Unit tests cho GroupService.
+    /// Tests: group CRUD, member management, favorites, analytics.
+    /// Ref: Services/GroupService.cs
+    /// </summary>
     public class GroupServiceTests
     {
         #region Setup & Helpers

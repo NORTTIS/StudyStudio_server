@@ -11,6 +11,11 @@ using Xunit;
 
 namespace StudioStudio_Server.Tests.Services
 {
+    /// <summary>
+    /// Unit tests cho HomeService.
+    /// Tests: personal task board, home summary, home task list, personal task status CRUD.
+    /// Ref: Services/HomeService.cs
+    /// </summary>
     public class HomeServiceTests
     {
         private readonly Mock<ITaskAssignmentRepository> _assignmentRepoMock;
@@ -46,6 +51,10 @@ namespace StudioStudio_Server.Tests.Services
 
         #region GetPersonalTaskBoardAsync
 
+        /// <summary>
+        /// Branch: userDetail == null → throw AppException(ErrorCodes.UserNotFound)
+        /// Ref: HomeService.GetPersonalTaskBoardAsync:46-50
+        /// </summary>
         [Fact]
         public async Task GetPersonalTaskBoardAsync_UserNotFound_ThrowsNotFound()
         {
@@ -55,6 +64,10 @@ namespace StudioStudio_Server.Tests.Services
             Assert.Equal(ErrorCodes.UserNotFound, ex.Code);
         }
 
+        /// <summary>
+        /// Branch: personalTaskStatus is empty → returns empty PersonalTaskStatuses
+        /// Ref: HomeService.GetPersonalTaskBoardAsync:59-90
+        /// </summary>
         [Fact]
         public async Task GetPersonalTaskBoardAsync_NoStatuses_ReturnsEmpty()
         {
@@ -70,6 +83,10 @@ namespace StudioStudio_Server.Tests.Services
             Assert.Empty(result.PersonalTaskStatuses);
         }
 
+        /// <summary>
+        /// Branch: user exists + has statuses → returns board with tasks grouped by status
+        /// Ref: HomeService.GetPersonalTaskBoardAsync:59-90
+        /// </summary>
         [Fact]
         public async Task GetPersonalTaskBoardAsync_WithStatuses_ReturnsBoard()
         {
@@ -96,6 +113,10 @@ namespace StudioStudio_Server.Tests.Services
 
         #region GetHomeSummaryAsync
 
+        /// <summary>
+        /// Branch: userDetail == null → throw AppException(ErrorCodes.UserNotFound)
+        /// Ref: HomeService.GetHomeSummaryAsync:97-98 (via EnsureUserExistsAsync:186-190)
+        /// </summary>
         [Fact]
         public async Task GetHomeSummaryAsync_UserNotFound_ThrowsNotFound()
         {
@@ -105,6 +126,10 @@ namespace StudioStudio_Server.Tests.Services
             Assert.Equal(ErrorCodes.UserNotFound, ex.Code);
         }
 
+        /// <summary>
+        /// Branch: user exists → calculates remaining, overdue, completed task counts + joined groups
+        /// Ref: HomeService.GetHomeSummaryAsync:100-116
+        /// </summary>
         [Fact]
         public async Task GetHomeSummaryAsync_WithTasks_ReturnsSummary()
         {
@@ -134,6 +159,10 @@ namespace StudioStudio_Server.Tests.Services
 
         #region GetHomeTaskListAsync
 
+        /// <summary>
+        /// Branch: userDetail == null → throw AppException(ErrorCodes.UserNotFound)
+        /// Ref: HomeService.GetHomeTaskListAsync:132 (via EnsureUserExistsAsync)
+        /// </summary>
         [Fact]
         public async Task GetHomeTaskListAsync_UserNotFound_ThrowsNotFound()
         {
@@ -143,6 +172,10 @@ namespace StudioStudio_Server.Tests.Services
             Assert.Equal(ErrorCodes.UserNotFound, ex.Code);
         }
 
+        /// <summary>
+        /// Branch: user exists + valid pagination → returns paginated group tasks
+        /// Ref: HomeService.GetHomeTaskListAsync:141-178
+        /// </summary>
         [Fact]
         public async Task GetHomeTaskListAsync_ValidUser_ReturnsPaginatedTasks()
         {
@@ -162,6 +195,10 @@ namespace StudioStudio_Server.Tests.Services
             Assert.Equal(1, result.Page);
         }
 
+        /// <summary>
+        /// Branch: page &lt;= 0 → defaults to page=1, pageSize=10
+        /// Ref: HomeService.GetHomeTaskListAsync:134-135
+        /// </summary>
         [Fact]
         public async Task GetHomeTaskListAsync_NegativePage_UsesDefault()
         {
@@ -182,6 +219,10 @@ namespace StudioStudio_Server.Tests.Services
 
         #region CreateNewPersonalTaskStatus
 
+        /// <summary>
+        /// Branch: userDetail == null → throw AppException(ErrorCodes.UserNotFound)
+        /// Ref: HomeService.CreateNewPersonalTaskStatus:204-208
+        /// </summary>
         [Fact]
         public async Task CreateNewPersonalTaskStatus_UserNotFound_ThrowsNotFound()
         {
@@ -191,6 +232,10 @@ namespace StudioStudio_Server.Tests.Services
             Assert.Equal(ErrorCodes.UserNotFound, ex.Code);
         }
 
+        /// <summary>
+        /// Branch: IsNameExist == true → throw AppException(ErrorCodes.StatusNameExist)
+        /// Ref: HomeService.CreateNewPersonalTaskStatus:231-234
+        /// </summary>
         [Fact]
         public async Task CreateNewPersonalTaskStatus_NameExists_ThrowsBadRequest()
         {
@@ -206,6 +251,10 @@ namespace StudioStudio_Server.Tests.Services
             Assert.Equal(ErrorCodes.StatusNameExist, ex.Code);
         }
 
+        /// <summary>
+        /// Branch: no existing statuses → Position = 1000
+        /// Ref: HomeService.CreateNewPersonalTaskStatus:213-219
+        /// </summary>
         [Fact]
         public async Task CreateNewPersonalTaskStatus_ValidRequest_CreatesStatus()
         {
@@ -223,6 +272,10 @@ namespace StudioStudio_Server.Tests.Services
             _personalTaskStatusRepoMock.Verify(x => x.AddAsync(It.IsAny<PersonalTaskStatus>()), Times.Once);
         }
 
+        /// <summary>
+        /// Branch: existing statuses exist → Position = max + 1000
+        /// Ref: HomeService.CreateNewPersonalTaskStatus:213-219
+        /// </summary>
         [Fact]
         public async Task CreateNewPersonalTaskStatus_WithExisting_CalculatesPosition()
         {
@@ -245,6 +298,10 @@ namespace StudioStudio_Server.Tests.Services
 
         #region DeletePersonalTaskStatus
 
+        /// <summary>
+        /// Branch: userDetail == null → throw AppException(ErrorCodes.UserNotFound)
+        /// Ref: HomeService.DeletePersonalTaskStatus:247-251
+        /// </summary>
         [Fact]
         public async Task DeletePersonalTaskStatus_UserNotFound_ThrowsNotFound()
         {
@@ -255,6 +312,10 @@ namespace StudioStudio_Server.Tests.Services
             Assert.Equal(ErrorCodes.UserNotFound, ex.Code);
         }
 
+        /// <summary>
+        /// Branch: status == null OR status.UserId != userId → throw AppException(ErrorCodes.StatusNotFound)
+        /// Ref: HomeService.DeletePersonalTaskStatus:252-256
+        /// </summary>
         [Fact]
         public async Task DeletePersonalTaskStatus_NotOwner_ThrowsNotFound()
         {
@@ -269,6 +330,10 @@ namespace StudioStudio_Server.Tests.Services
             Assert.Equal(ErrorCodes.StatusNotFound, ex.Code);
         }
 
+        /// <summary>
+        /// Branch: taskList.Any() == true → throw AppException(ErrorCodes.GroupDeleteTaskStatusFailed)
+        /// Ref: HomeService.DeletePersonalTaskStatus:257-261
+        /// </summary>
         [Fact]
         public async Task DeletePersonalTaskStatus_HasTasks_ThrowsBadRequest()
         {
@@ -285,6 +350,10 @@ namespace StudioStudio_Server.Tests.Services
             Assert.Equal(ErrorCodes.GroupDeleteTaskStatusFailed, ex.Code);
         }
 
+        /// <summary>
+        /// Branch: valid user + status + no tasks → DeletePersonalStatusAsync called
+        /// Ref: HomeService.DeletePersonalTaskStatus:262
+        /// </summary>
         [Fact]
         public async Task DeletePersonalTaskStatus_Valid_DeletesStatus()
         {
@@ -305,6 +374,10 @@ namespace StudioStudio_Server.Tests.Services
 
         #region UpdatePersonalTaskStatus
 
+        /// <summary>
+        /// Branch: userDetail == null → throw AppException(ErrorCodes.UserNotFound)
+        /// Ref: HomeService.UpdatePersonalTaskStatus:266-270
+        /// </summary>
         [Fact]
         public async Task UpdatePersonalTaskStatus_UserNotFound_ThrowsNotFound()
         {
@@ -315,6 +388,10 @@ namespace StudioStudio_Server.Tests.Services
             Assert.Equal(ErrorCodes.UserNotFound, ex.Code);
         }
 
+        /// <summary>
+        /// Branch: status == null OR status.UserId != userId → throw AppException(ErrorCodes.StatusNotFound)
+        /// Ref: HomeService.UpdatePersonalTaskStatus:272-276
+        /// </summary>
         [Fact]
         public async Task UpdatePersonalTaskStatus_NotOwner_ThrowsNotFound()
         {
@@ -329,6 +406,10 @@ namespace StudioStudio_Server.Tests.Services
             Assert.Equal(ErrorCodes.StatusNotFound, ex.Code);
         }
 
+        /// <summary>
+        /// Branch: IsNameExist == true → throw AppException(ErrorCodes.StatusNameExist)
+        /// Ref: HomeService.UpdatePersonalTaskStatus:280-283
+        /// </summary>
         [Fact]
         public async Task UpdatePersonalTaskStatus_NameExists_ThrowsBadRequest()
         {
@@ -345,6 +426,10 @@ namespace StudioStudio_Server.Tests.Services
             Assert.Equal(ErrorCodes.StatusNameExist, ex.Code);
         }
 
+        /// <summary>
+        /// Branch: valid user + status + name unique → UpdatePersonalStatusAsync called
+        /// Ref: HomeService.UpdatePersonalTaskStatus:285
+        /// </summary>
         [Fact]
         public async Task UpdatePersonalTaskStatus_Valid_UpdatesStatus()
         {
@@ -366,6 +451,10 @@ namespace StudioStudio_Server.Tests.Services
 
         #region ReorderPersonalTaskStatus
 
+        /// <summary>
+        /// Branch: userDetail == null → throw AppException(ErrorCodes.UserNotFound)
+        /// Ref: HomeService.ReorderPersonalTaskStatus:290-294
+        /// </summary>
         [Fact]
         public async Task ReorderPersonalTaskStatus_UserNotFound_ThrowsNotFound()
         {
@@ -376,6 +465,10 @@ namespace StudioStudio_Server.Tests.Services
             Assert.Equal(ErrorCodes.UserNotFound, ex.Code);
         }
 
+        /// <summary>
+        /// Branch: status == null OR status.UserId != userId → throw AppException(ErrorCodes.StatusNotFound)
+        /// Ref: HomeService.ReorderPersonalTaskStatus:296-300
+        /// </summary>
         [Fact]
         public async Task ReorderPersonalTaskStatus_NotOwner_ThrowsNotFound()
         {
@@ -390,6 +483,10 @@ namespace StudioStudio_Server.Tests.Services
             Assert.Equal(ErrorCodes.StatusNotFound, ex.Code);
         }
 
+        /// <summary>
+        /// Branch: valid user + status owner → ReorderStatusAsync called
+        /// Ref: HomeService.ReorderPersonalTaskStatus:302-307
+        /// </summary>
         [Fact]
         public async Task ReorderPersonalTaskStatus_Valid_CallsReorder()
         {

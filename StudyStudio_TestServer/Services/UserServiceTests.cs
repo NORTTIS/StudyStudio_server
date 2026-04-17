@@ -15,6 +15,11 @@ using Xunit;
 
 namespace StudioStudio_Server.Tests.Services
 {
+    /// <summary>
+    /// Unit tests cho UserService.
+    /// Tests: user profile management, password change, account deletion, subscription info.
+    /// Ref: Services/UserService.cs
+    /// </summary>
     public class UserServiceTests
     {
         private readonly Mock<IUserRepository> _userRepoMock;
@@ -27,9 +32,7 @@ namespace StudioStudio_Server.Tests.Services
         private readonly Mock<ICacheService> _cacheServiceMock;
         private UserService _service = null!;
 
-        // Fixed test IDs
         private readonly Guid _userId = Guid.NewGuid();
-        private readonly string _validPassword = "Password123!";
 
         public UserServiceTests()
         {
@@ -77,32 +80,34 @@ namespace StudioStudio_Server.Tests.Services
 
         #region GetByIdAsync
 
+        /// <summary>
+        /// Branch: user found → returns User
+        /// Ref: UserService.GetByIdAsync:59-68 (via cache)
+        /// </summary>
         [Fact]
         public async Task GetByIdAsync_UserFound_ReturnsUser()
         {
-            // Arrange
             var user = new User { UserId = _userId, FirstName = "John", LastName = "Doe" };
             _userRepoMock.Setup(x => x.GetByIdAsync(_userId)).ReturnsAsync(user);
 
-            // Act
             var result = await _service.GetByIdAsync(_userId);
 
-            // Assert
             Assert.NotNull(result);
             Assert.Equal(_userId, result.UserId);
             Assert.Equal("John", result.FirstName);
         }
 
+        /// <summary>
+        /// Branch: user not found → returns null
+        /// Ref: UserService.GetByIdAsync:59-68
+        /// </summary>
         [Fact]
         public async Task GetByIdAsync_UserNotFound_ReturnsNull()
         {
-            // Arrange
             _userRepoMock.Setup(x => x.GetByIdAsync(_userId)).ReturnsAsync((User?)null);
 
-            // Act
             var result = await _service.GetByIdAsync(_userId);
 
-            // Assert
             Assert.Null(result);
         }
 
@@ -110,33 +115,35 @@ namespace StudioStudio_Server.Tests.Services
 
         #region GetByEmailAsync
 
+        /// <summary>
+        /// Branch: user found by email → returns User
+        /// Ref: UserService.GetByEmailAsync:74-77
+        /// </summary>
         [Fact]
         public async Task GetByEmailAsync_UserFound_ReturnsUser()
         {
-            // Arrange
             var email = "john@example.com";
             var user = new User { UserId = _userId, Email = email };
             _userRepoMock.Setup(x => x.GetByEmailAsync(email)).ReturnsAsync(user);
 
-            // Act
             var result = await _service.GetByEmailAsync(email);
 
-            // Assert
             Assert.NotNull(result);
             Assert.Equal(email, result.Email);
         }
 
+        /// <summary>
+        /// Branch: user not found by email → returns null
+        /// Ref: UserService.GetByEmailAsync:74-77
+        /// </summary>
         [Fact]
         public async Task GetByEmailAsync_UserNotFound_ReturnsNull()
         {
-            // Arrange
             _userRepoMock.Setup(x => x.GetByEmailAsync(It.IsAny<string>()))
                 .ReturnsAsync((User?)null);
 
-            // Act
             var result = await _service.GetByEmailAsync("notfound@example.com");
 
-            // Assert
             Assert.Null(result);
         }
 
@@ -144,16 +151,17 @@ namespace StudioStudio_Server.Tests.Services
 
         #region UpdateAsync
 
+        /// <summary>
+        /// Branch: valid user → sets UpdatedAt + calls UpdateAsync + invalidates cache
+        /// Ref: UserService.UpdateAsync:84-91
+        /// </summary>
         [Fact]
         public async Task UpdateAsync_ValidUser_CallsRepositoryAndInvalidatesCache()
         {
-            // Arrange
             var user = new User { UserId = _userId, FirstName = "Jane" };
 
-            // Act
             await _service.UpdateAsync(user);
 
-            // Assert
             Assert.NotEqual(default, user.UpdatedAt);
             _userRepoMock.Verify(x => x.UpdateAsync(user), Times.Once);
             _cacheServiceMock.Verify(x => x.InvalidateUserCacheAsync(_userId), Times.Once);
@@ -163,39 +171,46 @@ namespace StudioStudio_Server.Tests.Services
 
         #region DeleteAsync
 
+        /// <summary>
+        /// Branch: user == null → throw AppException(ErrorCodes.UserNotFound)
+        /// Ref: UserService.DeleteAsync:105-109
+        /// </summary>
         [Fact]
         public async Task DeleteAsync_UserNotFound_ThrowsNotFound()
         {
-            // Arrange
             _userRepoMock.Setup(x => x.GetByIdIncludingDeletedAsync(_userId))
                 .ReturnsAsync((User?)null);
 
-            // Act & Assert
             var ex = await Assert.ThrowsAsync<AppException>(() =>
                 _service.DeleteAsync(_userId));
             Assert.Equal(ErrorCodes.UserNotFound, ex.Code);
             Assert.Equal(404, ex.HttpStatus);
         }
 
+        /// <summary>
+        /// Branch: user.Status == Deleted → throw AppException(ErrorCodes.UserAccountAlreadyDeleted)
+        /// Ref: UserService.DeleteAsync:111-114
+        /// </summary>
         [Fact]
         public async Task DeleteAsync_AlreadyDeleted_ThrowsBadRequest()
         {
-            // Arrange
             var user = new User { UserId = _userId, Status = UserStatus.Deleted };
             _userRepoMock.Setup(x => x.GetByIdIncludingDeletedAsync(_userId))
                 .ReturnsAsync(user);
 
-            // Act & Assert
             var ex = await Assert.ThrowsAsync<AppException>(() =>
                 _service.DeleteAsync(_userId));
             Assert.Equal(ErrorCodes.UserAccountAlreadyDeleted, ex.Code);
             Assert.Equal(400, ex.HttpStatus);
         }
 
+        /// <summary>
+        /// Branch: valid active user → ghostUser (anonymize) + invalidate cache
+        /// Ref: UserService.DeleteAsync:116-135
+        /// </summary>
         [Fact]
         public async Task DeleteAsync_ValidUser_GhostsUserAndInvalidatesCache()
         {
-            // Arrange
             var user = new User
             {
                 UserId = _userId,
@@ -209,10 +224,8 @@ namespace StudioStudio_Server.Tests.Services
             _passwordHasherMock.Setup(x => x.HashPassword(user, It.IsAny<string>()))
                 .Returns("hashed_password");
 
-            // Act
             await _service.DeleteAsync(_userId);
 
-            // Assert
             Assert.Equal(UserStatus.Deleted, user.Status);
             Assert.Equal("Deleted", user.FirstName);
             Assert.Equal("User", user.LastName);
@@ -229,10 +242,13 @@ namespace StudioStudio_Server.Tests.Services
 
         #region ChangePasswordAsync
 
+        /// <summary>
+        /// Branch: user == null → throw AppException(ErrorCodes.UserNotFound)
+        /// Ref: UserService.ChangePasswordAsync:149-153
+        /// </summary>
         [Fact]
         public async Task ChangePasswordAsync_UserNotFound_ThrowsNotFound()
         {
-            // Arrange
             _userRepoMock.Setup(x => x.GetByIdAsync(_userId))
                 .ReturnsAsync((User?)null);
 
@@ -243,16 +259,18 @@ namespace StudioStudio_Server.Tests.Services
                 ConfirmPassword = "NewPass456!"
             };
 
-            // Act & Assert
             var ex = await Assert.ThrowsAsync<AppException>(() =>
                 _service.ChangePasswordAsync(_userId, request));
             Assert.Equal(ErrorCodes.UserNotFound, ex.Code);
         }
 
+        /// <summary>
+        /// Branch: verifyResult != Success → throw AppException(ErrorCodes.AuthIncorrectCurrentPassword)
+        /// Ref: UserService.ChangePasswordAsync:155-160
+        /// </summary>
         [Fact]
         public async Task ChangePasswordAsync_IncorrectCurrentPassword_ThrowsBadRequest()
         {
-            // Arrange
             var user = new User { UserId = _userId, PasswordHash = "hashed_password" };
             _userRepoMock.Setup(x => x.GetByIdAsync(_userId)).ReturnsAsync(user);
             _passwordHasherMock.Setup(x => x.VerifyHashedPassword(user, "hashed_password", "WrongPass123!"))
@@ -265,16 +283,18 @@ namespace StudioStudio_Server.Tests.Services
                 ConfirmPassword = "NewPass456!"
             };
 
-            // Act & Assert
             var ex = await Assert.ThrowsAsync<AppException>(() =>
                 _service.ChangePasswordAsync(_userId, request));
             Assert.Equal(ErrorCodes.AuthIncorrectCurrentPassword, ex.Code);
         }
 
+        /// <summary>
+        /// Branch: !IsValidPassword(newPassword) → throw AppException(ErrorCodes.ValidationInvalidPassword)
+        /// Ref: UserService.ChangePasswordAsync:162-166
+        /// </summary>
         [Fact]
         public async Task ChangePasswordAsync_InvalidNewPasswordFormat_ThrowsBadRequest()
         {
-            // Arrange
             var user = new User { UserId = _userId, PasswordHash = "hashed_password" };
             _userRepoMock.Setup(x => x.GetByIdAsync(_userId)).ReturnsAsync(user);
             _passwordHasherMock.Setup(x => x.VerifyHashedPassword(user, "hashed_password", "OldPass123!"))
@@ -287,16 +307,18 @@ namespace StudioStudio_Server.Tests.Services
                 ConfirmPassword = "weak"
             };
 
-            // Act & Assert
             var ex = await Assert.ThrowsAsync<AppException>(() =>
                 _service.ChangePasswordAsync(_userId, request));
             Assert.Equal(ErrorCodes.ValidationInvalidPassword, ex.Code);
         }
 
+        /// <summary>
+        /// Branch: newPassword != confirmPassword → throw AppException(ErrorCodes.ValidationPasswordMismatch)
+        /// Ref: UserService.ChangePasswordAsync:168-172
+        /// </summary>
         [Fact]
         public async Task ChangePasswordAsync_PasswordMismatch_ThrowsBadRequest()
         {
-            // Arrange
             var user = new User { UserId = _userId, PasswordHash = "hashed_password" };
             _userRepoMock.Setup(x => x.GetByIdAsync(_userId)).ReturnsAsync(user);
             _passwordHasherMock.Setup(x => x.VerifyHashedPassword(user, "hashed_password", "OldPass123!"))
@@ -309,20 +331,20 @@ namespace StudioStudio_Server.Tests.Services
                 ConfirmPassword = "DifferentPass789!" // Mismatch
             };
 
-            // Act & Assert
             var ex = await Assert.ThrowsAsync<AppException>(() =>
                 _service.ChangePasswordAsync(_userId, request));
             Assert.Equal(ErrorCodes.ValidationPasswordMismatch, ex.Code);
         }
 
+        /// <summary>
+        /// Branch: newPassword same as current → throw AppException(ErrorCodes.ValidationNewPasswordSameAsCurrent)
+        /// Ref: UserService.ChangePasswordAsync:176-181
+        /// </summary>
         [Fact]
         public async Task ChangePasswordAsync_SameAsCurrentPassword_ThrowsBadRequest()
         {
-            // Arrange
             var user = new User { UserId = _userId, PasswordHash = "hashed_password" };
             _userRepoMock.Setup(x => x.GetByIdAsync(_userId)).ReturnsAsync(user);
-            _passwordHasherMock.Setup(x => x.VerifyHashedPassword(user, "hashed_password", "OldPass123!"))
-                .Returns(PasswordVerificationResult.Success);
             _passwordHasherMock.Setup(x => x.VerifyHashedPassword(user, "hashed_password", "OldPass123!"))
                 .Returns(PasswordVerificationResult.Success);
             _passwordHasherMock.Setup(x => x.HashPassword(user, "OldPass123!"))
@@ -335,16 +357,18 @@ namespace StudioStudio_Server.Tests.Services
                 ConfirmPassword = "OldPass123!"
             };
 
-            // Act & Assert
             var ex = await Assert.ThrowsAsync<AppException>(() =>
                 _service.ChangePasswordAsync(_userId, request));
             Assert.Equal(ErrorCodes.ValidationNewPasswordSameAsCurrent, ex.Code);
         }
 
+        /// <summary>
+        /// Branch: all validations pass → updates password + invalidate cache
+        /// Ref: UserService.ChangePasswordAsync:183-190
+        /// </summary>
         [Fact]
         public async Task ChangePasswordAsync_ValidRequest_UpdatesPasswordAndInvalidatesCache()
         {
-            // Arrange
             var user = new User { UserId = _userId, PasswordHash = "old_hash" };
             _userRepoMock.Setup(x => x.GetByIdAsync(_userId)).ReturnsAsync(user);
             _passwordHasherMock.Setup(x => x.VerifyHashedPassword(user, "old_hash", "OldPass123!"))
@@ -361,10 +385,8 @@ namespace StudioStudio_Server.Tests.Services
                 ConfirmPassword = "NewPass456!"
             };
 
-            // Act
             await _service.ChangePasswordAsync(_userId, request);
 
-            // Assert
             Assert.Equal("new_hash", user.PasswordHash);
             Assert.NotEqual(default, user.UpdatedAt);
             _userRepoMock.Verify(x => x.UpdateAsync(user), Times.Once);
@@ -375,25 +397,30 @@ namespace StudioStudio_Server.Tests.Services
 
         #region UpdateProfileAsync
 
+        /// <summary>
+        /// Branch: user == null → throw AppException(ErrorCodes.UserNotFound)
+        /// Ref: UserService.UpdateProfileAsync:203-207
+        /// </summary>
         [Fact]
         public async Task UpdateProfileAsync_UserNotFound_ThrowsNotFound()
         {
-            // Arrange
             _userRepoMock.Setup(x => x.GetByIdAsync(_userId))
                 .ReturnsAsync((User?)null);
 
             var request = new UpdateUserProfileRequest { FirstName = "Jane" };
 
-            // Act & Assert
             var ex = await Assert.ThrowsAsync<AppException>(() =>
                 _service.UpdateProfileAsync(_userId, request));
             Assert.Equal(ErrorCodes.UserNotFound, ex.Code);
         }
 
+        /// <summary>
+        /// Branch: valid user → updates fields (FirstName, LastName, Bio) + invalidate cache
+        /// Ref: UserService.UpdateProfileAsync:209-237
+        /// </summary>
         [Fact]
         public async Task UpdateProfileAsync_ValidRequest_UpdatesFieldsAndInvalidatesCache()
         {
-            // Arrange
             var user = new User { UserId = _userId, FirstName = "John" };
             _userRepoMock.Setup(x => x.GetByIdAsync(_userId)).ReturnsAsync(user);
 
@@ -404,10 +431,8 @@ namespace StudioStudio_Server.Tests.Services
                 Bio = "Hello world"
             };
 
-            // Act
             await _service.UpdateProfileAsync(_userId, request);
 
-            // Assert
             Assert.Equal("Jane", user.FirstName);
             Assert.Equal("Smith", user.LastName);
             Assert.Equal("Hello world", user.Bio);
@@ -416,35 +441,37 @@ namespace StudioStudio_Server.Tests.Services
             _cacheServiceMock.Verify(x => x.InvalidateUserCacheAsync(_userId), Times.Once);
         }
 
+        /// <summary>
+        /// Branch: request.Language provided → updates Language
+        /// Ref: UserService.UpdateProfileAsync:221-222
+        /// </summary>
         [Fact]
         public async Task UpdateProfileAsync_WithLanguage_UpdatesLanguage()
         {
-            // Arrange
             var user = new User { UserId = _userId };
             _userRepoMock.Setup(x => x.GetByIdAsync(_userId)).ReturnsAsync(user);
 
             var request = new UpdateUserProfileRequest { Language = "en" };
 
-            // Act
             await _service.UpdateProfileAsync(_userId, request);
 
-            // Assert
             Assert.Equal("en", user.Language);
         }
 
+        /// <summary>
+        /// Branch: request.EmailNotificationEnabled provided → updates flag
+        /// Ref: UserService.UpdateProfileAsync:224-226
+        /// </summary>
         [Fact]
         public async Task UpdateProfileAsync_WithEmailNotification_UpdatesFlag()
         {
-            // Arrange
             var user = new User { UserId = _userId, EmailNotificationEnabled = false };
             _userRepoMock.Setup(x => x.GetByIdAsync(_userId)).ReturnsAsync(user);
 
             var request = new UpdateUserProfileRequest { EmailNotificationEnabled = true };
 
-            // Act
             await _service.UpdateProfileAsync(_userId, request);
 
-            // Assert
             Assert.True(user.EmailNotificationEnabled);
         }
 
@@ -452,54 +479,57 @@ namespace StudioStudio_Server.Tests.Services
 
         #region GetAiRequestLimitInfoAsync
 
+        /// <summary>
+        /// Branch: subscription == null (Free plan) → dailyLimit = 20
+        /// Ref: UserService.GetAiRequestLimitInfoAsync:318-340
+        /// </summary>
         [Fact]
         public async Task GetAiRequestLimitInfoAsync_FreePlan_Returns20Limit()
         {
-            // Arrange
             _aiRequestLogRepoMock.Setup(x => x.CountTodayRequestsAsync(_userId, It.IsAny<DateTime>()))
                 .ReturnsAsync(5);
             _subscriptionRepoMock.Setup(x => x.GetSubscriptionPlanByUserIdAsync(_userId))
                 .ReturnsAsync((SubscriptionPlan?)null); // Free plan
 
-            // Act
             var (usedToday, dailyLimit) = await _service.GetAiRequestLimitInfoAsync(_userId);
 
-            // Assert
             Assert.Equal(5, usedToday);
             Assert.Equal(20, dailyLimit);
         }
 
+        /// <summary>
+        /// Branch: subscription has custom limit → returns that limit
+        /// Ref: UserService.GetAiRequestLimitInfoAsync:335
+        /// </summary>
         [Fact]
         public async Task GetAiRequestLimitInfoAsync_PremiumPlan_ReturnsCustomLimit()
         {
-            // Arrange
             _aiRequestLogRepoMock.Setup(x => x.CountTodayRequestsAsync(_userId, It.IsAny<DateTime>()))
                 .ReturnsAsync(50);
             var premiumPlan = new SubscriptionPlan { PlanName = "Premium", MaxAiRequestsPerDay = 100 };
             _subscriptionRepoMock.Setup(x => x.GetSubscriptionPlanByUserIdAsync(_userId))
                 .ReturnsAsync(premiumPlan);
 
-            // Act
             var (usedToday, dailyLimit) = await _service.GetAiRequestLimitInfoAsync(_userId);
 
-            // Assert
             Assert.Equal(50, usedToday);
             Assert.Equal(100, dailyLimit);
         }
 
+        /// <summary>
+        /// Branch: 0 requests today → usedToday = 0
+        /// Ref: UserService.GetAiRequestLimitInfoAsync:325
+        /// </summary>
         [Fact]
         public async Task GetAiRequestLimitInfoAsync_ZeroRequests_ReturnsZeroUsed()
         {
-            // Arrange
             _aiRequestLogRepoMock.Setup(x => x.CountTodayRequestsAsync(_userId, It.IsAny<DateTime>()))
                 .ReturnsAsync(0);
             _subscriptionRepoMock.Setup(x => x.GetSubscriptionPlanByUserIdAsync(_userId))
                 .ReturnsAsync((SubscriptionPlan?)null);
 
-            // Act
             var (usedToday, dailyLimit) = await _service.GetAiRequestLimitInfoAsync(_userId);
 
-            // Assert
             Assert.Equal(0, usedToday);
             Assert.Equal(20, dailyLimit);
         }
@@ -508,10 +538,13 @@ namespace StudioStudio_Server.Tests.Services
 
         #region GetUserSubscriptionPlan
 
+        /// <summary>
+        /// Branch: subscription == null → returns defaults (Free plan)
+        /// Ref: UserService.GetUserSubscriptionPlan:342-365
+        /// </summary>
         [Fact]
         public async Task GetUserSubscriptionPlan_NullSubscription_ReturnsDefaults()
         {
-            // Arrange
             // Note: In production, every user ALWAYS has a subscription (default Free plan).
             // The GetSubscriptionPlanByUserIdAsync returns null only in test when not mocked.
             var freePlan = new SubscriptionPlan
@@ -524,19 +557,20 @@ namespace StudioStudio_Server.Tests.Services
             _subscriptionRepoMock.Setup(x => x.GetSubscriptionPlanByUserIdAsync(_userId))
                 .ReturnsAsync(freePlan);
 
-            // Act
             var result = await _service.GetUserSubscriptionPlan(_userId);
 
-            // Assert
             Assert.NotNull(result);
             Assert.Equal(Guid.Empty, result.PlanId);
             Assert.Equal(20, result.MaxAiRequestsPerDay);
         }
 
+        /// <summary>
+        /// Branch: subscription != null → returns all plan fields
+        /// Ref: UserService.GetUserSubscriptionPlan:352-364
+        /// </summary>
         [Fact]
         public async Task GetUserSubscriptionPlan_WithPremiumPlan_ReturnsCorrectData()
         {
-            // Arrange
             var plan = new SubscriptionPlan
             {
                 PlanId = Guid.NewGuid(),
@@ -553,10 +587,8 @@ namespace StudioStudio_Server.Tests.Services
             _subscriptionRepoMock.Setup(x => x.GetSubscriptionPlanByUserIdAsync(_userId))
                 .ReturnsAsync(plan);
 
-            // Act
             var result = await _service.GetUserSubscriptionPlan(_userId);
 
-            // Assert
             Assert.Equal(plan.PlanId, result.PlanId);
             Assert.Equal("Premium", result.PlanName);
             Assert.Equal(9.99m, result.Price);
@@ -566,10 +598,13 @@ namespace StudioStudio_Server.Tests.Services
             Assert.Equal(100, result.MaxGroups);
         }
 
+        /// <summary>
+        /// Branch: calls cache service → GetOrSetAsync invoked
+        /// Ref: UserService.GetUserSubscriptionPlan:345-350
+        /// </summary>
         [Fact]
         public async Task GetUserSubscriptionPlan_UsesCache()
         {
-            // Arrange
             var plan = new SubscriptionPlan
             {
                 PlanId = Guid.NewGuid(),
@@ -579,10 +614,8 @@ namespace StudioStudio_Server.Tests.Services
             _subscriptionRepoMock.Setup(x => x.GetSubscriptionPlanByUserIdAsync(_userId))
                 .ReturnsAsync(plan);
 
-            // Act
             await _service.GetUserSubscriptionPlan(_userId);
 
-            // Assert
             _cacheServiceMock.Verify(x => x.GetOrSetAsync(
                 _cacheServiceMock.Object.GetUserSubscriptionKey(_userId),
                 It.IsAny<Func<Task<SubscriptionPlan>>>(),

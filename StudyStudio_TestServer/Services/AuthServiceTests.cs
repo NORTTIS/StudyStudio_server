@@ -12,6 +12,11 @@ using Xunit;
 
 namespace StudioStudio_Server.Tests.Services;
 
+/// <summary>
+/// Unit tests cho AuthService.
+/// Tests: register, verify email, login, refresh token, Google OAuth, password reset.
+/// Ref: Services/AuthService.cs
+/// </summary>
 public class AuthServiceTests
 {
     private static readonly Guid TestUserId = Guid.NewGuid();
@@ -19,7 +24,7 @@ public class AuthServiceTests
     private static readonly string TestPassword = "Password123!";
 
     // =====================================================================
-    // REGISTERASYNC TESTS
+    // REGISTERASYNC TESTS - Đăng ký tài khoản
     // =====================================================================
 
     [Fact]
@@ -143,7 +148,7 @@ public class AuthServiceTests
     }
 
     // =====================================================================
-    // VERIFYEMAILLINKASYNC TESTS
+    // VERIFYEMAILLINKASYNC TESTS - Xác thực email
     // =====================================================================
 
     [Fact]
@@ -251,7 +256,7 @@ public class AuthServiceTests
     }
 
     // =====================================================================
-    // LOGINASYNC TESTS
+    // LOGINASYNC TESTS - Đăng nhập
     // =====================================================================
 
     [Fact]
@@ -419,7 +424,7 @@ public class AuthServiceTests
     }
 
     // =====================================================================
-    // REFRESHTOKENASYNC TESTS
+    // REFRESHTOKENASYNC TESTS - Làm mới token
     // =====================================================================
 
     [Fact]
@@ -559,7 +564,7 @@ public class AuthServiceTests
     }
 
     // =====================================================================
-    // LOGOUTASYNC TESTS
+    // LOGOUTASYNC TESTS - Đăng xuất
     // =====================================================================
 
     [Fact]
@@ -602,7 +607,7 @@ public class AuthServiceTests
     }
 
     // =====================================================================
-    // GOOGLELOGINASYNC TESTS
+    // GOOGLELOGINASYNC TESTS - Đăng nhập Google
     // =====================================================================
 
     [Fact]
@@ -696,7 +701,7 @@ public class AuthServiceTests
     }
 
     // =====================================================================
-    // VERIFYRESETTOKENASYNC TESTS
+    // VERIFYRESETTOKENASYNC TESTS - Xác thực token reset
     // =====================================================================
 
     [Fact]
@@ -753,7 +758,7 @@ public class AuthServiceTests
     }
 
     // =====================================================================
-    // RESETPASSWORDASYNC TESTS
+    // RESETPASSWORDASYNC TESTS - Đặt lại mật khẩu
     // =====================================================================
 
     [Fact]
@@ -828,7 +833,7 @@ public class AuthServiceTests
     }
 
     // =====================================================================
-    // RESENDVERIFYEMAILASYNC TESTS
+    // RESENDVERIFYEMAILASYNC TESTS - Gửi lại email xác thực
     // =====================================================================
 
     [Fact]

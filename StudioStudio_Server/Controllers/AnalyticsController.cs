@@ -10,35 +10,35 @@ namespace StudioStudio_Server.Controllers
     [Route("api/analytics")]
     [ApiController]
     [Authorize]
-    public class AnalyticsController : ControllerBase
+    public class AnalyticsController(IAnalyticsService analyticsService) : ControllerBase
     {
-        private readonly IAnalyticsService _analyticsService;
-
-        public AnalyticsController(IAnalyticsService analyticsService)
-        {
-            _analyticsService = analyticsService;
-        }
-
-        /// <summary>
-        /// Authenticate and get userId from JWT token
-        /// Validate: User must not be admin (admin cannot use user APIs)
-        /// </summary>
+        /// Xác thực người dùng và lấy userId từ JWT token.
+        /// Kiểm tra: Người dùng không được là admin (admin không thể sử dụng API người dùng).
+        /// Trả về: UserId của người dùng hiện tại
+        /// lỗi: Khi token không hợp lệ hoặc người dùng là admin
         private Guid ValidateAndGetUserId()
         {
+            // Lấy claim NameIdentifier từ JWT token
             var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
 
+            // Kiểm tra claim có tồn tại và có định dạng GUID hợp lệ hay không
             if (string.IsNullOrEmpty(userIdClaim) || !Guid.TryParse(userIdClaim, out Guid userId))
             {
+                // Token không hợp lệ hoặc không chứa userId -> trả về lỗi 401
                 throw new AppException(
                     ErrorCodes.AuthInvalidCredential,
                     StatusCodes.Status401Unauthorized);
             }
 
+            // Kiểm tra xem người dùng có phải là admin hay không
             var isAdminClaim = User.FindFirst("IsAdmin")?.Value;
+            // Parse giá trị claim IsAdmin thành boolean
+            // Chỉ cần một trong các điều kiện thất bại (claim null, parse thất bại) thì isAdmin = false
             var isAdmin = isAdminClaim != null &&
                           bool.TryParse(isAdminClaim, out var adminResult) &&
                           adminResult;
 
+            // Nếu người dùng là admin -> từ chối truy cập với lỗi 403
             if (isAdmin)
             {
                 throw new AppException(
@@ -49,19 +49,18 @@ namespace StudioStudio_Server.Controllers
             return userId;
         }
 
-        // ==================== GROUP ANALYTICS ====================
-
-        /// <summary>
-        /// Get group summary (all time, no date filter)
-        /// Returns task breakdown, activity summary, and contribution data
-        /// </summary>
+        // GROUP ANALYTICS
+        /// Lấy tóm tắt nhóm (toàn bộ thời gian, không lọc theo ngày).
+        /// Trả về: phân tích công việc, tóm tắt hoạt động và dữ liệu đóng góp.
+        /// Tham số: ID của nhóm cần lấy thông tin tóm tắt
+        /// Tóm tắt nhóm với các thông tin tổng quan
         [HttpGet("group/{groupId}/summary")]
         public async Task<ActionResult<ApiResponse<GroupSummaryResponse>>> GetGroupSummary(
             Guid groupId)
         {
             var userId = ValidateAndGetUserId();
 
-            var result = await _analyticsService.GetGroupSummaryAsync(groupId, userId);
+            var result = await analyticsService.GetGroupSummaryAsync(groupId, userId);
 
             return Ok(ApiResponse<GroupSummaryResponse>.Success(
                 ErrorCodes.SuccessGetData,
@@ -69,9 +68,9 @@ namespace StudioStudio_Server.Controllers
                 result));
         }
 
-        /// <summary>
-        /// Get member progress trend with date filter and optional member filter
-        /// </summary>
+        /// Lấy xu hướng tiến độ của thành viên với bộ lọc ngày và bộ lọc thành viên tùy chọn.
+        /// Tham số: ID của nhóm, ngày bắt đầu, ngày kết thúc, danh sách ID thành viên cần lọc
+        /// Trả về: Danh sách dữ liệu xu hướng tiến độ của từng thành viên
         [HttpGet("group/{groupId}/trend")]
         public async Task<ActionResult<ApiResponse<List<MemberProgressTrendData>>>> GetMemberProgressTrend(
             Guid groupId,
@@ -84,7 +83,7 @@ namespace StudioStudio_Server.Controllers
             DateOnly? start = startDate.HasValue ? DateOnly.FromDateTime(startDate.Value) : null;
             DateOnly? end = endDate.HasValue ? DateOnly.FromDateTime(endDate.Value) : null;
 
-            var result = await _analyticsService.GetMemberProgressTrendAsync(groupId, start, end, memberIds);
+            var result = await analyticsService.GetMemberProgressTrendAsync(groupId, start, end, memberIds);
 
             return Ok(ApiResponse<List<MemberProgressTrendData>>.Success(
                 ErrorCodes.SuccessGetData,
@@ -92,9 +91,9 @@ namespace StudioStudio_Server.Controllers
                 result));
         }
 
-        /// <summary>
-        /// Get member heatmap with date filter
-        /// </summary>
+        /// Lấy bản đồ nhiệt (heatmap) hoạt động của các thành viên với bộ lọc ngày.
+        /// Tham số: ID của nhóm, ngày bắt đầu, ngày kết thúc
+        /// Trả về: Danh sách dữ liệu heatmap cho từng thành viên theo ngày
         [HttpGet("group/{groupId}/heatmap")]
         public async Task<ActionResult<ApiResponse<List<MemberHeatmapData>>>> GetMemberHeatmap(
             Guid groupId,
@@ -106,7 +105,7 @@ namespace StudioStudio_Server.Controllers
             DateOnly? start = startDate.HasValue ? DateOnly.FromDateTime(startDate.Value) : null;
             DateOnly? end = endDate.HasValue ? DateOnly.FromDateTime(endDate.Value) : null;
 
-            var result = await _analyticsService.GetMemberHeatmapAsync(groupId, start, end);
+            var result = await analyticsService.GetMemberHeatmapAsync(groupId, start, end);
 
             return Ok(ApiResponse<List<MemberHeatmapData>>.Success(
                 ErrorCodes.SuccessGetData,
@@ -114,81 +113,20 @@ namespace StudioStudio_Server.Controllers
                 result));
         }
 
-        /// <summary>
-        /// Get group member contributions (kept for backward compatibility)
-        /// </summary>
-        [HttpGet("group/{groupId}/members")]
-        public async Task<ActionResult<ApiResponse<List<MemberContributionData>>>> GetGroupMemberContribution(
-            Guid groupId)
-        {
-            var userId = ValidateAndGetUserId();
 
-            var result = await _analyticsService.GetGroupMemberContributionAsync(groupId);
-
-            return Ok(ApiResponse<List<MemberContributionData>>.Success(
-                ErrorCodes.SuccessGetData,
-                "Data retrieved successfully",
-                result));
-        }
-
-        // ==================== STUDIO ANALYTICS ====================
-
-        /// <summary>
-        /// Get studio group comparison
-        /// </summary>
-        [HttpGet("studio/{studioId}/groups")]
-        public async Task<ActionResult<ApiResponse<List<GroupComparisonData>>>> GetStudioGroupComparison(
-            Guid studioId)
-        {
-            var userId = ValidateAndGetUserId();
-
-            var result = await _analyticsService.GetStudioGroupComparisonAsync(studioId);
-
-            return Ok(ApiResponse<List<GroupComparisonData>>.Success(
-                ErrorCodes.SuccessGetData,
-                "Data retrieved successfully",
-                result));
-        }
-
-        /// <summary>
-        /// Get studio group activity heatmap for chart visualization
-        /// Date range: default 30 days (matching UI navigation)
-        /// </summary>
-        [HttpGet("studio/{studioId}/heatmap")]
-        public async Task<ActionResult<ApiResponse<StudioGroupHeatmapResponse>>> GetStudioGroupHeatmap(
-            Guid studioId,
-            [FromQuery] DateTime? startDate = null,
-            [FromQuery] DateTime? endDate = null)
-        {
-            var userId = ValidateAndGetUserId();
-
-            // Default: endDate = today, startDate = today - 29 days (total 30 days)
-            var end = endDate.HasValue ? DateOnly.FromDateTime(endDate.Value) : DateOnly.FromDateTime(DateTime.UtcNow);
-            var start = startDate.HasValue ? DateOnly.FromDateTime(startDate.Value) : end.AddDays(-29);
-
-            var result = await _analyticsService.GetStudioGroupHeatmapAsync(studioId, start, end);
-
-            return Ok(ApiResponse<StudioGroupHeatmapResponse>.Success(
-                ErrorCodes.SuccessGetData,
-                "Data retrieved successfully",
-                result));
-        }
 
         // ==================== STUDIO OVERVIEW (Chart 1 & 2) ====================
-
-        /// <summary>
-        /// GET /api/analytics/studio/{studioId}/overview
-        ///
-        /// Returns studio overview with all groups summary (no date filter).
-        /// Used for Chart 1 (Group Progress) & Chart 2 (Task Status per group).
-        /// </summary>
+        /// Lấy tổng quan studio với tóm tắt tất cả các nhóm (không lọc theo ngày).
+        /// Sử dụng cho Chart 1 (Tiến độ nhóm) và Chart 2 (Trạng thái công việc theo nhóm).
+        /// Tham số: ID của studio
+        /// Trả về: Tổng quan studio với dữ liệu biểu đồ
         [HttpGet("studio/{studioId}/overview")]
         public async Task<ActionResult<ApiResponse<StudioOverviewResponse>>> GetStudioOverview(
             Guid studioId)
         {
             var userId = ValidateAndGetUserId();
 
-            var result = await _analyticsService.GetStudioOverviewAsync(studioId);
+            var result = await analyticsService.GetStudioOverviewAsync(studioId);
 
             return Ok(ApiResponse<StudioOverviewResponse>.Success(
                 ErrorCodes.SuccessGetData,
@@ -197,13 +135,10 @@ namespace StudioStudio_Server.Controllers
         }
 
         // ==================== STUDIO COMPLETION TREND (Chart 3) ====================
-
-        /// <summary>
-        /// GET /api/analytics/studio/{studioId}/completion-trend
-        ///
-        /// Returns completion trend per group WITH date filter.
-        /// Used for Chart 3 (Line Chart).
-        /// </summary>
+        /// Lấy xu hướng hoàn thành task theo nhóm có bộ lọc ngày.
+        /// Sử dụng cho Chart 3 (Biểu đồ đường).
+        /// Tham số: ID của studio, ngày bắt đầu, ngày kết thúc, danh sách ID nhóm
+        /// Trả về: Dữ liệu xu hướng hoàn thành theo thời gian
         [HttpGet("studio/{studioId}/completion-trend")]
         public async Task<ActionResult<ApiResponse<StudioCompletionTrendResponse>>> GetStudioCompletionTrend(
             Guid studioId,
@@ -216,10 +151,14 @@ namespace StudioStudio_Server.Controllers
             DateOnly? start = startDate.HasValue ? DateOnly.FromDateTime(startDate.Value) : null;
             DateOnly? end = endDate.HasValue ? DateOnly.FromDateTime(endDate.Value) : null;
 
-            // Parse comma-separated groupIds
             List<Guid>? parsedGroupIds = null;
             if (!string.IsNullOrWhiteSpace(groupIds))
             {
+                // frontend sẽ truyền lên danh sách groupId dưới dạng chuỗi phân tách bằng dấu phẩy, ví dụ: "guid1,guid2,guid3"
+                // Tách chuỗi theo dấu phẩy, loại bỏ khoảng trắng thừa
+                // TryParse để lọc bỏ các chuỗi không phải GUID hợp lệ
+                // Where(g => g.HasValue) để loại bỏ các giá trị null từ parse thất bại
+                // Select(g => g!.Value) để chuyển từ Guid? sang Guid
                 parsedGroupIds = groupIds
                     .Split(',', StringSplitOptions.RemoveEmptyEntries)
                     .Select(s => Guid.TryParse(s.Trim(), out var g) ? g : (Guid?)null)
@@ -228,7 +167,7 @@ namespace StudioStudio_Server.Controllers
                     .ToList();
             }
 
-            var result = await _analyticsService.GetStudioCompletionTrendAsync(studioId, start, end, parsedGroupIds);
+            var result = await analyticsService.GetStudioCompletionTrendAsync(studioId, start, end, parsedGroupIds);
 
             return Ok(ApiResponse<StudioCompletionTrendResponse>.Success(
                 ErrorCodes.SuccessGetData,
@@ -236,48 +175,24 @@ namespace StudioStudio_Server.Controllers
                 result));
         }
 
-        // ==================== STUDIO GROUP STATUS (Chart 4) ====================
-
-        /// <summary>
-        /// GET /api/analytics/studio/{studioId}/group-status
-        ///
-        /// Returns task status breakdown per group WITH date filter.
-        /// Used for Chart 4 (Grouped Bar Chart).
-        /// </summary>
-        [HttpGet("studio/{studioId}/group-status")]
-        public async Task<ActionResult<ApiResponse<StudioGroupStatusResponse>>> GetStudioGroupStatus(
-            Guid studioId,
-            [FromQuery] DateTime? startDate = null,
-            [FromQuery] DateTime? endDate = null)
-        {
-            var userId = ValidateAndGetUserId();
-
-            DateOnly? start = startDate.HasValue ? DateOnly.FromDateTime(startDate.Value) : null;
-            DateOnly? end = endDate.HasValue ? DateOnly.FromDateTime(endDate.Value) : null;
-
-            var result = await _analyticsService.GetStudioGroupStatusAsync(studioId, start, end);
-
-            return Ok(ApiResponse<StudioGroupStatusResponse>.Success(
-                ErrorCodes.SuccessGetData,
-                "Data retrieved successfully",
-                result));
-        }
 
         // ==================== STUDIO GROUP ACTIVITY (Chart 5) ====================
 
-        /// <summary>
-        /// GET /api/analytics/studio/{studioId}/group-activity
+        /// Lấy dữ liệu bản đồ nhiệt hoạt động theo nhóm có hỗ trợ bộ lọc ngày.
+        /// Mức độ hoạt động chia làm 4 level
+        /// Sử dụng cho Chart 5 (Bản đồ nhiệt hoạt động).
         ///
-        /// Returns activity heatmap data per group WITH date filter.
-        /// Activity Level (0-4) is pre-calculated by backend with fixed thresholds.
-        /// Used for Chart 5 (Activity Heatmap).
-        ///
-        /// Activity Score Formula:
+        /// Công thức tính Activity Score:
         ///   Score = tasksCompleted×4 + tasksCreated×3 + tasksUpdated×2 + commentsCreated×1 + messagesSent×1
         ///
-        /// Activity Level Thresholds (FIXED):
-        ///   0 = 0, 1 = 1-5, 2 = 6-15, 3 = 16-30, 4 = 31+
-        /// </summary>
+        /// Ngưỡng Activity Level:
+        ///   0 = 0 điểm (Không hoạt động)
+        ///   1 = 1-5 điểm (Hoạt động thấp)
+        ///   2 = 6-15 điểm (Hoạt động trung bình)
+        ///   3 = 16-30 điểm (Hoạt động cao)
+        ///   4 = 31+ điểm (Rất hoạt động)
+        /// Tham số: ID của studio, ngày bắt đầu, ngày kết thúc
+        /// Trả về: Dữ liệu hoạt động theo nhóm và ngày
         [HttpGet("studio/{studioId}/group-activity")]
         public async Task<ActionResult<ApiResponse<StudioGroupActivityResponse>>> GetStudioGroupActivity(
             Guid studioId,
@@ -289,7 +204,7 @@ namespace StudioStudio_Server.Controllers
             DateOnly? start = startDate.HasValue ? DateOnly.FromDateTime(startDate.Value) : null;
             DateOnly? end = endDate.HasValue ? DateOnly.FromDateTime(endDate.Value) : null;
 
-            var result = await _analyticsService.GetStudioGroupActivityAsync(studioId, start, end);
+            var result = await analyticsService.GetStudioGroupActivityAsync(studioId, start, end);
 
             return Ok(ApiResponse<StudioGroupActivityResponse>.Success(
                 ErrorCodes.SuccessGetData,
@@ -298,131 +213,118 @@ namespace StudioStudio_Server.Controllers
         }
 
         // ==================== PERSONAL ANALYTICS (AnalysisHome) ====================
-
-        /// <summary>
-        /// GET /api/analytics/user/{userId}/kpi-summary
-        /// KPI summary: total tasks, completed, overdue, completion rate, avg time
-        /// </summary>
+        /// Lấy tóm tắt KPI của người dùng.
+        /// Bao gồm: tổng công việc, đã hoàn thành, quá hạn, tỷ lệ hoàn thành, thời gian trung bình.
+        /// Tham số: ID của người dùng cần lấy KPI
+        /// Trả về: Tóm tắt KPI của người dùng
         [HttpGet("user/{userId}/kpi-summary")]
         public async Task<ActionResult<ApiResponse<UserKpiSummaryResponse>>> GetUserKpiSummary(Guid userId)
         {
             var currentUserId = ValidateAndGetUserId();
+
+            // Kiểm tra người dùng hiện tại chỉ có thể xem KPI của chính mình
             if (currentUserId != userId)
                 throw new AppException(ErrorCodes.AuthForbidden, StatusCodes.Status403Forbidden);
 
-            var result = await _analyticsService.GetUserKpiSummaryAsync(userId);
+            var result = await analyticsService.GetUserKpiSummaryAsync(userId);
             return Ok(ApiResponse<UserKpiSummaryResponse>.Success(
                 ErrorCodes.SuccessGetData, "Data retrieved successfully", result));
         }
 
-        /// <summary>
-        /// GET /api/analytics/user/{userId}/task-status
-        /// Task status donut: Hoàn thành, Đang làm, Chưa bắt đầu, Quá hạn
-        /// </summary>
+        /// Lấy trạng thái công việc của người dùng dưới dạng donut chart.
+        /// Phân loại: Hoàn thành, Đang làm, Chưa bắt đầu, Quá hạn.
+        /// Tham số: ID của người dùng
+        /// Trả về: Phân bổ công việc theo trạng thái
         [HttpGet("user/{userId}/task-status")]
         public async Task<ActionResult<ApiResponse<UserTaskStatusResponse>>> GetUserTaskStatus(Guid userId)
         {
             var currentUserId = ValidateAndGetUserId();
+
+            // Chỉ cho phép người dùng xem trạng thái công việc của chính mình
             if (currentUserId != userId)
                 throw new AppException(ErrorCodes.AuthForbidden, StatusCodes.Status403Forbidden);
 
-            var result = await _analyticsService.GetUserTaskStatusAsync(userId);
+            var result = await analyticsService.GetUserTaskStatusAsync(userId);
             return Ok(ApiResponse<UserTaskStatusResponse>.Success(
                 ErrorCodes.SuccessGetData, "Data retrieved successfully", result));
         }
 
-        /// <summary>
-        /// GET /api/analytics/user/{userId}/group-rankings
-        /// Cross-studio group rankings sorted by score
-        /// </summary>
+        /// Lấy xếp hạng nhóm của người dùng qua các studio khác nhau, sắp xếp theo điểm số.
+        /// Tham số: ID của người dùng
+        /// Trả về: Danh sách xếp hạng nhóm của người dùng
         [HttpGet("user/{userId}/group-rankings")]
         public async Task<ActionResult<ApiResponse<UserGroupRankingsResponse>>> GetUserGroupRankings(Guid userId)
         {
             var currentUserId = ValidateAndGetUserId();
+
+            // Chỉ cho phép người dùng xem xếp hạng của chính mình
             if (currentUserId != userId)
                 throw new AppException(ErrorCodes.AuthForbidden, StatusCodes.Status403Forbidden);
 
-            var result = await _analyticsService.GetUserGroupRankingsAsync(userId);
+            var result = await analyticsService.GetUserGroupRankingsAsync(userId);
             return Ok(ApiResponse<UserGroupRankingsResponse>.Success(
                 ErrorCodes.SuccessGetData, "Data retrieved successfully", result));
         }
 
-        /// <summary>
-        /// GET /api/analytics/user/{userId}/productivity-trend?period=30
-        /// 30-day productivity trend (area chart)
-        /// </summary>
+        /// Lấy xu hướng năng suất của người dùng trong N ngày gần nhất (biểu đồ area).
+        /// Tham số: ID của người dùng, số ngày cần lấy dữ liệu (mặc định: 30 ngày, tối đa: 365 ngày)
+        /// Trả về:Dữ liệu xu hướng năng suất theo thời gian
         [HttpGet("user/{userId}/productivity-trend")]
         public async Task<ActionResult<ApiResponse<UserProductivityTrendResponse>>> GetUserProductivityTrend(
             Guid userId,
             [FromQuery] int period = 30)
         {
             var currentUserId = ValidateAndGetUserId();
+
+            // Chỉ cho phép người dùng xem năng suất của chính mình
             if (currentUserId != userId)
                 throw new AppException(ErrorCodes.AuthForbidden, StatusCodes.Status403Forbidden);
 
-            // Validate period bounds
-            if (period < 1 || period > 365)
-                throw new AppException(
-                    ErrorCodes.ValidationInvalidRange,
-                    StatusCodes.Status400BadRequest);
-
-            var result = await _analyticsService.GetUserProductivityTrendAsync(userId, period);
+            var result = await analyticsService.GetUserProductivityTrendAsync(userId, period);
             return Ok(ApiResponse<UserProductivityTrendResponse>.Success(
                 ErrorCodes.SuccessGetData, "Data retrieved successfully", result));
         }
 
-        /// <summary>
-        /// GET /api/analytics/user/{userId}/on-time-overview
-        /// On-time vs overdue donut
-        /// </summary>
-        [HttpGet("user/{userId}/on-time-overview")]
-        public async Task<ActionResult<ApiResponse<UserOnTimeOverviewResponse>>> GetUserOnTimeOverview(Guid userId)
-        {
-            var currentUserId = ValidateAndGetUserId();
-            if (currentUserId != userId)
-                throw new AppException(ErrorCodes.AuthForbidden, StatusCodes.Status403Forbidden);
-
-            var result = await _analyticsService.GetUserOnTimeOverviewAsync(userId);
-            return Ok(ApiResponse<UserOnTimeOverviewResponse>.Success(
-                ErrorCodes.SuccessGetData, "Data retrieved successfully", result));
-        }
-
-        /// <summary>
-        /// GET /api/analytics/user/{userId}/priority-distribution
-        /// Task distribution by priority: Cao, Trung bình, Thấp
-        /// </summary>
+        
+        /// Lấy phân bổ công việc theo mức ưu tiên.
+        /// Phân loại: Cao, Trung bình, Thấp.
+        /// Tham số: ID của người dùng
+        /// Trả về: Phân bổ công việc theo mức ưu tiên
         [HttpGet("user/{userId}/priority-distribution")]
         public async Task<ActionResult<ApiResponse<UserPriorityDistributionResponse>>> GetUserPriorityDistribution(Guid userId)
         {
             var currentUserId = ValidateAndGetUserId();
+
+            // Chỉ cho phép người dùng xem phân bổ của chính mình
             if (currentUserId != userId)
                 throw new AppException(ErrorCodes.AuthForbidden, StatusCodes.Status403Forbidden);
 
-            var result = await _analyticsService.GetUserPriorityDistributionAsync(userId);
+            var result = await analyticsService.GetUserPriorityDistributionAsync(userId);
             return Ok(ApiResponse<UserPriorityDistributionResponse>.Success(
                 ErrorCodes.SuccessGetData, "Data retrieved successfully", result));
         }
 
-        /// <summary>
-        /// GET /api/analytics/user/{userId}/urgency-distribution
-        /// Task distribution by urgency: Khẩn cấp, Cao, Trung bình, Thấp
-        /// </summary>
+        /// Lấy phân bổ công việc theo mức độ khẩn cấp.
+        /// Phân loại: Khẩn cấp, Cao, Trung bình, Thấp.
+        /// Tham số: ID của người dùng
+        /// Trả về: Phân bổ công việc theo mức độ khẩn cấp
         [HttpGet("user/{userId}/urgency-distribution")]
         public async Task<ActionResult<ApiResponse<UserUrgencyDistributionResponse>>> GetUserUrgencyDistribution(Guid userId)
         {
             var currentUserId = ValidateAndGetUserId();
+
+            // Chỉ cho phép người dùng xem phân bổ của chính mình
             if (currentUserId != userId)
                 throw new AppException(ErrorCodes.AuthForbidden, StatusCodes.Status403Forbidden);
 
-            var result = await _analyticsService.GetUserUrgencyDistributionAsync(userId);
+            var result = await analyticsService.GetUserUrgencyDistributionAsync(userId);
             return Ok(ApiResponse<UserUrgencyDistributionResponse>.Success(
                 ErrorCodes.SuccessGetData, "Data retrieved successfully", result));
         }
 
-        /// <summary>
-        /// GET /api/analytics/user/{userId}/benchmark?weeks=7&groupId={guid}
-        /// Weekly performance benchmark (user vs group avg)
-        /// </summary>
+        /// Lấy điểm chuẩn hiệu suất hàng tuần của người dùng so với trung bình nhóm.
+        /// Tham số: ID của người dùng
+        /// Trả về: Dữ liệu benchmark hiệu suất
         [HttpGet("user/{userId}/benchmark")]
         public async Task<ActionResult<ApiResponse<UserBenchmarkResponse>>> GetUserBenchmark(
             Guid userId,
@@ -430,40 +332,32 @@ namespace StudioStudio_Server.Controllers
             [FromQuery] Guid? groupId = null)
         {
             var currentUserId = ValidateAndGetUserId();
+
+            // Chỉ cho phép người dùng xem benchmark của chính mình
             if (currentUserId != userId)
                 throw new AppException(ErrorCodes.AuthForbidden, StatusCodes.Status403Forbidden);
 
-            // Validate weeks bounds
-            if (weeks < 1 || weeks > 52)
-                throw new AppException(
-                    ErrorCodes.ValidationInvalidRange,
-                    StatusCodes.Status400BadRequest);
-
-            var result = await _analyticsService.GetUserBenchmarkAsync(userId, weeks, groupId);
+            var result = await analyticsService.GetUserBenchmarkAsync(userId, weeks, groupId);
             return Ok(ApiResponse<UserBenchmarkResponse>.Success(
                 ErrorCodes.SuccessGetData, "Data retrieved successfully", result));
         }
 
-        /// <summary>
-        /// GET /api/analytics/user/{userId}/risk-alerts?limit=10
-        /// Risk alerts: overdue, due soon, stuck tasks
-        /// </summary>
+        /// Lấy các cảnh báo rủi ro của người dùng.
+        /// Bao gồm: công việc quá hạn, công việc sắp đến hạn, công việc bị kẹt.
+        /// Tham số: ID của người dùng
+        /// Trả về: Danh sách cảnh báo rủi ro được sắp xếp theo mức độ ưu tiên
         [HttpGet("user/{userId}/risk-alerts")]
         public async Task<ActionResult<ApiResponse<UserRiskAlertsResponse>>> GetUserRiskAlerts(
             Guid userId,
             [FromQuery] int limit = 10)
         {
             var currentUserId = ValidateAndGetUserId();
+
+            // Chỉ cho phép người dùng xem cảnh báo của chính mình
             if (currentUserId != userId)
                 throw new AppException(ErrorCodes.AuthForbidden, StatusCodes.Status403Forbidden);
 
-            // Validate limit bounds
-            if (limit < 1 || limit > 100)
-                throw new AppException(
-                    ErrorCodes.ValidationInvalidRange,
-                    StatusCodes.Status400BadRequest);
-
-            var result = await _analyticsService.GetUserRiskAlertsAsync(userId, limit);
+            var result = await analyticsService.GetUserRiskAlertsAsync(userId, limit);
             return Ok(ApiResponse<UserRiskAlertsResponse>.Success(
                 ErrorCodes.SuccessGetData, "Data retrieved successfully", result));
         }
