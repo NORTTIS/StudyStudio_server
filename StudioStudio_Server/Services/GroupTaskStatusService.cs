@@ -4,7 +4,6 @@ using StudioStudio_Server.Models.DTOs.Response;
 using StudioStudio_Server.Models.Entities;
 using StudioStudio_Server.Repositories.Interfaces;
 using StudioStudio_Server.Services.Interfaces;
-using System.Threading.Tasks;
 
 namespace StudioStudio_Server.Services
 {
@@ -19,11 +18,6 @@ namespace StudioStudio_Server.Services
         IGroupRepository groupRepository,
         ITaskRepository taskRepository) : IGroupTaskStatusService
     {
-        private readonly IGroupTaskStatusRepository _groupTaskStatusRepository = groupTaskStatusRepository;
-        private readonly IGroupParticipantRepository _participantRepository = participantRepository;
-        private readonly IGroupRepository _groupRepository = groupRepository;
-        private readonly ITaskRepository _taskRepository = taskRepository;
-
         /// <summary>
         /// Create new task status column for group
         /// Validate:
@@ -33,19 +27,19 @@ namespace StudioStudio_Server.Services
         /// </summary>
         public async Task<GroupTaskStatusResponse> CreateNewGroupTaskStatus(Guid userId, Guid groupId, GroupTaskStatusRequest request)
         {
-            var userRole = await _participantRepository.GetGroupRoleByUserIdAsync(userId, groupId);
+            var userRole = await participantRepository.GetGroupRoleByUserIdAsync(userId, groupId);
             if (userRole.Equals(GroupRole.Viewer) || userRole.Equals(GroupRole.Commenter))
             {
                 throw new AppException(ErrorCodes.GroupCreateTaskStatusDenied, StatusCodes.Status401Unauthorized);
             }
 
-            var group = await _groupRepository.GetByIdAsync(groupId);
+            var group = await groupRepository.GetByIdAsync(groupId);
             if (group != null && group.IsArchived && userRole != GroupRole.Owner)
             {
                 throw new AppException(ErrorCodes.GroupIsArchived, StatusCodes.Status403Forbidden);
             }
 
-            var existingStatuses = await _groupTaskStatusRepository.GetByGroupIdAsync(groupId);
+            var existingStatuses = await groupTaskStatusRepository.GetByGroupIdAsync(groupId);
 
             int newPosition;
             if (existingStatuses.Any())
@@ -65,12 +59,12 @@ namespace StudioStudio_Server.Services
                 Position = newPosition,
             };
 
-            if (await _groupTaskStatusRepository.NameExistsInGroupAsync(newStatus))
+            if (await groupTaskStatusRepository.NameExistsInGroupAsync(newStatus))
             {
-                throw new AppException(ErrorCodes.StatusNameExist, StatusCodes.Status400BadRequest);
+                throw new AppException(ErrorCodes.StatusNameExist);
             }
 
-            await _groupTaskStatusRepository.AddAsync(newStatus);
+            await groupTaskStatusRepository.AddAsync(newStatus);
 
             return new GroupTaskStatusResponse
             {
@@ -86,7 +80,7 @@ namespace StudioStudio_Server.Services
         /// </summary>
         public async Task<GroupTaskStatusResponse> GetGroupTaskStatusDetail(Guid taskStatusId)
         {
-            var taskStatus = await _groupTaskStatusRepository.GetDetailAsync(taskStatusId)
+            var taskStatus = await groupTaskStatusRepository.GetDetailAsync(taskStatusId)
                 ?? throw new InvalidOperationException($"Task status {taskStatusId} not found");
             return new GroupTaskStatusResponse
             {
@@ -105,29 +99,29 @@ namespace StudioStudio_Server.Services
         /// </summary>
         public async Task DeleteGroupTaskStatus(Guid userId, Guid groupId, Guid taskStatusId)
         {
-            var userRole = await _participantRepository.GetGroupRoleByUserIdAsync(userId, groupId);
+            var userRole = await participantRepository.GetGroupRoleByUserIdAsync(userId, groupId);
             if (!userRole.Equals(GroupRole.Moderator) && !userRole.Equals(GroupRole.Owner))
             {
                 throw new AppException(ErrorCodes.GroupDeleteTaskStatusDenied, StatusCodes.Status401Unauthorized);
             }
 
-            var group = await _groupRepository.GetByIdAsync(groupId);
+            var group = await groupRepository.GetByIdAsync(groupId);
             if (group != null && group.IsArchived && userRole != GroupRole.Owner)
             {
                 throw new AppException(ErrorCodes.GroupIsArchived, StatusCodes.Status403Forbidden);
             }
 
-            var taskStatus = await _groupTaskStatusRepository.GetDetailAsync(taskStatusId);
+            var taskStatus = await groupTaskStatusRepository.GetDetailAsync(taskStatusId);
             if (taskStatus == null || taskStatus.GroupId != groupId)
             {
                 throw new AppException(ErrorCodes.GroupStatusNotFound, StatusCodes.Status404NotFound);
             }
-            var taskList = await _taskRepository.GetAllTasksByStatusIdAsync(taskStatusId);
+            var taskList = await taskRepository.GetAllTasksByStatusIdAsync(taskStatusId);
             if (taskList.Any())
             {
-                throw new AppException(ErrorCodes.GroupDeleteTaskStatusFailed, StatusCodes.Status400BadRequest);
+                throw new AppException(ErrorCodes.GroupDeleteTaskStatusFailed);
             }
-            await _groupTaskStatusRepository.DeleteAsync(taskStatus);
+            await groupTaskStatusRepository.DeleteAsync(taskStatus);
         }
 
         /// <summary>
@@ -139,19 +133,19 @@ namespace StudioStudio_Server.Services
         /// </summary>
         public async Task UpdateGroupTaskStatus(Guid userId, Guid groupId, Guid taskStatusId, GroupTaskStatusRequest request)
         {
-            var userRole = await _participantRepository.GetGroupRoleByUserIdAsync(userId, groupId);
+            var userRole = await participantRepository.GetGroupRoleByUserIdAsync(userId, groupId);
             if (!userRole.Equals(GroupRole.Moderator) && !userRole.Equals(GroupRole.Owner))
             {
                 throw new AppException(ErrorCodes.GroupUpdatePermissionDenied, StatusCodes.Status401Unauthorized);
             }
             
-            var group = await _groupRepository.GetByIdAsync(groupId);
+            var group = await groupRepository.GetByIdAsync(groupId);
             if (group != null && group.IsArchived && userRole != GroupRole.Owner)
             {
                 throw new AppException(ErrorCodes.GroupIsArchived, StatusCodes.Status403Forbidden);
             }
 
-            var taskStatus = await _groupTaskStatusRepository.GetDetailAsync(taskStatusId);
+            var taskStatus = await groupTaskStatusRepository.GetDetailAsync(taskStatusId);
             if (taskStatus == null || taskStatus.GroupId != groupId)
             {
                 throw new AppException(ErrorCodes.StatusNotFound, StatusCodes.Status404NotFound);
@@ -159,12 +153,12 @@ namespace StudioStudio_Server.Services
 
             taskStatus.StatusName = request.StatusName;
 
-            if (await _groupTaskStatusRepository.NameExistsInGroupAsync(taskStatus))
+            if (await groupTaskStatusRepository.NameExistsInGroupAsync(taskStatus))
             {
-                throw new AppException(ErrorCodes.StatusNameExist, StatusCodes.Status400BadRequest);
+                throw new AppException(ErrorCodes.StatusNameExist);
             }
 
-            await _groupTaskStatusRepository.UpdateAsync(taskStatus);
+            await groupTaskStatusRepository.UpdateAsync(taskStatus);
         }
 
         /// <summary>
@@ -176,25 +170,25 @@ namespace StudioStudio_Server.Services
         /// </summary>
         public async Task ReorderGroupTaskStatus(Guid userId, Guid groupId, ReorderGroupTaskStatusRequest request)
         {
-            var userRole = await _participantRepository.GetGroupRoleByUserIdAsync(userId, groupId);
+            var userRole = await participantRepository.GetGroupRoleByUserIdAsync(userId, groupId);
             if (userRole.Equals(GroupRole.Viewer) || userRole.Equals(GroupRole.Commenter))
             {
                 throw new AppException(ErrorCodes.GroupUpdatePermissionDenied, StatusCodes.Status401Unauthorized);
             }
 
-            var group = await _groupRepository.GetByIdAsync(groupId);
+            var group = await groupRepository.GetByIdAsync(groupId);
             if (group != null && group.IsArchived && userRole != GroupRole.Owner)
             {
                 throw new AppException(ErrorCodes.GroupIsArchived, StatusCodes.Status403Forbidden);
             }
 
-            var status = await _groupTaskStatusRepository.GetDetailAsync(request.StatusId);
+            var status = await groupTaskStatusRepository.GetDetailAsync(request.StatusId);
             if (status == null || status.GroupId != groupId)
             {
                 throw new AppException(ErrorCodes.StatusNotFound, StatusCodes.Status404NotFound);
             }
 
-            await _groupTaskStatusRepository.ReorderStatusAsync(
+            await groupTaskStatusRepository.ReorderStatusAsync(
                 request.StatusId,
                 request.PrevStatusId,
                 request.NextStatusId,

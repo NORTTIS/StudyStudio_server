@@ -1,4 +1,3 @@
-using Microsoft.AspNetCore.Http;
 using StudioStudio_Server.Exceptions;
 using StudioStudio_Server.Models.DTOs.Request;
 using StudioStudio_Server.Models.DTOs.Response;
@@ -12,16 +11,13 @@ namespace StudioStudio_Server.Services
 {
     public class AdminUserService(IUserRepository userRepository, IHttpContextAccessor httpContextAccessor) : IAdminUserService
     {
-        private readonly IUserRepository _userRepository = userRepository;
-        private readonly IHttpContextAccessor _httpContextAccessor = httpContextAccessor;
-
         /// <summary>
         /// Get paginated list of users with filters
         /// </summary>
         public async Task<UserListResponse> GetUsersAsync(GetUsersRequest request)
         {
             // Get paginated users
-            var (users, totalCount) = await _userRepository.GetUsersAsync(
+            var (users, totalCount) = await userRepository.GetUsersAsync(
                 request.SearchTerm,
                 request.Status,
                 request.Package,
@@ -30,10 +26,10 @@ namespace StudioStudio_Server.Services
 
             // Get studio counts for all users in the list (to avoid N+1)
             var userIds = users.Select(u => u.UserId).ToList();
-            var studioCounts = await _userRepository.GetStudioCountsAsync(userIds);
+            var studioCounts = await userRepository.GetStudioCountsAsync(userIds);
 
             // Get summary statistics
-            var summary = await _userRepository.GetUserSummaryAsync();
+            var summary = await userRepository.GetUserSummaryAsync();
 
             // Map to response DTOs
             var userListItems = users.Select(u => MapToUserListItem(u, studioCounts)).ToList();
@@ -61,7 +57,7 @@ namespace StudioStudio_Server.Services
         /// </summary>
         public async Task<UserDetailItem> GetUserDetailAsync(Guid userId)
         {
-            var user = await _userRepository.GetByIdWithDetailsAsync(userId);
+            var user = await userRepository.GetByIdWithDetailsAsync(userId);
 
             if (user == null)
             {
@@ -69,7 +65,7 @@ namespace StudioStudio_Server.Services
             }
 
             // Get studio count for this user
-            var studioCount = await _userRepository.GetStudioCountsAsync(new List<Guid> { userId });
+            var studioCount = await userRepository.GetStudioCountsAsync(new List<Guid> { userId });
 
             return MapToUserDetailItem(user, studioCount);
         }
@@ -149,7 +145,7 @@ namespace StudioStudio_Server.Services
                 Status = baseItem.Status,
                 PhoneNumber = user.PhoneNumber,
                 Bio = user.Bio,
-                AvatarUrl = AvatarUrlHelper.BuildAbsoluteAvatarUrl(user.AvatarUrl, _httpContextAccessor.HttpContext),
+                AvatarUrl = AvatarUrlHelper.BuildAbsoluteAvatarUrl(user.AvatarUrl, httpContextAccessor.HttpContext),
                 IsVerify = user.IsVerify,
                 UpdatedAt = user.UpdatedAt,
                 IsAdmin = user.IsAdmin,
@@ -166,12 +162,11 @@ namespace StudioStudio_Server.Services
             if (status == UserStatus.Deleted)
             {
                 throw new AppException(
-                    ErrorCodes.UserInvalidStatus,
-                    StatusCodes.Status400BadRequest);
+                    ErrorCodes.UserInvalidStatus);
             }
 
             // Check if user exists
-            var user = await _userRepository.GetByIdIncludingDeletedAsync(userId);
+            var user = await userRepository.GetByIdIncludingDeletedAsync(userId);
             if (user == null)
             {
                 throw new AppException(
@@ -187,7 +182,7 @@ namespace StudioStudio_Server.Services
                     StatusCodes.Status403Forbidden);
             }
 
-            await _userRepository.UpdateUserStatusAsync(userId, status);
+            await userRepository.UpdateUserStatusAsync(userId, status);
         }
     }
 }

@@ -1,6 +1,5 @@
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Identity;
-using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.IdentityModel.Tokens;
@@ -19,6 +18,7 @@ using StudioStudio_Server.Models.Entities;
 using StudioStudio_Server.Repositories;
 using StudioStudio_Server.Repositories.Interfaces;
 using StudioStudio_Server.Services;
+using StudioStudio_Server.Services.AI;
 using StudioStudio_Server.Services.Interfaces;
 using System.Text;
 
@@ -148,7 +148,6 @@ builder.Services.AddScoped<ILLMService, GeminiLLMService>();
 builder.Services.AddScoped<IGroupAttachmentRepository, GroupAttachmentRepository>();
 builder.Services.AddScoped<IDocumentService, DocumentService>();
 builder.Services.AddScoped<IAvatarService, AvatarService>();
-builder.Services.AddScoped<IAIService, AIService>();
 builder.Services.AddScoped<IAIRequestLogRepository, AIRequestLogRepository>();
 
 // AI Tool Calling (Agentic AI)

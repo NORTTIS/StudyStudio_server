@@ -1,10 +1,5 @@
-﻿using iText.Layout.Renderer;
-using Microsoft.AspNetCore.Http.HttpResults;
-using Microsoft.AspNetCore.Http;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.IdentityModel.Tokens;
+﻿using Microsoft.EntityFrameworkCore;
 using StudioStudio_Server.Configurations;
-using StudioStudio_Server.Data;
 using StudioStudio_Server.Exceptions;
 using StudioStudio_Server.Models.DTOs.Request;
 using StudioStudio_Server.Models.DTOs.Response;
@@ -18,7 +13,6 @@ namespace StudioStudio_Server.Services
 {
     public class GroupService(
         ILogger<GroupService> logger,
-        IMessageService messageService,
         IGroupRepository groupRepository,
         IUserSubscriptionRepository userSubscriptionRepository,
         IFavouriteRepository favouriteRepository,
@@ -35,24 +29,6 @@ namespace StudioStudio_Server.Services
         IConfiguration configuration,
         ICacheService cacheService) : IGroupService
     {
-        private readonly ILogger<GroupService> _logger = logger;
-        private readonly IMessageService _messageService = messageService;
-        private readonly IGroupRepository _groupRepository = groupRepository;
-        private readonly IUserSubscriptionRepository _userSubscriptionRepository = userSubscriptionRepository;
-        private readonly IFavouriteRepository _favouriteRepository = favouriteRepository;
-        private readonly IUserRepository _userRepository = userRepository;
-        private readonly IStudioRepository _studioRepository = studioRepository;
-        private readonly IGroupParticipantRepository _groupParticipantRepository = groupParticipantRepository;
-        private readonly ITaskRepository _taskRepository = taskRepository;
-        private readonly ITemplateRepository _templateRepository = templateRepository;
-        private readonly IGroupTaskStatusRepository _groupTaskStatusRepository = groupTaskStatusRepository;
-        private readonly ITaskAssignmentRepository _taskAssignmentRepository = taskAssignmentRepository;
-        private readonly IStudioParticipantRepository _studioParticipantRepository = studioParticipantRepository;
-        private readonly IEmailService _emailService = emailService;
-        private readonly IHttpContextAccessor _httpContextAccessor = httpContextAccessor;
-        private readonly IConfiguration _configuration = configuration;
-        private readonly ICacheService _cacheService = cacheService;
-
         private static readonly string[] BrandColors = new[]
         {
             "#FF5F3D", "#FF7A54", "#FF4D6A", "#FF3CAC",
@@ -68,35 +44,35 @@ namespace StudioStudio_Server.Services
         public async Task<GroupListResponse> GetGroupsAsync(Guid userId)
         {
             // Get user's subscription plan
-            var subscriptionPlan = await _userSubscriptionRepository.GetSubscriptionPlanByUserIdAsync(userId);
+            var subscriptionPlan = await userSubscriptionRepository.GetSubscriptionPlanByUserIdAsync(userId);
 
             // Get all groups user participates in
-            var groups = await _groupRepository.GetUserGroupsAsync(userId);
+            var groups = await groupRepository.GetUserGroupsAsync(userId);
 
             // Get all group IDs
             var groupIds = groups.Select(g => g.GroupId).ToList();
 
             // Get favorites for this user
-            var favorites = await _favouriteRepository.GetByUserAndGroupIdsAsync(userId, groupIds);
+            var favorites = await favouriteRepository.GetByUserAndGroupIdsAsync(userId, groupIds);
             var favoriteGroupIds = favorites.Select(f => f.GroupId).ToHashSet();
 
             // Get all creators
             var creatorIds = groups.Select(g => g.CreatedBy).Distinct().ToList();
-            var creators = await _userRepository.GetByIdsAsync(creatorIds);
+            var creators = await userRepository.GetByIdsAsync(creatorIds);
 
             // Get studios
             var studioIds = groups.Where(g => g.StudioId.HasValue)
                 .Select(g => g.StudioId.Value).Distinct().ToList();
-            var studios = await _studioRepository.GetByIdsAsync(studioIds);
+            var studios = await studioRepository.GetByIdsAsync(studioIds);
 
             // Get all participants for member previews
-            var allParticipants = await _groupParticipantRepository.GetByGroupIdsAsync(groupIds);
+            var allParticipants = await groupParticipantRepository.GetByGroupIdsAsync(groupIds);
 
             var participantUserIds = allParticipants.Select(gp => gp.UserId).Distinct().ToList();
-            var users = await _userRepository.GetByIdsAsync(participantUserIds);
+            var users = await userRepository.GetByIdsAsync(participantUserIds);
 
             // Get task counts
-            var taskCounts = await _taskRepository.GetTaskCountByGroupIdsAsync(groupIds);
+            var taskCounts = await taskRepository.GetTaskCountByGroupIdsAsync(groupIds);
 
             // Build GroupCardDto for all groups
             var groupCards = groups.Select(g =>
@@ -117,7 +93,7 @@ namespace StudioStudio_Server.Services
                             Id = gp.UserId,
                             FirstName = user?.FirstName ?? "",
                             LastName = user?.LastName ?? "",
-                            AvatarUrl = AvatarUrlHelper.BuildAbsoluteAvatarUrl(user?.AvatarUrl, _httpContextAccessor.HttpContext)
+                            AvatarUrl = AvatarUrlHelper.BuildAbsoluteAvatarUrl(user?.AvatarUrl, httpContextAccessor.HttpContext)
                         };
                     })
                     .ToList();
@@ -139,7 +115,7 @@ namespace StudioStudio_Server.Services
                         Id = createdByUser.UserId,
                         FirstName = createdByUser.FirstName,
                         LastName = createdByUser.LastName,
-                        AvatarUrl = AvatarUrlHelper.BuildAbsoluteAvatarUrl(createdByUser.AvatarUrl, _httpContextAccessor.HttpContext)
+                        AvatarUrl = AvatarUrlHelper.BuildAbsoluteAvatarUrl(createdByUser.AvatarUrl, httpContextAccessor.HttpContext)
                     } : new UserDto(),
                     MemberCount = groupParticipants.Count,
                     TaskCount = taskCounts.TryGetValue(g.GroupId, out var count) ? count : 0,
@@ -206,7 +182,7 @@ namespace StudioStudio_Server.Services
         public async Task<GroupDetailResponse> GetGroupDetailAsync(Guid userId, Guid groupId)
         {
             // Get group with participants
-            var group = await _groupRepository.GetGroupWithDetailsAsync(groupId);
+            var group = await groupRepository.GetGroupWithDetailsAsync(groupId);
             if (group == null)
             {
                 throw new AppException(ErrorCodes.GroupNotFound, StatusCodes.Status404NotFound);
@@ -223,27 +199,27 @@ namespace StudioStudio_Server.Services
             Studio? studio = null;
             if (group.StudioId.HasValue)
             {
-                studio = await _studioRepository.GetByIdAsync(group.StudioId.Value);
+                studio = await studioRepository.GetByIdAsync(group.StudioId.Value);
             }
 
             // Get creator info
-            var creator = await _userRepository.GetByIdAsync(group.CreatedBy);
+            var creator = await userRepository.GetByIdAsync(group.CreatedBy);
 
             // Check if favorite
-            var isFavorite = await _favouriteRepository.IsFavouriteAsync(userId, groupId);
+            var isFavorite = await favouriteRepository.IsFavouriteAsync(userId, groupId);
 
             // Get task count
-            var taskCount = await _taskRepository.GetTaskCountByGroupIdAsync(groupId);
+            var taskCount = await taskRepository.GetTaskCountByGroupIdAsync(groupId);
 
             // Get member count
-            var memberCount = await _groupParticipantRepository.GetParticipantCountByGroupIdAsync(groupId);
+            var memberCount = await groupParticipantRepository.GetParticipantCountByGroupIdAsync(groupId);
 
             // Get task statuses
-            var taskStatuses = await _groupTaskStatusRepository.GetByGroupIdAsync(groupId);
+            var taskStatuses = await groupTaskStatusRepository.GetByGroupIdAsync(groupId);
 
             // Get tasks
             var taskStatusIdList = taskStatuses.Select(s => s.StatusId).ToList();
-            var taskList = await _taskRepository.GetListTasksByListStatusId(taskStatusIdList);
+            var taskList = await taskRepository.GetListTasksByListStatusId(taskStatusIdList);
 
             // Get assinees
             var taskIdList = taskList.SelectMany(t => t.Value).Select(t => t.TaskId).ToList();
@@ -251,9 +227,9 @@ namespace StudioStudio_Server.Services
             Dictionary<Guid, UserDto> assigneeDict = new();
             if (taskIdList.Count > 0)
             {
-                var assignees = await _taskAssignmentRepository.GetListAssigneesByListTaskId(taskIdList);
+                var assignees = await taskAssignmentRepository.GetListAssigneesByListTaskId(taskIdList);
                 var userIds = assignees.Select(a => a.AssignedTo).Distinct().ToList();
-                var users = await _userRepository.GetByIdsAsync(userIds);
+                var users = await userRepository.GetByIdsAsync(userIds);
                 var userDict = users.ToDictionary(u => u.UserId);
 
                 foreach (var assignee in assignees)
@@ -265,7 +241,7 @@ namespace StudioStudio_Server.Services
                             Id = user.UserId,
                             FirstName = user.FirstName,
                             LastName = user.LastName,
-                            AvatarUrl = AvatarUrlHelper.BuildAbsoluteAvatarUrl(user.AvatarUrl, _httpContextAccessor.HttpContext)
+                            AvatarUrl = AvatarUrlHelper.BuildAbsoluteAvatarUrl(user.AvatarUrl, httpContextAccessor.HttpContext)
                         };
                     }
                 }
@@ -273,7 +249,7 @@ namespace StudioStudio_Server.Services
 
 
             // Check if group is a template
-            var template = await _templateRepository.GetByGroupIdAsync(groupId);
+            var template = await templateRepository.GetByGroupIdAsync(groupId);
 
             return new GroupDetailResponse
             {
@@ -291,7 +267,7 @@ namespace StudioStudio_Server.Services
                     Id = creator.UserId,
                     FirstName = creator.FirstName,
                     LastName = creator.LastName,
-                    AvatarUrl = AvatarUrlHelper.BuildAbsoluteAvatarUrl(creator.AvatarUrl, _httpContextAccessor.HttpContext)
+                    AvatarUrl = AvatarUrlHelper.BuildAbsoluteAvatarUrl(creator.AvatarUrl, httpContextAccessor.HttpContext)
                 } : new UserDto(),
                 CreatedAt = group.CreatedAt,
                 UpdatedAt = group.UpdatedAt,
@@ -339,25 +315,25 @@ namespace StudioStudio_Server.Services
         public async Task<GroupMemberListResponse> GetGroupMembersAsync(Guid userId, Guid groupId)
         {
             // Get group
-            var group = await _groupRepository.GetByIdAsync(groupId);
+            var group = await groupRepository.GetByIdAsync(groupId);
             if (group == null)
             {
                 throw new AppException(ErrorCodes.GroupNotFound, StatusCodes.Status404NotFound);
             }
 
             // Check if user is an approved member
-            var isUserInGroup = await _groupParticipantRepository.IsUserApprovedInGroupAsync(groupId, userId);
+            var isUserInGroup = await groupParticipantRepository.IsUserApprovedInGroupAsync(groupId, userId);
             if (!isUserInGroup)
             {
                 throw new AppException(ErrorCodes.GroupPermissionDenied, StatusCodes.Status403Forbidden);
             }
 
             // Get all participants (including pending for the pending members list API)
-            var participants = await _groupParticipantRepository.GetAllByGroupIdAsync(groupId);
+            var participants = await groupParticipantRepository.GetAllByGroupIdAsync(groupId);
 
             // Get user info for all participants
             var userIds = participants.Select(p => p.UserId).ToList();
-            var users = await _userRepository.GetByIdsAsync(userIds);
+            var users = await userRepository.GetByIdsAsync(userIds);
 
             // Build member list
             var members = participants.Select(p =>
@@ -369,7 +345,7 @@ namespace StudioStudio_Server.Services
                     FirstName = user?.FirstName ?? "",
                     LastName = user?.LastName ?? "",
                     Email = user?.Email ?? "",
-                    AvatarUrl = AvatarUrlHelper.BuildAbsoluteAvatarUrl(user?.AvatarUrl, _httpContextAccessor.HttpContext),
+                    AvatarUrl = AvatarUrlHelper.BuildAbsoluteAvatarUrl(user?.AvatarUrl, httpContextAccessor.HttpContext),
                     Role = p.Role.ToString(),
                     IsApproved = p.IsApproved,
                     JoinedAt = p.CreatedAt
@@ -391,10 +367,10 @@ namespace StudioStudio_Server.Services
         public async Task<CreateGroupResponse> CreateGroupAsync(Guid userId, CreateGroupRequest request)
         {
             // Check subscription limit
-            var subscriptionPlan = await _userSubscriptionRepository.GetSubscriptionPlanByUserIdAsync(userId);
+            var subscriptionPlan = await userSubscriptionRepository.GetSubscriptionPlanByUserIdAsync(userId);
             var groupLimit = subscriptionPlan?.MaxGroups ?? 5;
 
-            var currentGroupCount = await _groupRepository.CountGroupsCreatedByUserAsync(userId);
+            var currentGroupCount = await groupRepository.CountGroupsCreatedByUserAsync(userId);
             if (currentGroupCount >= groupLimit)
             {
                 throw new AppException(ErrorCodes.GroupLimitReached, StatusCodes.Status403Forbidden);
@@ -403,46 +379,46 @@ namespace StudioStudio_Server.Services
             // Validate: GroupName must not exceed 255 characters
             if (request.GroupName.Length > 255)
             {
-                throw new AppException(ErrorCodes.GroupNameInvalid, StatusCodes.Status400BadRequest);
+                throw new AppException(ErrorCodes.GroupNameInvalid);
             }
 
             // Validate: Description must not exceed 500 characters
             if (request.Description != null && request.Description.Length > 500)
             {
-                throw new AppException(ErrorCodes.GroupDescriptionInvalid, StatusCodes.Status400BadRequest);
+                throw new AppException(ErrorCodes.GroupDescriptionInvalid);
             }
 
             // Check if creating in studio
             if (request.StudioId.HasValue)
             {
                 // Verify studio exists
-                var studio = await _studioRepository.GetByIdAsync(request.StudioId.Value);
+                var studio = await studioRepository.GetByIdAsync(request.StudioId.Value);
                 if (studio == null)
                 {
                     throw new AppException(ErrorCodes.StudioNotFound, StatusCodes.Status404NotFound);
                 }
 
                 // Verify user is studio owner
-                var isOwner = await _studioRepository.IsUserStudioOwnerAsync(request.StudioId.Value, userId);
+                var isOwner = await studioRepository.IsUserStudioOwnerAsync(request.StudioId.Value, userId);
                 if (!isOwner)
                 {
                     throw new AppException(ErrorCodes.StudioPermissionDenied, StatusCodes.Status403Forbidden);
                 }
 
                 // Check if group name already exists in this studio
-                var nameExists = await _groupRepository.GroupNameExistsInStudioAsync(request.StudioId, request.GroupName, null);
+                var nameExists = await groupRepository.GroupNameExistsInStudioAsync(request.StudioId, request.GroupName, null);
                 if (nameExists)
                 {
-                    throw new AppException(ErrorCodes.GroupNameAlreadyExists, StatusCodes.Status400BadRequest);
+                    throw new AppException(ErrorCodes.GroupNameAlreadyExists);
                 }
             }
             else
             {
                 // For independent groups, check if name exists (studioId = null)
-                var nameExists = await _groupRepository.GroupNameExistsInStudioAsync(null, request.GroupName, userId);
+                var nameExists = await groupRepository.GroupNameExistsInStudioAsync(null, request.GroupName, userId);
                 if (nameExists)
                 {
-                    throw new AppException(ErrorCodes.GroupPersonalAlreadyExists, StatusCodes.Status400BadRequest);
+                    throw new AppException(ErrorCodes.GroupPersonalAlreadyExists);
                 }
             }
 
@@ -450,7 +426,7 @@ namespace StudioStudio_Server.Services
             List<GroupTaskStatus>? templateTaskStatuses = null;
             if (request.TemplateId.HasValue)
             {
-                var template = await _templateRepository.GetByIdAsync(request.TemplateId.Value);
+                var template = await templateRepository.GetByIdAsync(request.TemplateId.Value);
                 if (template == null)
                 {
                     throw new AppException(ErrorCodes.TemplateNotFound, StatusCodes.Status404NotFound);
@@ -463,7 +439,7 @@ namespace StudioStudio_Server.Services
                 }
 
                 // Get template's task statuses
-                templateTaskStatuses = await _groupTaskStatusRepository.GetByGroupIdAsync(template.GroupId);
+                templateTaskStatuses = await groupTaskStatusRepository.GetByGroupIdAsync(template.GroupId);
             }
 
             // Create new group
@@ -474,25 +450,25 @@ namespace StudioStudio_Server.Services
             {
                 if (!System.Text.RegularExpressions.Regex.IsMatch(request.ColorHex, @"^#[0-9A-Fa-f]{6}$", System.Text.RegularExpressions.RegexOptions.None, TimeSpan.FromMilliseconds(200)))
                 {
-                    throw new AppException(ErrorCodes.ValidationInvalidColor, StatusCodes.Status400BadRequest);
+                    throw new AppException(ErrorCodes.ValidationInvalidColor);
                 }
             }
 
             if (!string.IsNullOrEmpty(request.IconEmoji) && request.IconEmoji.Length > 10)
             {
-                throw new AppException(ErrorCodes.ValidationInvalidEmoji, StatusCodes.Status400BadRequest);
+                throw new AppException(ErrorCodes.ValidationInvalidEmoji);
             }
 
             // validate BannerUrl
             if (!string.IsNullOrEmpty(request.BannerUrl) && !Uri.TryCreate(request.BannerUrl, UriKind.Absolute, out _))
             {
-                throw new AppException(ErrorCodes.ValidationInvalidBannerUrl, StatusCodes.Status400BadRequest);
+                throw new AppException(ErrorCodes.ValidationInvalidBannerUrl);
             }
 
             // validate Tagline
             if (!string.IsNullOrEmpty(request.Tagline) && request.Tagline.Length > 200)
             {
-                throw new AppException(ErrorCodes.ValidationStringLength, StatusCodes.Status400BadRequest);
+                throw new AppException(ErrorCodes.ValidationStringLength);
             }
 
             // validate Alias pattern
@@ -500,11 +476,11 @@ namespace StudioStudio_Server.Services
             {
                 if (request.Alias.Length > 50)
                 {
-                    throw new AppException(ErrorCodes.ValidationStringLength, StatusCodes.Status400BadRequest);
+                    throw new AppException(ErrorCodes.ValidationStringLength);
                 }
                 if (!System.Text.RegularExpressions.Regex.IsMatch(request.Alias, @"^[a-zA-Z0-9\sÀ-ỹ_\-]+$", System.Text.RegularExpressions.RegexOptions.None, TimeSpan.FromMilliseconds(200)))
                 {
-                    throw new AppException(ErrorCodes.ValidationInvalidAlias, StatusCodes.Status400BadRequest);
+                    throw new AppException(ErrorCodes.ValidationInvalidAlias);
                 }
             }
 
@@ -529,7 +505,7 @@ namespace StudioStudio_Server.Services
                 IsArchived = false
             };
 
-            await _groupRepository.AddAsync(newGroup);
+            await groupRepository.AddAsync(newGroup);
 
             // Add creator as Owner participant (always approved)
             var ownerParticipant = new GroupParticipant
@@ -542,7 +518,7 @@ namespace StudioStudio_Server.Services
                 CreatedAt = now
             };
 
-            await _groupParticipantRepository.AddAsync(ownerParticipant);
+            await groupParticipantRepository.AddAsync(ownerParticipant);
 
             // Copy task statuses from template if provided
             if (templateTaskStatuses != null && templateTaskStatuses.Any())
@@ -555,7 +531,7 @@ namespace StudioStudio_Server.Services
                     Position = ts.Position
                 }).ToList();
 
-                await _groupTaskStatusRepository.AddRangeAsync(newTaskStatuses);
+                await groupTaskStatusRepository.AddRangeAsync(newTaskStatuses);
             }
 
             return new CreateGroupResponse
@@ -581,21 +557,21 @@ namespace StudioStudio_Server.Services
         public async Task DeleteGroupAsync(Guid userId, Guid groupId)
         {
             // Check if group exists
-            var group = await _groupRepository.GetByIdAsync(groupId);
+            var group = await groupRepository.GetByIdAsync(groupId);
             if (group == null)
             {
                 throw new AppException(ErrorCodes.GroupNotFound, StatusCodes.Status404NotFound);
             }
 
             // Check if user is the owner of the group
-            var isOwner = await _groupRepository.IsUserGroupOwnerAsync(groupId, userId);
+            var isOwner = await groupRepository.IsUserGroupOwnerAsync(groupId, userId);
             if (!isOwner)
             {
                 throw new AppException(ErrorCodes.GroupPermissionDenied, StatusCodes.Status403Forbidden);
             }
 
             // Soft delete the group
-            await _groupRepository.DeleteAsync(group);
+            await groupRepository.DeleteAsync(group);
         }
 
         /// <summary>
@@ -606,14 +582,14 @@ namespace StudioStudio_Server.Services
         public async Task<UpdateGroupResponse> UpdateGroupAsync(Guid userId, UpdateGroupRequest request)
         {
             // Check if group exists
-            var group = await _groupRepository.GetByIdAsync(request.GroupId);
+            var group = await groupRepository.GetByIdAsync(request.GroupId);
             if (group == null)
             {
                 throw new AppException(ErrorCodes.GroupNotFound, StatusCodes.Status404NotFound);
             }
 
             // Check if user is Owner or Moderator
-            var userParticipant = await _groupParticipantRepository.GetByGroupAndUserAsync(request.GroupId, userId);
+            var userParticipant = await groupParticipantRepository.GetByGroupAndUserAsync(request.GroupId, userId);
             if (userParticipant == null ||
                 (userParticipant.Role != GroupRole.Owner && userParticipant.Role != GroupRole.Moderator))
             {
@@ -623,25 +599,25 @@ namespace StudioStudio_Server.Services
             // Validate: GroupName must not exceed 255 characters
             if (request.GroupName.Length > 255)
             {
-                throw new AppException(ErrorCodes.GroupNameInvalid, StatusCodes.Status400BadRequest);
+                throw new AppException(ErrorCodes.GroupNameInvalid);
             }
 
             // Validate: Description must not exceed 500 characters
             if (request.Description != null && request.Description.Length > 500)
             {
-                throw new AppException(ErrorCodes.GroupDescriptionInvalid, StatusCodes.Status400BadRequest);
+                throw new AppException(ErrorCodes.GroupDescriptionInvalid);
             }
 
             // Check if name is being changed
             if (group.GroupName != request.GroupName)
             {
                 // Check if new name already exists in the same studio (excluding current group)
-                var nameExists = await _groupRepository.GroupNameExistsInStudioExcludingGroupAsync(
+                var nameExists = await groupRepository.GroupNameExistsInStudioExcludingGroupAsync(
                     group.StudioId, request.GroupName, request.GroupId);
 
                 if (nameExists)
                 {
-                    throw new AppException(ErrorCodes.GroupNameAlreadyExists, StatusCodes.Status400BadRequest);
+                    throw new AppException(ErrorCodes.GroupNameAlreadyExists);
                 }
 
                 group.GroupName = request.GroupName;
@@ -655,7 +631,7 @@ namespace StudioStudio_Server.Services
             {
                 if (!System.Text.RegularExpressions.Regex.IsMatch(request.ColorHex, @"^#[0-9A-Fa-f]{6}$", System.Text.RegularExpressions.RegexOptions.None, TimeSpan.FromMilliseconds(200)))
                 {
-                    throw new AppException(ErrorCodes.ValidationInvalidColor, StatusCodes.Status400BadRequest);
+                    throw new AppException(ErrorCodes.ValidationInvalidColor);
                 }
                 group.ColorHex = request.ColorHex;
             }
@@ -669,7 +645,7 @@ namespace StudioStudio_Server.Services
             {
                 if (request.IconEmoji.Length > 10)
                 {
-                    throw new AppException(ErrorCodes.ValidationInvalidEmoji, StatusCodes.Status400BadRequest);
+                    throw new AppException(ErrorCodes.ValidationInvalidEmoji);
                 }
                 group.IconEmoji = request.IconEmoji;
             }
@@ -681,14 +657,14 @@ namespace StudioStudio_Server.Services
             // validate and update BannerUrl
             if (!string.IsNullOrEmpty(request.BannerUrl) && !Uri.TryCreate(request.BannerUrl, UriKind.Absolute, out _))
             {
-                throw new AppException(ErrorCodes.ValidationInvalidBannerUrl, StatusCodes.Status400BadRequest);
+                throw new AppException(ErrorCodes.ValidationInvalidBannerUrl);
             }
             group.BannerUrl = request.BannerUrl;
 
             // Validate and update Tagline
             if (!string.IsNullOrEmpty(request.Tagline) && request.Tagline.Length > 200)
             {
-                throw new AppException(ErrorCodes.ValidationStringLength, StatusCodes.Status400BadRequest);
+                throw new AppException(ErrorCodes.ValidationStringLength);
             }
             group.Tagline = request.Tagline;
 
@@ -697,11 +673,11 @@ namespace StudioStudio_Server.Services
             {
                 if (request.Alias.Length > 50)
                 {
-                    throw new AppException(ErrorCodes.ValidationStringLength, StatusCodes.Status400BadRequest);
+                    throw new AppException(ErrorCodes.ValidationStringLength);
                 }
                 if (!System.Text.RegularExpressions.Regex.IsMatch(request.Alias, @"^[a-zA-Z0-9\sÀ-ỹ_\-]+$", System.Text.RegularExpressions.RegexOptions.None, TimeSpan.FromMilliseconds(200)))
                 {
-                    throw new AppException(ErrorCodes.ValidationInvalidAlias, StatusCodes.Status400BadRequest);
+                    throw new AppException(ErrorCodes.ValidationInvalidAlias);
                 }
                 group.Alias = request.Alias;
             }
@@ -723,7 +699,7 @@ namespace StudioStudio_Server.Services
             }
 
             // Handle template creation/deactivation
-            var existingTemplate = await _templateRepository.GetByGroupIdAsync(request.GroupId);
+            var existingTemplate = await templateRepository.GetByGroupIdAsync(request.GroupId);
             Template? activeTemplate = null;
 
             if (request.IsTemplate && existingTemplate == null)
@@ -740,19 +716,19 @@ namespace StudioStudio_Server.Services
                     IsActive = true
                 };
 
-                await _templateRepository.AddAsync(newTemplate);
+                await templateRepository.AddAsync(newTemplate);
                 activeTemplate = newTemplate;
 
-                _logger.LogInformation(
+                logger.LogInformation(
                     "Template created for group {GroupId} by user {UserId}. TemplateId: {TemplateId}",
                     group.GroupId, userId, newTemplate.TemplateId);
             }
             else if (!request.IsTemplate && existingTemplate != null && existingTemplate.IsActive)
             {
                 // Deactivate existing template
-                await _templateRepository.DeleteAsync(existingTemplate);
+                await templateRepository.DeleteAsync(existingTemplate);
 
-                _logger.LogInformation(
+                logger.LogInformation(
                     "Template deactivated for group {GroupId} by user {UserId}. TemplateId: {TemplateId}",
                     group.GroupId, userId, existingTemplate.TemplateId);
             }
@@ -761,10 +737,10 @@ namespace StudioStudio_Server.Services
                 // Reactivate existing template
                 existingTemplate.IsActive = true;
                 existingTemplate.UpdatedAt = DateTime.UtcNow;
-                await _templateRepository.UpdateAsync(existingTemplate);
+                await templateRepository.UpdateAsync(existingTemplate);
                 activeTemplate = existingTemplate;
 
-                _logger.LogInformation(
+                logger.LogInformation(
                     "Template reactivated for group {GroupId} by user {UserId}. TemplateId: {TemplateId}",
                     group.GroupId, userId, existingTemplate.TemplateId);
             }
@@ -775,10 +751,10 @@ namespace StudioStudio_Server.Services
             }
 
             // Save changes
-            await _groupRepository.UpdateAsync(group);
+            await groupRepository.UpdateAsync(group);
 
             // Invalidate AI group cache so AI sees fresh group data immediately
-            await _cacheService.InvalidateAIGroupCacheAsync(group.GroupId);
+            await cacheService.InvalidateAIGroupCacheAsync(group.GroupId);
 
             return new UpdateGroupResponse
             {
@@ -810,22 +786,22 @@ namespace StudioStudio_Server.Services
             {
                 var studioId = request.StudioId.Value;
 
-                var studio = await _studioRepository.GetByIdAsync(studioId);
+                var studio = await studioRepository.GetByIdAsync(studioId);
                 if (studio == null)
                 {
                     throw new AppException(ErrorCodes.StudioNotFound, StatusCodes.Status404NotFound);
                 }
 
-                var isOwner = await _studioRepository.IsUserStudioOwnerAsync(studioId, userId);
+                var isOwner = await studioRepository.IsUserStudioOwnerAsync(studioId, userId);
                 if (!isOwner)
                 {
                     throw new AppException(ErrorCodes.StudioPermissionDenied, StatusCodes.Status403Forbidden);
                 }
-                currentGroupCount = await _groupRepository.GetGroupCountByStudioIdAsync(request.StudioId.Value);
+                currentGroupCount = await groupRepository.GetGroupCountByStudioIdAsync(request.StudioId.Value);
 
             }
 
-            var subscriptionPlan = await _userSubscriptionRepository.GetSubscriptionPlanByUserIdAsync(userId);
+            var subscriptionPlan = await userSubscriptionRepository.GetSubscriptionPlanByUserIdAsync(userId);
             var groupLimit = subscriptionPlan?.MaxGroups ?? 5;
 
             var createGroupCount = request.GroupCount;
@@ -837,7 +813,7 @@ namespace StudioStudio_Server.Services
             }
 
             var existingNames = new HashSet<string>(
-                await _groupRepository.GetGroupNamesInStudioAsync(request.StudioId),
+                await groupRepository.GetGroupNamesInStudioAsync(request.StudioId),
                 StringComparer.OrdinalIgnoreCase);
 
             for (int i = currentGroupCount + 1; i <= totalGroupCount; i++)
@@ -846,14 +822,14 @@ namespace StudioStudio_Server.Services
 
                 if (existingNames.Contains(groupName))
                 {
-                    throw new AppException(ErrorCodes.GroupNameAlreadyExists, StatusCodes.Status400BadRequest);
+                    throw new AppException(ErrorCodes.GroupNameAlreadyExists);
                 }
             }
 
             List<GroupTaskStatus>? templateTaskStatuses = null;
             if (request.TemplateId.HasValue)
             {
-                var template = await _templateRepository.GetByIdAsync(request.TemplateId.Value);
+                var template = await templateRepository.GetByIdAsync(request.TemplateId.Value);
                 if (template == null)
                 {
                     throw new AppException(ErrorCodes.TemplateNotFound, StatusCodes.Status404NotFound);
@@ -864,7 +840,7 @@ namespace StudioStudio_Server.Services
                     throw new AppException(ErrorCodes.TemplatePermissionDenied, StatusCodes.Status403Forbidden);
                 }
 
-                templateTaskStatuses = await _groupTaskStatusRepository.GetByGroupIdAsync(template.GroupId);
+                templateTaskStatuses = await groupTaskStatusRepository.GetByGroupIdAsync(template.GroupId);
             }
 
             var now = DateTime.UtcNow;
@@ -889,7 +865,7 @@ namespace StudioStudio_Server.Services
                     ColorHex = BrandColors[colorIndex]
                 };
 
-                await _groupRepository.AddAsync(newGroup);
+                await groupRepository.AddAsync(newGroup);
 
                 var ownerParticipant = new GroupParticipant
                 {
@@ -900,7 +876,7 @@ namespace StudioStudio_Server.Services
                     CreatedAt = now
                 };
 
-                await _groupParticipantRepository.AddAsync(ownerParticipant);
+                await groupParticipantRepository.AddAsync(ownerParticipant);
 
                 if (templateTaskStatuses?.Count > 0)
                 {
@@ -912,7 +888,7 @@ namespace StudioStudio_Server.Services
                         Position = ts.Position
                     }).ToList();
 
-                    await _groupTaskStatusRepository.AddRangeAsync(newTaskStatuses);
+                    await groupTaskStatusRepository.AddRangeAsync(newTaskStatuses);
                 }
 
                 groupList.Add(newGroup);
@@ -936,21 +912,21 @@ namespace StudioStudio_Server.Services
         public async Task<StudioGroupListResponse> GetStudioGroupsAsync(Guid userId, Guid studioId)
         {
             // Check if studio exists
-            var studio = await _studioRepository.GetByIdAsync(studioId);
+            var studio = await studioRepository.GetByIdAsync(studioId);
             if (studio == null)
             {
                 throw new AppException(ErrorCodes.StudioNotFound, StatusCodes.Status404NotFound);
             }
 
             // Check if user is owner or member of studio
-            var userStudioParticipant = await _studioParticipantRepository.GetByStudioAndUserAsync(studioId, userId);
+            var userStudioParticipant = await studioParticipantRepository.GetByStudioAndUserAsync(studioId, userId);
             if (studio.OwnerId != userId && userStudioParticipant == null)
             {
                 throw new AppException(ErrorCodes.AuthForbidden, StatusCodes.Status403Forbidden);
             }
 
             // Get all groups belong to studio
-            var groups = await _groupRepository.GetStudioGroupsAsync(studioId);
+            var groups = await groupRepository.GetStudioGroupsAsync(studioId);
 
             // If user is a member (not owner), filter to only groups they participate in
             List<Guid> allowedGroupIds;
@@ -969,7 +945,7 @@ namespace StudioStudio_Server.Services
                 }
                 else
                 {
-                    var userGroupParticipants = await _groupParticipantRepository.GetByGroupIdsAsync(groupIds);
+                    var userGroupParticipants = await groupParticipantRepository.GetByGroupIdsAsync(groupIds);
                     // 🔹 MODIFIED: Only show groups where user is an approved member
                     allowedGroupIds = userGroupParticipants
                         .Where(gp => gp.UserId == userId && gp.IsApproved)
@@ -985,15 +961,15 @@ namespace StudioStudio_Server.Services
             var groupIdsForQuery = filteredGroups.Select(g => g.GroupId).ToList();
 
             // Get all participants for member previews
-            var allParticipants = await _groupParticipantRepository.GetByGroupIdsAsync(groupIdsForQuery);
+            var allParticipants = await groupParticipantRepository.GetByGroupIdsAsync(groupIdsForQuery);
 
             var participantUserIds = allParticipants.Select(gp => gp.UserId).Distinct().ToList();
-            var users = await _userRepository.GetByIdsAsync(participantUserIds);
+            var users = await userRepository.GetByIdsAsync(participantUserIds);
 
             // Get task counts
-            var taskCounts = await _taskRepository.GetTaskCountByGroupIdsAsync(groupIdsForQuery);
+            var taskCounts = await taskRepository.GetTaskCountByGroupIdsAsync(groupIdsForQuery);
 
-            var createdByUser = await _userRepository.GetByIdAsync(userId);
+            var createdByUser = await userRepository.GetByIdAsync(userId);
 
             var groupCards = filteredGroups.Select(g =>
             {
@@ -1016,7 +992,7 @@ namespace StudioStudio_Server.Services
                             Id = gp.UserId,
                             FirstName = user?.FirstName ?? "",
                             LastName = user?.LastName ?? "",
-                            AvatarUrl = AvatarUrlHelper.BuildAbsoluteAvatarUrl(user?.AvatarUrl, _httpContextAccessor.HttpContext)
+                            AvatarUrl = AvatarUrlHelper.BuildAbsoluteAvatarUrl(user?.AvatarUrl, httpContextAccessor.HttpContext)
                         };
                     })
                     .ToList();
@@ -1038,7 +1014,7 @@ namespace StudioStudio_Server.Services
                         Id = createdByUser.UserId,
                         FirstName = createdByUser.FirstName,
                         LastName = createdByUser.LastName,
-                        AvatarUrl = AvatarUrlHelper.BuildAbsoluteAvatarUrl(createdByUser.AvatarUrl, _httpContextAccessor.HttpContext)
+                        AvatarUrl = AvatarUrlHelper.BuildAbsoluteAvatarUrl(createdByUser.AvatarUrl, httpContextAccessor.HttpContext)
                     } : new UserDto(),
                     MemberCount = groupParticipants.Count,
                     TaskCount = taskCounts.TryGetValue(g.GroupId, out var count) ? count : 0,
@@ -1096,14 +1072,14 @@ namespace StudioStudio_Server.Services
             bool sortAscending = true)
         {
             // Validate group exists
-            var group = await _groupRepository.GetByIdAsync(groupId);
+            var group = await groupRepository.GetByIdAsync(groupId);
             if (group == null)
             {
                 throw new AppException(ErrorCodes.GroupNotFound, StatusCodes.Status404NotFound);
             }
 
             // Validate user is an approved member of group
-            var isUserInGroup = await _groupParticipantRepository.IsUserApprovedInGroupAsync(groupId, userId);
+            var isUserInGroup = await groupParticipantRepository.IsUserApprovedInGroupAsync(groupId, userId);
             if (!isUserInGroup)
             {
                 throw new AppException(ErrorCodes.GroupPermissionDenied, StatusCodes.Status403Forbidden);
@@ -1114,7 +1090,7 @@ namespace StudioStudio_Server.Services
             pageSize = pageSize <= 0 ? 10 : pageSize;
 
             // Get group statuses for filter dropdown
-            var groupStatuses = await _groupTaskStatusRepository.GetByGroupIdAsync(groupId);
+            var groupStatuses = await groupTaskStatusRepository.GetByGroupIdAsync(groupId);
             var statusDtos = groupStatuses.Select(s => new TaskStatusInfoDto
             {
                 StatusId = s.StatusId,
@@ -1122,7 +1098,7 @@ namespace StudioStudio_Server.Services
             }).ToList();
 
             // Get tasks with filters and pagination from repository
-            var (tasks, totalCount) = await _taskRepository.GetGroupTasksWithFiltersAsync(
+            var (tasks, totalCount) = await taskRepository.GetGroupTasksWithFiltersAsync(
                 groupId,
                 page,
                 pageSize,
@@ -1149,9 +1125,9 @@ namespace StudioStudio_Server.Services
             Dictionary<Guid, List<UserDto>> taskAssigneesDict = new();
             if (taskIds.Any())
             {
-                var assignments = await _taskAssignmentRepository.GetListAssigneesByListTaskId(taskIds);
+                var assignments = await taskAssignmentRepository.GetListAssigneesByListTaskId(taskIds);
                 var assigneeUserIds = assignments.Select(a => a.AssignedTo).Distinct().ToList();
-                var assigneeUsers = await _userRepository.GetByIdsAsync(assigneeUserIds);
+                var assigneeUsers = await userRepository.GetByIdsAsync(assigneeUserIds);
                 var userDict = assigneeUsers.ToDictionary(u => u.UserId);
 
                 foreach (var assignment in assignments)
@@ -1168,7 +1144,7 @@ namespace StudioStudio_Server.Services
                             Id = user.UserId,
                             FirstName = user.FirstName,
                             LastName = user.LastName,
-                            AvatarUrl = AvatarUrlHelper.BuildAbsoluteAvatarUrl(user.AvatarUrl, _httpContextAccessor.HttpContext)
+                            AvatarUrl = AvatarUrlHelper.BuildAbsoluteAvatarUrl(user.AvatarUrl, httpContextAccessor.HttpContext)
                         });
                     }
                 }
@@ -1198,7 +1174,7 @@ namespace StudioStudio_Server.Services
                     Id = t.Owner.UserId,
                     FirstName = t.Owner.FirstName,
                     LastName = t.Owner.LastName,
-                    AvatarUrl = AvatarUrlHelper.BuildAbsoluteAvatarUrl(t.Owner.AvatarUrl, _httpContextAccessor.HttpContext)
+                    AvatarUrl = AvatarUrlHelper.BuildAbsoluteAvatarUrl(t.Owner.AvatarUrl, httpContextAccessor.HttpContext)
                 }
             }).ToList();
 
@@ -1221,14 +1197,14 @@ namespace StudioStudio_Server.Services
         // Toggle IsOpen setting (Owner/Moderator only)
         public async Task<ToggleIsOpenResponse> ToggleIsOpenAsync(Guid userId, Guid groupId, bool isOpen)
         {
-            var group = await _groupRepository.GetByIdAsync(groupId);
+            var group = await groupRepository.GetByIdAsync(groupId);
             if (group == null)
             {
                 throw new AppException(ErrorCodes.GroupNotFound, StatusCodes.Status404NotFound);
             }
 
             // Check if user is Owner or Moderator
-            var userParticipant = await _groupParticipantRepository.GetByGroupAndUserAsync(groupId, userId);
+            var userParticipant = await groupParticipantRepository.GetByGroupAndUserAsync(groupId, userId);
             if (userParticipant == null ||
                 (userParticipant.Role != GroupRole.Owner && userParticipant.Role != GroupRole.Moderator))
             {
@@ -1237,9 +1213,9 @@ namespace StudioStudio_Server.Services
 
             group.IsOpen = isOpen;
             group.UpdatedAt = DateTime.UtcNow;
-            await _groupRepository.UpdateAsync(group);
+            await groupRepository.UpdateAsync(group);
 
-            _logger.LogInformation(
+            logger.LogInformation(
                 "User {UserId} toggled IsOpen to {IsOpen} for group {GroupId}",
                 userId, isOpen, groupId);
 
@@ -1255,14 +1231,14 @@ namespace StudioStudio_Server.Services
         //  Get pending members (Owner/Moderator only)
         public async Task<PendingMemberListResponse> GetPendingMembersAsync(Guid userId, Guid groupId)
         {
-            var group = await _groupRepository.GetByIdAsync(groupId);
+            var group = await groupRepository.GetByIdAsync(groupId);
             if (group == null)
             {
                 throw new AppException(ErrorCodes.GroupNotFound, StatusCodes.Status404NotFound);
             }
 
             // Check if user is Owner or Moderator
-            var userParticipant = await _groupParticipantRepository.GetByGroupAndUserAsync(groupId, userId);
+            var userParticipant = await groupParticipantRepository.GetByGroupAndUserAsync(groupId, userId);
             if (userParticipant == null ||
                 (userParticipant.Role != GroupRole.Owner && userParticipant.Role != GroupRole.Moderator))
             {
@@ -1270,9 +1246,9 @@ namespace StudioStudio_Server.Services
             }
 
             // Get pending members
-            var pendingParticipants = await _groupParticipantRepository.GetPendingByGroupIdAsync(groupId);
+            var pendingParticipants = await groupParticipantRepository.GetPendingByGroupIdAsync(groupId);
             var userIds = pendingParticipants.Select(p => p.UserId).ToList();
-            var users = await _userRepository.GetByIdsAsync(userIds);
+            var users = await userRepository.GetByIdsAsync(userIds);
 
             var pendingMembers = pendingParticipants.Select(p =>
             {
@@ -1283,7 +1259,7 @@ namespace StudioStudio_Server.Services
                     FirstName = user?.FirstName ?? "",
                     LastName = user?.LastName ?? "",
                     Email = user?.Email ?? "",
-                    AvatarUrl = AvatarUrlHelper.BuildAbsoluteAvatarUrl(user?.AvatarUrl, _httpContextAccessor.HttpContext),
+                    AvatarUrl = AvatarUrlHelper.BuildAbsoluteAvatarUrl(user?.AvatarUrl, httpContextAccessor.HttpContext),
                     Role = p.Role.ToString(),
                     RequestedAt = p.CreatedAt
                 };
@@ -1301,14 +1277,14 @@ namespace StudioStudio_Server.Services
         // Approve pending member (Owner/Moderator only)
         public async Task<ApproveMemberResponse> ApproveMemberAsync(Guid userId, Guid groupId, Guid targetUserId)
         {
-            var group = await _groupRepository.GetByIdAsync(groupId);
+            var group = await groupRepository.GetByIdAsync(groupId);
             if (group == null)
             {
                 throw new AppException(ErrorCodes.GroupNotFound, StatusCodes.Status404NotFound);
             }
 
             // Check if user is Owner or Moderator
-            var userParticipant = await _groupParticipantRepository.GetByGroupAndUserAsync(groupId, userId);
+            var userParticipant = await groupParticipantRepository.GetByGroupAndUserAsync(groupId, userId);
             if (userParticipant == null ||
                 (userParticipant.Role != GroupRole.Owner && userParticipant.Role != GroupRole.Moderator))
             {
@@ -1316,7 +1292,7 @@ namespace StudioStudio_Server.Services
             }
 
             // Get pending participant
-            var targetParticipant = await _groupParticipantRepository.GetPendingByGroupAndUserAsync(groupId, targetUserId);
+            var targetParticipant = await groupParticipantRepository.GetPendingByGroupAndUserAsync(groupId, targetUserId);
             if (targetParticipant == null)
             {
                 throw new AppException(ErrorCodes.GroupMemberNotFound, StatusCodes.Status404NotFound);
@@ -1335,9 +1311,9 @@ namespace StudioStudio_Server.Services
             }
 
             // Check member limit
-            var subscriptionPlan = await _userSubscriptionRepository.GetSubscriptionPlanByUserIdAsync(userId);
+            var subscriptionPlan = await userSubscriptionRepository.GetSubscriptionPlanByUserIdAsync(userId);
             int memberLimit = subscriptionPlan?.MaxMembersPerGroup ?? 10;
-            int currentMemberCount = await _groupParticipantRepository.GetParticipantCountByGroupIdAsync(groupId);
+            int currentMemberCount = await groupParticipantRepository.GetParticipantCountByGroupIdAsync(groupId);
 
             if (currentMemberCount >= memberLimit)
             {
@@ -1345,16 +1321,16 @@ namespace StudioStudio_Server.Services
             }
 
             targetParticipant.IsApproved = true;
-            await _groupParticipantRepository.UpdateAsync(targetParticipant);
+            await groupParticipantRepository.UpdateAsync(targetParticipant);
 
             // Invalidate AI member cache so AI sees fresh member data immediately
             try
             {
-                await _cacheService.InvalidateAIMemberCacheAsync(groupId);
+                await cacheService.InvalidateAIMemberCacheAsync(groupId);
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex,
+                logger.LogWarning(ex,
                     "Non-critical AI member cache invalidation failed for GroupId={GroupId}",
                     groupId);
             }
@@ -1362,23 +1338,23 @@ namespace StudioStudio_Server.Services
             // Auto-approve user in studio if they were added as pending when joining group
             if (group.StudioId.HasValue)
             {
-                var existingStudioParticipant = await _studioParticipantRepository
+                var existingStudioParticipant = await studioParticipantRepository
                     .GetPendingByStudioAndUserAsync(group.StudioId.Value, targetUserId);
 
                 if (existingStudioParticipant != null)
                 {
                     // User was added as pending when joining the group - now approve them in studio
                     existingStudioParticipant.IsApproved = true;
-                    await _studioParticipantRepository.UpdateAsync(existingStudioParticipant);
+                    await studioParticipantRepository.UpdateAsync(existingStudioParticipant);
 
-                    _logger.LogInformation(
+                    logger.LogInformation(
                         "User {TargetUserId} auto-approved in studio {StudioId} after group {GroupId} approval",
                         targetUserId, group.StudioId.Value, groupId);
                 }
                 else
                 {
                     // Check if user is already an approved studio member
-                    var isStudioMember = await _studioParticipantRepository
+                    var isStudioMember = await studioParticipantRepository
                         .IsUserApprovedInStudioAsync(group.StudioId.Value, targetUserId);
 
                     if (!isStudioMember)
@@ -1396,16 +1372,16 @@ namespace StudioStudio_Server.Services
 
                         try
                         {
-                            await _studioParticipantRepository.AddAsync(studioParticipant);
+                            await studioParticipantRepository.AddAsync(studioParticipant);
 
-                            _logger.LogInformation(
+                            logger.LogInformation(
                                 "User {TargetUserId} auto-added to studio {StudioId} after group {GroupId} approval",
                                 targetUserId, group.StudioId.Value, groupId);
                         }
                         catch (DbUpdateException ex) when (ex.InnerException?.Message.Contains("IX_StudioParticipants_StudioId_UserId") == true)
                         {
                             // User already in studio (race condition), ignore
-                            _logger.LogWarning(
+                            logger.LogWarning(
                                 "User {TargetUserId} already in studio {StudioId} when approving group {GroupId}",
                                 targetUserId, group.StudioId.Value, groupId);
                         }
@@ -1413,7 +1389,7 @@ namespace StudioStudio_Server.Services
                 }
             }
 
-            var targetUser = await _userRepository.GetByIdAsync(targetUserId);
+            var targetUser = await userRepository.GetByIdAsync(targetUserId);
 
             // Send approval notification email
             if (targetUser != null && !string.IsNullOrEmpty(targetUser.Email))
@@ -1430,24 +1406,24 @@ namespace StudioStudio_Server.Services
                         DateTime.UtcNow,
                         language);
 
-                    await _emailService.SendLinkAsync(
+                    await emailService.SendLinkAsync(
                         targetUser!.Email,
                         "Join group request approved",
                         emailBody);
 
-                    _logger.LogInformation(
+                    logger.LogInformation(
                         "Approval notification email sent to {Email} for group {GroupId}",
                         targetUser.Email, groupId);
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogWarning(ex,
+                    logger.LogWarning(ex,
                         "Failed to send approval notification email to {Email}",
                         targetUser.Email);
                 }
             }
 
-            _logger.LogInformation(
+            logger.LogInformation(
                 "User {UserId} approved member {TargetUserId} in group {GroupId}",
                 userId, targetUserId, groupId);
 
@@ -1463,20 +1439,20 @@ namespace StudioStudio_Server.Services
         }
         private string BuildGroupUrl(Guid groupId)
         {
-            var baseUrl = _configuration["Frontend:BaseUrl"] ?? "http://localhost:3000";
+            var baseUrl = configuration["Frontend:BaseUrl"] ?? "http://localhost:3000";
             return $"{baseUrl}/group/{groupId}";
         }
 
         public async Task<ArchiveGroupResponse> ToggleArchiveGroupAsync(Guid userId, Guid groupId, bool isArchived)
         {
-            var group = await _groupRepository.GetByIdAsync(groupId);
+            var group = await groupRepository.GetByIdAsync(groupId);
             if (group == null)
             {
                 throw new AppException(ErrorCodes.GroupNotFound, StatusCodes.Status404NotFound);
             }
 
             // Only Owner can archive/unarchive
-            var isOwner = await _groupRepository.IsUserGroupOwnerAsync(groupId, userId);
+            var isOwner = await groupRepository.IsUserGroupOwnerAsync(groupId, userId);
             if (!isOwner)
             {
                 throw new AppException(ErrorCodes.GroupPermissionDenied, StatusCodes.Status403Forbidden);
@@ -1484,9 +1460,9 @@ namespace StudioStudio_Server.Services
 
             group.IsArchived = isArchived;
             group.UpdatedAt = DateTime.UtcNow;
-            await _groupRepository.UpdateAsync(group);
+            await groupRepository.UpdateAsync(group);
 
-            _logger.LogInformation(
+            logger.LogInformation(
                 "User {UserId} set IsArchived to {IsArchived} for group {GroupId}",
                 userId, isArchived, groupId);
 

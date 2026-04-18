@@ -3,7 +3,6 @@ using StudioStudio_Server.Exceptions;
 using StudioStudio_Server.Models.DTOs.Request;
 using StudioStudio_Server.Models.DTOs.Response;
 using StudioStudio_Server.Models.Entities;
-using StudioStudio_Server.Models.Enums;
 using StudioStudio_Server.Repositories.Interfaces;
 using StudioStudio_Server.Services.Interfaces;
 
@@ -16,12 +15,6 @@ namespace StudioStudio_Server.Services
         IGroupParticipantRepository groupParticipantRepository,
         StudioDbContext context) : ITemplateService
     {
-        private readonly ITemplateRepository _templateRepository = templateRepository;
-        private readonly IGroupRepository _groupRepository = groupRepository;
-        private readonly IGroupTaskStatusRepository _groupTaskStatusRepository = groupTaskStatusRepository;
-        private readonly IGroupParticipantRepository _groupParticipantRepository = groupParticipantRepository;
-        private readonly StudioDbContext _context = context;
-
         public async Task<TemplateResponse> CreateTemplateAsync(Guid userId, CreateTemplateRequest request)
         {
             var group = new Group
@@ -37,7 +30,7 @@ namespace StudioStudio_Server.Services
                 IsActive = true
             };
 
-            await _groupRepository.AddAsync(group);
+            await groupRepository.AddAsync(group);
 
             // Add admin as Owner of the group template
             var ownerParticipant = new GroupParticipant
@@ -49,7 +42,7 @@ namespace StudioStudio_Server.Services
                 CreatedAt = DateTime.UtcNow,
                 IsApproved = true
             };
-            await _groupParticipantRepository.AddAsync(ownerParticipant);
+            await groupParticipantRepository.AddAsync(ownerParticipant);
 
             var taskStatuses = request.GroupTaskStatuses.Select(s => new GroupTaskStatus
             {
@@ -59,7 +52,7 @@ namespace StudioStudio_Server.Services
                 Position = s.Position
             }).ToList();
 
-            await _groupTaskStatusRepository.AddRangeAsync(taskStatuses);
+            await groupTaskStatusRepository.AddRangeAsync(taskStatuses);
 
             var template = new Template
             {
@@ -72,7 +65,7 @@ namespace StudioStudio_Server.Services
                 IsActive = request.IsActive
             };
 
-            await _templateRepository.AddAsync(template);
+            await templateRepository.AddAsync(template);
 
             var statusResponses = taskStatuses.Select(s => new GroupTaskStatusResponse
             {
@@ -100,13 +93,13 @@ namespace StudioStudio_Server.Services
 
         public async Task<TemplateResponse> UpdateTemplateAsync(Guid userId, Guid templateId, UpdateTemplateRequest request)
         {
-            var template = await _templateRepository.GetByIdIncludingInactiveAsync(templateId);
+            var template = await templateRepository.GetByIdIncludingInactiveAsync(templateId);
             if (template == null)
             {
                 throw new AppException(ErrorCodes.TemplateNotFound, StatusCodes.Status404NotFound);
             }
 
-            var group = await _groupRepository.GetByIdAdminAsync(template.GroupId);
+            var group = await groupRepository.GetByIdAdminAsync(template.GroupId);
             if (group == null)
             {
                 throw new AppException(ErrorCodes.TemplateGroupNotFound, StatusCodes.Status404NotFound);
@@ -122,22 +115,22 @@ namespace StudioStudio_Server.Services
             {
                 group.GroupName = request.GroupName;
                 group.UpdatedAt = DateTime.UtcNow;
-                await _groupRepository.UpdateAsync(group);
+                await groupRepository.UpdateAsync(group);
             }
 
             if (request.GroupDescription != null)
             {
                 group.Description = request.GroupDescription;
                 group.UpdatedAt = DateTime.UtcNow;
-                await _groupRepository.UpdateAsync(group);
+                await groupRepository.UpdateAsync(group);
             }
 
             // Update groupStatuses if provided (replace all: hard-delete old + insert new)
             if (request.GroupTaskStatuses != null)
             {
-                var existingStatuses = await _groupTaskStatusRepository
+                var existingStatuses = await groupTaskStatusRepository
                     .GetByGroupIdWithTrackingAsync(template.GroupId);
-                await _groupTaskStatusRepository.RemoveRangeAsync(existingStatuses);
+                await groupTaskStatusRepository.RemoveRangeAsync(existingStatuses);
 
                 var newStatuses = request.GroupTaskStatuses.Select(s => new GroupTaskStatus
                 {
@@ -146,10 +139,10 @@ namespace StudioStudio_Server.Services
                     StatusName = s.StatusName,
                     Position = s.Position
                 }).ToList();
-                await _groupTaskStatusRepository.AddRangeAsync(newStatuses);
+                await groupTaskStatusRepository.AddRangeAsync(newStatuses);
 
                 template.UpdatedAt = DateTime.UtcNow;
-                await _templateRepository.UpdateAsync(template);
+                await templateRepository.UpdateAsync(template);
 
                 var statusResponses = newStatuses.Select(s => new GroupTaskStatusResponse
                 {
@@ -176,61 +169,49 @@ namespace StudioStudio_Server.Services
             }
 
             template.UpdatedAt = DateTime.UtcNow;
-            await _templateRepository.UpdateAsync(template);
+            await templateRepository.UpdateAsync(template);
 
             // Return with existing statuses
-            var currentStatuses = await _groupTaskStatusRepository.GetByGroupIdAsync(template.GroupId);
+            var currentStatuses = await groupTaskStatusRepository.GetByGroupIdAsync(template.GroupId);
             return MapTemplate(template, group, currentStatuses);
         }
 
         public async Task DeleteTemplateAsync(Guid userId, Guid templateId)
         {
-            var template = await _templateRepository.GetByIdAsync(templateId);
+            var template = await templateRepository.GetByIdAsync(templateId);
             if (template == null)
             {
                 throw new AppException(ErrorCodes.TemplateNotFound, StatusCodes.Status404NotFound);
             }
 
-            await _templateRepository.DeleteAsync(template);
+            await templateRepository.DeleteAsync(template);
 
-            var group = await _groupRepository.GetByIdAsync(template.GroupId);
+            var group = await groupRepository.GetByIdAsync(template.GroupId);
             if (group != null)
             {
-                await _groupRepository.DeleteAsync(group);
+                await groupRepository.DeleteAsync(group);
             }
         }
 
         public async Task<TemplateResponse> GetTemplateByIdAsync(Guid templateId)
         {
-            var template = await _templateRepository.GetByIdAsync(templateId);
+            var template = await templateRepository.GetByIdAsync(templateId);
             if (template == null)
             {
                 throw new AppException(ErrorCodes.TemplateNotFound, StatusCodes.Status404NotFound);
             }
 
-            var statuses = await _groupTaskStatusRepository.GetByGroupIdAsync(template.GroupId);
+            var statuses = await groupTaskStatusRepository.GetByGroupIdAsync(template.GroupId);
             return MapTemplate(template, template.Group, statuses);
-        }
-
-        public async Task<List<TemplateResponse>> GetAllTemplatesAsync()
-        {
-            var templates = await _templateRepository.GetAllAsync();
-            var result = new List<TemplateResponse>();
-            foreach (var t in templates)
-            {
-                var statuses = await _groupTaskStatusRepository.GetByGroupIdAsync(t.GroupId);
-                result.Add(MapTemplate(t, t.Group, statuses));
-            }
-            return result;
         }
 
         public async Task<List<TemplateResponse>> GetAllSystemTemplatesAsync()
         {
-            var templates = await _templateRepository.GetAllSystemTemplatesAsync();
+            var templates = await templateRepository.GetAllSystemTemplatesAsync();
             var result = new List<TemplateResponse>();
             foreach (var t in templates)
             {
-                var statuses = await _groupTaskStatusRepository.GetByGroupIdAsync(t.GroupId);
+                var statuses = await groupTaskStatusRepository.GetByGroupIdAsync(t.GroupId);
                 result.Add(MapTemplate(t, t.Group, statuses));
             }
             return result;
@@ -238,14 +219,14 @@ namespace StudioStudio_Server.Services
 
         public async Task<List<TemplateResponse>> GetAvailableTemplatesForUserAsync(Guid userId)
         {
-            var systemTemplates = await _templateRepository.GetSystemTemplatesAsync();
-            var userTemplates = await _templateRepository.GetUserTemplatesAsync(userId);
+            var systemTemplates = await templateRepository.GetSystemTemplatesAsync();
+            var userTemplates = await templateRepository.GetUserTemplatesAsync(userId);
 
             var allTemplates = systemTemplates.Concat(userTemplates).ToList();
             var result = new List<TemplateResponse>();
             foreach (var t in allTemplates)
             {
-                var statuses = await _groupTaskStatusRepository.GetByGroupIdAsync(t.GroupId);
+                var statuses = await groupTaskStatusRepository.GetByGroupIdAsync(t.GroupId);
                 result.Add(MapTemplate(t, t.Group, statuses));
             }
             return result;
@@ -253,38 +234,38 @@ namespace StudioStudio_Server.Services
 
         public async Task<TemplateResponse> GetTemplateByIdIncludingInactiveAsync(Guid templateId)
         {
-            var template = await _templateRepository.GetByIdIncludingInactiveAsync(templateId);
+            var template = await templateRepository.GetByIdIncludingInactiveAsync(templateId);
             if (template == null)
             {
                 throw new AppException(ErrorCodes.TemplateNotFound, StatusCodes.Status404NotFound);
             }
 
-            var statuses = await _groupTaskStatusRepository.GetByGroupIdAsync(template.GroupId);
+            var statuses = await groupTaskStatusRepository.GetByGroupIdAsync(template.GroupId);
             return MapTemplate(template, template.Group, statuses);
         }
 
         public async Task HardDeleteTemplateAsync(Guid templateId)
         {
-            var template = await _templateRepository.GetByIdIncludingInactiveAsync(templateId);
+            var template = await templateRepository.GetByIdIncludingInactiveAsync(templateId);
             if (template == null)
             {
                 throw new AppException(ErrorCodes.TemplateNotFound, StatusCodes.Status404NotFound);
             }
 
             // Hard-delete GroupTaskStatuses
-            var statuses = await _groupTaskStatusRepository.GetByGroupIdWithTrackingAsync(template.GroupId);
-            await _groupTaskStatusRepository.RemoveRangeAsync(statuses);
+            var statuses = await groupTaskStatusRepository.GetByGroupIdWithTrackingAsync(template.GroupId);
+            await groupTaskStatusRepository.RemoveRangeAsync(statuses);
 
             // Hard-delete Group
-            var group = await _groupRepository.GetByIdAsync(template.GroupId);
+            var group = await groupRepository.GetByIdAsync(template.GroupId);
             if (group != null)
             {
-                _context.Groups.Remove(group);
-                await _context.SaveChangesAsync();
+                context.Groups.Remove(group);
+                await context.SaveChangesAsync();
             }
 
             // Hard-delete Template
-            await _templateRepository.HardDeleteAsync(template);
+            await templateRepository.HardDeleteAsync(template);
         }
 
         // --- Private helpers ---

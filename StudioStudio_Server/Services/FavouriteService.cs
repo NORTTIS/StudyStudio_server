@@ -18,11 +18,6 @@ namespace StudioStudio_Server.Services
         IGroupParticipantRepository groupParticipantRepository,
         ILogger<FavouriteService> logger) : IFavouriteService
     {
-        private readonly IFavouriteRepository _favouriteRepository = favouriteRepository;
-        private readonly IGroupRepository _groupRepository = groupRepository;
-        private readonly IGroupParticipantRepository _groupParticipantRepository = groupParticipantRepository;
-        private readonly ILogger<FavouriteService> _logger = logger;
-
         /// <summary>
         /// Add group to user's favourites
         /// Validate:
@@ -46,9 +41,9 @@ namespace StudioStudio_Server.Services
                 CreatedAt = DateTime.UtcNow
             };
 
-            await _favouriteRepository.AddAsync(favourite);
+            await favouriteRepository.AddAsync(favourite);
 
-            _logger.LogInformation(
+            logger.LogInformation(
                 "User {UserId} added group {GroupId} to favourites",
                 userId, request.GroupId);
 
@@ -72,9 +67,9 @@ namespace StudioStudio_Server.Services
         {
             var favourite = await ValidateFavouriteExistsAsync(userId, request.GroupId);
 
-            await _favouriteRepository.RemoveAsync(favourite);
+            await favouriteRepository.RemoveAsync(favourite);
 
-            _logger.LogInformation(
+            logger.LogInformation(
                 "User {UserId} removed group {GroupId} from favourites",
                 userId, request.GroupId);
         }
@@ -85,7 +80,7 @@ namespace StudioStudio_Server.Services
         /// </summary>
         private async Task<Group> ValidateGroupExistsAsync(Guid groupId)
         {
-            var group = await _groupRepository.GetByIdAsync(groupId);
+            var group = await groupRepository.GetByIdAsync(groupId);
 
             if (group == null)
             {
@@ -103,7 +98,7 @@ namespace StudioStudio_Server.Services
         /// </summary>
         private async Task ValidateUserIsMemberAsync(Guid groupId, Guid userId)
         {
-            var isMember = await _groupParticipantRepository
+            var isMember = await groupParticipantRepository
                 .IsUserInGroupAsync(groupId, userId);
 
             if (!isMember)
@@ -120,13 +115,12 @@ namespace StudioStudio_Server.Services
         /// </summary>
         private async Task ValidateFavouriteNotExistsAsync(Guid userId, Guid groupId)
         {
-            var exists = await _favouriteRepository.ExistsAsync(userId, groupId);
+            var exists = await favouriteRepository.ExistsAsync(userId, groupId);
 
             if (exists)
             {
                 throw new AppException(
-                    ErrorCodes.FavouriteAlreadyExists,
-                    StatusCodes.Status400BadRequest);
+                    ErrorCodes.FavouriteAlreadyExists);
             }
         }
 
@@ -136,7 +130,7 @@ namespace StudioStudio_Server.Services
         /// </summary>
         private async Task<Favourite> ValidateFavouriteExistsAsync(Guid userId, Guid groupId)
         {
-            var favourite = await _favouriteRepository
+            var favourite = await favouriteRepository
                 .GetByUserAndGroupIdAsync(userId, groupId);
 
             if (favourite == null)

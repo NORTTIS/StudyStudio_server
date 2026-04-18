@@ -13,35 +13,30 @@ namespace StudioStudio_Server.Services
         ILogger<SeederService> logger,
         IConfiguration configuration) : ISeederService
     {
-        private readonly StudioDbContext _context = context;
-        private readonly IPasswordHasher<User> _passwordHasher = passwordHasher;
-        private readonly ILogger<SeederService> _logger = logger;
-        private readonly IConfiguration _configuration = configuration;
-
         public async Task SeedInitialDataAsync()
         {
             try
             {
                 await SeedSubscriptionPlansAsync();
                 await SeedAdminUserAsync();
-                await _context.SaveChangesAsync();
+                await context.SaveChangesAsync();
 
-                _logger.LogInformation("Seed data initialization completed successfully");
+                logger.LogInformation("Seed data initialization completed successfully");
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error occurred during seed data initialization");
+                logger.LogError(ex, "Error occurred during seed data initialization");
                 throw;
             }
         }
 
         private async Task SeedSubscriptionPlansAsync()
         {
-            var existingPlans = await _context.SubscriptionPlans.CountAsync();
+            var existingPlans = await context.SubscriptionPlans.CountAsync();
 
             if (existingPlans > 0)
             {
-                _logger.LogInformation("Subscription plans already exist. Skipping seed.");
+                logger.LogInformation("Subscription plans already exist. Skipping seed.");
                 return;
             }
 
@@ -78,29 +73,29 @@ namespace StudioStudio_Server.Services
                 IsActive = true
             };
 
-            _context.SubscriptionPlans.AddRange(freePlan, premiumPlan);
-            _logger.LogInformation("Subscription plans seeded successfully. FreePlanId: {FreePlanId}, PremiumPlanId: {PremiumPlanId}",
+            context.SubscriptionPlans.AddRange(freePlan, premiumPlan);
+            logger.LogInformation("Subscription plans seeded successfully. FreePlanId: {FreePlanId}, PremiumPlanId: {PremiumPlanId}",
                 freePlanId, premiumPlanId);
         }
 
         private async Task SeedAdminUserAsync()
         {
-            var adminEmail = _configuration["Admin:Email"] ?? "admin@studystudio.com";
-            var adminPassword = _configuration["Admin:Password"];
-            var adminFirstName = _configuration["Admin:FirstName"] ?? "Admin";
-            var adminLastName = _configuration["Admin:LastName"] ?? "User";
+            var adminEmail = configuration["Admin:Email"] ?? "admin@studystudio.com";
+            var adminPassword = configuration["Admin:Password"];
+            var adminFirstName = configuration["Admin:FirstName"] ?? "Admin";
+            var adminLastName = configuration["Admin:LastName"] ?? "User";
 
             if (string.IsNullOrWhiteSpace(adminPassword))
             {
-                _logger.LogWarning("Admin password not configured in environment variables. Using default password: Admin@123456");
+                logger.LogWarning("Admin password not configured in environment variables. Using default password: Admin@123456");
                 adminPassword = "Admin@123456";
             }
 
-            var existingAdmin = await _context.Users.FirstOrDefaultAsync(u => u.Email == adminEmail);
+            var existingAdmin = await context.Users.FirstOrDefaultAsync(u => u.Email == adminEmail);
 
             if (existingAdmin != null)
             {
-                _logger.LogInformation("Admin user already exists. Skipping seed. Email: {Email}", adminEmail);
+                logger.LogInformation("Admin user already exists. Skipping seed. Email: {Email}", adminEmail);
                 return;
             }
 
@@ -119,10 +114,10 @@ namespace StudioStudio_Server.Services
                 UpdatedAt = DateTime.UtcNow
             };
 
-            adminUser.PasswordHash = _passwordHasher.HashPassword(adminUser, adminPassword);
+            adminUser.PasswordHash = passwordHasher.HashPassword(adminUser, adminPassword);
 
-            _context.Users.Add(adminUser);
-            _logger.LogInformation("Admin user seeded successfully. Email: {Email}, FirstName: {FirstName}, LastName: {LastName}",
+            context.Users.Add(adminUser);
+            logger.LogInformation("Admin user seeded successfully. Email: {Email}, FirstName: {FirstName}, LastName: {LastName}",
                 adminEmail, adminFirstName, adminLastName);
         }
     }

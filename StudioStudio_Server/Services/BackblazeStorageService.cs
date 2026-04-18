@@ -127,12 +127,6 @@ namespace StudioStudio_Server.Services
         /// </summary>
         public async Task<bool> DeleteFileAsync(string key, string bucketName)
         {
-            if (_s3Client == null)
-            {
-                _logger.LogWarning("Backblaze B2 storage ch�a ��?c c?u h?nh. Kh�ng th? x�a file v?i key: {Key}", key);
-                return false;
-            }
-
             DeleteObjectRequest request = new DeleteObjectRequest
             {
                 BucketName = bucketName,
@@ -160,12 +154,6 @@ namespace StudioStudio_Server.Services
         /// </summary>
         public async Task<bool> FileExistsAsync(string key, string bucketName)
         {
-            if (_s3Client == null)
-            {
-                _logger.LogWarning("Backblaze B2 storage ch�a ��?c c?u h?nh. Kh�ng th? ki?m tra file v?i key: {Key}", key);
-                return false;
-            }
-
             try
             {
                 GetObjectMetadataRequest request = new GetObjectMetadataRequest
@@ -196,12 +184,6 @@ namespace StudioStudio_Server.Services
         /// <returns>Stream c?a file</returns>
         public async Task<Stream> DownloadFileAsync(string key)
         {
-            if (_s3Client == null)
-            {
-                _logger.LogWarning("Backblaze B2 storage ch�a ��?c c?u h?nh. Kh�ng th? download file v?i key: {Key}", key);
-                throw new Exception("Backblaze B2 storage ch�a ��?c c?u h?nh");
-            }
-
             try
             {
                 GetObjectRequest request = new GetObjectRequest

@@ -2,7 +2,6 @@ using StackExchange.Redis;
 using StudioStudio_Server.Models.Caches;
 using StudioStudio_Server.Services.Interfaces;
 using System.Security.Cryptography;
-using System.Text;
 using System.Text.Json;
 
 namespace StudioStudio_Server.Services
@@ -17,8 +16,6 @@ namespace StudioStudio_Server.Services
         IConnectionMultiplexer redis,
         ILogger<StudioInviteService> logger) : IStudioInviteService
     {
-        private readonly IConnectionMultiplexer _redis = redis;
-        private readonly ILogger<StudioInviteService> _logger = logger;
         private const int TOKEN_LIFETIME_MINUTES = 15;
         private const int RATE_LIMIT_WINDOW_MINUTES = 15;
         private const int MAX_LINKS_PER_WINDOW = 5;
@@ -53,7 +50,7 @@ namespace StudioStudio_Server.Services
         /// </summary>
         public async Task<bool> StoreInviteTokenAsync(string token, StudioInviteToken inviteData)
         {
-            IDatabase db = _redis.GetDatabase();
+            IDatabase db = redis.GetDatabase();
             string key = $"studio:invite:{token}";
 
             string jsonData = JsonSerializer.Serialize(inviteData);
@@ -64,7 +61,7 @@ namespace StudioStudio_Server.Services
 
             if (result)
             {
-                _logger.LogInformation("Invite token stored for studio {StudioId} with role {Role}. Expires in {Minutes} minutes.",
+                logger.LogInformation("Invite token stored for studio {StudioId} with role {Role}. Expires in {Minutes} minutes.",
                     inviteData.StudioId, inviteData.Role, TOKEN_LIFETIME_MINUTES);
             }
 
@@ -78,14 +75,14 @@ namespace StudioStudio_Server.Services
         /// </summary>
         public async Task<StudioInviteToken?> GetInviteTokenDataAsync(string token)
         {
-            IDatabase db = _redis.GetDatabase();
+            IDatabase db = redis.GetDatabase();
             string key = $"studio:invite:{token}";
 
             RedisValue value = await db.StringGetAsync(key);
 
             if (value.IsNullOrEmpty)
             {
-                _logger.LogWarning("Invite token not found or expired: {Token}", token);
+                logger.LogWarning("Invite token not found or expired: {Token}", token);
                 return null;
             }
 
@@ -103,7 +100,7 @@ namespace StudioStudio_Server.Services
         /// </summary>
         public async Task<bool> CheckInviteCreationRateLimitAsync(Guid studioId, Guid userId)
         {
-            IDatabase db = _redis.GetDatabase();
+            IDatabase db = redis.GetDatabase();
             string key = $"invite:ratelimit:studio:{studioId}:{userId}";
 
             RedisValue value = await db.StringGetAsync(key);
@@ -116,7 +113,7 @@ namespace StudioStudio_Server.Services
 
             if (currentCount >= MAX_LINKS_PER_WINDOW)
             {
-                _logger.LogWarning("Rate limit exceeded for user {UserId} in studio {StudioId}. Count: {Count}",
+                logger.LogWarning("Rate limit exceeded for user {UserId} in studio {StudioId}. Count: {Count}",
                     userId, studioId, currentCount);
                 return false;
             }

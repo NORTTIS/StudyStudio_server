@@ -18,15 +18,6 @@ namespace StudioStudio_Server.Services.Interfaces
         Task<bool> UpsertVectorAsync(string id, float[] vector, Dictionary<string, object> payload);
 
         /// <summary>
-        /// Search for similar vectors
-        /// </summary>
-        /// <param name="queryVector">Query vector for search</param>
-        /// <param name="limit">Number of results (default: 5)</param>
-        /// <param name="filters">Filters for payload (optional)</param>
-        /// <returns>List of similar vectors with scores</returns>
-        Task<List<VectorSearchResult>> SearchSimilarAsync(float[] queryVector, int limit = 5, Dictionary<string, object>? filters = null);
-
-        /// <summary>
         /// Search vectors with groupId filter (for AI Q&A)
         /// </summary>
         /// <param name="queryVector">Query vector for search</param>
@@ -50,35 +41,6 @@ namespace StudioStudio_Server.Services.Interfaces
         Task<bool> DeleteVectorAsync(string id);
 
         /// <summary>
-        /// Delete multiple vectors by filter (Qdrant DSL format)
-        /// </summary>
-        /// <param name="filters">Filters to identify vectors to delete</param>
-        /// <returns>True if delete successful</returns>
-        Task<bool> DeleteVectorsByFilterAsync(Dictionary<string, object> filters);
-
-        /// <summary>
-        /// Delete all vectors belonging to a group
-        /// </summary>
-        /// <param name="groupId">Group ID</param>
-        /// <returns>True if delete successful</returns>
-        Task<bool> DeleteVectorsByGroupIdAsync(Guid groupId);
-
-        /// <summary>
-        /// Delete all vectors of a user
-        /// </summary>
-        /// <param name="userId">User ID</param>
-        /// <returns>True if delete successful</returns>
-        Task<bool> DeleteVectorsByUserIdAsync(Guid userId);
-
-        /// <summary>
-        /// Delete vectors of user NOT belonging to specific group
-        /// </summary>
-        /// <param name="userId">User ID</param>
-        /// <param name="groupId">Group ID (exclude)</param>
-        /// <returns>True if delete successful</returns>
-        Task<bool> DeleteVectorsByUserNotInGroupAsync(Guid userId, Guid groupId);
-
-        /// <summary>
         /// Search vectors across multiple groups (for studio-level AI)
         /// Uses Qdrant MatchAny filter on groupId
         /// </summary>
@@ -94,20 +56,6 @@ namespace StudioStudio_Server.Services.Interfaces
             List<Guid> groupIds,
             Guid? documentId = null,
             CancellationToken cancellationToken = default);
-
-        /// <summary>
-        /// Delete all vectors of a specific document
-        /// </summary>
-        /// <param name="documentId">Document ID</param>
-        /// <returns>True if delete successful</returns>
-        Task<bool> DeleteVectorsByDocumentIdAsync(Guid documentId);
-
-        /// <summary>
-        /// Get vector information by ID
-        /// </summary>
-        /// <param name="id">ID of vector</param>
-        /// <returns>Vector data or null if not found</returns>
-        Task<VectorSearchResult?> GetVectorByIdAsync(string id);
 
         /// <summary>
         /// Test connection to vector database (for health checks)

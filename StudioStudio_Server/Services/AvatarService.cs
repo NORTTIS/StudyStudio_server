@@ -1,11 +1,8 @@
-using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Options;
 using StudioStudio_Server.Configurations;
 using StudioStudio_Server.Exceptions;
 using StudioStudio_Server.Models.DTOs.Request;
 using StudioStudio_Server.Models.DTOs.Response;
-using StudioStudio_Server.Models.Entities;
-using StudioStudio_Server.Models.Enums;
 using StudioStudio_Server.Repositories.Interfaces;
 using StudioStudio_Server.Services.Interfaces;
 
@@ -20,12 +17,6 @@ namespace StudioStudio_Server.Services
         IFileStorageService fileStorageService,
         IOptions<BackblazeConfig> backblazeConfig) : IAvatarService
     {
-        private readonly ILogger<AvatarService> _logger = logger;
-        private readonly IGroupRepository _groupRepository = groupRepository;
-        private readonly IStudioRepository _studioRepository = studioRepository;
-        private readonly IGroupParticipantRepository _groupParticipantRepository = groupParticipantRepository;
-        private readonly IStudioParticipantRepository _studioParticipantRepository = studioParticipantRepository;
-        private readonly IFileStorageService _fileStorageService = fileStorageService;
         private readonly BackblazeConfig _backblazeConfig = backblazeConfig.Value;
 
         // Avatar upload settings
@@ -82,14 +73,14 @@ namespace StudioStudio_Server.Services
             Guid userId, Guid groupId, RequestAvatarUploadRequest request)
         {
             // Check if group exists (with tracking for avatar URL access)
-            var group = await _groupRepository.GetByIdAsync(groupId);
+            var group = await groupRepository.GetByIdAsync(groupId);
             if (group == null)
             {
                 throw new AppException(ErrorCodes.GroupNotFound, StatusCodes.Status404NotFound);
             }
 
             // Check if user is Owner or Moderator of the group
-            var participant = await _groupParticipantRepository.GetByGroupAndUserAsync(groupId, userId);
+            var participant = await groupParticipantRepository.GetByGroupAndUserAsync(groupId, userId);
             if (participant == null ||
                 (participant.Role != GroupRole.Owner && participant.Role != GroupRole.Moderator))
             {
@@ -99,13 +90,13 @@ namespace StudioStudio_Server.Services
             // Validate file size
             if (request.FileSize <= 0 || request.FileSize > MaxAvatarFileSize)
             {
-                throw new AppException(ErrorCodes.ValidationFileSizeExceeded, StatusCodes.Status400BadRequest);
+                throw new AppException(ErrorCodes.ValidationFileSizeExceeded);
             }
 
             // Validate content type
             if (!AllowedContentTypes.Contains(request.ContentType.ToLowerInvariant()))
             {
-                throw new AppException(ErrorCodes.ValidationInvalidFileFormat, StatusCodes.Status400BadRequest);
+                throw new AppException(ErrorCodes.ValidationInvalidFileFormat);
             }
 
             // Get file extension
@@ -122,19 +113,19 @@ namespace StudioStudio_Server.Services
                 {
                     var oldKey = ExtractFileKey(group.AvatarUrl);
                     if (!string.IsNullOrEmpty(oldKey))
-                        await _fileStorageService.DeleteFileAsync(oldKey, _backblazeConfig.PublicBucketName);
-                    _logger.LogInformation("Deleted old avatar for group {GroupId}: {OldKey}", groupId, oldKey);
+                        await fileStorageService.DeleteFileAsync(oldKey, _backblazeConfig.PublicBucketName);
+                    logger.LogInformation("Deleted old avatar for group {GroupId}: {OldKey}", groupId, oldKey);
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogWarning(ex, "Failed to delete old avatar for group {GroupId}", groupId);
+                    logger.LogWarning(ex, "Failed to delete old avatar for group {GroupId}", groupId);
                 }
             }
 
             // Generate presigned upload URL (60 minutes) using public bucket
-            var uploadUrl = await _fileStorageService.GeneratePresignedUploadUrlAsync(fileKey, _backblazeConfig.PublicBucketName, 60);
+            var uploadUrl = await fileStorageService.GeneratePresignedUploadUrlAsync(fileKey, _backblazeConfig.PublicBucketName, 60);
 
-            _logger.LogInformation(
+            logger.LogInformation(
                 "Avatar upload requested for group {GroupId} by user {UserId}. Key: {FileKey}",
                 groupId, userId, fileKey);
 
@@ -151,7 +142,7 @@ namespace StudioStudio_Server.Services
             Guid userId, Guid studioId, RequestAvatarUploadRequest request)
         {
             // Check if studio exists (with tracking for avatar URL access)
-            var studio = await _studioRepository.GetByIdAsync(studioId);
+            var studio = await studioRepository.GetByIdAsync(studioId);
             if (studio == null)
             {
                 throw new AppException(ErrorCodes.StudioNotFound, StatusCodes.Status404NotFound);
@@ -166,13 +157,13 @@ namespace StudioStudio_Server.Services
             // Validate file size
             if (request.FileSize <= 0 || request.FileSize > MaxAvatarFileSize)
             {
-                throw new AppException(ErrorCodes.ValidationFileSizeExceeded, StatusCodes.Status400BadRequest);
+                throw new AppException(ErrorCodes.ValidationFileSizeExceeded);
             }
 
             // Validate content type
             if (!AllowedContentTypes.Contains(request.ContentType.ToLowerInvariant()))
             {
-                throw new AppException(ErrorCodes.ValidationInvalidFileFormat, StatusCodes.Status400BadRequest);
+                throw new AppException(ErrorCodes.ValidationInvalidFileFormat);
             }
 
             // Get file extension
@@ -189,19 +180,19 @@ namespace StudioStudio_Server.Services
                 {
                     var oldKey = ExtractFileKey(studio.AvatarUrl);
                     if (!string.IsNullOrEmpty(oldKey))
-                        await _fileStorageService.DeleteFileAsync(oldKey, _backblazeConfig.PublicBucketName);
-                    _logger.LogInformation("Deleted old avatar for studio {StudioId}: {OldKey}", studioId, oldKey);
+                        await fileStorageService.DeleteFileAsync(oldKey, _backblazeConfig.PublicBucketName);
+                    logger.LogInformation("Deleted old avatar for studio {StudioId}: {OldKey}", studioId, oldKey);
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogWarning(ex, "Failed to delete old avatar for studio {StudioId}", studioId);
+                    logger.LogWarning(ex, "Failed to delete old avatar for studio {StudioId}", studioId);
                 }
             }
 
             // Generate presigned upload URL (60 minutes) using public bucket
-            var uploadUrl = await _fileStorageService.GeneratePresignedUploadUrlAsync(fileKey, _backblazeConfig.PublicBucketName, 60);
+            var uploadUrl = await fileStorageService.GeneratePresignedUploadUrlAsync(fileKey, _backblazeConfig.PublicBucketName, 60);
 
-            _logger.LogInformation(
+            logger.LogInformation(
                 "Avatar upload requested for studio {StudioId} by user {UserId}. Key: {FileKey}",
                 studioId, userId, fileKey);
 
@@ -218,14 +209,14 @@ namespace StudioStudio_Server.Services
             Guid userId, Guid groupId, CompleteAvatarUploadRequest request)
         {
             // Check if group exists (with tracking for update)
-            var group = await _groupRepository.GetByIdForUpdateAsync(groupId);
+            var group = await groupRepository.GetByIdForUpdateAsync(groupId);
             if (group == null)
             {
                 throw new AppException(ErrorCodes.GroupNotFound, StatusCodes.Status404NotFound);
             }
 
             // Check if user is Owner or Moderator
-            var participant = await _groupParticipantRepository.GetByGroupAndUserAsync(groupId, userId);
+            var participant = await groupParticipantRepository.GetByGroupAndUserAsync(groupId, userId);
             if (participant == null ||
                 (participant.Role != GroupRole.Owner && participant.Role != GroupRole.Moderator))
             {
@@ -233,18 +224,18 @@ namespace StudioStudio_Server.Services
             }
 
             // Verify file exists in B2
-            var fileExists = await _fileStorageService.FileExistsAsync(request.FileKey, _backblazeConfig.PublicBucketName);
+            var fileExists = await fileStorageService.FileExistsAsync(request.FileKey, _backblazeConfig.PublicBucketName);
             if (!fileExists)
             {
-                throw new AppException(ErrorCodes.ValidationInvalidFileFormat, StatusCodes.Status400BadRequest);
+                throw new AppException(ErrorCodes.ValidationInvalidFileFormat);
             }
 
             // Update group with full B2 URL
             group.AvatarUrl = BuildAvatarUrl(request.FileKey);
             group.UpdatedAt = DateTime.UtcNow;
-            await _groupRepository.UpdateAsync(group);
+            await groupRepository.UpdateAsync(group);
 
-            _logger.LogInformation(
+            logger.LogInformation(
                 "Avatar upload completed for group {GroupId}. Key: {FileKey}",
                 groupId, request.FileKey);
         }
@@ -253,7 +244,7 @@ namespace StudioStudio_Server.Services
             Guid userId, Guid studioId, CompleteAvatarUploadRequest request)
         {
             // Check if studio exists (with tracking for update)
-            var studio = await _studioRepository.GetByIdForUpdateAsync(studioId);
+            var studio = await studioRepository.GetByIdForUpdateAsync(studioId);
             if (studio == null)
             {
                 throw new AppException(ErrorCodes.StudioNotFound, StatusCodes.Status404NotFound);
@@ -262,7 +253,7 @@ namespace StudioStudio_Server.Services
             // Check if user is Owner
             if (studio.OwnerId != userId)
             {
-                var participant = await _studioParticipantRepository.GetByStudioAndUserAsync(studioId, userId);
+                var participant = await studioParticipantRepository.GetByStudioAndUserAsync(studioId, userId);
                 if (participant == null)
                 {
                     throw new AppException(ErrorCodes.AuthForbidden, StatusCodes.Status403Forbidden);
@@ -270,31 +261,31 @@ namespace StudioStudio_Server.Services
             }
 
             // Verify file exists in B2
-            var fileExists = await _fileStorageService.FileExistsAsync(request.FileKey, _backblazeConfig.PublicBucketName);
+            var fileExists = await fileStorageService.FileExistsAsync(request.FileKey, _backblazeConfig.PublicBucketName);
             if (!fileExists)
             {
-                throw new AppException(ErrorCodes.ValidationInvalidFileFormat, StatusCodes.Status400BadRequest);
+                throw new AppException(ErrorCodes.ValidationInvalidFileFormat);
             }
 
             // Update studio with full B2 URL
             studio.AvatarUrl = BuildAvatarUrl(request.FileKey);
             studio.UpdatedAt = DateTime.UtcNow;
-            await _studioRepository.UpdateStudioAsync(studio);
+            await studioRepository.UpdateStudioAsync(studio);
 
-            _logger.LogInformation(
+            logger.LogInformation(
                 "Avatar upload completed for studio {StudioId}. Key: {FileKey}",
                 studioId, request.FileKey);
         }
 
         public async Task DeleteGroupAvatarAsync(Guid userId, Guid groupId)
         {
-            var group = await _groupRepository.GetByIdForUpdateAsync(groupId);
+            var group = await groupRepository.GetByIdForUpdateAsync(groupId);
             if (group == null)
             {
                 throw new AppException(ErrorCodes.GroupNotFound, StatusCodes.Status404NotFound);
             }
 
-            var participant = await _groupParticipantRepository.GetByGroupAndUserAsync(groupId, userId);
+            var participant = await groupParticipantRepository.GetByGroupAndUserAsync(groupId, userId);
             if (participant == null ||
                 (participant.Role != GroupRole.Owner && participant.Role != GroupRole.Moderator))
             {
@@ -308,24 +299,24 @@ namespace StudioStudio_Server.Services
                 {
                     var fileKey = ExtractFileKey(group.AvatarUrl);
                     if (!string.IsNullOrEmpty(fileKey))
-                        await _fileStorageService.DeleteFileAsync(fileKey, _backblazeConfig.PublicBucketName);
-                    _logger.LogInformation("Deleted avatar for group {GroupId}", groupId);
+                        await fileStorageService.DeleteFileAsync(fileKey, _backblazeConfig.PublicBucketName);
+                    logger.LogInformation("Deleted avatar for group {GroupId}", groupId);
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogWarning(ex, "Failed to delete avatar from B2 for group {GroupId}", groupId);
+                    logger.LogWarning(ex, "Failed to delete avatar from B2 for group {GroupId}", groupId);
                 }
             }
 
             // Clear database field
             group.AvatarUrl = null;
             group.UpdatedAt = DateTime.UtcNow;
-            await _groupRepository.UpdateAsync(group);
+            await groupRepository.UpdateAsync(group);
         }
 
         public async Task DeleteStudioAvatarAsync(Guid userId, Guid studioId)
         {
-            var studio = await _studioRepository.GetByIdForUpdateAsync(studioId);
+            var studio = await studioRepository.GetByIdForUpdateAsync(studioId);
             if (studio == null)
             {
                 throw new AppException(ErrorCodes.StudioNotFound, StatusCodes.Status404NotFound);
@@ -333,7 +324,7 @@ namespace StudioStudio_Server.Services
 
             if (studio.OwnerId != userId)
             {
-                var participant = await _studioParticipantRepository.GetByStudioAndUserAsync(studioId, userId);
+                var participant = await studioParticipantRepository.GetByStudioAndUserAsync(studioId, userId);
                 if (participant == null)
                 {
                     throw new AppException(ErrorCodes.AuthForbidden, StatusCodes.Status403Forbidden);
@@ -347,19 +338,19 @@ namespace StudioStudio_Server.Services
                 {
                     var fileKey = ExtractFileKey(studio.AvatarUrl);
                     if (!string.IsNullOrEmpty(fileKey))
-                        await _fileStorageService.DeleteFileAsync(fileKey, _backblazeConfig.PublicBucketName);
-                    _logger.LogInformation("Deleted avatar for studio {StudioId}", studioId);
+                        await fileStorageService.DeleteFileAsync(fileKey, _backblazeConfig.PublicBucketName);
+                    logger.LogInformation("Deleted avatar for studio {StudioId}", studioId);
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogWarning(ex, "Failed to delete avatar from B2 for studio {StudioId}", studioId);
+                    logger.LogWarning(ex, "Failed to delete avatar from B2 for studio {StudioId}", studioId);
                 }
             }
 
             // Clear database field
             studio.AvatarUrl = null;
             studio.UpdatedAt = DateTime.UtcNow;
-            await _studioRepository.UpdateStudioAsync(studio);
+            await studioRepository.UpdateStudioAsync(studio);
         }
 
         // 🔹 ADDED: Group Banner Methods
@@ -369,10 +360,10 @@ namespace StudioStudio_Server.Services
             string currentUrl, RequestAvatarUploadRequest request, string fileKey)
         {
             if (request.FileSize <= 0 || request.FileSize > MaxBannerFileSize)
-                throw new AppException(ErrorCodes.ValidationFileSizeExceeded, StatusCodes.Status400BadRequest);
+                throw new AppException(ErrorCodes.ValidationFileSizeExceeded);
 
             if (!AllowedContentTypes.Contains(request.ContentType.ToLowerInvariant()))
-                throw new AppException(ErrorCodes.ValidationInvalidFileFormat, StatusCodes.Status400BadRequest);
+                throw new AppException(ErrorCodes.ValidationInvalidFileFormat);
 
             if (!string.IsNullOrEmpty(currentUrl))
             {
@@ -380,22 +371,22 @@ namespace StudioStudio_Server.Services
                 {
                     var oldKey = ExtractFileKey(currentUrl);
                     if (!string.IsNullOrEmpty(oldKey))
-                        await _fileStorageService.DeleteFileAsync(oldKey, _backblazeConfig.PublicBucketName);
+                        await fileStorageService.DeleteFileAsync(oldKey, _backblazeConfig.PublicBucketName);
                 }
-                catch (Exception ex) { _logger.LogWarning(ex, "Failed to delete old banner"); }
+                catch (Exception ex) { logger.LogWarning(ex, "Failed to delete old banner"); }
             }
 
-            var uploadUrl = await _fileStorageService.GeneratePresignedUploadUrlAsync(fileKey, _backblazeConfig.PublicBucketName, 60);
+            var uploadUrl = await fileStorageService.GeneratePresignedUploadUrlAsync(fileKey, _backblazeConfig.PublicBucketName, 60);
             return new AvatarUploadResponse { EntityId = Guid.NewGuid(), UploadUrl = uploadUrl, FileKey = fileKey, ExpiresIn = 60 };
         }
 
         public async Task<AvatarUploadResponse> RequestGroupBannerUploadAsync(
             Guid userId, Guid groupId, RequestAvatarUploadRequest request)
         {
-            var group = await _groupRepository.GetByIdAsync(groupId);
+            var group = await groupRepository.GetByIdAsync(groupId);
             if (group == null) throw new AppException(ErrorCodes.GroupNotFound, StatusCodes.Status404NotFound);
 
-            var participant = await _groupParticipantRepository.GetByGroupAndUserAsync(groupId, userId);
+            var participant = await groupParticipantRepository.GetByGroupAndUserAsync(groupId, userId);
             if (participant == null || (participant.Role != GroupRole.Owner && participant.Role != GroupRole.Moderator))
                 throw new AppException(ErrorCodes.GroupUpdatePermissionDenied, StatusCodes.Status403Forbidden);
 
@@ -407,27 +398,27 @@ namespace StudioStudio_Server.Services
         public async Task CompleteGroupBannerUploadAsync(
             Guid userId, Guid groupId, CompleteAvatarUploadRequest request)
         {
-            var group = await _groupRepository.GetByIdForUpdateAsync(groupId);
+            var group = await groupRepository.GetByIdForUpdateAsync(groupId);
             if (group == null) throw new AppException(ErrorCodes.GroupNotFound, StatusCodes.Status404NotFound);
 
-            var participant = await _groupParticipantRepository.GetByGroupAndUserAsync(groupId, userId);
+            var participant = await groupParticipantRepository.GetByGroupAndUserAsync(groupId, userId);
             if (participant == null || (participant.Role != GroupRole.Owner && participant.Role != GroupRole.Moderator))
                 throw new AppException(ErrorCodes.GroupUpdatePermissionDenied, StatusCodes.Status403Forbidden);
 
-            var fileExists = await _fileStorageService.FileExistsAsync(request.FileKey, _backblazeConfig.PublicBucketName);
-            if (!fileExists) throw new AppException(ErrorCodes.ValidationInvalidFileFormat, StatusCodes.Status400BadRequest);
+            var fileExists = await fileStorageService.FileExistsAsync(request.FileKey, _backblazeConfig.PublicBucketName);
+            if (!fileExists) throw new AppException(ErrorCodes.ValidationInvalidFileFormat);
 
             group.BannerUrl = BuildAvatarUrl(request.FileKey);
             group.UpdatedAt = DateTime.UtcNow;
-            await _groupRepository.UpdateAsync(group);
+            await groupRepository.UpdateAsync(group);
         }
 
         public async Task DeleteGroupBannerAsync(Guid userId, Guid groupId)
         {
-            var group = await _groupRepository.GetByIdForUpdateAsync(groupId);
+            var group = await groupRepository.GetByIdForUpdateAsync(groupId);
             if (group == null) throw new AppException(ErrorCodes.GroupNotFound, StatusCodes.Status404NotFound);
 
-            var participant = await _groupParticipantRepository.GetByGroupAndUserAsync(groupId, userId);
+            var participant = await groupParticipantRepository.GetByGroupAndUserAsync(groupId, userId);
             if (participant == null || (participant.Role != GroupRole.Owner && participant.Role != GroupRole.Moderator))
                 throw new AppException(ErrorCodes.GroupUpdatePermissionDenied, StatusCodes.Status403Forbidden);
 
@@ -437,20 +428,20 @@ namespace StudioStudio_Server.Services
                 {
                     var fileKey = ExtractFileKey(group.BannerUrl);
                     if (!string.IsNullOrEmpty(fileKey))
-                        await _fileStorageService.DeleteFileAsync(fileKey, _backblazeConfig.PublicBucketName);
+                        await fileStorageService.DeleteFileAsync(fileKey, _backblazeConfig.PublicBucketName);
                 }
-                catch (Exception ex) { _logger.LogWarning(ex, "Failed to delete banner from B2"); }
+                catch (Exception ex) { logger.LogWarning(ex, "Failed to delete banner from B2"); }
             }
             group.BannerUrl = null;
             group.UpdatedAt = DateTime.UtcNow;
-            await _groupRepository.UpdateAsync(group);
+            await groupRepository.UpdateAsync(group);
         }
 
         // 🔹 ADDED: Studio Banner Methods
         public async Task<AvatarUploadResponse> RequestStudioBannerUploadAsync(
             Guid userId, Guid studioId, RequestAvatarUploadRequest request)
         {
-            var studio = await _studioRepository.GetByIdAsync(studioId);
+            var studio = await studioRepository.GetByIdAsync(studioId);
             if (studio == null) throw new AppException(ErrorCodes.StudioNotFound, StatusCodes.Status404NotFound);
             if (studio.OwnerId != userId) throw new AppException(ErrorCodes.AuthForbidden, StatusCodes.Status403Forbidden);
 
@@ -462,21 +453,21 @@ namespace StudioStudio_Server.Services
         public async Task CompleteStudioBannerUploadAsync(
             Guid userId, Guid studioId, CompleteAvatarUploadRequest request)
         {
-            var studio = await _studioRepository.GetByIdForUpdateAsync(studioId);
+            var studio = await studioRepository.GetByIdForUpdateAsync(studioId);
             if (studio == null) throw new AppException(ErrorCodes.StudioNotFound, StatusCodes.Status404NotFound);
             if (studio.OwnerId != userId) throw new AppException(ErrorCodes.AuthForbidden, StatusCodes.Status403Forbidden);
 
-            var fileExists = await _fileStorageService.FileExistsAsync(request.FileKey, _backblazeConfig.PublicBucketName);
-            if (!fileExists) throw new AppException(ErrorCodes.ValidationInvalidFileFormat, StatusCodes.Status400BadRequest);
+            var fileExists = await fileStorageService.FileExistsAsync(request.FileKey, _backblazeConfig.PublicBucketName);
+            if (!fileExists) throw new AppException(ErrorCodes.ValidationInvalidFileFormat);
 
             studio.BannerUrl = BuildAvatarUrl(request.FileKey);
             studio.UpdatedAt = DateTime.UtcNow;
-            await _studioRepository.UpdateStudioAsync(studio);
+            await studioRepository.UpdateStudioAsync(studio);
         }
 
         public async Task DeleteStudioBannerAsync(Guid userId, Guid studioId)
         {
-            var studio = await _studioRepository.GetByIdForUpdateAsync(studioId);
+            var studio = await studioRepository.GetByIdForUpdateAsync(studioId);
             if (studio == null) throw new AppException(ErrorCodes.StudioNotFound, StatusCodes.Status404NotFound);
             if (studio.OwnerId != userId) throw new AppException(ErrorCodes.AuthForbidden, StatusCodes.Status403Forbidden);
 
@@ -486,13 +477,13 @@ namespace StudioStudio_Server.Services
                 {
                     var fileKey = ExtractFileKey(studio.BannerUrl);
                     if (!string.IsNullOrEmpty(fileKey))
-                        await _fileStorageService.DeleteFileAsync(fileKey, _backblazeConfig.PublicBucketName);
+                        await fileStorageService.DeleteFileAsync(fileKey, _backblazeConfig.PublicBucketName);
                 }
-                catch (Exception ex) { _logger.LogWarning(ex, "Failed to delete banner from B2"); }
+                catch (Exception ex) { logger.LogWarning(ex, "Failed to delete banner from B2"); }
             }
             studio.BannerUrl = null;
             studio.UpdatedAt = DateTime.UtcNow;
-            await _studioRepository.UpdateStudioAsync(studio);
+            await studioRepository.UpdateStudioAsync(studio);
         }
     }
 }

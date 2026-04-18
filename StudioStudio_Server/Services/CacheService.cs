@@ -1,5 +1,4 @@
 using Microsoft.Extensions.Caching.Memory;
-using StudioStudio_Server.Models.Entities;
 using StudioStudio_Server.Services.Interfaces;
 
 namespace StudioStudio_Server.Services
@@ -11,9 +10,6 @@ namespace StudioStudio_Server.Services
     /// </summary>
     public class CacheService(IMemoryCache cache, ILogger<CacheService> logger) : ICacheService
     {
-        private readonly IMemoryCache _cache = cache;
-        private readonly ILogger<CacheService> _logger = logger;
-        
         // Default cache durations
         private static readonly TimeSpan DefaultExpiration = TimeSpan.FromMinutes(10);
         private static readonly TimeSpan UserProfileExpiration = TimeSpan.FromMinutes(15);
@@ -30,20 +26,17 @@ namespace StudioStudio_Server.Services
         public async Task<T?> GetOrSetAsync<T>(string key, Func<Task<T>> factory, TimeSpan? expiration = null) where T : class
         {
             // Try to get from cache first
-            if (_cache.TryGetValue(key, out T? cachedValue))
+            if (cache.TryGetValue(key, out T? cachedValue))
             {
-                _logger.LogDebug("Cache HIT: {Key}", key);
+                logger.LogDebug("Cache HIT: {Key}", key);
                 return cachedValue;
             }
 
             // Cache miss - fetch from source
-            _logger.LogDebug("Cache MISS: {Key}", key);
+            logger.LogDebug("Cache MISS: {Key}", key);
             var value = await factory();
-            
-            if (value != null)
-            {
-                await SetAsync(key, value, expiration ?? DefaultExpiration);
-            }
+
+            await SetAsync(key, value, expiration ?? DefaultExpiration);
 
             return value;
         }
@@ -53,7 +46,7 @@ namespace StudioStudio_Server.Services
         /// </summary>
         public Task<T?> GetAsync<T>(string key) where T : class
         {
-            _cache.TryGetValue(key, out T? value);
+            cache.TryGetValue(key, out T? value);
             return Task.FromResult(value);
         }
 
@@ -67,8 +60,8 @@ namespace StudioStudio_Server.Services
                 AbsoluteExpirationRelativeToNow = expiration ?? DefaultExpiration
             };
 
-            _cache.Set(key, value, cacheOptions);
-            _logger.LogDebug("Cache SET: {Key} (Expiration: {Expiration})", key, expiration ?? DefaultExpiration);
+            cache.Set(key, value, cacheOptions);
+            logger.LogDebug("Cache SET: {Key} (Expiration: {Expiration})", key, expiration ?? DefaultExpiration);
             
             return Task.CompletedTask;
         }
@@ -78,20 +71,8 @@ namespace StudioStudio_Server.Services
         /// </summary>
         public Task RemoveAsync(string key)
         {
-            _cache.Remove(key);
-            _logger.LogDebug("Cache REMOVE: {Key}", key);
-            return Task.CompletedTask;
-        }
-
-        /// <summary>
-        /// Remove all cache entries matching pattern
-        /// Note: IMemoryCache doesn't support pattern matching natively
-        /// Consider using Redis for production if pattern matching is heavily used
-        /// </summary>
-        public Task RemoveByPatternAsync(string pattern)
-        {
-            _logger.LogWarning("RemoveByPattern not fully supported in IMemoryCache. Consider using Redis. Pattern: {Pattern}", pattern);
-            // Implementation note: You'll need to track keys separately or use Redis for pattern-based invalidation
+            cache.Remove(key);
+            logger.LogDebug("Cache REMOVE: {Key}", key);
             return Task.CompletedTask;
         }
 
@@ -124,9 +105,6 @@ namespace StudioStudio_Server.Services
             return $"ai:tool:{userId}:{scope}:{toolName}:{paramsHash}";
         }
 
-        public string GetAIGroupToolPattern(Guid groupId) => $"ai:tool:*:group:{groupId}:*";
-        public string GetAIUserToolPattern(Guid userId) => $"ai:tool:{userId}:*";
-        public string GetAIStudioToolPattern(Guid studioId) => $"ai:tool:*:studio:{studioId}:*";
 
         /// <summary>
         /// Get appropriate cache expiration for a given cache key
@@ -172,7 +150,7 @@ namespace StudioStudio_Server.Services
             await RemoveAsync(GetUserGroupsKey(userId));
             await RemoveAsync(GetAiRequestCountKey(userId));
             
-            _logger.LogInformation("Invalidated all cache for user: {UserId}", userId);
+            logger.LogInformation("Invalidated all cache for user: {UserId}", userId);
         }
 
         /// <summary>
@@ -185,7 +163,7 @@ namespace StudioStudio_Server.Services
             // Note: Individual user subscription caches remain until they expire
             // If immediate invalidation needed, track all user subscription keys
             
-            _logger.LogInformation("Invalidated subscription plan caches");
+            logger.LogInformation("Invalidated subscription plan caches");
         }
 
         /// <summary>
@@ -198,55 +176,42 @@ namespace StudioStudio_Server.Services
             // User-specific announcement caches remain until expiration
             // If immediate invalidation needed, track all user announcement keys
 
-            _logger.LogInformation("Invalidated announcement caches");
+            logger.LogInformation("Invalidated announcement caches");
         }
 
         // ==================== AI TOOL CACHE INVALIDATION ====================
         // Note: IMemoryCache doesn't support pattern matching.
         // For AI tool caching, consider using Redis which supports RemoveByPatternAsync.
 
-        public Task InvalidateAITaskCacheAsync(Guid userId, Guid? groupId)
-        {
-            // In production with Redis, this would use RemoveByPatternAsync
-            // With IMemoryCache, we rely on short TTL (30s) for AI tool caches
-            _logger.LogWarning("AI task cache invalidation requires Redis for pattern-based deletion");
-            return Task.CompletedTask;
-        }
-
         public Task InvalidateAIGroupCacheAsync(Guid groupId)
         {
-            _logger.LogWarning("AI group cache invalidation requires Redis for pattern-based deletion");
+            logger.LogWarning("AI group cache invalidation requires Redis for pattern-based deletion");
             return Task.CompletedTask;
         }
 
         public Task InvalidateAIStudioCacheAsync(Guid studioId)
         {
-            _logger.LogWarning("AI studio cache invalidation requires Redis for pattern-based deletion");
+            logger.LogWarning("AI studio cache invalidation requires Redis for pattern-based deletion");
             return Task.CompletedTask;
         }
 
         public Task InvalidateAIDocumentCacheAsync(Guid userId, Guid? groupId, Guid? studioId)
         {
-            _logger.LogWarning("AI document cache invalidation requires Redis for pattern-based deletion");
+            logger.LogWarning("AI document cache invalidation requires Redis for pattern-based deletion");
             return Task.CompletedTask;
         }
 
         public Task InvalidateAIDocumentCacheForGroupAsync(Guid groupId, Guid? studioId = null)
         {
-            _logger.LogWarning("AI group document cache invalidation requires Redis for pattern-based deletion");
+            logger.LogWarning("AI group document cache invalidation requires Redis for pattern-based deletion");
             return Task.CompletedTask;
         }
 
         public Task InvalidateAIMemberCacheAsync(Guid groupId)
         {
-            _logger.LogWarning("AI member cache invalidation requires Redis for pattern-based deletion");
+            logger.LogWarning("AI member cache invalidation requires Redis for pattern-based deletion");
             return Task.CompletedTask;
         }
 
-        public Task InvalidateAIUserCacheAsync(Guid userId)
-        {
-            _logger.LogWarning("AI user cache invalidation requires Redis for pattern-based deletion");
-            return Task.CompletedTask;
-        }
     }
 }

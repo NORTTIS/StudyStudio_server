@@ -25,17 +25,13 @@ namespace StudioStudio_Server.Services.DeleteQueue
         IServiceScopeFactory serviceScopeFactory,
         ILogger<DeleteBackgroundService> logger) : BackgroundService
     {
-        private readonly IDeleteQueue _queue = queue;
-        private readonly IServiceScopeFactory _serviceScopeFactory = serviceScopeFactory;
-        private readonly ILogger<DeleteBackgroundService> _logger = logger;
-
         private int _processedJobsCount = 0;
         private int _failedJobsCount = 0;
         private int _partialJobsCount = 0;
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            _logger.LogInformation(
+            logger.LogInformation(
                 "??? Delete Background Service started");
 
             while (!stoppingToken.IsCancellationRequested)
@@ -43,9 +39,9 @@ namespace StudioStudio_Server.Services.DeleteQueue
                 try
                 {
                     // Wait for next job
-                    var job = await _queue.DequeueAsync(stoppingToken);
+                    var job = await queue.DequeueAsync(stoppingToken);
 
-                    _logger.LogInformation(
+                    logger.LogInformation(
                         "?? Processing delete job: AttachmentId={AttachmentId}, File={FileName}, " +
                         "Chunks={ChunkCount}, Attempt={Retry}/{Max}",
                         job.AttachmentId, job.FileName, job.ChunkCount,
@@ -54,7 +50,7 @@ namespace StudioStudio_Server.Services.DeleteQueue
                     Stopwatch sw = Stopwatch.StartNew();
 
                     // Create a new scope for scoped services
-                    using var scope = _serviceScopeFactory.CreateScope();
+                    using var scope = serviceScopeFactory.CreateScope();
                     var vectorDbService = scope.ServiceProvider.GetRequiredService<IVectorDatabaseService>();
 
                     try
@@ -82,7 +78,7 @@ namespace StudioStudio_Server.Services.DeleteQueue
                             else
                             {
                                 failureCount++;
-                                _logger.LogWarning(
+                                logger.LogWarning(
                                     "Failed to delete vector after retries. " +
                                     "VectorId={VectorId}, AttachmentId={AttachmentId}, ChunkIndex={ChunkIndex}",
                                     vectorId, job.AttachmentId, i);
@@ -91,7 +87,7 @@ namespace StudioStudio_Server.Services.DeleteQueue
                             // Update progress every 5 chunks or on last chunk
                             if ((i + 1) % 5 == 0 || i == job.ChunkCount - 1)
                             {
-                                _queue.UpdateJobStatus(
+                                queue.UpdateJobStatus(
                                     job.AttachmentId,
                                     DeleteJobStatus.Processing,
                                     null,
@@ -108,7 +104,7 @@ namespace StudioStudio_Server.Services.DeleteQueue
                         {
                             finalStatus = DeleteJobStatus.Completed;
                             _processedJobsCount++;
-                            _logger.LogInformation(
+                            logger.LogInformation(
                                 "? Delete job completed successfully: AttachmentId={AttachmentId}, " +
                                 "Deleted={Success}/{Total} vectors in {Ms}ms",
                                 job.AttachmentId, successCount, job.ChunkCount, sw.ElapsedMilliseconds);
@@ -117,7 +113,7 @@ namespace StudioStudio_Server.Services.DeleteQueue
                         {
                             finalStatus = DeleteJobStatus.PartiallyCompleted;
                             _partialJobsCount++;
-                            _logger.LogWarning(
+                            logger.LogWarning(
                                 "?? Delete job partially completed: AttachmentId={AttachmentId}, " +
                                 "Deleted={Success}/{Total}, Failed={Failed} in {Ms}ms",
                                 job.AttachmentId, successCount, job.ChunkCount, failureCount, sw.ElapsedMilliseconds);
@@ -126,27 +122,27 @@ namespace StudioStudio_Server.Services.DeleteQueue
                         {
                             finalStatus = DeleteJobStatus.Failed;
                             _failedJobsCount++;
-                            _logger.LogError(
+                            logger.LogError(
                                 "? Delete job failed completely: AttachmentId={AttachmentId}, " +
                                 "All {Total} vectors failed to delete",
                                 job.AttachmentId, job.ChunkCount);
                         }
 
-                        _queue.UpdateJobStatus(
+                        queue.UpdateJobStatus(
                             job.AttachmentId,
                             finalStatus,
                             null,
                             successCount,
                             failureCount);
 
-                        _logger.LogInformation(
+                        logger.LogInformation(
                             "?? Delete service stats: Completed={Completed}, Partial={Partial}, " +
                             "Failed={Failed}, Queue={Queue}",
-                            _processedJobsCount, _partialJobsCount, _failedJobsCount, _queue.GetQueueDepth());
+                            _processedJobsCount, _partialJobsCount, _failedJobsCount, queue.GetQueueDepth());
                     }
                     catch (Exception ex)
                     {
-                        _logger.LogError(ex,
+                        logger.LogError(ex,
                             "? Failed to process delete job: AttachmentId={AttachmentId} (Attempt {Retry}/{Max})",
                             job.AttachmentId, job.RetryCount + 1, job.MaxRetries);
 
@@ -158,24 +154,24 @@ namespace StudioStudio_Server.Services.DeleteQueue
                             // Exponential backoff before retry
                             int delaySeconds = (int)Math.Pow(2, job.RetryCount) * 5; // 5s, 10s, 20s
 
-                            _logger.LogWarning(
+                            logger.LogWarning(
                                 "?? Retrying delete job: AttachmentId={AttachmentId} in {Delay}s (Attempt {Retry}/{Max})",
                                 job.AttachmentId, delaySeconds, job.RetryCount + 1, job.MaxRetries);
 
                             await Task.Delay(TimeSpan.FromSeconds(delaySeconds), stoppingToken);
 
                             // Re-queue the job
-                            await _queue.EnqueueAsync(job, stoppingToken);
+                            await queue.EnqueueAsync(job, stoppingToken);
                         }
                         else
                         {
-                            _queue.UpdateJobStatus(
+                            queue.UpdateJobStatus(
                                 job.AttachmentId,
                                 DeleteJobStatus.Failed,
                                 ex.Message);
                             _failedJobsCount++;
 
-                            _logger.LogError(
+                            logger.LogError(
                                 "? Delete job failed permanently: AttachmentId={AttachmentId} after {Retries} attempts",
                                 job.AttachmentId, job.MaxRetries);
                         }
@@ -187,17 +183,17 @@ namespace StudioStudio_Server.Services.DeleteQueue
                 catch (OperationCanceledException)
                 {
                     // Normal shutdown
-                    _logger.LogInformation("?? Delete Background Service shutting down gracefully");
+                    logger.LogInformation("?? Delete Background Service shutting down gracefully");
                     break;
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "? Unexpected error in delete background service");
+                    logger.LogError(ex, "? Unexpected error in delete background service");
                     await Task.Delay(TimeSpan.FromSeconds(5), stoppingToken);
                 }
             }
 
-            _logger.LogInformation(
+            logger.LogInformation(
                 "?? Delete Background Service stopped. " +
                 "Final stats: Completed={Completed}, Partial={Partial}, Failed={Failed}",
                 _processedJobsCount, _partialJobsCount, _failedJobsCount);
@@ -227,7 +223,7 @@ namespace StudioStudio_Server.Services.DeleteQueue
                     {
                         if (retryCount > 0)
                         {
-                            _logger.LogInformation(
+                            logger.LogInformation(
                                 "Vector deleted successfully after {RetryCount} retries. VectorId={VectorId}",
                                 retryCount, vectorId);
                         }
@@ -235,28 +231,28 @@ namespace StudioStudio_Server.Services.DeleteQueue
                     }
 
                     // If delete returns false but no exception, consider it a failure
-                    _logger.LogWarning(
+                    logger.LogWarning(
                         "Vector delete returned false (attempt {Attempt}/{Max}). VectorId={VectorId}",
                         retryCount + 1, maxRetries, vectorId);
                 }
                 catch (TaskCanceledException ex)
                 {
                     // Timeout exception
-                    _logger.LogWarning(
+                    logger.LogWarning(
                         "Vector delete timeout (attempt {Attempt}/{Max}). VectorId={VectorId}, Error={Error}",
                         retryCount + 1, maxRetries, vectorId, ex.Message);
                 }
                 catch (HttpRequestException ex)
                 {
                     // HTTP errors (network issues, 500, 502, 503, 504)
-                    _logger.LogWarning(
+                    logger.LogWarning(
                         "Vector delete HTTP error (attempt {Attempt}/{Max}). VectorId={VectorId}, Error={Error}",
                         retryCount + 1, maxRetries, vectorId, ex.Message);
                 }
                 catch (Exception ex)
                 {
                     // Other unexpected errors - log and retry
-                    _logger.LogWarning(ex,
+                    logger.LogWarning(ex,
                         "Vector delete unexpected error (attempt {Attempt}/{Max}). VectorId={VectorId}",
                         retryCount + 1, maxRetries, vectorId);
                 }
@@ -266,7 +262,7 @@ namespace StudioStudio_Server.Services.DeleteQueue
                 // If not last retry, wait before retrying (exponential backoff)
                 if (retryCount < maxRetries && !cancellationToken.IsCancellationRequested)
                 {
-                    _logger.LogInformation(
+                    logger.LogInformation(
                         "Retrying vector delete in {DelayMs}ms. VectorId={VectorId}",
                         delayMs, vectorId);
 
@@ -278,11 +274,11 @@ namespace StudioStudio_Server.Services.DeleteQueue
             // All retries exhausted or cancelled
             if (cancellationToken.IsCancellationRequested)
             {
-                _logger.LogWarning("Vector delete cancelled. VectorId={VectorId}", vectorId);
+                logger.LogWarning("Vector delete cancelled. VectorId={VectorId}", vectorId);
             }
             else
             {
-                _logger.LogError(
+                logger.LogError(
                     "Failed to delete vector after {MaxRetries} attempts. VectorId={VectorId}",
                     maxRetries, vectorId);
             }

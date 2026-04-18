@@ -1,4 +1,3 @@
-using Microsoft.AspNetCore.Http;
 using StudioStudio_Server.Exceptions;
 using StudioStudio_Server.Models.DTOs.Request;
 using StudioStudio_Server.Models.DTOs.Response;
@@ -24,24 +23,10 @@ namespace StudioStudio_Server.Services
         IUserAnnouncementService userAnnouncementService,
         IGroupRepository groupRepository,
         IMessageService messageService,
-        INotificationService notificationService,
         ILogger<TaskCommentService> logger,
         IHttpContextAccessor httpContextAccessor,
         IActivityLogService activityLogService) : ITaskCommentService
     {
-        private readonly ITaskCommentRepository _commentRepository = commentRepository;
-        private readonly ITaskRepository _taskRepository = taskRepository;
-        private readonly IGroupParticipantRepository _groupParticipantRepository = groupParticipantRepository;
-        private readonly IGroupRepository _groupRepository = groupRepository;
-        private readonly IUserRepository _userRepository = userRepository;
-        private readonly IAnnouncementRepository _announcementRepository = announcementRepository;
-        private readonly IUserAnnouncementService _userAnnouncementService = userAnnouncementService;
-        private readonly IMessageService _messageService = messageService;
-        private readonly INotificationService _notificationService = notificationService;
-        private readonly ILogger<TaskCommentService> _logger = logger;
-        private readonly IHttpContextAccessor _httpContextAccessor = httpContextAccessor;
-        private readonly IActivityLogService _activityLogService = activityLogService;
-
         /// <summary>
         /// Get comment history for task (pagination)
         /// </summary>
@@ -54,14 +39,14 @@ namespace StudioStudio_Server.Services
             var task = await ValidateTaskExistsAsync(taskId);
             await ValidateUserHasAccessToTaskAsync(task, userId);
 
-            var comments = await _commentRepository.GetByTaskIdAsync(taskId, limit, offset);
-            var totalCount = await _commentRepository.GetCountByTaskIdAsync(taskId);
+            var comments = await commentRepository.GetByTaskIdAsync(taskId, limit, offset);
+            var totalCount = await commentRepository.GetCountByTaskIdAsync(taskId);
 
             var commentDtos = comments
                 .Select(MapToTaskCommentDto)
                 .ToList();
 
-            _logger.LogInformation(
+            logger.LogInformation(
                 "Retrieved {Count} comments for task {TaskId} (Total: {Total}). UserId: {UserId}",
                 commentDtos.Count, taskId, totalCount, userId);
 
@@ -96,19 +81,19 @@ namespace StudioStudio_Server.Services
                 IsDeleted = false
             };
 
-            await _commentRepository.AddAsync(comment);
+            await commentRepository.AddAsync(comment);
 
             // Log comment creation activity
-            var taskForLog = await _taskRepository.GetByIdAsync(request.TaskId);
+            var taskForLog = await taskRepository.GetByIdAsync(request.TaskId);
             if (taskForLog != null)
             {
-                await _activityLogService.LogCommentCreateAsync(userId, comment.CommentId, request.TaskId, taskForLog.GroupId);
+                await activityLogService.LogCommentCreateAsync(userId, comment.CommentId, request.TaskId, taskForLog.GroupId);
             }
 
-            var user = await _userRepository.GetByIdAsync(userId);
+            var user = await userRepository.GetByIdAsync(userId);
             var commentDto = MapToTaskCommentDtoWithUser(comment, user!);
 
-            _logger.LogInformation(
+            logger.LogInformation(
                 "Comment sent to task {TaskId} by user {UserId}",
                 request.TaskId, userId);
 
@@ -130,11 +115,11 @@ namespace StudioStudio_Server.Services
             var task = await ValidateTaskExistsAsync(request.TaskId);
             await ValidateUserCanCommentAsync(task, userId);
 
-            var parentComment = await _commentRepository.GetByIdAsync(request.ParentCommentId);
+            var parentComment = await commentRepository.GetByIdAsync(request.ParentCommentId);
 
             if (parentComment == null || parentComment.IsDeleted)
             {
-                _logger.LogError(
+                logger.LogError(
                     "Parent comment not found or deleted: ParentCommentId={ParentCommentId}",
                     request.ParentCommentId);
                 throw new AppException(
@@ -144,7 +129,7 @@ namespace StudioStudio_Server.Services
 
             if (parentComment.TaskId != request.TaskId)
             {
-                _logger.LogError(
+                logger.LogError(
                     "Parent comment TaskId mismatch: ParentTaskId={ParentTaskId}, RequestTaskId={RequestTaskId}",
                     parentComment.TaskId, request.TaskId);
                 throw new AppException(
@@ -163,12 +148,12 @@ namespace StudioStudio_Server.Services
                 IsDeleted = false
             };
 
-            await _commentRepository.AddAsync(reply);
+            await commentRepository.AddAsync(reply);
 
-            var user = await _userRepository.GetByIdAsync(userId);
+            var user = await userRepository.GetByIdAsync(userId);
             var replyDto = MapToTaskCommentDtoWithUser(reply, user!);
 
-            _logger.LogInformation(
+            logger.LogInformation(
                 "Reply sent to comment {ParentCommentId} in task {TaskId} by user {UserId}",
                 request.ParentCommentId, request.TaskId, userId);
 
@@ -187,7 +172,7 @@ namespace StudioStudio_Server.Services
         /// </summary>
         public async Task DeleteCommentAsync(Guid userId, DeleteTaskCommentRequest request)
         {
-            var comment = await _commentRepository.GetByIdWithRepliesAsync(request.CommentId);
+            var comment = await commentRepository.GetByIdWithRepliesAsync(request.CommentId);
             if (comment == null)
             {
                 throw new AppException(
@@ -200,10 +185,10 @@ namespace StudioStudio_Server.Services
             // Check if group is archived (non-owner cannot delete comments)
             if (task.GroupId.HasValue)
             {
-                var group = await _groupRepository.GetByIdAsync(task.GroupId.Value);
+                var group = await groupRepository.GetByIdAsync(task.GroupId.Value);
                 if (group != null && group.IsArchived)
                 {
-                    var userRole = await _groupParticipantRepository
+                    var userRole = await groupParticipantRepository
                         .GetGroupRoleByUserIdAsync(userId, task.GroupId.Value);
                     if (userRole != GroupRole.Owner)
                     {
@@ -220,10 +205,10 @@ namespace StudioStudio_Server.Services
                     StatusCodes.Status403Forbidden);
             }
 
-            var replyCount = await _commentRepository.GetReplyCountAsync(request.CommentId);
-            await _commentRepository.SoftDeleteWithRepliesAsync(request.CommentId);
+            var replyCount = await commentRepository.GetReplyCountAsync(request.CommentId);
+            await commentRepository.SoftDeleteWithRepliesAsync(request.CommentId);
 
-            _logger.LogInformation(
+            logger.LogInformation(
                 "Comment {CommentId} and {ReplyCount} replies deleted by user {UserId}",
                 request.CommentId, replyCount, userId);
         }
@@ -261,15 +246,15 @@ namespace StudioStudio_Server.Services
             }
 
             var now = DateTime.UtcNow;
-            var sender = await _userRepository.GetByIdAsync(senderId);
-            var task = await _taskRepository.GetByIdAsync(taskId);
+            var sender = await userRepository.GetByIdAsync(senderId);
+            var task = await taskRepository.GetByIdAsync(taskId);
             var senderName = $"{sender!.FirstName} {sender.LastName}";
 
             var announcement = new Announcement
             {
                 AnnouncementId = Guid.NewGuid(),
-                Title = _messageService.GetMessage(ErrorCodes.AnnouncementTagTitle),
-                Content = $"{senderName} {_messageService.GetMessage(ErrorCodes.AnnouncementTagTask)} {task!.Title} - {ExtractPlainText(content)}",
+                Title = messageService.GetMessage(ErrorCodes.AnnouncementTagTitle),
+                Content = $"{senderName} {messageService.GetMessage(ErrorCodes.AnnouncementTagTask)} {task!.Title} - {ExtractPlainText(content)}",
                 Type = AnnouncementType.Mention,
                 IsActive = true,
                 CreatedBy = senderId,
@@ -281,7 +266,7 @@ namespace StudioStudio_Server.Services
                 SourceType = "comment"
             };
 
-            await _announcementRepository.AddAsync(announcement);
+            await announcementRepository.AddAsync(announcement);
 
             foreach (var taggedUserId in taggedUserIds)
             {
@@ -294,10 +279,10 @@ namespace StudioStudio_Server.Services
                     CreatedAt = now
                 };
 
-                await _userAnnouncementService.AddAnnouncementAsync(userAnnouncement);
+                await userAnnouncementService.AddAnnouncementAsync(userAnnouncement);
             }
 
-            _logger.LogInformation(
+            logger.LogInformation(
                 "Mention notifications sent to {Count} users in task {TaskId}",
                 taggedUserIds.Count, taskId);
         }
@@ -307,7 +292,7 @@ namespace StudioStudio_Server.Services
         /// </summary>
         private async Task<TaskItem> ValidateTaskExistsAsync(Guid taskId)
         {
-            var task = await _taskRepository.GetByIdAsync(taskId);
+            var task = await taskRepository.GetByIdAsync(taskId);
 
             if (task == null)
             {
@@ -327,7 +312,7 @@ namespace StudioStudio_Server.Services
         {
             if (task.GroupId.HasValue)
             {
-                var isUserInGroup = await _groupParticipantRepository
+                var isUserInGroup = await groupParticipantRepository
                     .IsUserInGroupAsync(task.GroupId.Value, userId);
 
                 if (!isUserInGroup)
@@ -337,7 +322,7 @@ namespace StudioStudio_Server.Services
                         StatusCodes.Status403Forbidden);
                 }
 
-                var userRole = await _groupParticipantRepository
+                var userRole = await groupParticipantRepository
                     .GetGroupRoleByUserIdAsync(userId, task.GroupId.Value);
 
                 if (userRole == GroupRole.Viewer)
@@ -348,7 +333,7 @@ namespace StudioStudio_Server.Services
                 }
 
                 //  Check if group is archived (non-owner cannot interact)
-                var group = await _groupRepository.GetByIdAsync(task.GroupId.Value);
+                var group = await groupRepository.GetByIdAsync(task.GroupId.Value);
                 if (group != null && group.IsArchived && userRole != GroupRole.Owner)
                 {
                     throw new AppException(ErrorCodes.GroupIsArchived, StatusCodes.Status403Forbidden);
@@ -381,7 +366,7 @@ namespace StudioStudio_Server.Services
 
             if (task.GroupId.HasValue)
             {
-                var participant = await _groupParticipantRepository
+                var participant = await groupParticipantRepository
                     .GetByUserAndGroupAsync(userId, task.GroupId.Value);
 
                 return participant != null &&
@@ -402,7 +387,7 @@ namespace StudioStudio_Server.Services
         {
             if (task.GroupId.HasValue)
             {
-                var isUserInGroup = await _groupParticipantRepository
+                var isUserInGroup = await groupParticipantRepository
                     .IsUserInGroupAsync(task.GroupId.Value, userId);
 
                 if (!isUserInGroup)
@@ -412,10 +397,10 @@ namespace StudioStudio_Server.Services
                         StatusCodes.Status403Forbidden);
                 }
 
-                var group = await _groupRepository.GetByIdAsync(task.GroupId.Value);
+                var group = await groupRepository.GetByIdAsync(task.GroupId.Value);
                 if (group != null && group.IsArchived)
                 {
-                    var userRole = await _groupParticipantRepository
+                    var userRole = await groupParticipantRepository
                         .GetGroupRoleByUserIdAsync(userId, task.GroupId.Value);
                     if (userRole != GroupRole.Owner)
                     {
@@ -453,7 +438,7 @@ namespace StudioStudio_Server.Services
                     Id = comment.User.UserId,
                     FirstName = comment.User.FirstName,
                     LastName = comment.User.LastName,
-                    AvatarUrl = AvatarUrlHelper.BuildAbsoluteAvatarUrl(comment.User.AvatarUrl, _httpContextAccessor.HttpContext)
+                    AvatarUrl = AvatarUrlHelper.BuildAbsoluteAvatarUrl(comment.User.AvatarUrl, httpContextAccessor.HttpContext)
                 },
                 ReplyCount = comment.Replies?.Count(r => !r.IsDeleted) ?? 0,
                 Replies = comment.Replies?
@@ -473,7 +458,7 @@ namespace StudioStudio_Server.Services
                             Id = r.User.UserId,
                             FirstName = r.User.FirstName,
                             LastName = r.User.LastName,
-                            AvatarUrl = AvatarUrlHelper.BuildAbsoluteAvatarUrl(r.User.AvatarUrl, _httpContextAccessor.HttpContext)
+                            AvatarUrl = AvatarUrlHelper.BuildAbsoluteAvatarUrl(r.User.AvatarUrl, httpContextAccessor.HttpContext)
                         },
                         ReplyCount = 0,
                         Replies = null
@@ -503,7 +488,7 @@ namespace StudioStudio_Server.Services
                     Id = user.UserId,
                     FirstName = user.FirstName,
                     LastName = user.LastName,
-                    AvatarUrl = AvatarUrlHelper.BuildAbsoluteAvatarUrl(user.AvatarUrl, _httpContextAccessor.HttpContext)
+                    AvatarUrl = AvatarUrlHelper.BuildAbsoluteAvatarUrl(user.AvatarUrl, httpContextAccessor.HttpContext)
                 },
                 ReplyCount = 0,
                 Replies = null

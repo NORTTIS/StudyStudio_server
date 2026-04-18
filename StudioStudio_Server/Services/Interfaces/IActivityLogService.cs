@@ -5,11 +5,6 @@ namespace StudioStudio_Server.Services.Interfaces
     public interface IActivityLogService
     {
         /// <summary>
-        /// Log a general user action with context
-        /// </summary>
-        Task LogAsync(ActivityLog log);
-
-        /// <summary>
         /// Get task delete activity logs by task IDs
         /// </summary>
         Task<List<ActivityLog>> GetTaskDeleteLogsAsync(List<Guid> taskIds);
@@ -46,16 +41,6 @@ namespace StudioStudio_Server.Services.Interfaces
         /// Log message creation activity
         /// </summary>
         Task LogMessageCreateAsync(Guid userId, Guid messageId, Guid groupId, Guid? studioId);
-
-        /// <summary>
-        /// Log group creation activity
-        /// </summary>
-        Task LogGroupCreateAsync(Guid userId, Guid groupId, Guid studioId);
-
-        /// <summary>
-        /// Log group join activity
-        /// </summary>
-        Task LogGroupJoinAsync(Guid userId, Guid groupId, Guid studioId);
 
         /// <summary>
         /// Log task delete activity

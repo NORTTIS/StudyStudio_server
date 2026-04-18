@@ -18,10 +18,8 @@ namespace StudioStudio_Server.Tests.Services
     /// </summary>
     public class HomeServiceTests
     {
-        private readonly Mock<ITaskAssignmentRepository> _assignmentRepoMock;
         private readonly Mock<ITaskRepository> _taskRepoMock;
         private readonly Mock<IGroupRepository> _groupRepoMock;
-        private readonly Mock<IGroupTaskStatusRepository> _groupTaskStatusRepoMock;
         private readonly Mock<IPersonalTaskStatusRepository> _personalTaskStatusRepoMock;
         private readonly Mock<IUserRepository> _userRepoMock;
         private readonly Mock<IHttpContextAccessor> _httpContextAccessorMock;
@@ -31,19 +29,14 @@ namespace StudioStudio_Server.Tests.Services
 
         public HomeServiceTests()
         {
-            _assignmentRepoMock = new Mock<ITaskAssignmentRepository>();
             _taskRepoMock = new Mock<ITaskRepository>();
             _groupRepoMock = new Mock<IGroupRepository>();
-            _groupTaskStatusRepoMock = new Mock<IGroupTaskStatusRepository>();
             _personalTaskStatusRepoMock = new Mock<IPersonalTaskStatusRepository>();
             _userRepoMock = new Mock<IUserRepository>();
             _httpContextAccessorMock = new Mock<IHttpContextAccessor>();
 
-            _service = new HomeService(
-                _assignmentRepoMock.Object,
-                _taskRepoMock.Object,
+            _service = new HomeService(_taskRepoMock.Object,
                 _groupRepoMock.Object,
-                _groupTaskStatusRepoMock.Object,
                 _personalTaskStatusRepoMock.Object,
                 _userRepoMock.Object,
                 _httpContextAccessorMock.Object);

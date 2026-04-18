@@ -1,4 +1,3 @@
-using Microsoft.AspNetCore.Http;
 
 namespace StudioStudio_Server.Utils
 {
@@ -37,47 +36,6 @@ namespace StudioStudio_Server.Utils
 
             // Only Vietnamese returns "vi", everything else returns "en"
             return culture.StartsWith("vi") ? "vi" : "en";
-        }
-
-        /// <summary>
-        /// Get language code from Accept-Language header (alias for GetCultureFromHeader)
-        /// Default: "vi" (Vietnamese)
-        /// Supported: "vi", "en"
-        /// </summary>
-        /// <param name="context">HTTP context</param>
-        /// <returns>Language code ("vi" or "en")</returns>
-        public static string GetLanguageFromHeader(HttpContext context)
-        {
-            return GetCultureFromHeader(context);
-        }
-
-        /// <summary>
-        /// Determine if language is English from Accept-Language header
-        /// </summary>
-        /// <param name="context">HTTP context</param>
-        /// <returns>True if English, false otherwise</returns>
-        public static bool IsEnglish(HttpContext context)
-        {
-            var culture = GetCultureFromHeader(context);
-            return culture.Equals("en", StringComparison.OrdinalIgnoreCase);
-        }
-
-        /// <summary>
-        /// Build absolute URL from relative path
-        /// Example: "/uploads/avatar.jpg" ? "https://api.example.com/uploads/avatar.jpg"
-        /// </summary>
-        /// <param name="context">HTTP context</param>
-        /// <param name="relativePath">Relative path (must start with /)</param>
-        /// <returns>Absolute URL or original path if not relative</returns>
-        public static string? BuildAbsoluteUrl(HttpContext context, string? relativePath)
-        {
-            if (!string.IsNullOrEmpty(relativePath) && relativePath.StartsWith("/"))
-            {
-                var request = context.Request;
-                return $"{request.Scheme}://{request.Host}{relativePath}";
-            }
-
-            return relativePath;
         }
     }
 }

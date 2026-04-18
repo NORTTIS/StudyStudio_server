@@ -1,8 +1,6 @@
-﻿using Microsoft.AspNetCore.Http;
-using StudioStudio_Server.Exceptions;
+﻿using StudioStudio_Server.Exceptions;
 using StudioStudio_Server.Models.DTOs.Request;
 using StudioStudio_Server.Models.DTOs.Response;
-using StudioStudio_Server.Models.Entities;
 using StudioStudio_Server.Repositories.Interfaces;
 using StudioStudio_Server.Services.Interfaces;
 using StudioStudio_Server.Utils;
@@ -10,40 +8,30 @@ using StudioStudio_Server.Utils;
 namespace StudioStudio_Server.Services
 {
     public class HomeService(
-        ITaskAssignmentRepository assignmentRepository,
         ITaskRepository taskRepository,
         IGroupRepository groupRepository,
-        IGroupTaskStatusRepository groupTaskStatusRepository,
         IPersonalTaskStatusRepository personalTaskStatusRepository,
         IUserRepository userRepository,
         IHttpContextAccessor httpContextAccessor) : IHomeService
     {
-        private readonly ITaskAssignmentRepository _assignmentRepository = assignmentRepository;
-        private readonly ITaskRepository _taskRepository = taskRepository;
-        private readonly IGroupRepository _groupRepository = groupRepository;
-        private readonly IGroupTaskStatusRepository _groupTaskStatusRepository = groupTaskStatusRepository;
-        private readonly IPersonalTaskStatusRepository _personalTaskStatusRepository = personalTaskStatusRepository;
-        private readonly IUserRepository _userRepository = userRepository;
-        private readonly IHttpContextAccessor _httpContextAccessor = httpContextAccessor;
-
         /// <summary>
         /// Get personal task board data for the current user.
         /// Returns: PersonalTaskStatuses with tasks grouped by status.
         /// </summary>
         public async Task<PersonalTaskBoardResponse> GetPersonalTaskBoardAsync(Guid userId)
         {
-            var userDetail = await _userRepository.GetByIdAsync(userId);
+            var userDetail = await userRepository.GetByIdAsync(userId);
             if (userDetail == null)
             {
                 throw new AppException(ErrorCodes.UserNotFound, StatusCodes.Status404NotFound);
             }
 
             // Get personal status list
-            var personalTaskStatus = await _personalTaskStatusRepository.GetAllByUserIdAsync(userId);
+            var personalTaskStatus = await personalTaskStatusRepository.GetAllByUserIdAsync(userId);
             var personalStatusIdList = personalTaskStatus.Select(s => s.StatusId).ToList();
 
             // Get user task list
-            var personalTaskList = await _taskRepository.GetPersonalListTasksByListStatusId(personalStatusIdList);
+            var personalTaskList = await taskRepository.GetPersonalListTasksByListStatusId(personalStatusIdList);
 
             return new PersonalTaskBoardResponse
             {
@@ -71,7 +59,7 @@ namespace StudioStudio_Server.Services
                                  Id = userId,
                                  FirstName = userDetail.FirstName,
                                  LastName = userDetail.LastName,
-                                 AvatarUrl = AvatarUrlHelper.BuildAbsoluteAvatarUrl(userDetail.AvatarUrl, _httpContextAccessor.HttpContext),
+                                 AvatarUrl = AvatarUrlHelper.BuildAbsoluteAvatarUrl(userDetail.AvatarUrl, httpContextAccessor.HttpContext),
                              }
                          }).ToList()
                          : new List<TaskItemResponse>()
@@ -86,15 +74,15 @@ namespace StudioStudio_Server.Services
         {
             await EnsureUserExistsAsync(userId);
 
-            var personalTasks = await _taskRepository.GetPersonalTasksByOwnerAsync(userId);
-            var groupTasks = await _taskRepository.GetAssignedGroupTasksByUserAsync(userId);
+            var personalTasks = await taskRepository.GetPersonalTasksByOwnerAsync(userId);
+            var groupTasks = await taskRepository.GetAssignedGroupTasksByUserAsync(userId);
             var allTasks = personalTasks.Concat(groupTasks).ToList();
 
             var completedTaskCount = allTasks.Count(IsTaskCompleted);
             var overdueTaskCount = allTasks.Count(t => t.DueDate.HasValue && t.DueDate.Value < DateTime.UtcNow && !IsTaskCompleted(t));
             var remainingTaskCount = allTasks.Count - completedTaskCount;
 
-            var userGroups = await _groupRepository.GetUserGroupsAsync(userId);
+            var userGroups = await groupRepository.GetUserGroupsAsync(userId);
 
             return new HomeSummaryResponse
             {
@@ -127,11 +115,11 @@ namespace StudioStudio_Server.Services
             bool sortAscending = sortBy?.ToLower() != "desc";
 
             // Get tasks with database-level pagination
-            var (groupTasks, totalCount) = await _taskRepository.GetAssignedGroupTasksWithPaginationAsync(
+            var (groupTasks, totalCount) = await taskRepository.GetAssignedGroupTasksWithPaginationAsync(
                 userId, page, pageSize, search, groupId, sortAscending);
 
             // Get user groups for the response
-            var userGroups = await _groupRepository.GetUserGroupsAsync(userId);
+            var userGroups = await groupRepository.GetUserGroupsAsync(userId);
             var userGroupDtos = userGroups.Select(g => new UserGroupDto
             {
                 GroupId = g.GroupId,
@@ -172,7 +160,7 @@ namespace StudioStudio_Server.Services
         /// </summary>
         private async Task EnsureUserExistsAsync(Guid userId)
         {
-            var userDetail = await _userRepository.GetByIdAsync(userId);
+            var userDetail = await userRepository.GetByIdAsync(userId);
             if (userDetail == null)
             {
                 throw new AppException(ErrorCodes.UserNotFound, StatusCodes.Status404NotFound);
@@ -190,13 +178,13 @@ namespace StudioStudio_Server.Services
 
         public async Task<PersonalTaskStatusResponse> CreateNewPersonalTaskStatus(Guid userId, PersonalTaskStatusRequest request)
         {
-            var userDetail = await _userRepository.GetByIdAsync(userId);
+            var userDetail = await userRepository.GetByIdAsync(userId);
             if (userDetail == null)
             {
                 throw new AppException(ErrorCodes.UserNotFound, StatusCodes.Status404NotFound);
             }
 
-            var existingStatuses = await _personalTaskStatusRepository.GetAllByUserIdAsync(userId);
+            var existingStatuses = await personalTaskStatusRepository.GetAllByUserIdAsync(userId);
 
             int newPosition;
             if (existingStatuses.Any())
@@ -217,12 +205,12 @@ namespace StudioStudio_Server.Services
                 CreatedAt = DateTime.UtcNow,
             };
 
-            if (await _personalTaskStatusRepository.IsNameExist(newStatus))
+            if (await personalTaskStatusRepository.IsNameExist(newStatus))
             {
-                throw new AppException(ErrorCodes.StatusNameExist, StatusCodes.Status400BadRequest);
+                throw new AppException(ErrorCodes.StatusNameExist);
             }
 
-            await _personalTaskStatusRepository.AddAsync(newStatus);
+            await personalTaskStatusRepository.AddAsync(newStatus);
 
             return new PersonalTaskStatusResponse
             {
@@ -233,32 +221,32 @@ namespace StudioStudio_Server.Services
         }
         public async Task DeletePersonalTaskStatus(Guid userId, Guid taskStatusId)
         {
-            var userDetail = await _userRepository.GetByIdAsync(userId);
+            var userDetail = await userRepository.GetByIdAsync(userId);
             if (userDetail == null)
             {
                 throw new AppException(ErrorCodes.UserNotFound, StatusCodes.Status404NotFound);
             }
-            var taskStatus = await _personalTaskStatusRepository.GetDetailAsync(taskStatusId);
+            var taskStatus = await personalTaskStatusRepository.GetDetailAsync(taskStatusId);
             if (taskStatus == null || taskStatus.UserId != userId)
             {
                 throw new AppException(ErrorCodes.StatusNotFound, StatusCodes.Status404NotFound);
             }
-            var taskList = await _taskRepository.GetAllPersonalTasksByStatusIdAsync(taskStatusId);
+            var taskList = await taskRepository.GetAllPersonalTasksByStatusIdAsync(taskStatusId);
             if (taskList.Any())
             {
-                throw new AppException(ErrorCodes.GroupDeleteTaskStatusFailed, StatusCodes.Status400BadRequest);
+                throw new AppException(ErrorCodes.GroupDeleteTaskStatusFailed);
             }
-            await _personalTaskStatusRepository.DeletePersonalStatusAsync(taskStatus);
+            await personalTaskStatusRepository.DeletePersonalStatusAsync(taskStatus);
         }
         public async Task UpdatePersonalTaskStatus(Guid userId, Guid taskStatusId, PersonalTaskStatusRequest request)
         {
-            var userDetail = await _userRepository.GetByIdAsync(userId);
+            var userDetail = await userRepository.GetByIdAsync(userId);
             if (userDetail == null)
             {
                 throw new AppException(ErrorCodes.UserNotFound, StatusCodes.Status404NotFound);
             }
 
-            var taskStatus = await _personalTaskStatusRepository.GetDetailAsync(taskStatusId);
+            var taskStatus = await personalTaskStatusRepository.GetDetailAsync(taskStatusId);
             if (taskStatus == null || taskStatus.UserId != userId)
             {
                 throw new AppException(ErrorCodes.StatusNotFound, StatusCodes.Status404NotFound);
@@ -266,29 +254,29 @@ namespace StudioStudio_Server.Services
 
             taskStatus.StatusName = request.StatusName;
 
-            if (await _personalTaskStatusRepository.IsNameExist(taskStatus))
+            if (await personalTaskStatusRepository.IsNameExist(taskStatus))
             {
-                throw new AppException(ErrorCodes.StatusNameExist, StatusCodes.Status400BadRequest);
+                throw new AppException(ErrorCodes.StatusNameExist);
             }
 
-            await _personalTaskStatusRepository.UpdatePersonalStatusAsync(taskStatus);
+            await personalTaskStatusRepository.UpdatePersonalStatusAsync(taskStatus);
         }
 
         public async Task ReorderPersonalTaskStatus(Guid userId, ReorderPersonalTaskStatusRequest request)
         {
-            var userDetail = await _userRepository.GetByIdAsync(userId);
+            var userDetail = await userRepository.GetByIdAsync(userId);
             if (userDetail == null)
             {
                 throw new AppException(ErrorCodes.UserNotFound, StatusCodes.Status404NotFound);
             }
 
-            var status = await _personalTaskStatusRepository.GetDetailAsync(request.StatusId);
+            var status = await personalTaskStatusRepository.GetDetailAsync(request.StatusId);
             if (status == null || status.UserId != userId)
             {
                 throw new AppException(ErrorCodes.StatusNotFound, StatusCodes.Status404NotFound);
             }
 
-            await _personalTaskStatusRepository.ReorderStatusAsync(
+            await personalTaskStatusRepository.ReorderStatusAsync(
                 request.StatusId,
                 request.PrevStatusId,
                 request.NextStatusId,

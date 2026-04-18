@@ -1,9 +1,6 @@
 ﻿using Google.Apis.Auth;
-using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Identity;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
-using Newtonsoft.Json.Linq;
 using StudioStudio_Server.Configurations;
 using StudioStudio_Server.Exceptions;
 using StudioStudio_Server.Metrics;
@@ -14,7 +11,6 @@ using StudioStudio_Server.Models.Enums;
 using StudioStudio_Server.Repositories.Interfaces;
 using StudioStudio_Server.Services.Interfaces;
 using System.IdentityModel.Tokens.Jwt;
-using System.Runtime.InteropServices;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
@@ -41,14 +37,6 @@ namespace StudioStudio_Server.Services
         // Password must be 10-20 characters long, contain at least one uppercase letter, one lowercase letter, and one digit
         private readonly Regex PasswordRegex = new(@"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)[A-Za-z\d@$!%*?&]{10,20}$", RegexOptions.Compiled);
 
-        private readonly IUserRepository _userRepository = userRepository;
-        private readonly IRefreshTokenRepository _refreshTokenRepository = refreshTokenRepository;
-        private readonly IPasswordHasher<User> _passwordHasher = passwordHasher;
-        private readonly IConfiguration _configuration = configuration;
-        private readonly IEmailService _emailService = emailService;
-        private readonly IEmailVerificationCacheService _emailVerificationCache = emailVerificationCache;
-        private readonly IPasswordResetCacheService _resetCache = resetCache;
-
         /// <summary>
         /// Register new user account
         /// Validate:
@@ -64,27 +52,27 @@ namespace StudioStudio_Server.Services
         {
             if (!IsValidEmail(registerRequest.Email))
             {
-                throw new AppException(ErrorCodes.ValidationInvalidEmail, StatusCodes.Status400BadRequest);
+                throw new AppException(ErrorCodes.ValidationInvalidEmail);
             }
 
             if (!IsValidPass(registerRequest.Password))
             {
-                throw new AppException(ErrorCodes.ValidationInvalidPassword, StatusCodes.Status400BadRequest);
+                throw new AppException(ErrorCodes.ValidationInvalidPassword);
             }
 
             // Check rate limit
-            if (!await _emailVerificationCache.CanSendVerificationEmailAsync(registerRequest.Email))
+            if (!await emailVerificationCache.CanSendVerificationEmailAsync(registerRequest.Email))
             {
                 throw new AppException(ErrorCodes.ValidationRateLimitExceeded, StatusCodes.Status429TooManyRequests);
             }
 
             //check if user email have used or not
-            User? existUser = await _userRepository.GetByEmailAsync(registerRequest.Email);
+            User? existUser = await userRepository.GetByEmailAsync(registerRequest.Email);
 
             //if email used, throw exception
             if (existUser != null)
             {
-                throw new AppException(ErrorCodes.UserAlreadyExist, StatusCodes.Status400BadRequest);
+                throw new AppException(ErrorCodes.UserAlreadyExist);
             }
 
             //else create new user
@@ -99,10 +87,10 @@ namespace StudioStudio_Server.Services
             };
 
             //hashpassword using .net PasswordHasher
-            registedUser.PasswordHash = _passwordHasher.HashPassword(registedUser, registerRequest.Password);
+            registedUser.PasswordHash = passwordHasher.HashPassword(registedUser, registerRequest.Password);
             registedUser.CreatedAt = DateTime.UtcNow;
 
-            await _userRepository.AddAsync(registedUser);
+            await userRepository.AddAsync(registedUser);
 
             // Record registration metric
             AppMetrics.UserRegistrationsTotal.Inc();
@@ -111,7 +99,7 @@ namespace StudioStudio_Server.Services
             var token = Convert.ToBase64String(RandomNumberGenerator.GetBytes(64));
             var expiry = TimeSpan.FromMinutes(15);
 
-            await _emailVerificationCache.StoreVerificationTokenAsync(
+            await emailVerificationCache.StoreVerificationTokenAsync(
                 registerRequest.Email,
                 token,
                 registedUser.UserId,
@@ -119,14 +107,14 @@ namespace StudioStudio_Server.Services
             );
 
             // Increment rate limit counter
-            await _emailVerificationCache.IncrementSendCountAsync(registerRequest.Email);
+            await emailVerificationCache.IncrementSendCountAsync(registerRequest.Email);
 
             //Fe verify code url - URL encode token to handle special characters
-            string verifyUrl = $"{_configuration["Frontend:VerifyURL"]}?token={Uri.EscapeDataString(token)}";
+            string verifyUrl = $"{configuration["Frontend:VerifyURL"]}?token={Uri.EscapeDataString(token)}";
 
             string html = EmailTemplate.VerifyLinkEmail(verifyUrl);
 
-            await _emailService.SendLinkAsync(
+            await emailService.SendLinkAsync(
                 registedUser.Email,
                 "Xác thực tài khoản của bạn",
                 html
@@ -143,14 +131,14 @@ namespace StudioStudio_Server.Services
         /// </summary>
         public async Task VerifyEmailLinkAsync(string token)
         {
-            var verifyData = await _emailVerificationCache.GetVerificationDataByTokenAsync(token);
+            var verifyData = await emailVerificationCache.GetVerificationDataByTokenAsync(token);
 
             if (verifyData == null)
             {
-                throw new AppException(ErrorCodes.ValidationInvalidToken, StatusCodes.Status400BadRequest);
+                throw new AppException(ErrorCodes.ValidationInvalidToken);
             }
 
-            var user = await _userRepository.GetByIdAsync(verifyData.UserId);
+            var user = await userRepository.GetByIdAsync(verifyData.UserId);
 
             if (user == null)
             {
@@ -159,7 +147,7 @@ namespace StudioStudio_Server.Services
 
             if (user.Status == UserStatus.Deleted)
             {
-                throw new AppException(ErrorCodes.UserAccountAlreadyDeleted, StatusCodes.Status400BadRequest);
+                throw new AppException(ErrorCodes.UserAccountAlreadyDeleted);
             }
 
             if (user.Status == UserStatus.Inactive)
@@ -169,17 +157,17 @@ namespace StudioStudio_Server.Services
 
             if (user.IsVerify)
             {
-                throw new AppException(ErrorCodes.ValidationEmailAlreadyVerified, StatusCodes.Status400BadRequest);
+                throw new AppException(ErrorCodes.ValidationEmailAlreadyVerified);
             }
 
 
             user.IsVerify = true;
             user.UpdatedAt = DateTime.UtcNow;
 
-            await _userRepository.UpdateAsync(user);
+            await userRepository.UpdateAsync(user);
 
             // Invalidate token after successful verification
-            await _emailVerificationCache.InvalidateVerificationTokenAsync(verifyData.Email);
+            await emailVerificationCache.InvalidateVerificationTokenAsync(verifyData.Email);
         }
 
         /// <summary>
@@ -195,11 +183,11 @@ namespace StudioStudio_Server.Services
         {
             if (!IsValidEmail(loginRequest.Email))
             {
-                throw new AppException(ErrorCodes.ValidationInvalidEmail, StatusCodes.Status400BadRequest);
+                throw new AppException(ErrorCodes.ValidationInvalidEmail);
             }
 
             //find user and check if user exist or not
-            User? user = await _userRepository.GetByEmailAsync(loginRequest.Email);
+            User? user = await userRepository.GetByEmailAsync(loginRequest.Email);
 
             if (user == null)
             {
@@ -210,11 +198,11 @@ namespace StudioStudio_Server.Services
             if (user.Status == UserStatus.Deleted)
             {
                 AppMetrics.UserLoginAttemptsTotal.WithLabels("failed").Inc();
-                throw new AppException(ErrorCodes.UserAccountAlreadyDeleted, StatusCodes.Status400BadRequest);
+                throw new AppException(ErrorCodes.UserAccountAlreadyDeleted);
             }
 
             //check user password has match
-            var result = _passwordHasher.VerifyHashedPassword(user, user.PasswordHash!, loginRequest.Password);
+            var result = passwordHasher.VerifyHashedPassword(user, user.PasswordHash!, loginRequest.Password);
 
             if (result != PasswordVerificationResult.Success)
             {
@@ -232,8 +220,8 @@ namespace StudioStudio_Server.Services
                 throw new AppException(ErrorCodes.AuthAccountNotVerified, StatusCodes.Status403Forbidden);
             }
 
-            var accessTokenExpireMs = _configuration.GetValue<long>("JWT:AccessTokenExpireMs", 3600000);
-            var refreshTokenExpireMs = _configuration.GetValue<long>("JWT:RefreshTokenExpireMs", 86400000);
+            var accessTokenExpireMs = configuration.GetValue<long>("JWT:AccessTokenExpireMs", 3600000);
+            var refreshTokenExpireMs = configuration.GetValue<long>("JWT:RefreshTokenExpireMs", 86400000);
 
             var accessExpireAt = DateTime.UtcNow.AddMilliseconds(accessTokenExpireMs);
             var refreshExpireAt = DateTime.UtcNow.AddMilliseconds(refreshTokenExpireMs);
@@ -241,7 +229,7 @@ namespace StudioStudio_Server.Services
             string accessToken = GenerateJWTToken(user, accessExpireAt);
 
             RefreshToken refreshToken = CreateRefreshToken(user, refreshExpireAt);
-            await _refreshTokenRepository.AddAsync(refreshToken);
+            await refreshTokenRepository.AddAsync(refreshToken);
 
             SetRefreshTokenCookie(response, refreshToken.Token, refreshExpireAt);
 
@@ -279,31 +267,31 @@ namespace StudioStudio_Server.Services
         /// </summary>
         public async Task<LoginResponse> RefreshTokenAsync(string refreshToken, HttpResponse response)
         {
-            var token = await _refreshTokenRepository.GetValidAsync(refreshToken);
+            var token = await refreshTokenRepository.GetValidAsync(refreshToken);
 
             if (token == null || token.IsRevoked || token.ExpiresAt < DateTime.UtcNow)
                 throw new AppException(ErrorCodes.AuthTokenExpired, StatusCodes.Status401Unauthorized);
 
-            await _refreshTokenRepository.RevokeAsync(token);
+            await refreshTokenRepository.RevokeAsync(token);
 
             // ✅ CLEANUP: Delete all expired/revoked tokens for this user
-            await _refreshTokenRepository.CleanupUserTokensAsync(token.UserId);
+            await refreshTokenRepository.CleanupUserTokensAsync(token.UserId);
 
-            var user = await _userRepository.GetByIdAsync(token.UserId);
+            var user = await userRepository.GetByIdAsync(token.UserId);
             if (user == null)
                 throw new AppException(ErrorCodes.UserNotFound, StatusCodes.Status404NotFound);
 
             if (user.Status == UserStatus.Deleted)
-                throw new AppException(ErrorCodes.UserAccountAlreadyDeleted, StatusCodes.Status400BadRequest);
+                throw new AppException(ErrorCodes.UserAccountAlreadyDeleted);
 
-            var accessTokenExpireMs = _configuration.GetValue<long>("JWT:AccessTokenExpireMs", 3600000);
-            var refreshTokenExpireMs = _configuration.GetValue<long>("JWT:RefreshTokenExpireMs", 86400000);
+            var accessTokenExpireMs = configuration.GetValue<long>("JWT:AccessTokenExpireMs", 3600000);
+            var refreshTokenExpireMs = configuration.GetValue<long>("JWT:RefreshTokenExpireMs", 86400000);
 
             var accessExpireAt = DateTime.UtcNow.AddMilliseconds(accessTokenExpireMs);
             var refreshExpireAt = DateTime.UtcNow.AddMilliseconds(refreshTokenExpireMs);
 
             var newRefreshToken = CreateRefreshToken(user, refreshExpireAt);
-            await _refreshTokenRepository.AddAsync(newRefreshToken);
+            await refreshTokenRepository.AddAsync(newRefreshToken);
 
             var newAccessToken = GenerateJWTToken(user, accessExpireAt);
 
@@ -334,13 +322,13 @@ namespace StudioStudio_Server.Services
         /// </summary>
         public async Task LogoutAsync(string refreshToken, HttpResponse response)
         {
-            var token = await _refreshTokenRepository.GetValidAsync(refreshToken);
+            var token = await refreshTokenRepository.GetValidAsync(refreshToken);
             if (token != null)
             {
-                await _refreshTokenRepository.RevokeAsync(token);
+                await refreshTokenRepository.RevokeAsync(token);
 
                 // ✅ CLEANUP: Delete all expired/revoked tokens for this user
-                await _refreshTokenRepository.CleanupUserTokensAsync(token.UserId);
+                await refreshTokenRepository.CleanupUserTokensAsync(token.UserId);
             }
 
             response.Cookies.Delete("refreshToken", new CookieOptions
@@ -367,7 +355,7 @@ namespace StudioStudio_Server.Services
             {
                 var settings = new GoogleJsonWebSignature.ValidationSettings
                 {
-                    Audience = new[] { _configuration["Google:ClientId"] }
+                    Audience = new[] { configuration["Google:ClientId"] }
                 };
 
                 var payload = await GoogleJsonWebSignature.ValidateAsync(request.IdToken, settings);
@@ -378,13 +366,13 @@ namespace StudioStudio_Server.Services
                 var lastName = payload.FamilyName;
                 var imgURL = payload.Picture;
 
-                var user = await _userRepository.GetByEmailAsync(email);
+                var user = await userRepository.GetByEmailAsync(email);
 
             
                 if (user == null)
                 {
                     var tempPassword = Guid.NewGuid().ToString();
-                    var passwordHash = _passwordHasher.HashPassword(null!, tempPassword);
+                    var passwordHash = passwordHasher.HashPassword(null!, tempPassword);
                     user = new User
                     {
                         UserId = Guid.NewGuid(),
@@ -398,7 +386,7 @@ namespace StudioStudio_Server.Services
                         IsVerify = true
                     };
 
-                    await _userRepository.AddAsync(user);
+                    await userRepository.AddAsync(user);
                 }
                 else
                 {
@@ -410,11 +398,11 @@ namespace StudioStudio_Server.Services
                     user.GoogleId ??= googleId;
                     user.AvatarUrl ??= imgURL;
 
-                    await _userRepository.UpdateAsync(user);
+                    await userRepository.UpdateAsync(user);
                 }
 
-                var accessTokenExpireMs = _configuration.GetValue<long>("JWT:AccessTokenExpireMs", 3600000);
-                var refreshTokenExpireMs = _configuration.GetValue<long>("JWT:RefreshTokenExpireMs", 86400000);
+                var accessTokenExpireMs = configuration.GetValue<long>("JWT:AccessTokenExpireMs", 3600000);
+                var refreshTokenExpireMs = configuration.GetValue<long>("JWT:RefreshTokenExpireMs", 86400000);
 
                 var accessExpireAt = DateTime.UtcNow.AddMilliseconds(accessTokenExpireMs);
                 var refreshExpireAt = DateTime.UtcNow.AddMilliseconds(refreshTokenExpireMs);
@@ -422,7 +410,7 @@ namespace StudioStudio_Server.Services
                 var accessToken = GenerateJWTToken(user, accessExpireAt);
                 var refreshToken = CreateRefreshToken(user, refreshExpireAt);
 
-                await _refreshTokenRepository.AddAsync(refreshToken);
+                await refreshTokenRepository.AddAsync(refreshToken);
 
                 SetRefreshTokenCookie(response, refreshToken.Token, refreshExpireAt);
 
@@ -464,16 +452,16 @@ namespace StudioStudio_Server.Services
         {
             if (!IsValidEmail(email))
             {
-                throw new AppException(ErrorCodes.ValidationInvalidEmail, StatusCodes.Status400BadRequest);
+                throw new AppException(ErrorCodes.ValidationInvalidEmail);
             }
 
             // Check rate limit
-            if (!await _resetCache.CanSendResetEmailAsync(email))
+            if (!await resetCache.CanSendResetEmailAsync(email))
             {
                 throw new AppException(ErrorCodes.ValidationRateLimitExceeded, StatusCodes.Status429TooManyRequests);
             }
 
-            var user = await _userRepository.GetByEmailAsync(email);
+            var user = await userRepository.GetByEmailAsync(email);
             if (user == null)
             {
                 throw new AppException(ErrorCodes.UserNotFound, StatusCodes.Status404NotFound);
@@ -481,21 +469,21 @@ namespace StudioStudio_Server.Services
 
             if (user.Status == UserStatus.Deleted)
             {
-                throw new AppException(ErrorCodes.UserAccountAlreadyDeleted, StatusCodes.Status400BadRequest);
+                throw new AppException(ErrorCodes.UserAccountAlreadyDeleted);
             }
 
             var token = Convert.ToBase64String(RandomNumberGenerator.GetBytes(64));
             var expiry = TimeSpan.FromMinutes(15);
 
-            await _resetCache.StoreResetTokenAsync(email, token, user.UserId, expiry);
+            await resetCache.StoreResetTokenAsync(email, token, user.UserId, expiry);
 
             // Increment rate limit counter
-            await _resetCache.IncrementSendCountAsync(email);
+            await resetCache.IncrementSendCountAsync(email);
 
-            string resetURL = $"{_configuration["Frontend:ResetPassURL"]}?token={Uri.EscapeDataString(token)}";
+            string resetURL = $"{configuration["Frontend:ResetPassURL"]}?token={Uri.EscapeDataString(token)}";
             string html = EmailTemplate.ResetPasswordEmail(resetURL);
 
-            await _emailService.SendLinkAsync(
+            await emailService.SendLinkAsync(
                 user.Email,
                 "Reset your password",
                 html
@@ -517,17 +505,17 @@ namespace StudioStudio_Server.Services
         {
             if (!IsValidPass(newPassword))
             {
-                throw new AppException(ErrorCodes.ValidationInvalidPassword, StatusCodes.Status400BadRequest);
+                throw new AppException(ErrorCodes.ValidationInvalidPassword);
             }
 
-            var resetData = await _resetCache.GetResetDataByTokenAsync(token);
+            var resetData = await resetCache.GetResetDataByTokenAsync(token);
 
             if (resetData == null)
             {
-                throw new AppException(ErrorCodes.ValidationInvalidToken, StatusCodes.Status400BadRequest);
+                throw new AppException(ErrorCodes.ValidationInvalidToken);
             }
 
-            var user = await _userRepository.GetByIdAsync(resetData.UserId);
+            var user = await userRepository.GetByIdAsync(resetData.UserId);
             if (user == null)
             {
                 throw new AppException(ErrorCodes.UserNotFound, StatusCodes.Status404NotFound);
@@ -535,16 +523,16 @@ namespace StudioStudio_Server.Services
 
             if (user.Status == UserStatus.Deleted)
             {
-                throw new AppException(ErrorCodes.UserAccountAlreadyDeleted, StatusCodes.Status400BadRequest);
+                throw new AppException(ErrorCodes.UserAccountAlreadyDeleted);
             }
 
-            user.PasswordHash = _passwordHasher.HashPassword(user, newPassword);
+            user.PasswordHash = passwordHasher.HashPassword(user, newPassword);
             user.UpdatedAt = DateTime.UtcNow;
 
-            await _userRepository.UpdateAsync(user);
-            await _resetCache.InvalidateResetTokenAsync(resetData.Email);
+            await userRepository.UpdateAsync(user);
+            await resetCache.InvalidateResetTokenAsync(resetData.Email);
 
-            await _refreshTokenRepository.RevokeAllUserTokensAsync(user.UserId);
+            await refreshTokenRepository.RevokeAllUserTokensAsync(user.UserId);
         }
 
         /// <summary>
@@ -554,11 +542,11 @@ namespace StudioStudio_Server.Services
         /// </summary>
         public async Task<bool> VerifyResetTokenAsync(string token)
         {
-            var resetData = await _resetCache.GetResetDataByTokenAsync(token);
+            var resetData = await resetCache.GetResetDataByTokenAsync(token);
 
             if (resetData != null)
             {
-                var user = await _userRepository.GetByIdAsync(resetData.UserId);
+                var user = await userRepository.GetByIdAsync(resetData.UserId);
                 if (user == null || user.Status == UserStatus.Deleted)
                 {
                     return false;
@@ -584,18 +572,17 @@ namespace StudioStudio_Server.Services
             if (!IsValidEmail(request.Email))
             {
                 throw new AppException(
-                    ErrorCodes.ValidationInvalidEmail,
-                    StatusCodes.Status400BadRequest
+                    ErrorCodes.ValidationInvalidEmail
                 );
             }
 
             // Check rate limit
-            if (!await _emailVerificationCache.CanSendVerificationEmailAsync(request.Email))
+            if (!await emailVerificationCache.CanSendVerificationEmailAsync(request.Email))
             {
                 throw new AppException(ErrorCodes.ValidationRateLimitExceeded, StatusCodes.Status429TooManyRequests);
             }
 
-            var user = await _userRepository.GetByEmailAsync(request.Email);
+            var user = await userRepository.GetByEmailAsync(request.Email);
 
             if (user == null)
             {
@@ -604,7 +591,7 @@ namespace StudioStudio_Server.Services
 
             if (user.Status == UserStatus.Deleted)
             {
-                throw new AppException(ErrorCodes.UserAccountAlreadyDeleted, StatusCodes.Status400BadRequest);
+                throw new AppException(ErrorCodes.UserAccountAlreadyDeleted);
             }
 
 
@@ -612,7 +599,7 @@ namespace StudioStudio_Server.Services
             var token = Convert.ToBase64String(RandomNumberGenerator.GetBytes(64));
             var expiry = TimeSpan.FromMinutes(15);
 
-            await _emailVerificationCache.StoreVerificationTokenAsync(
+            await emailVerificationCache.StoreVerificationTokenAsync(
                 request.Email,
                 token,
                 user.UserId,
@@ -620,14 +607,14 @@ namespace StudioStudio_Server.Services
             );
 
             // Increment rate limit counter
-            await _emailVerificationCache.IncrementSendCountAsync(request.Email);
+            await emailVerificationCache.IncrementSendCountAsync(request.Email);
 
             string verifyUrl =
-                $"{_configuration["Frontend:VerifyURL"]}?token={Uri.EscapeDataString(token)}";
+                $"{configuration["Frontend:VerifyURL"]}?token={Uri.EscapeDataString(token)}";
 
             string html = EmailTemplate.VerifyLinkEmail(verifyUrl);
 
-            await _emailService.SendLinkAsync(
+            await emailService.SendLinkAsync(
                 user.Email,
                 "Xác thực tài khoản của bạn",
                 html
@@ -665,15 +652,15 @@ namespace StudioStudio_Server.Services
                 new Claim("IsAdmin", user.IsAdmin.ToString())
             };
 
-            var jwtKey = _configuration["JWT:Key"]
+            var jwtKey = configuration["JWT:Key"]
                 ?? throw new InvalidOperationException("JWT:Key is not configured");
             var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey));
 
             var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 
             var token = new JwtSecurityToken(
-                issuer: _configuration["JWT:Issuer"],
-                audience: _configuration["JWT:Audience"],
+                issuer: configuration["JWT:Issuer"],
+                audience: configuration["JWT:Audience"],
                 claims: claims,
                 expires: expireAt,
                 signingCredentials: creds);

@@ -19,13 +19,7 @@ namespace StudioStudio_Server.Services.EmbeddingQueue
         /// Used for token-based rate limiting
         /// </summary>
         public int EstimatedTokens { get; set; }
-        
-        /// <summary>
-        /// Actual tokens used after processing
-        /// Updated after document processing completes
-        /// </summary>
-        public int ActualTokens { get; set; }
-        
+
         /// <summary>
         /// Priority of the job (lower number = higher priority)
         /// Can be used for prioritizing smaller documents

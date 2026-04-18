@@ -17,9 +17,9 @@ namespace StudioStudio_Server.Middlewares
         IWebHostEnvironment env,
         IConnectionMultiplexer redis)
     {
-        // Configuration: Max requests per minute per user
-        private const int MAX_REQUESTS_PER_MINUTE = 300;
-        private const int RATE_LIMIT_WINDOW_SECONDS = 60;
+        // Configuration: Max requests per window per user
+        private const int MAX_REQUESTS_PER_WINDOW = 500;
+        private const int RATE_LIMIT_WINDOW_SECONDS = 30;
 
         public async Task InvokeAsync(HttpContext context)
         {
@@ -55,34 +55,26 @@ namespace StudioStudio_Server.Middlewares
 
                     if (userId.HasValue)
                     {
-                        // Check rate limit
+                        // Fixed time-based window: counter resets every RATE_LIMIT_WINDOW_SECONDS
+                        // Key includes window number so expired windows are automatically skipped
                         var db = redis.GetDatabase();
-                        var key = $"ratelimit:user:{userId.Value}";
+                        var windowStart = DateTimeOffset.UtcNow.ToUnixTimeSeconds() / RATE_LIMIT_WINDOW_SECONDS;
+                        var key = $"ratelimit:user:{userId.Value}:{windowStart}";
 
-                        // Get current request count
-                        var currentCount = await db.StringGetAsync(key);
-                        
-                        if (currentCount.HasValue && int.TryParse(currentCount, out int count))
-                        {
-                            if (count >= MAX_REQUESTS_PER_MINUTE)
-                            {
-                                logger.LogWarning(
-                                    "Rate limit exceeded for user {UserId}. Count: {Count}, Path: {Path}", 
-                                    userId.Value, 
-                                    count,
-                                    path);
-                                
-                                await HandleRateLimitExceeded(context);
-                                return;
-                            }
+                        // Atomic increment, then check
+                        var newCount = await db.StringIncrementAsync(key);
+                        await db.KeyExpireAsync(key, TimeSpan.FromSeconds(RATE_LIMIT_WINDOW_SECONDS * 2));
 
-                            // Increment counter
-                            await db.StringIncrementAsync(key);
-                        }
-                        else
+                        if (newCount > MAX_REQUESTS_PER_WINDOW)
                         {
-                            // First request in this window - set counter and expiry
-                            await db.StringSetAsync(key, 1, TimeSpan.FromSeconds(RATE_LIMIT_WINDOW_SECONDS));
+                            logger.LogWarning(
+                                "Rate limit exceeded for user {UserId}. Count: {Count}, Path: {Path}",
+                                userId.Value,
+                                newCount,
+                                path);
+
+                            await HandleRateLimitExceeded(context);
+                            return;
                         }
                     }
                 }

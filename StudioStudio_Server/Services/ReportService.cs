@@ -6,7 +6,6 @@ using StudioStudio_Server.Models.Entities;
 using StudioStudio_Server.Models.Enums;
 using StudioStudio_Server.Repositories.Interfaces;
 using StudioStudio_Server.Services.Interfaces;
-using System.Text.Json;
 using System.Text.RegularExpressions;
 
 namespace StudioStudio_Server.Services
@@ -20,10 +19,6 @@ namespace StudioStudio_Server.Services
         IConfiguration configuration,
         ILogger<ReportService> logger) : IReportService
     {
-        private readonly IReportRepository _reportRepository = reportRepository;
-        private readonly IEmailService _emailService = emailService;
-        private readonly IConfiguration _configuration = configuration;
-        private readonly ILogger<ReportService> _logger = logger;
         private readonly Regex _emailRegex = new(@"^[^@\s]+@[^@\s]+\.[^@\s]+$", RegexOptions.Compiled);
 
         /// <summary>
@@ -38,7 +33,7 @@ namespace StudioStudio_Server.Services
         {
             ValidateEmailFormat(request.Email);
 
-            var reportToEmail = _configuration["Report:ToEmail"];
+            var reportToEmail = configuration["Report:ToEmail"];
             if (string.IsNullOrWhiteSpace(reportToEmail))
             {
                 throw new AppException(
@@ -59,7 +54,7 @@ namespace StudioStudio_Server.Services
                 CreatedAt = DateTime.UtcNow
             };
 
-            await _reportRepository.AddAsync(report);
+            await reportRepository.AddAsync(report);
 
             var subject = $"[Report] {request.Type} - {request.Title}";
             var body = EmailTemplate.ReportEmail(
@@ -69,9 +64,9 @@ namespace StudioStudio_Server.Services
                 request.Content,
                 userId?.ToString() ?? "Anonymous");
 
-            await _emailService.SendLinkAsync(reportToEmail, subject, body);
+            await emailService.SendLinkAsync(reportToEmail, subject, body);
 
-            _logger.LogInformation(
+            logger.LogInformation(
                 "Report sent. Type: {Type}, Email: {Email}, UserId: {UserId}",
                 request.Type, request.Email, userId?.ToString() ?? "Anonymous");
         }
@@ -82,21 +77,21 @@ namespace StudioStudio_Server.Services
         /// </summary>
         public async Task<ReportListResponse> GetReportsAsync(GetReportsRequest request)
         {
-            var reports = await _reportRepository.GetReportsAsync(
+            var reports = await reportRepository.GetReportsAsync(
                 request.SearchTerm,
                 request.Type,
                 request.Status,
                 request.PageNumber,
                 request.PageSize);
 
-            var totalCount = await _reportRepository.GetTotalReportsCountAsync(
+            var totalCount = await reportRepository.GetTotalReportsCountAsync(
                 request.SearchTerm,
                 request.Type,
                 request.Status);
 
-            var totalOpen = await _reportRepository.GetReportsCountByStatusAsync(ReportStatus.Open);
-            var totalInProgress = await _reportRepository.GetReportsCountByStatusAsync(ReportStatus.InProgress);
-            var totalResolved = await _reportRepository.GetReportsCountByStatusAsync(ReportStatus.Resolved);
+            var totalOpen = await reportRepository.GetReportsCountByStatusAsync(ReportStatus.Open);
+            var totalInProgress = await reportRepository.GetReportsCountByStatusAsync(ReportStatus.InProgress);
+            var totalResolved = await reportRepository.GetReportsCountByStatusAsync(ReportStatus.Resolved);
             var totalReport = totalOpen + totalInProgress + totalResolved;
 
             var reportList = reports.Select(r => new ReportItemResponse
@@ -138,7 +133,7 @@ namespace StudioStudio_Server.Services
         /// </summary>
         public async Task<ReportItemResponse> UpdateReportAsync(Guid adminUserId, UpdateReportRequest request)
         {
-            var report = await _reportRepository.GetReportByIdAsync(request.ReportId);
+            var report = await reportRepository.GetReportByIdAsync(request.ReportId);
 
             if (report == null)
             {
@@ -164,9 +159,9 @@ namespace StudioStudio_Server.Services
 
             report.UpdatedAt = DateTime.UtcNow;
 
-            await _reportRepository.UpdateAsync(report);
+            await reportRepository.UpdateAsync(report);
 
-            _logger.LogInformation(
+            logger.LogInformation(
                 "Report updated by admin. ReportId: {ReportId}, AdminId: {AdminId}",
                 report.ReportId, adminUserId);
 
@@ -194,8 +189,7 @@ namespace StudioStudio_Server.Services
             if (!_emailRegex.IsMatch(email))
             {
                 throw new AppException(
-                    ErrorCodes.ValidationInvalidEmail,
-                    StatusCodes.Status400BadRequest);
+                    ErrorCodes.ValidationInvalidEmail);
             }
         }
     }

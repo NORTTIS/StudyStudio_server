@@ -65,7 +65,6 @@ namespace StudioStudio_Server.Tests.Services
         {
             return new GroupService(
                 _loggerMock.Object,
-                _messageServiceMock.Object,
                 _groupRepoMock.Object,
                 _userSubscriptionRepoMock.Object,
                 _favouriteRepoMock.Object,

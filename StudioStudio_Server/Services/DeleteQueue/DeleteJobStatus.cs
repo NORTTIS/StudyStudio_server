@@ -69,18 +69,5 @@ namespace StudioStudio_Server.Services.DeleteQueue
         /// Number of retry attempts
         /// </summary>
         public int RetryCount { get; set; }
-
-        /// <summary>
-        /// User-friendly status message
-        /// </summary>
-        public string StatusMessage => Status switch
-        {
-            DeleteJobStatus.Queued => "Waiting to delete vectors",
-            DeleteJobStatus.Processing => $"Deleting vectors ({DeletedCount}/{TotalCount})",
-            DeleteJobStatus.Completed => "All vectors deleted successfully",
-            DeleteJobStatus.PartiallyCompleted => $"Partial deletion: {DeletedCount}/{TotalCount} deleted, {FailedCount} failed",
-            DeleteJobStatus.Failed => "Vector deletion failed",
-            _ => "Unknown status"
-        };
     }
 }

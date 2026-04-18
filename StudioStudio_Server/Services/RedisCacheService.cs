@@ -19,9 +19,7 @@ namespace StudioStudio_Server.Services
         IConnectionMultiplexer redis,
         ILogger<RedisCacheService> logger) : ICacheService
     {
-        private readonly IConnectionMultiplexer _redis = redis;
         private readonly IDatabase _database = redis.GetDatabase();
-        private readonly ILogger<RedisCacheService> _logger = logger;
 
         // Instance name for all cache keys (same as existing Redis usage)
         private const string INSTANCE_PREFIX = "StudyStudio:Cache:";
@@ -60,13 +58,13 @@ namespace StudioStudio_Server.Services
                     var deserialized = JsonSerializer.Deserialize<T>(cachedValue!, JsonOptions);
                     if (deserialized != null)
                     {
-                        _logger.LogDebug("Redis Cache HIT: {Key}", key);
+                        logger.LogDebug("Redis Cache HIT: {Key}", key);
                         return deserialized;
                     }
                 }
 
                 // Cache miss - fetch from source
-                _logger.LogDebug("Redis Cache MISS: {Key}", key);
+                logger.LogDebug("Redis Cache MISS: {Key}", key);
                 var value = await factory();
                 
                 if (value != null)
@@ -78,7 +76,7 @@ namespace StudioStudio_Server.Services
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Redis cache error for key {Key}. Falling back to direct query.", key);
+                logger.LogError(ex, "Redis cache error for key {Key}. Falling back to direct query.", key);
                 // Fallback: If Redis fails, fetch directly from source
                 return await factory();
             }
@@ -104,7 +102,7 @@ namespace StudioStudio_Server.Services
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Redis get error for key {Key}", key);
+                logger.LogError(ex, "Redis get error for key {Key}", key);
                 return null;
             }
         }
@@ -122,11 +120,11 @@ namespace StudioStudio_Server.Services
                 var json = JsonSerializer.Serialize(value, JsonOptions);
                 await _database.StringSetAsync(redisKey, json, expiration ?? DefaultExpiration);
                 
-                _logger.LogDebug("Redis Cache SET: {Key} (Expiration: {Expiration})", key, expiration ?? DefaultExpiration);
+                logger.LogDebug("Redis Cache SET: {Key} (Expiration: {Expiration})", key, expiration ?? DefaultExpiration);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Redis set error for key {Key}", key);
+                logger.LogError(ex, "Redis set error for key {Key}", key);
             }
         }
 
@@ -140,11 +138,11 @@ namespace StudioStudio_Server.Services
             try
             {
                 await _database.KeyDeleteAsync(redisKey);
-                _logger.LogDebug("Redis Cache REMOVE: {Key}", key);
+                logger.LogDebug("Redis Cache REMOVE: {Key}", key);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Redis remove error for key {Key}", key);
+                logger.LogError(ex, "Redis remove error for key {Key}", key);
             }
         }
 
@@ -158,15 +156,15 @@ namespace StudioStudio_Server.Services
             try
             {
                 var redisPattern = INSTANCE_PREFIX + pattern;
-                var endpoint = _redis.GetEndPoints().FirstOrDefault();
+                var endpoint = redis.GetEndPoints().FirstOrDefault();
                 
                 if (endpoint == null)
                 {
-                    _logger.LogWarning("No Redis endpoint found for pattern deletion: {Pattern}", pattern);
+                    logger.LogWarning("No Redis endpoint found for pattern deletion: {Pattern}", pattern);
                     return;
                 }
 
-                var server = _redis.GetServer(endpoint);
+                var server = redis.GetServer(endpoint);
                 var keys = server.Keys(pattern: redisPattern, pageSize: 1000);
                 
                 var batch = _database.CreateBatch();
@@ -181,11 +179,11 @@ namespace StudioStudio_Server.Services
                 await Task.WhenAll(deleteTasks);
                 
                 var deletedCount = deleteTasks.Count(t => t.Result);
-                _logger.LogInformation("Redis Cache PATTERN DELETE: {Pattern}, Deleted {Count} keys", pattern, deletedCount);
+                logger.LogInformation("Redis Cache PATTERN DELETE: {Pattern}, Deleted {Count} keys", pattern, deletedCount);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Redis pattern delete error for pattern {Pattern}", pattern);
+                logger.LogError(ex, "Redis pattern delete error for pattern {Pattern}", pattern);
             }
         }
 
@@ -218,8 +216,6 @@ namespace StudioStudio_Server.Services
             return $"ai:tool:{userId}:{scope}:{toolName}:{paramsHash}";
         }
 
-        public string GetAIGroupToolPattern(Guid groupId) => $"ai:tool:*:group:{groupId}:*";
-        public string GetAIUserToolPattern(Guid userId) => $"ai:tool:{userId}:*";
         public string GetAIStudioToolPattern(Guid studioId) => $"ai:tool:*:studio:{studioId}:*";
 
         /// <summary>
@@ -278,11 +274,11 @@ namespace StudioStudio_Server.Services
                 await Task.WhenAll(tasks);
                 
                 var deletedCount = tasks.Count(t => t.Result);
-                _logger.LogInformation("Redis: Invalidated {Count}/5 cache entries for user: {UserId}", deletedCount, userId);
+                logger.LogInformation("Redis: Invalidated {Count}/5 cache entries for user: {UserId}", deletedCount, userId);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Redis error invalidating user cache for {UserId}", userId);
+                logger.LogError(ex, "Redis error invalidating user cache for {UserId}", userId);
             }
         }
 
@@ -299,11 +295,11 @@ namespace StudioStudio_Server.Services
                 // Could also invalidate all user_subscription:* keys if needed:
                 // await RemoveByPatternAsync("user_subscription:*");
                 
-                _logger.LogInformation("Redis: Invalidated subscription plan caches");
+                logger.LogInformation("Redis: Invalidated subscription plan caches");
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Redis error invalidating subscription caches");
+                logger.LogError(ex, "Redis error invalidating subscription caches");
             }
         }
 
@@ -319,45 +315,15 @@ namespace StudioStudio_Server.Services
                 // Could also invalidate all user_announcements:* keys if needed:
                 // await RemoveByPatternAsync("user_announcements:*");
 
-                _logger.LogInformation("Redis: Invalidated announcement caches");
+                logger.LogInformation("Redis: Invalidated announcement caches");
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Redis error invalidating announcement caches");
+                logger.LogError(ex, "Redis error invalidating announcement caches");
             }
         }
 
         // ==================== AI TOOL CACHE INVALIDATION ====================
-
-        /// <summary>
-        /// Invalidate AI tool caches related to task changes (create/update/delete task)
-        /// Call this from TaskService when task data changes so AI sees fresh data
-        /// </summary>
-        public async Task InvalidateAITaskCacheAsync(Guid userId, Guid? groupId)
-        {
-            try
-            {
-                var tasks = new List<Task>();
-
-                // Invalidate task tools for this user
-                tasks.Add(RemoveByPatternAsync($"ai:tool:{userId}:*task*"));
-                tasks.Add(RemoveByPatternAsync($"ai:tool:{userId}:*deadline*"));
-
-                // If group context, invalidate group task caches too
-                if (groupId.HasValue)
-                {
-                    tasks.Add(RemoveByPatternAsync($"ai:tool:*:group:{groupId}:*task*"));
-                    tasks.Add(RemoveByPatternAsync($"ai:tool:*:group:{groupId}:*deadline*"));
-                }
-
-                await Task.WhenAll(tasks);
-                _logger.LogInformation("AI Task cache invalidated for user {UserId}, group {GroupId}", userId, groupId);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Failed to invalidate AI task cache");
-            }
-        }
 
         /// <summary>
         /// Invalidate all AI tool caches for a group (member changes, group settings)
@@ -367,11 +333,11 @@ namespace StudioStudio_Server.Services
             try
             {
                 await RemoveByPatternAsync($"ai:tool:*:{groupId}:*");
-                _logger.LogInformation("AI Group cache invalidated for group {GroupId}", groupId);
+                logger.LogInformation("AI Group cache invalidated for group {GroupId}", groupId);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Failed to invalidate AI group cache for {GroupId}", groupId);
+                logger.LogError(ex, "Failed to invalidate AI group cache for {GroupId}", groupId);
             }
         }
 
@@ -383,11 +349,11 @@ namespace StudioStudio_Server.Services
             try
             {
                 await RemoveByPatternAsync(GetAIStudioToolPattern(studioId));
-                _logger.LogInformation("AI Studio cache invalidated for studio {StudioId}", studioId);
+                logger.LogInformation("AI Studio cache invalidated for studio {StudioId}", studioId);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Failed to invalidate AI studio cache for {StudioId}", studioId);
+                logger.LogError(ex, "Failed to invalidate AI studio cache for {StudioId}", studioId);
             }
         }
 
@@ -410,11 +376,11 @@ namespace StudioStudio_Server.Services
                     tasks.Add(RemoveByPatternAsync($"ai:tool:*:studio:{studioId}:*search*document*"));
 
                 await Task.WhenAll(tasks);
-                _logger.LogInformation("AI Document cache invalidated");
+                logger.LogInformation("AI Document cache invalidated");
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Failed to invalidate AI document cache");
+                logger.LogError(ex, "Failed to invalidate AI document cache");
             }
         }
 
@@ -427,11 +393,11 @@ namespace StudioStudio_Server.Services
             {
                 await RemoveByPatternAsync($"ai:tool:*:group:{groupId}:*member*");
                 await RemoveByPatternAsync($"ai:tool:*:group:{groupId}:*permission*");
-                _logger.LogInformation("AI Member cache invalidated for group {GroupId}", groupId);
+                logger.LogInformation("AI Member cache invalidated for group {GroupId}", groupId);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Failed to invalidate AI member cache for {GroupId}", groupId);
+                logger.LogError(ex, "Failed to invalidate AI member cache for {GroupId}", groupId);
             }
         }
 
@@ -450,27 +416,11 @@ namespace StudioStudio_Server.Services
                 }
 
                 await Task.WhenAll(tasks);
-                _logger.LogInformation("AI group document cache invalidated for group {GroupId}", groupId);
+                logger.LogInformation("AI group document cache invalidated for group {GroupId}", groupId);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Failed to invalidate AI group document cache for {GroupId}", groupId);
-            }
-        }
-
-        /// <summary>
-        /// Invalidate all AI caches for a user (personal AI, all groups)
-        /// </summary>
-        public async Task InvalidateAIUserCacheAsync(Guid userId)
-        {
-            try
-            {
-                await RemoveByPatternAsync($"ai:tool:{userId}:*");
-                _logger.LogInformation("AI User cache invalidated for user {UserId}", userId);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Failed to invalidate AI user cache for {UserId}", userId);
+                logger.LogError(ex, "Failed to invalidate AI group document cache for {GroupId}", groupId);
             }
         }
     }

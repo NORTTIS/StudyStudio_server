@@ -14,9 +14,6 @@ namespace StudioStudio_Server.Services.AI
     /// </summary>
     public class AIToolCacheService(ICacheService cacheService, ILogger<AIToolCacheService> logger)
     {
-        private readonly ICacheService _cacheService = cacheService;
-        private readonly ILogger<AIToolCacheService> _logger = logger;
-
         // Short TTL for AI tool cache - balances performance with data freshness
         private static readonly TimeSpan ToolCacheTtl = TimeSpan.FromSeconds(30);
 
@@ -48,27 +45,27 @@ namespace StudioStudio_Server.Services.AI
             }
 
             var paramsHash = ComputeParamsHash(parameters);
-            var cacheKey = _cacheService.GetAIToolCacheKey(userId, groupId, context.StudioId, toolName, paramsHash);
+            var cacheKey = cacheService.GetAIToolCacheKey(userId, groupId, context.StudioId, toolName, paramsHash);
 
-            _logger.LogDebug("[AI-CACHE] Execute tool {Tool} with cache. Key: {Key}", toolName, cacheKey);
+            logger.LogDebug("[AI-CACHE] Execute tool {Tool} with cache. Key: {Key}", toolName, cacheKey);
 
             // Try cache first
             try
             {
-                var cached = await _cacheService.GetAsync<AIQueryResult>(cacheKey);
+                var cached = await cacheService.GetAsync<AIQueryResult>(cacheKey);
                 if (cached != null)
                 {
-                    _logger.LogInformation("[AI-CACHE] HIT: {Tool} for user {UserId}, group {GroupId}",
+                    logger.LogInformation("[AI-CACHE] HIT: {Tool} for user {UserId}, group {GroupId}",
                         toolName, userId, groupId);
                     return cached;
                 }
 
-                _logger.LogInformation("[AI-CACHE] MISS: {Tool} for user {UserId}, group {GroupId}. Executing...",
+                logger.LogInformation("[AI-CACHE] MISS: {Tool} for user {UserId}, group {GroupId}. Executing...",
                     toolName, userId, groupId);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "[AI-CACHE] Error reading cache for tool {Tool}. Executing without cache hit", toolName);
+                logger.LogError(ex, "[AI-CACHE] Error reading cache for tool {Tool}. Executing without cache hit", toolName);
             }
 
             // Execute tool exactly once
@@ -79,13 +76,13 @@ namespace StudioStudio_Server.Services.AI
             {
                 try
                 {
-                    await _cacheService.SetAsync(cacheKey, result, ToolCacheTtl);
-                    _logger.LogInformation("[AI-CACHE] Stored result for {Tool}. TTL: {TTL}s",
+                    await cacheService.SetAsync(cacheKey, result, ToolCacheTtl);
+                    logger.LogInformation("[AI-CACHE] Stored result for {Tool}. TTL: {TTL}s",
                         toolName, ToolCacheTtl.TotalSeconds);
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "[AI-CACHE] Failed to write cache for tool {Tool}. Returning original result", toolName);
+                    logger.LogError(ex, "[AI-CACHE] Failed to write cache for tool {Tool}. Returning original result", toolName);
                 }
             }
 

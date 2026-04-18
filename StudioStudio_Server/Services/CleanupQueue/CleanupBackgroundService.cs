@@ -15,10 +15,6 @@ namespace StudioStudio_Server.Services.CleanupQueue
         IServiceScopeFactory serviceScopeFactory,
         ILogger<CleanupBackgroundService> logger) : BackgroundService
     {
-        private readonly ICleanupQueue _queue = queue;
-        private readonly IServiceScopeFactory _serviceScopeFactory = serviceScopeFactory;
-        private readonly ILogger<CleanupBackgroundService> _logger = logger;
-
         private static readonly TimeSpan ScanInterval = TimeSpan.FromMinutes(15);
         private static readonly TimeSpan StuckThreshold = TimeSpan.FromMinutes(30);
 
@@ -27,7 +23,7 @@ namespace StudioStudio_Server.Services.CleanupQueue
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            _logger.LogInformation(
+            logger.LogInformation(
                 "Cleanup Background Service started. Scan interval: {Interval}min, Stuck threshold: {Threshold}min",
                 ScanInterval.TotalMinutes, StuckThreshold.TotalMinutes);
 
@@ -39,12 +35,12 @@ namespace StudioStudio_Server.Services.CleanupQueue
                 }
                 catch (OperationCanceledException)
                 {
-                    _logger.LogInformation("Cleanup Background Service shutting down gracefully");
+                    logger.LogInformation("Cleanup Background Service shutting down gracefully");
                     break;
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "Error scanning for stuck uploads");
+                    logger.LogError(ex, "Error scanning for stuck uploads");
                 }
 
                 try
@@ -57,7 +53,7 @@ namespace StudioStudio_Server.Services.CleanupQueue
                 }
             }
 
-            _logger.LogInformation(
+            logger.LogInformation(
                 "Cleanup Background Service stopped. Final stats: Processed={Processed}, Failed={Failed}",
                 _processedCount, _failedCount);
         }
@@ -67,20 +63,20 @@ namespace StudioStudio_Server.Services.CleanupQueue
         /// </summary>
         private async Task ScanAndEnqueueStuckUploadsAsync(CancellationToken stoppingToken)
         {
-            using var scope = _serviceScopeFactory.CreateScope();
+            using var scope = serviceScopeFactory.CreateScope();
             var attachmentRepository = scope.ServiceProvider.GetRequiredService<IGroupAttachmentRepository>();
 
-            _logger.LogInformation("Scanning for stuck uploads older than {Threshold} minutes...", StuckThreshold.TotalMinutes);
+            logger.LogInformation("Scanning for stuck uploads older than {Threshold} minutes...", StuckThreshold.TotalMinutes);
 
             var stuckUploads = await attachmentRepository.GetStuckUploadsAsync(StuckThreshold);
 
             if (stuckUploads.Count == 0)
             {
-                _logger.LogInformation("No stuck uploads found");
+                logger.LogInformation("No stuck uploads found");
                 return;
             }
 
-            _logger.LogInformation("Found {Count} stuck uploads to clean up", stuckUploads.Count);
+            logger.LogInformation("Found {Count} stuck uploads to clean up", stuckUploads.Count);
 
             foreach (var upload in stuckUploads)
             {
@@ -96,13 +92,13 @@ namespace StudioStudio_Server.Services.CleanupQueue
                         UploadedAt = upload.UploadedAt
                     };
 
-                    await _queue.EnqueueAsync(job, stoppingToken);
+                    await queue.EnqueueAsync(job, stoppingToken);
                     _processedCount++;
                 }
                 catch (Exception ex)
                 {
                     _failedCount++;
-                    _logger.LogError(ex,
+                    logger.LogError(ex,
                         "Failed to enqueue stuck upload cleanup job: AttachmentId={AttachmentId}",
                         upload.GroupAttachmentId);
                 }
@@ -117,17 +113,17 @@ namespace StudioStudio_Server.Services.CleanupQueue
         /// </summary>
         private async Task ProcessCleanupQueueAsync(CancellationToken stoppingToken)
         {
-            while (!stoppingToken.IsCancellationRequested && _queue.GetQueueDepth() > 0)
+            while (!stoppingToken.IsCancellationRequested && queue.GetQueueDepth() > 0)
             {
                 try
                 {
-                    var job = await _queue.DequeueAsync(stoppingToken);
+                    var job = await queue.DequeueAsync(stoppingToken);
 
-                    _logger.LogInformation(
+                    logger.LogInformation(
                         "Processing stuck upload cleanup: AttachmentId={AttachmentId}, FileKey={FileKey}, FileSize={FileSize}",
                         job.AttachmentId, job.FileKey, job.FileSize);
 
-                    using var scope = _serviceScopeFactory.CreateScope();
+                    using var scope = serviceScopeFactory.CreateScope();
                     var attachmentRepository = scope.ServiceProvider.GetRequiredService<IGroupAttachmentRepository>();
                     var fileStorageService = scope.ServiceProvider.GetRequiredService<IFileStorageService>();
 
@@ -135,12 +131,12 @@ namespace StudioStudio_Server.Services.CleanupQueue
                     try
                     {
                         await fileStorageService.DeleteFileAsync(job.FileKey);
-                        _logger.LogInformation("B2 blob deleted: AttachmentId={AttachmentId}, FileKey={FileKey}",
+                        logger.LogInformation("B2 blob deleted: AttachmentId={AttachmentId}, FileKey={FileKey}",
                             job.AttachmentId, job.FileKey);
                     }
                     catch (Exception ex)
                     {
-                        _logger.LogWarning(ex,
+                        logger.LogWarning(ex,
                             "Failed to delete B2 blob for stuck upload: AttachmentId={AttachmentId}. Continuing with DB cleanup.",
                             job.AttachmentId);
                     }
@@ -148,7 +144,7 @@ namespace StudioStudio_Server.Services.CleanupQueue
                     // Hard-delete DB record
                     await attachmentRepository.HardDeleteAsync(job.AttachmentId);
 
-                    _logger.LogInformation(
+                    logger.LogInformation(
                         "Stuck upload cleaned up: AttachmentId={AttachmentId}, FileSize={FileSize}",
                         job.AttachmentId, job.FileSize);
                 }
@@ -159,7 +155,7 @@ namespace StudioStudio_Server.Services.CleanupQueue
                 catch (Exception ex)
                 {
                     _failedCount++;
-                    _logger.LogError(ex, "Error processing stuck upload cleanup job");
+                    logger.LogError(ex, "Error processing stuck upload cleanup job");
                     await Task.Delay(TimeSpan.FromSeconds(5), stoppingToken);
                 }
             }

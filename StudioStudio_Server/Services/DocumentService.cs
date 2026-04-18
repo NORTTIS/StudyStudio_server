@@ -1,6 +1,4 @@
-﻿using Microsoft.AspNetCore.Http;
-using StudioStudio_Server.Configurations;
-using StudioStudio_Server.Exceptions;
+﻿using StudioStudio_Server.Exceptions;
 using StudioStudio_Server.Models.DTOs.Request;
 using StudioStudio_Server.Models.DTOs.Response;
 using StudioStudio_Server.Models.Entities;
@@ -31,10 +29,7 @@ namespace StudioStudio_Server.Services
         IGroupAttachmentRepository attachmentRepository,
         IGroupParticipantRepository groupParticipantRepository,
         IFileStorageService fileStorageService,
-        IVectorDatabaseService vectorDbService,
-        IEmbeddingService embeddingService,
         IUserRepository userRepository,
-        IServiceScopeFactory serviceScopeFactory,
         IEmbeddingQueue embeddingQueue,
         IDeleteQueue deleteQueue,
         ILogger<DocumentService> logger,
@@ -43,20 +38,6 @@ namespace StudioStudio_Server.Services
         IHttpContextAccessor httpContextAccessor,
         ICacheService cacheService) : IDocumentService
     {
-        private readonly IGroupAttachmentRepository _attachmentRepository = attachmentRepository;
-        private readonly IGroupParticipantRepository _groupParticipantRepository = groupParticipantRepository;
-        private readonly IFileStorageService _fileStorageService = fileStorageService;
-        private readonly IVectorDatabaseService _vectorDbService = vectorDbService;
-        private readonly IEmbeddingService _embeddingService = embeddingService;
-        private readonly IUserRepository _userRepository = userRepository;
-        private readonly IServiceScopeFactory _serviceScopeFactory = serviceScopeFactory;
-        private readonly IEmbeddingQueue _embeddingQueue = embeddingQueue;
-        private readonly IDeleteQueue _deleteQueue = deleteQueue;
-        private readonly ILogger<DocumentService> _logger = logger;
-        private readonly IGroupRepository _groupRepository = groupRepository;
-        private readonly IUserSubscriptionRepository _userSubscriptionRepository = userSubscriptionRepository;
-        private readonly IHttpContextAccessor _httpContextAccessor = httpContextAccessor;
-        private readonly ICacheService _cacheService = cacheService;
 
         // Allowed file extensions for upload
         private static readonly HashSet<string> AllowedExtensions = new()
@@ -83,7 +64,7 @@ namespace StudioStudio_Server.Services
             RequestDocumentUploadRequest request)
         {
             // Check if user is a member of the group
-            bool isMember = await _groupParticipantRepository.IsUserInGroupAsync(
+            bool isMember = await groupParticipantRepository.IsUserInGroupAsync(
                 request.GroupId,
                 userId);
 
@@ -94,10 +75,10 @@ namespace StudioStudio_Server.Services
                     StatusCodes.Status403Forbidden);
             }
 
-            var group = await _groupRepository.GetByIdAsync(request.GroupId);
+            var group = await groupRepository.GetByIdAsync(request.GroupId);
             if (group != null && group.IsArchived)
             {
-                var userRole = await _groupParticipantRepository.GetGroupRoleByUserIdAsync(userId, request.GroupId);
+                var userRole = await groupParticipantRepository.GetGroupRoleByUserIdAsync(userId, request.GroupId);
                 if (userRole != GroupRole.Owner)
                 {
                     throw new AppException(ErrorCodes.GroupIsArchived, StatusCodes.Status403Forbidden);
@@ -109,43 +90,40 @@ namespace StudioStudio_Server.Services
             if (!AllowedExtensions.Contains(extension))
             {
                 throw new AppException(
-                    ErrorCodes.ValidationInvalidFileFormat,
-                    StatusCodes.Status400BadRequest);
+                    ErrorCodes.ValidationInvalidFileFormat);
             }
 
             // Validate content type
             if (!AllowedContentTypes.Contains(request.ContentType))
             {
                 throw new AppException(
-                    ErrorCodes.ValidationInvalidFileFormat,
-                    StatusCodes.Status400BadRequest);
+                    ErrorCodes.ValidationInvalidFileFormat);
             }
 
             // Validate file size (max 10MB per file)
             if (request.FileSize > 10 * 1024 * 1024)
             {
                 throw new AppException(
-                    ErrorCodes.ValidationFileSizeExceeded,
-                    StatusCodes.Status400BadRequest);
+                    ErrorCodes.ValidationFileSizeExceeded);
             }
 
             // Check storage quota for group
-            Guid groupOwnerId = await _groupRepository.GetGroupOwnerIdAsync(request.GroupId);
+            Guid groupOwnerId = await groupRepository.GetGroupOwnerIdAsync(request.GroupId);
 
             // Get owner's subscription plan
-            SubscriptionPlan? subscriptionPlan = await _userSubscriptionRepository.GetSubscriptionPlanByUserIdAsync(groupOwnerId);
+            SubscriptionPlan? subscriptionPlan = await userSubscriptionRepository.GetSubscriptionPlanByUserIdAsync(groupOwnerId);
             int storageLimit = subscriptionPlan?.MaxStorageMb ?? 500; // Default 500MB
             long storageLimitBytes = storageLimit * 1024L * 1024L;
 
             // Get current storage used by group
-            long currentStorageUsed = await _attachmentRepository.GetTotalStorageUsedByGroupAsync(request.GroupId);
+            long currentStorageUsed = await attachmentRepository.GetTotalStorageUsedByGroupAsync(request.GroupId);
 
             // Check if adding this file exceeds storage quota
             if (currentStorageUsed + request.FileSize > storageLimitBytes)
             {
                 long availableStorage = storageLimitBytes - currentStorageUsed;
 
-                _logger.LogWarning(
+                logger.LogWarning(
                     "Storage quota exceeded for group {GroupId}. " +
                     "Current: {CurrentMB:F2}MB, Limit: {LimitMB}MB, " +
                     "Requested: {RequestedMB:F2}MB, Available: {AvailableMB:F2}MB",
@@ -160,7 +138,7 @@ namespace StudioStudio_Server.Services
                     StatusCodes.Status403Forbidden);
             }
 
-            _logger.LogInformation(
+            logger.LogInformation(
                 "Storage check passed for group {GroupId}. " +
                 "Current: {CurrentMB:F2}MB/{LimitMB}MB, " +
                 "After upload: {AfterMB:F2}MB ({Percent:F1}%)",
@@ -189,14 +167,14 @@ namespace StudioStudio_Server.Services
                 IsDeleted = false
             };
 
-            await _attachmentRepository.CreateAsync(attachment);
+            await attachmentRepository.CreateAsync(attachment);
 
             // Generate presigned URL for frontend to upload directly to B2
-            string presignedUrl = await _fileStorageService.GeneratePresignedUploadUrlAsync(
+            string presignedUrl = await fileStorageService.GeneratePresignedUploadUrlAsync(
                 fileKey,
                 expirationMinutes: 60);
 
-            _logger.LogInformation("Document upload requested. AttachmentId: {AttachmentId}, GroupId: {GroupId}",
+            logger.LogInformation("Document upload requested. AttachmentId: {AttachmentId}, GroupId: {GroupId}",
                 attachmentId, request.GroupId);
 
             return new RequestDocumentUploadResponse
@@ -215,7 +193,7 @@ namespace StudioStudio_Server.Services
         /// </summary>
         public async Task CompleteUploadAsync(Guid userId, Guid attachmentId)
         {
-            GroupAttachment? attachment = await _attachmentRepository.GetByIdAsync(attachmentId);
+            GroupAttachment? attachment = await attachmentRepository.GetByIdAsync(attachmentId);
 
             if (attachment == null || attachment.UploadedBy != userId)
             {
@@ -225,17 +203,16 @@ namespace StudioStudio_Server.Services
             }
 
             // Verify file was successfully uploaded to B2
-            bool fileExists = await _fileStorageService.FileExistsAsync(attachment.FileUrl);
+            bool fileExists = await fileStorageService.FileExistsAsync(attachment.FileUrl);
             if (!fileExists)
             {
                 throw new AppException(
-                    ErrorCodes.ValidationRequiredField,
-                    StatusCodes.Status400BadRequest);
+                    ErrorCodes.ValidationRequiredField);
             }
 
             // Update status to Processing
             attachment.ProcessingStatus = DocumentStatus.Processing;
-            await _attachmentRepository.UpdateAsync(attachment);
+            await attachmentRepository.UpdateAsync(attachment);
 
             // Estimate tokens based on file size
             // Rule of thumb: 1MB ≈ 20,000 characters ≈ 5,000 tokens
@@ -256,16 +233,16 @@ namespace StudioStudio_Server.Services
                 Priority = CalculateJobPriority(attachment.FileSize)
             };
 
-            await _embeddingQueue.EnqueueAsync(job);
+            await embeddingQueue.EnqueueAsync(job);
 
-            _logger.LogInformation(
+            logger.LogInformation(
                 "Document upload completed and queued for processing. " +
                 "AttachmentId: {AttachmentId}, File: {FileName}, " +
                 "Size: {Size} bytes, Estimated tokens: {Tokens:N0}, " +
                 "Queue depth: {Depth}",
                 attachmentId, attachment.FileName,
                 attachment.FileSize, estimatedTokens,
-                _embeddingQueue.GetQueueDepth());
+                embeddingQueue.GetQueueDepth());
         }
 
         /// <summary>
@@ -302,26 +279,6 @@ namespace StudioStudio_Server.Services
                 < 8_000_000 => 7,      // < 8MB: Medium-low priority
                 _ => 9                  // >= 8MB: Low priority
             };
-        }
-
-        /// <summary>
-        /// Wrapper for background processing with separate scope
-        /// </summary>
-        private async Task ProcessDocumentInScopeAsync(Guid attachmentId, IServiceProvider serviceProvider)
-        {
-            var attachmentRepository = serviceProvider.GetRequiredService<IGroupAttachmentRepository>();
-            var fileStorageService = serviceProvider.GetRequiredService<IFileStorageService>();
-            var embeddingService = serviceProvider.GetRequiredService<IEmbeddingService>();
-            var vectorDbService = serviceProvider.GetRequiredService<IVectorDatabaseService>();
-            var logger = serviceProvider.GetRequiredService<ILogger<DocumentService>>();
-
-            await ProcessDocumentAsync(
-                attachmentId,
-                attachmentRepository,
-                fileStorageService,
-                embeddingService,
-                vectorDbService,
-                logger);
         }
 
         /// <summary>
@@ -394,7 +351,7 @@ namespace StudioStudio_Server.Services
                 chunkSw.Stop();
 
                 // Update queue with total chunks (for progress tracking)
-                _embeddingQueue.UpdateJobStatus(attachmentId, EmbeddingJobStatus.Processing, null, 0, chunks.Count);
+                embeddingQueue.UpdateJobStatus(attachmentId, EmbeddingJobStatus.Processing, null, 0, chunks.Count);
 
                 // Calculate chunk statistics
                 int minChunkSize = chunks.Count > 0 ? chunks.Min(c => c.Length) : 0;
@@ -459,7 +416,7 @@ namespace StudioStudio_Server.Services
                     // Update progress in queue (every 5 chunks or last chunk)
                     if ((i + 1) % 5 == 0 || i == chunks.Count - 1)
                     {
-                        _embeddingQueue.UpdateJobStatus(
+                        embeddingQueue.UpdateJobStatus(
                             attachmentId,
                             EmbeddingJobStatus.Processing,
                             null,
@@ -534,7 +491,7 @@ namespace StudioStudio_Server.Services
                 await attachmentRepository.UpdateAsync(attachment);
 
                 // Update actual token usage in queue
-                _embeddingQueue.UpdateActualTokens(attachmentId, actualTotalTokens);
+                embeddingQueue.UpdateActualTokens(attachmentId, actualTotalTokens);
 
                 sw.Stop();
                 logger.LogInformation(
@@ -624,7 +581,7 @@ namespace StudioStudio_Server.Services
             // FIX 9: Add content length guard
             if (rawText.Length > 1_000_000)
             {
-                _logger.LogWarning("Extracted text too large: {Length} characters, truncating", rawText.Length);
+                logger.LogWarning("Extracted text too large: {Length} characters, truncating", rawText.Length);
                 rawText = rawText.Substring(0, 1_000_000);
             }
 
@@ -659,7 +616,7 @@ namespace StudioStudio_Server.Services
                     // FIX 3: Early detection for empty/scan PDFs
                     if (pageCount == 0)
                     {
-                        _logger.LogWarning("PDF has no pages");
+                        logger.LogWarning("PDF has no pages");
                         return "[PDF contains no pages]";
                     }
 
@@ -667,7 +624,7 @@ namespace StudioStudio_Server.Services
                     int pagesToProcess = Math.Min(pageCount, MAX_PAGES);
                     if (pageCount > MAX_PAGES)
                     {
-                        _logger.LogWarning("PDF has {PageCount} pages, processing only first {MaxPages}",
+                        logger.LogWarning("PDF has {PageCount} pages, processing only first {MaxPages}",
                             pageCount, MAX_PAGES);
                     }
 
@@ -688,7 +645,7 @@ namespace StudioStudio_Server.Services
                         // FIX 3: Early stop if content is getting too large
                         if (text.Length > 900_000)
                         {
-                            _logger.LogWarning("PDF content exceeds 900k chars at page {Page}, stopping extraction", page);
+                            logger.LogWarning("PDF content exceeds 900k chars at page {Page}, stopping extraction", page);
                             break;
                         }
                     }
@@ -699,7 +656,7 @@ namespace StudioStudio_Server.Services
                 // FIX 6: Better scan detection message
                 if (string.IsNullOrWhiteSpace(result))
                 {
-                    _logger.LogWarning("PDF text extraction resulted in empty content - may be scanned/image-based");
+                    logger.LogWarning("PDF text extraction resulted in empty content - may be scanned/image-based");
                     return "[PDF contains no extractable text content - may require OCR processing]";
                 }
 
@@ -707,7 +664,7 @@ namespace StudioStudio_Server.Services
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error extracting text from PDF");
+                logger.LogError(ex, "Error extracting text from PDF");
                 throw new AppException(
                     ErrorCodes.UnexpectedError,
                     StatusCodes.Status500InternalServerError,
@@ -729,11 +686,11 @@ namespace StudioStudio_Server.Services
                 {
                     if (wordDoc.MainDocumentPart?.Document?.Body == null)
                     {
-                        _logger.LogWarning("DOCX has no body content");
+                        logger.LogWarning("DOCX has no body content");
                         return "[DOCX contains no body content]";
                     }
 
-                    // FIX D: Extract headers (all sections)
+                    // Extract headers (all sections)
                     if (wordDoc.MainDocumentPart.HeaderParts != null)
                     {
                         foreach (var headerPart in wordDoc.MainDocumentPart.HeaderParts)
@@ -777,7 +734,7 @@ namespace StudioStudio_Server.Services
                         // FIX 3: Early stop if content is getting too large
                         if (text.Length > 900_000)
                         {
-                            _logger.LogWarning("DOCX content exceeds 900k chars, stopping extraction");
+                            logger.LogWarning("DOCX content exceeds 900k chars, stopping extraction");
                             break;
                         }
                     }
@@ -828,7 +785,7 @@ namespace StudioStudio_Server.Services
 
                 if (string.IsNullOrWhiteSpace(result))
                 {
-                    _logger.LogWarning("DOCX text extraction resulted in empty content");
+                    logger.LogWarning("DOCX text extraction resulted in empty content");
                     return "[DOCX contains no extractable text content]";
                 }
 
@@ -839,7 +796,7 @@ namespace StudioStudio_Server.Services
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error extracting text from DOCX");
+                logger.LogError(ex, "Error extracting text from DOCX");
                 throw new AppException(
                     ErrorCodes.UnexpectedError,
                     StatusCodes.Status500InternalServerError,
@@ -1037,7 +994,7 @@ namespace StudioStudio_Server.Services
         /// </summary>
         public async Task<DocumentStatusResponse> GetDocumentStatusAsync(Guid userId, Guid attachmentId)
         {
-            GroupAttachment? attachment = await _attachmentRepository.GetByIdAsync(attachmentId);
+            GroupAttachment? attachment = await attachmentRepository.GetByIdAsync(attachmentId);
 
             if (attachment == null)
             {
@@ -1047,7 +1004,7 @@ namespace StudioStudio_Server.Services
             }
 
             // Check if user has permission to view document
-            bool isMember = await _groupParticipantRepository.IsUserInGroupAsync(
+            bool isMember = await groupParticipantRepository.IsUserInGroupAsync(
                 attachment.GroupId,
                 userId);
 
@@ -1059,7 +1016,7 @@ namespace StudioStudio_Server.Services
             }
 
             // Check actual status from embedding queue
-            var queueStatus = _embeddingQueue.GetJobStatus(attachmentId);
+            var queueStatus = embeddingQueue.GetJobStatus(attachmentId);
 
             // Calculate progress and status message
             int? progress = null;
@@ -1074,13 +1031,12 @@ namespace StudioStudio_Server.Services
                     EmbeddingJobStatus.Processing when queueStatus.TotalChunks > 0 =>
                         10 + (int)((queueStatus.ProcessedChunks / (double)queueStatus.TotalChunks) * 90),
                     EmbeddingJobStatus.Completed => 100,
-                    EmbeddingJobStatus.Failed => 0,
                     _ => 0
                 };
 
                 message = queueStatus.Status switch
                 {
-                    EmbeddingJobStatus.Queued => $"Queued for indexing (position: {_embeddingQueue.GetQueueDepth()})",
+                    EmbeddingJobStatus.Queued => $"Queued for indexing (position: {embeddingQueue.GetQueueDepth()})",
                     EmbeddingJobStatus.Processing => $"Indexing document ({queueStatus.ProcessedChunks}/{queueStatus.TotalChunks} chunks)",
                     EmbeddingJobStatus.Completed => "Indexing completed",
                     EmbeddingJobStatus.Failed => $"Indexing failed: {queueStatus.ErrorMessage}",
@@ -1095,7 +1051,6 @@ namespace StudioStudio_Server.Services
                     DocumentStatus.Uploading => 5,
                     DocumentStatus.Processing => 50,
                     DocumentStatus.Completed => 100,
-                    DocumentStatus.Failed => 0,
                     _ => 0
                 };
 
@@ -1129,7 +1084,7 @@ namespace StudioStudio_Server.Services
         public async Task<GroupDocumentsResponse> GetGroupDocumentsAsync(Guid userId, Guid groupId)
         {
             // Check if user is a member of the group
-            bool isMember = await _groupParticipantRepository.IsUserInGroupAsync(
+            bool isMember = await groupParticipantRepository.IsUserInGroupAsync(
                 groupId,
                 userId);
 
@@ -1141,11 +1096,11 @@ namespace StudioStudio_Server.Services
             }
 
             // Get all attachments for the group
-            List<GroupAttachment> attachments = await _attachmentRepository.GetByGroupIdAsync(groupId);
+            List<GroupAttachment> attachments = await attachmentRepository.GetByGroupIdAsync(groupId);
 
             // Get uploader information
             List<Guid> uploaderIds = attachments.Select(a => a.UploadedBy).Distinct().ToList();
-            List<User> uploaders = await _userRepository.GetByIdsAsync(uploaderIds);
+            List<User> uploaders = await userRepository.GetByIdsAsync(uploaderIds);
 
             // Map to DTOs
             List<DocumentItem> documentItems = attachments.Select(a =>
@@ -1165,7 +1120,7 @@ namespace StudioStudio_Server.Services
                         Id = uploader.UserId,
                         FirstName = uploader.FirstName,
                         LastName = uploader.LastName,
-                        AvatarUrl = AvatarUrlHelper.BuildAbsoluteAvatarUrl(uploader.AvatarUrl, _httpContextAccessor.HttpContext)
+                        AvatarUrl = AvatarUrlHelper.BuildAbsoluteAvatarUrl(uploader.AvatarUrl, httpContextAccessor.HttpContext)
                     } : new UserDto(),
                     CreatedAt = a.UploadedAt
                 };
@@ -1187,7 +1142,7 @@ namespace StudioStudio_Server.Services
         /// </summary>
         public async Task DeleteDocumentAsync(Guid userId, Guid attachmentId)
         {
-            GroupAttachment? attachment = await _attachmentRepository.GetByIdAsync(attachmentId);
+            GroupAttachment? attachment = await attachmentRepository.GetByIdAsync(attachmentId);
 
             if (attachment == null)
             {
@@ -1197,7 +1152,7 @@ namespace StudioStudio_Server.Services
             }
 
             // Check permission: User must be uploader or member of group
-            bool isMember = await _groupParticipantRepository.IsUserInGroupAsync(
+            bool isMember = await groupParticipantRepository.IsUserInGroupAsync(
                 attachment.GroupId,
                 userId);
 
@@ -1211,14 +1166,14 @@ namespace StudioStudio_Server.Services
             // Delete B2 blob file
             try
             {
-                await _fileStorageService.DeleteFileAsync(attachment.FileUrl);
-                _logger.LogInformation(
+                await fileStorageService.DeleteFileAsync(attachment.FileUrl);
+                logger.LogInformation(
                     "B2 blob deleted: AttachmentId={AttachmentId}, FileKey={FileKey}",
                     attachmentId, attachment.FileUrl);
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex,
+                logger.LogWarning(ex,
                     "Failed to delete B2 blob for AttachmentId={AttachmentId}. Continuing with deletion.",
                     attachmentId);
             }
@@ -1238,31 +1193,31 @@ namespace StudioStudio_Server.Services
                     MaxRetries = 3
                 };
 
-                await _deleteQueue.EnqueueAsync(deleteJob);
+                await deleteQueue.EnqueueAsync(deleteJob);
 
-                _logger.LogInformation(
+                logger.LogInformation(
                     "Document deletion queued: AttachmentId={AttachmentId}, " +
                     "ChunkCount={ChunkCount}, Queue depth={Depth}",
-                    attachmentId, attachment.ChunkCount, _deleteQueue.GetQueueDepth());
+                    attachmentId, attachment.ChunkCount, deleteQueue.GetQueueDepth());
             }
 
             // Hard-delete DB record
-            await _attachmentRepository.HardDeleteAsync(attachmentId);
+            await attachmentRepository.HardDeleteAsync(attachmentId);
 
             // Invalidate AI document cache so AI sees fresh document data immediately
             try
             {
-                await _cacheService.InvalidateAIDocumentCacheAsync(userId, attachment.GroupId, null);
-                await _cacheService.InvalidateAIDocumentCacheForGroupAsync(attachment.GroupId, null);
+                await cacheService.InvalidateAIDocumentCacheAsync(userId, attachment.GroupId, null);
+                await cacheService.InvalidateAIDocumentCacheForGroupAsync(attachment.GroupId, null);
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex,
+                logger.LogWarning(ex,
                     "Failed to invalidate AI document cache after hard delete: AttachmentId={AttachmentId}, GroupId={GroupId}",
                     attachmentId, attachment.GroupId);
             }
 
-            _logger.LogInformation(
+            logger.LogInformation(
                 "Document hard-deleted: AttachmentId={AttachmentId}, FileSize={FileSize}",
                 attachmentId, attachment.FileSize);
         }
@@ -1273,7 +1228,7 @@ namespace StudioStudio_Server.Services
         /// </summary>
         public async Task<string> GetDocumentDownloadUrlAsync(Guid userId, Guid attachmentId, int expirationMinutes = 60)
         {
-            GroupAttachment? attachment = await _attachmentRepository.GetByIdAsync(attachmentId);
+            GroupAttachment? attachment = await attachmentRepository.GetByIdAsync(attachmentId);
 
             if (attachment == null || attachment.IsDeleted)
             {
@@ -1283,7 +1238,7 @@ namespace StudioStudio_Server.Services
             }
 
             // Check if user has permission to download document
-            bool isMember = await _groupParticipantRepository.IsUserInGroupAsync(
+            bool isMember = await groupParticipantRepository.IsUserInGroupAsync(
                 attachment.GroupId,
                 userId);
 
@@ -1295,11 +1250,11 @@ namespace StudioStudio_Server.Services
             }
 
             // Generate presigned download URL
-            string downloadUrl = await _fileStorageService.GeneratePresignedDownloadUrlAsync(
+            string downloadUrl = await fileStorageService.GeneratePresignedDownloadUrlAsync(
                 attachment.FileUrl,
                 expirationMinutes);
 
-            _logger.LogInformation(
+            logger.LogInformation(
                 "Download URL generated: AttachmentId={AttachmentId}, File={FileName}, ExpiresIn={Minutes}min",
                 attachmentId, attachment.FileName, expirationMinutes);
 

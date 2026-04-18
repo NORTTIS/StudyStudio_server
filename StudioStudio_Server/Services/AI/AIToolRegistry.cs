@@ -1,5 +1,4 @@
 using StudioStudio_Server.Services.AI.Interfaces;
-using System.Text.Json;
 using System.Text.Json.Nodes;
 using StudioStudio_Server.Services.AI.Models;
 
@@ -16,7 +15,6 @@ public class AIToolRegistry(ILogger<AIToolRegistry> logger) : IAIToolRegistry
     private readonly Dictionary<string, Type> _toolTypes = new();
     // Giữ instance để generate manifest (manifest chỉ cần metadata, không cần DbContext)
     private readonly Dictionary<string, IAITool> _toolInstances = new();
-    private readonly ILogger<AIToolRegistry> _logger = logger;
 
     // Tool categories for role-based filtering
     private static readonly HashSet<string> PersonalTools = new(StringComparer.OrdinalIgnoreCase)
@@ -65,13 +63,13 @@ public class AIToolRegistry(ILogger<AIToolRegistry> logger) : IAIToolRegistry
     {
         if (_toolTypes.ContainsKey(tool.Name))
         {
-            _logger.LogWarning("Tool {ToolName} already registered, skipping", tool.Name);
+            logger.LogWarning("Tool {ToolName} already registered, skipping", tool.Name);
             return;
         }
 
         _toolTypes[tool.Name] = tool.GetType();     // Lưu TYPE để resolve fresh instance
         _toolInstances[tool.Name] = tool;            // Giữ instance cho manifest
-        _logger.LogInformation("Registered AI Tool: {ToolName} (Type: {ToolType})", tool.Name, tool.GetType().Name);
+        logger.LogInformation("Registered AI Tool: {ToolName} (Type: {ToolType})", tool.Name, tool.GetType().Name);
     }
 
     /// <summary>
@@ -96,7 +94,7 @@ public class AIToolRegistry(ILogger<AIToolRegistry> logger) : IAIToolRegistry
             });
         }
 
-        _logger.LogDebug("Tools manifest for context: StudioId={StudioId}, GroupId={GroupId}, Count={Count}",
+        logger.LogDebug("Tools manifest for context: StudioId={StudioId}, GroupId={GroupId}, Count={Count}",
             context.StudioId, context.GroupId, tools.Count);
 
         return new JsonObject
@@ -133,29 +131,5 @@ public class AIToolRegistry(ILogger<AIToolRegistry> logger) : IAIToolRegistry
             .Where(t => PersonalTools.Contains(t.Name))
             .ToList()
             .AsReadOnly();
-    }
-
-    public JsonObject GetToolsManifest()
-    {
-        var tools = new JsonArray();
-
-        foreach (var tool in _toolInstances.Values)
-        {
-            tools.Add(new JsonObject
-            {
-                ["type"] = "function",
-                ["function"] = new JsonObject
-                {
-                    ["name"] = tool.Name,
-                    ["description"] = tool.Description,
-                    ["parameters"] = tool.ParametersSchema
-                }
-            });
-        }
-
-        return new JsonObject
-        {
-            ["tools"] = tools
-        };
     }
 }

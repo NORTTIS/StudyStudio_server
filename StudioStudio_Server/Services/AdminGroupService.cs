@@ -1,4 +1,3 @@
-using Microsoft.AspNetCore.Http;
 using StudioStudio_Server.Exceptions;
 using StudioStudio_Server.Models.DTOs.Request;
 using StudioStudio_Server.Models.DTOs.Response;
@@ -12,29 +11,27 @@ namespace StudioStudio_Server.Services
     /// </summary>
     public class AdminGroupService(IGroupRepository groupRepository) : IAdminGroupService
     {
-        private readonly IGroupRepository _groupRepository = groupRepository;
-
         /// <summary>
         /// Get paginated list of groups with filters for admin
         /// </summary>
         public async Task<AdminGroupListResponse> GetGroupsAsync(GetGroupsRequest request)
         {
             // Get groups with pagination
-            var (groups, totalCount) = await _groupRepository.GetGroupsAsync(
+            var (groups, totalCount) = await groupRepository.GetGroupsAsync(
                 request.SearchTerm,
                 request.GroupType,
                 request.PageNumber,
                 request.PageSize);
 
             // Get summary
-            var summary = await _groupRepository.GetGroupSummaryAsync(request.GroupType);
+            var summary = await groupRepository.GetGroupSummaryAsync(request.GroupType);
 
             // Get additional data for mapping
             var groupIds = groups.Select(g => g.GroupId).ToList();
-            var memberCounts = await _groupRepository.GetMemberCountsAsync(groupIds);
-            var taskCounts = await _groupRepository.GetTaskCountsAsync(groupIds);
-            var lastActivities = await _groupRepository.GetLastActivityAsync(groupIds);
-            var studioNames = await _groupRepository.GetStudioNamesAsync(groups.Select(g => g.StudioId).ToList());
+            var memberCounts = await groupRepository.GetMemberCountsAsync(groupIds);
+            var taskCounts = await groupRepository.GetTaskCountsAsync(groupIds);
+            var lastActivities = await groupRepository.GetLastActivityAsync(groupIds);
+            var studioNames = await groupRepository.GetStudioNamesAsync(groups.Select(g => g.StudioId).ToList());
 
             // Map to response DTOs
             var groupList = groups.Select(g => new GroupListItem
@@ -69,7 +66,7 @@ namespace StudioStudio_Server.Services
         /// </summary>
         public async Task UpdateGroupStatusAsync(Guid groupId, bool isActive)
         {
-            var group = await _groupRepository.GetByIdAdminAsync(groupId);
+            var group = await groupRepository.GetByIdAdminAsync(groupId);
 
             if (group == null)
             {
@@ -83,7 +80,7 @@ namespace StudioStudio_Server.Services
                 var candidateName = currentName;
 
                 // Lặp kiểm tra trùng tên, thêm "_restored" cho đến khi không trùng
-                while (await _groupRepository.HasActiveGroupWithNameAsync(group.CreatedBy, group.StudioId, candidateName, group.GroupId))
+                while (await groupRepository.HasActiveGroupWithNameAsync(group.CreatedBy, group.StudioId, candidateName, group.GroupId))
                 {
                     candidateName += "_restored";
                 }
@@ -94,7 +91,7 @@ namespace StudioStudio_Server.Services
             group.IsActive = isActive;
             group.UpdatedAt = DateTime.UtcNow;
 
-            await _groupRepository.UpdateAsync(group);
+            await groupRepository.UpdateAsync(group);
         }
     }
 }

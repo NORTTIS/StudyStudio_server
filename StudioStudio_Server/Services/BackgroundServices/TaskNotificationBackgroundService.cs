@@ -14,23 +14,19 @@ namespace StudioStudio_Server.Services.BackgroundServices
         IConnectionMultiplexer redis,
         ILogger<TaskNotificationBackgroundService> logger) : BackgroundService
     {
-        private readonly IServiceProvider _serviceProvider = serviceProvider;
-        private readonly ILogger<TaskNotificationBackgroundService> _logger = logger;
-        private readonly IConnectionMultiplexer _redis = redis;
-
         // 7:00 AM UTC+7 = 0:00 UTC (Vietnam is UTC+7)
         private static readonly TimeSpan TargetTimeUtc = TimeSpan.Zero;
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            _logger.LogInformation("Task Notification Background Service started. Runs daily at 07:00 UTC+7 (00:00 UTC)");
+            logger.LogInformation("Task Notification Background Service started. Runs daily at 07:00 UTC+7 (00:00 UTC)");
 
             while (!stoppingToken.IsCancellationRequested)
             {
                 try
                 {
                     var delay = CalculateDelayUntilTargetTimeUtc();
-                    _logger.LogInformation(
+                    logger.LogInformation(
                         "Next notification run in {Hours:F1} hours ({TargetTime})",
                         delay.TotalHours,
                         DateTime.UtcNow.Add(delay).ToString("yyyy-MM-dd HH:mm:ss 'UTC'"));
@@ -45,13 +41,13 @@ namespace StudioStudio_Server.Services.BackgroundServices
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "Error while processing task notifications");
+                    logger.LogError(ex, "Error while processing task notifications");
                     // Wait 1 hour before retrying to avoid tight loop on persistent errors
                     await Task.Delay(TimeSpan.FromHours(1), stoppingToken);
                 }
             }
 
-            _logger.LogInformation("Task Notification Background Service stopped");
+            logger.LogInformation("Task Notification Background Service stopped");
         }
 
         /// <summary>
@@ -73,15 +69,15 @@ namespace StudioStudio_Server.Services.BackgroundServices
 
         private async Task ProcessNotificationsAsync(CancellationToken stoppingToken)
         {
-            using var scope = _serviceProvider.CreateScope();
+            using var scope = serviceProvider.CreateScope();
             var db = scope.ServiceProvider.GetRequiredService<StudioDbContext>();
             var notificationService = scope.ServiceProvider.GetRequiredService<INotificationService>();
-            var redisDb = _redis.GetDatabase();
+            var redisDb = redis.GetDatabase();
 
             var nowUtc = DateTime.UtcNow;
             var todayDate = DateOnly.FromDateTime(nowUtc);
 
-            _logger.LogInformation("Processing daily task notifications for date: {Date}", todayDate);
+            logger.LogInformation("Processing daily task notifications for date: {Date}", todayDate);
 
             // Query all active task assignments
             var assignments = await db.TaskAssignments
@@ -90,7 +86,7 @@ namespace StudioStudio_Server.Services.BackgroundServices
 
             if (!assignments.Any())
             {
-                _logger.LogInformation("No task assignments found");
+                logger.LogInformation("No task assignments found");
                 return;
             }
 
@@ -118,7 +114,7 @@ namespace StudioStudio_Server.Services.BackgroundServices
                 if (!taskDict.TryGetValue(assignment.TaskId, out var task) || !task.DueDate.HasValue)
                     continue;
 
-                if (!userDict.TryGetValue(assignment.AssignedTo, out var assignee) || assignee == null)
+                if (!userDict.TryGetValue(assignment.AssignedTo, out var assignee))
                     continue;
 
                 var dueDate = task.DueDate.Value;
@@ -132,12 +128,7 @@ namespace StudioStudio_Server.Services.BackgroundServices
 
                     if (!alreadySent)
                     {
-                        await notificationService.NotifyTaskReminderAsync(
-                            assignee,
-                            task.TaskId,
-                            task.Title,
-                            dueDate,
-                            hoursUntilDeadline: 0);
+                        await notificationService.NotifyTaskReminderAsync(assignee, task.TaskId, task.Title, dueDate, hoursUntilDeadline: 0, cancellationToken: stoppingToken);
 
                         await redisDb.StringSetAsync(dedupKey, "1", TimeSpan.FromHours(24));
                         reminderCount++;
@@ -153,12 +144,7 @@ namespace StudioStudio_Server.Services.BackgroundServices
                     if (!alreadySent)
                     {
                         var overdueDays = (todayDate.ToDateTime(TimeOnly.MinValue) - dueDate).Days;
-                        await notificationService.NotifyTaskOverdueAsync(
-                            assignee,
-                            task.TaskId,
-                            task.Title,
-                            dueDate,
-                            overdueDays);
+                        await notificationService.NotifyTaskOverdueAsync(assignee, task.TaskId, task.Title, dueDate, overdueDays, stoppingToken);
 
                         await redisDb.StringSetAsync(dedupKey, "1", TimeSpan.FromHours(24));
                         overdueCount++;
@@ -166,7 +152,7 @@ namespace StudioStudio_Server.Services.BackgroundServices
                 }
             }
 
-            _logger.LogInformation(
+            logger.LogInformation(
                 "Daily task notifications completed. Date: {Date}. Reminders sent: {ReminderCount}, Overdue sent: {OverdueCount}",
                 todayDate,
                 reminderCount,

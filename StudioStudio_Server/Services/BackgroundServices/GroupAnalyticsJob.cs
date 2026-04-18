@@ -12,13 +12,11 @@ namespace StudioStudio_Server.Services.BackgroundServices
         IServiceProvider serviceProvider,
         ILogger<GroupAnalyticsJob> logger) : BackgroundService
     {
-        private readonly IServiceProvider _serviceProvider = serviceProvider;
-        private readonly ILogger<GroupAnalyticsJob> _logger = logger;
         private static readonly TimeSpan Interval = TimeSpan.FromMinutes(10);
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            _logger.LogInformation("Group Analytics Job started");
+            logger.LogInformation("Group Analytics Job started");
 
             while (!stoppingToken.IsCancellationRequested)
             {
@@ -26,12 +24,12 @@ namespace StudioStudio_Server.Services.BackgroundServices
                 {
                     await Task.Delay(Interval, stoppingToken);
 
-                    using var scope = _serviceProvider.CreateScope();
+                    using var scope = serviceProvider.CreateScope();
                     var context = scope.ServiceProvider.GetRequiredService<StudioDbContext>();
                     var analyticsRepository = scope.ServiceProvider
                         .GetRequiredService<IAnalyticsRepository>();
 
-                    _logger.LogInformation("Starting group analytics aggregation...");
+                    logger.LogInformation("Starting group analytics aggregation...");
 
                     var to = DateTime.UtcNow;
                     var from = to.AddMinutes(-10);
@@ -96,15 +94,15 @@ namespace StudioStudio_Server.Services.BackgroundServices
                         await analyticsRepository.UpsertGroupAnalyticsAsync(analytics);
                     }
 
-                    _logger.LogInformation("Group analytics aggregation completed. Processed {Count} groups", groups.Count);
+                    logger.LogInformation("Group analytics aggregation completed. Processed {Count} groups", groups.Count);
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "Error during group analytics aggregation");
+                    logger.LogError(ex, "Error during group analytics aggregation");
                 }
             }
 
-            _logger.LogInformation("Group Analytics Job stopped");
+            logger.LogInformation("Group Analytics Job stopped");
         }
     }
 }

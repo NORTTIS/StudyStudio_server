@@ -70,8 +70,6 @@ namespace StudioStudio_Server.Tests.Services
             _service = new UserService(
                 _userRepoMock.Object,
                 _passwordHasherMock.Object,
-                _configMock.Object,
-                _httpContextAccessorMock.Object,
                 _environmentMock.Object,
                 _subscriptionRepoMock.Object,
                 _aiRequestLogRepoMock.Object,

@@ -1,13 +1,9 @@
-using System.ComponentModel.DataAnnotations;
-using System.Globalization;
 using System.Text;
-using Microsoft.EntityFrameworkCore;
 using StudioStudio_Server.Data;
 using StudioStudio_Server.Exceptions;
 using StudioStudio_Server.Models.DTOs.Request;
 using StudioStudio_Server.Models.DTOs.Response;
 using StudioStudio_Server.Models.Entities;
-using StudioStudio_Server.Models.Enums;
 using StudioStudio_Server.Repositories.Interfaces;
 using StudioStudio_Server.Resources.Localization;
 using StudioStudio_Server.Services.ExcelParsing;
@@ -31,17 +27,6 @@ namespace StudioStudio_Server.Services
         IHttpContextAccessor httpContextAccessor,
         IWebHostEnvironment env) : IBatchAssignService
     {
-        private readonly StudioDbContext _db = db;
-        private readonly IGroupRepository _groupRepository = groupRepository;
-        private readonly IGroupParticipantRepository _groupParticipantRepository = groupParticipantRepository;
-        private readonly IStudioRepository _studioRepository = studioRepository;
-        private readonly IStudioParticipantRepository _studioParticipantRepository = studioParticipantRepository;
-        private readonly IUserSubscriptionRepository _userSubscriptionRepository = userSubscriptionRepository;
-        private readonly IExcelParser _excelParser = excelParser;
-        private readonly ILogger<BatchAssignService> _logger = logger;
-        private readonly IHttpContextAccessor _httpContextAccessor = httpContextAccessor;
-        private readonly IWebHostEnvironment _env = env;
-
         // Valid roles for batch assignment (Owner not allowed)
         private static readonly HashSet<string> ValidRoles = new(StringComparer.OrdinalIgnoreCase)
         {
@@ -55,21 +40,20 @@ namespace StudioStudio_Server.Services
         private async Task<Group> CreateMissingGroupAsync(
             Guid studioId,
             string groupName,
-            Guid userId,
-            CancellationToken cancellationToken)
+            Guid userId)
         {
             // 1. Check plan limit
-            var plan = await _userSubscriptionRepository.GetSubscriptionPlanByUserIdAsync(userId);
+            var plan = await userSubscriptionRepository.GetSubscriptionPlanByUserIdAsync(userId);
             var groupLimit = plan?.MaxGroups ?? 5;
-            var currentCount = await _groupRepository.CountGroupsCreatedByUserAsync(userId);
+            var currentCount = await groupRepository.CountGroupsCreatedByUserAsync(userId);
 
             if (currentCount >= groupLimit)
                 throw new AppException(ErrorCodes.GroupLimitReached, StatusCodes.Status403Forbidden);
 
             // 2. Check duplicate name in studio
-            var nameExists = await _groupRepository.GroupNameExistsInStudioAsync(studioId, groupName, userId);
+            var nameExists = await groupRepository.GroupNameExistsInStudioAsync(studioId, groupName, userId);
             if (nameExists)
-                throw new AppException(ErrorCodes.GroupNameAlreadyExists, StatusCodes.Status400BadRequest);
+                throw new AppException(ErrorCodes.GroupNameAlreadyExists);
 
             // 3. Create group
             var newGroup = new Group
@@ -82,7 +66,7 @@ namespace StudioStudio_Server.Services
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow
             };
-            await _groupRepository.AddAsync(newGroup);
+            await groupRepository.AddAsync(newGroup);
 
             // 4. Add creator as Owner
             var ownerParticipant = new GroupParticipant
@@ -93,7 +77,7 @@ namespace StudioStudio_Server.Services
                 Role = GroupRole.Owner,
                 CreatedAt = DateTime.UtcNow
             };
-            await _groupParticipantRepository.AddAsync(ownerParticipant);
+            await groupParticipantRepository.AddAsync(ownerParticipant);
 
             return newGroup;
         }
@@ -103,8 +87,8 @@ namespace StudioStudio_Server.Services
         /// </summary>
         private string GetLocalizedMessage(string errorCode)
         {
-            var culture = HttpContextHelper.GetCultureFromHeader(_httpContextAccessor.HttpContext!);
-            var localizer = new JsonStringLocalizer(_env, culture);
+            var culture = HttpContextHelper.GetCultureFromHeader(httpContextAccessor.HttpContext!);
+            var localizer = new JsonStringLocalizer(env, culture);
             return localizer.Get(errorCode);
         }
 
@@ -135,7 +119,7 @@ namespace StudioStudio_Server.Services
             CancellationToken cancellationToken = default)
         {
             // 1. Validate studio exists
-            var studio = await _studioRepository.GetByIdAsync(studioId);
+            var studio = await studioRepository.GetByIdAsync(studioId);
             if (studio == null)
             {
                 throw new AppException(ErrorCodes.BatchStudioNotFound, StatusCodes.Status404NotFound);
@@ -153,23 +137,23 @@ namespace StudioStudio_Server.Services
             }
 
             // 3. Get plan limits
-            var plan = await _userSubscriptionRepository.GetSubscriptionPlanByUserIdAsync(userId);
+            var plan = await userSubscriptionRepository.GetSubscriptionPlanByUserIdAsync(userId);
             var maxMembersPerGroup = plan?.MaxMembersPerGroup ?? 10;
 
             // 4. Get studio groups (can be empty if creating new groups via CSV)
-            var studioGroups = await _groupRepository.GetStudioGroupsAsync(studioId);
+            var studioGroups = await groupRepository.GetStudioGroupsAsync(studioId);
 
             // 5. Get studio members with email lookup
-            var studioParticipants = await _studioParticipantRepository.GetParticipantsByStudioIdAsync(studioId);
+            var studioParticipants = await studioParticipantRepository.GetParticipantsByStudioIdAsync(studioId);
             var emailToUserId = studioParticipants
                 .Where(sp => sp.User != null)
                 .ToDictionary(sp => sp.User!.Email.ToLowerInvariant(), sp => sp.UserId);
 
             // 6. Parse the file
-            var parseResult = await _excelParser.ParseAsync(stream, fileName, cancellationToken);
+            var parseResult = await excelParser.ParseAsync(stream, fileName, cancellationToken);
             if (parseResult.ErrorCode != null)
             {
-                throw new AppException(parseResult.ErrorCode, StatusCodes.Status400BadRequest);
+                throw new AppException(parseResult.ErrorCode);
             }
 
             if (parseResult.Rows.Count == 0)
@@ -189,7 +173,7 @@ namespace StudioStudio_Server.Services
             var groupIds = studioGroups.Select(g => g.GroupId).ToList();
 
             // Get existing group participants
-            var existingParticipants = await _groupParticipantRepository.GetByGroupIdsAsync(groupIds);
+            var existingParticipants = await groupParticipantRepository.GetByGroupIdsAsync(groupIds);
             var existingByGroupAndUser = existingParticipants
                 .ToDictionary(p => (p.GroupId, p.UserId), p => p);
 
@@ -237,7 +221,7 @@ namespace StudioStudio_Server.Services
                     // Group doesn't exist → create new
                     try
                     {
-                        targetGroup = await CreateMissingGroupAsync(studioId, row.GroupName, userId, cancellationToken);
+                        targetGroup = await CreateMissingGroupAsync(studioId, row.GroupName, userId);
                         groupNameToGroup[row.GroupName.ToLowerInvariant()] = targetGroup;
                         groupIds.Add(targetGroup.GroupId);
                         currentMemberCounts[targetGroup.GroupId] = 0;
@@ -358,7 +342,7 @@ namespace StudioStudio_Server.Services
             }
 
             // 8. Execute all changes in a single transaction
-            using var transaction = await _db.Database.BeginTransactionAsync(cancellationToken);
+            using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
             try
             {
                 // Add new participants
@@ -372,7 +356,7 @@ namespace StudioStudio_Server.Services
                         Role = role,
                         CreatedAt = DateTime.UtcNow
                     };
-                    _db.GroupParticipants.Add(newParticipant);
+                    db.GroupParticipants.Add(newParticipant);
 
                     // Update count
                     currentMemberCounts[groupId] = currentMemberCounts.GetValueOrDefault(groupId, 0) + 1;
@@ -390,7 +374,7 @@ namespace StudioStudio_Server.Services
                 foreach (var (existing, newRole, row) in pendingUpdates)
                 {
                     existing.Role = newRole;
-                    _db.GroupParticipants.Update(existing);
+                    db.GroupParticipants.Update(existing);
 
                     assignments.Add(new BatchAssignmentItem
                     {
@@ -401,12 +385,12 @@ namespace StudioStudio_Server.Services
                     });
                 }
 
-                await _db.SaveChangesAsync(cancellationToken);
+                await db.SaveChangesAsync(cancellationToken);
                 await transaction.CommitAsync(cancellationToken);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Batch assign transaction failed");
+                logger.LogError(ex, "Batch assign transaction failed");
                 await transaction.RollbackAsync(cancellationToken);
                 throw new AppException(ErrorCodes.UnexpectedError, StatusCodes.Status500InternalServerError);
             }
@@ -434,7 +418,7 @@ namespace StudioStudio_Server.Services
             CancellationToken cancellationToken = default)
         {
             // 1. Validate studio exists
-            var studio = await _studioRepository.GetByIdAsync(studioId);
+            var studio = await studioRepository.GetByIdAsync(studioId);
             if (studio == null)
             {
                 throw new AppException(ErrorCodes.BatchStudioNotFound, StatusCodes.Status404NotFound);
@@ -454,40 +438,40 @@ namespace StudioStudio_Server.Services
             // 3. Validate role is not Owner
             if (request.DefaultRole == GroupRole.Owner)
             {
-                throw new AppException(ErrorCodes.BatchCannotAssignOwnerRole, StatusCodes.Status400BadRequest);
+                throw new AppException(ErrorCodes.BatchCannotAssignOwnerRole);
             }
 
             // 4. Get plan limits
-            var plan = await _userSubscriptionRepository.GetSubscriptionPlanByUserIdAsync(userId);
+            var plan = await userSubscriptionRepository.GetSubscriptionPlanByUserIdAsync(userId);
             var maxMembersPerGroup = plan?.MaxMembersPerGroup ?? 10;
 
             // 5. Get studio groups
             List<Group> targetGroups;
             if (request.TargetGroupIds != null && request.TargetGroupIds.Count > 0)
             {
-                targetGroups = await _groupRepository.GetByIdsAsync(request.TargetGroupIds);
+                targetGroups = await groupRepository.GetByIdsAsync(request.TargetGroupIds);
                 // Filter to only groups that belong to this studio
                 targetGroups = targetGroups.Where(g => g.StudioId == studioId).ToList();
             }
             else
             {
-                targetGroups = await _groupRepository.GetStudioGroupsAsync(studioId);
+                targetGroups = await groupRepository.GetStudioGroupsAsync(studioId);
             }
 
             if (targetGroups.Count == 0)
             {
-                throw new AppException(ErrorCodes.BatchNoGroupsInStudio, StatusCodes.Status400BadRequest);
+                throw new AppException(ErrorCodes.BatchNoGroupsInStudio);
             }
 
             // 6. Get existing participants for target groups (approved only)
             var groupIds = targetGroups.Select(g => g.GroupId).ToList();
-            var existingParticipants = await _groupParticipantRepository.GetByGroupIdsAsync(groupIds);
+            var existingParticipants = await groupParticipantRepository.GetByGroupIdsAsync(groupIds);
             var existingByGroupAndUser = existingParticipants
                 .ToDictionary(p => (p.GroupId, p.UserId), p => p);
 
             // 6b. Also load pending (unapproved) records for these groups
             // These will be removed when users are assigned to the same group
-            var pendingParticipants = await _groupParticipantRepository.GetPendingByGroupIdsAsync(groupIds);
+            var pendingParticipants = await groupParticipantRepository.GetPendingByGroupIdsAsync(groupIds);
 
             // 7. Check moderator conflicts BEFORE any DB write
             var conflicts = new List<GroupConflictInfo>();
@@ -520,7 +504,7 @@ namespace StudioStudio_Server.Services
             }
 
             // 8. Get studio members
-            var studioParticipants = await _studioParticipantRepository.GetParticipantsByStudioIdAsync(studioId);
+            var studioParticipants = await studioParticipantRepository.GetParticipantsByStudioIdAsync(studioId);
 
             // Exclude users and studio owner
             var excludeUserIds = request.ExcludeUserIds ?? new List<Guid>();
@@ -553,7 +537,7 @@ namespace StudioStudio_Server.Services
 
                 if (nonOwnerParticipants.Count > 0)
                 {
-                    await _groupParticipantRepository.RemoveRangeAsync(nonOwnerParticipants);
+                    await groupParticipantRepository.RemoveRangeAsync(nonOwnerParticipants);
 
                     // Update local state
                     foreach (var p in nonOwnerParticipants)
@@ -631,13 +615,13 @@ namespace StudioStudio_Server.Services
 
             if (pendingToRemove.Count > 0)
             {
-                await _groupParticipantRepository.RemoveRangeAsync(pendingToRemove);
+                await groupParticipantRepository.RemoveRangeAsync(pendingToRemove);
             }
 
             // 14. Save to database
             if (newParticipants.Count > 0)
             {
-                await _groupParticipantRepository.AddRangeAsync(newParticipants);
+                await groupParticipantRepository.AddRangeAsync(newParticipants);
             }
 
             return new RandomAssignResponse
@@ -658,7 +642,7 @@ namespace StudioStudio_Server.Services
         public async Task<byte[]> GenerateTemplateAsync(Guid studioId, Guid userId)
         {
             // Validate studio exists
-            var studio = await _studioRepository.GetByIdAsync(studioId);
+            var studio = await studioRepository.GetByIdAsync(studioId);
             if (studio == null)
             {
                 throw new AppException(ErrorCodes.BatchStudioNotFound, StatusCodes.Status404NotFound);
@@ -676,8 +660,8 @@ namespace StudioStudio_Server.Services
             }
 
             // Get studio members and groups
-            var studioParticipants = await _studioParticipantRepository.GetParticipantsByStudioIdAsync(studioId);
-            var studioGroups = await _groupRepository.GetStudioGroupsAsync(studioId);
+            var studioParticipants = await studioParticipantRepository.GetParticipantsByStudioIdAsync(studioId);
+            var studioGroups = await groupRepository.GetStudioGroupsAsync(studioId);
 
             var sb = new StringBuilder();
 
@@ -699,8 +683,6 @@ namespace StudioStudio_Server.Services
             var groupIndex = 0;
             foreach (var participant in eligibleParticipants)
             {
-                if (participant.User == null) continue;
-
                 var group = studioGroups[groupIndex % studioGroups.Count];
                 sb.AppendLine($"{participant.User.Email},{group.GroupName},Member");
                 groupIndex++;

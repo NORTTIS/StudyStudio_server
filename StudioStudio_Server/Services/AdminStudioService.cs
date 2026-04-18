@@ -11,30 +11,28 @@ namespace StudioStudio_Server.Services
     /// </summary>
     public class AdminStudioService(IStudioRepository studioRepository) : IAdminStudioService
     {
-        private readonly IStudioRepository _studioRepository = studioRepository;
-
         /// <summary>
         /// Get paginated list of studios with filters for admin
         /// </summary>
         public async Task<AdminStudioListResponse> GetStudiosAsync(GetStudiosRequest request)
         {
             // Get studios with pagination
-            var (studios, totalCount) = await _studioRepository.GetStudiosAsync(
+            var (studios, totalCount) = await studioRepository.GetStudiosAsync(
                 request.SearchTerm,
                 request.PageNumber,
                 request.PageSize);
 
             // Get summary
             var (totalStudios, activeStudios, inactiveStudios, totalMembers, totalGroups) =
-                await _studioRepository.GetStudioSummaryAsync();
+                await studioRepository.GetStudioSummaryAsync();
 
             // Get additional data for mapping
             var studioIds = studios.Select(s => s.StudioId).ToList();
-            var memberCounts = await _studioRepository.GetMemberCountsAsync(studioIds);
-            var groupCounts = await _studioRepository.GetGroupCountsAsync(studioIds);
-            var taskCounts = await _studioRepository.GetTaskCountsAsync(studioIds);
-            var lastActivities = await _studioRepository.GetLastActivityAsync(studioIds);
-            var ownerInfos = await _studioRepository.GetOwnerInfosAsync(studios.Select(s => s.OwnerId).ToList());
+            var memberCounts = await studioRepository.GetMemberCountsAsync(studioIds);
+            var groupCounts = await studioRepository.GetGroupCountsAsync(studioIds);
+            var taskCounts = await studioRepository.GetTaskCountsAsync(studioIds);
+            var lastActivities = await studioRepository.GetLastActivityAsync(studioIds);
+            var ownerInfos = await studioRepository.GetOwnerInfosAsync(studios.Select(s => s.OwnerId).ToList());
 
             // Map to response DTOs
             var studioList = studios.Select(s => new StudioListItem
@@ -76,7 +74,7 @@ namespace StudioStudio_Server.Services
         /// </summary>
         public async Task UpdateStudioStatusAsync(Guid studioId, bool isActive)
         {
-            var studio = await _studioRepository.GetByIdAdminAsync(studioId);
+            var studio = await studioRepository.GetByIdAdminAsync(studioId);
 
             if (studio == null)
             {
@@ -90,7 +88,7 @@ namespace StudioStudio_Server.Services
                 var candidateName = currentName;
 
                 // Lặp kiểm tra trùng tên, thêm "_restored" cho đến khi không trùng
-                while (await _studioRepository.HasActiveStudioWithNameAsync(studio.OwnerId, candidateName, studio.StudioId))
+                while (await studioRepository.HasActiveStudioWithNameAsync(studio.OwnerId, candidateName, studio.StudioId))
                 {
                     candidateName += "_restored";
                 }
@@ -101,7 +99,7 @@ namespace StudioStudio_Server.Services
             studio.IsDeleted = !isActive;
             studio.UpdatedAt = DateTime.UtcNow;
 
-            await _studioRepository.UpdateStudioAsync(studio);
+            await studioRepository.UpdateStudioAsync(studio);
         }
     }
 }

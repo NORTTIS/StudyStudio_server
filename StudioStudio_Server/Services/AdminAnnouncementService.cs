@@ -18,10 +18,6 @@ namespace StudioStudio_Server.Services
         ILogger<AdminAnnouncementService> logger,
         ICacheService cacheService) : IAdminAnnouncementService
     {
-        private readonly IAnnouncementRepository _announcementRepository = announcementRepository;
-        private readonly ILogger<AdminAnnouncementService> _logger = logger;
-        private readonly ICacheService _cacheService = cacheService;
-
         /// <summary>
         /// Get system-wide announcements (not @mentions)
         /// Returns: List of announcements that are NOT user-specific @mentions
@@ -29,7 +25,7 @@ namespace StudioStudio_Server.Services
         /// </summary>
         public async Task<List<AnnouncementResponse>> GetAllAnnouncementsAsync()
         {
-            var announcements = await _announcementRepository.GetSystemAnnouncementsAsync();
+            var announcements = await announcementRepository.GetSystemAnnouncementsAsync();
 
             return announcements
                 .Select(MapToAnnouncementResponse)
@@ -72,12 +68,12 @@ namespace StudioStudio_Server.Services
                 PublishedAt = DeterminePublishedAt(request.IsActive, null, request.PublishedAt)
             };
 
-            await _announcementRepository.AddAsync(announcement);
+            await announcementRepository.AddAsync(announcement);
 
             // Invalidate announcement cache
-            await _cacheService.InvalidateAnnouncementCachesAsync();
+            await cacheService.InvalidateAnnouncementCachesAsync();
 
-            _logger.LogInformation(
+            logger.LogInformation(
                 "Announcement created by admin {UserId}. AnnouncementId: {AnnouncementId}, Title: {Title}",
                 adminUserId, announcement.AnnouncementId, announcement.Title);
 
@@ -107,12 +103,12 @@ namespace StudioStudio_Server.Services
                 announcement.PublishedAt,
                 request.PublishedAt);
 
-            await _announcementRepository.UpdateAsync(announcement);
+            await announcementRepository.UpdateAsync(announcement);
 
             // Invalidate announcement cache
-            await _cacheService.InvalidateAnnouncementCachesAsync();
+            await cacheService.InvalidateAnnouncementCachesAsync();
 
-            _logger.LogInformation(
+            logger.LogInformation(
                 "Announcement {AnnouncementId} updated by admin {UserId}. Title: {Title}",
                 announcement.AnnouncementId, adminUserId, announcement.Title);
 
@@ -129,12 +125,12 @@ namespace StudioStudio_Server.Services
         {
             var announcement = await ValidateAnnouncementExistsAsync(announcementId);
 
-            await _announcementRepository.DeleteAsync(announcement);
+            await announcementRepository.DeleteAsync(announcement);
 
             // Invalidate announcement cache
-            await _cacheService.InvalidateAnnouncementCachesAsync();
+            await cacheService.InvalidateAnnouncementCachesAsync();
 
-            _logger.LogInformation(
+            logger.LogInformation(
                 "Announcement {AnnouncementId} deleted by admin {UserId}. Title: {Title}",
                 announcementId, adminUserId, announcement.Title);
         }
@@ -145,7 +141,7 @@ namespace StudioStudio_Server.Services
         /// </summary>
         private async Task<Announcement> ValidateAnnouncementExistsAsync(Guid announcementId)
         {
-            var announcement = await _announcementRepository.GetByIdAsync(announcementId);
+            var announcement = await announcementRepository.GetByIdAsync(announcementId);
 
             if (announcement == null)
             {

@@ -65,17 +65,5 @@ namespace StudioStudio_Server.Services.EmbeddingQueue
         /// Estimated tokens for this job
         /// </summary>
         public int EstimatedTokens { get; set; }
-        
-        /// <summary>
-        /// User-friendly status message
-        /// </summary>
-        public string StatusMessage => Status switch
-        {
-            EmbeddingJobStatus.Queued => "Waiting in queue",
-            EmbeddingJobStatus.Processing => $"Indexing ({ProcessedChunks}/{TotalChunks} chunks)",
-            EmbeddingJobStatus.Completed => "Indexing completed",
-            EmbeddingJobStatus.Failed => "Indexing failed",
-            _ => "Unknown status"
-        };
     }
 }

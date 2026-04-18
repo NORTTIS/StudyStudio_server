@@ -13,8 +13,6 @@ namespace StudioStudio_Server.Services
         ILogger<SMTPEmailService> logger) : IEmailService
     {
         private readonly EmailOptions _emailOptions = emailOptions.Value;
-        private readonly IUserRepository _userRepository = userRepository;
-        private readonly ILogger<SMTPEmailService> _logger = logger;
 
         public async Task SendLinkAsync(string to, string subject, string body)
         {
@@ -22,8 +20,8 @@ namespace StudioStudio_Server.Services
             if (string.IsNullOrEmpty(_emailOptions.Host) ||
                 string.IsNullOrEmpty(_emailOptions.From))
             {
-                _logger.LogWarning("Email service is not configured. Skipping email to {To} with subject: {Subject}", to, subject);
-                _logger.LogInformation("Email content (dev only): {Body}", body);
+                logger.LogWarning("Email service is not configured. Skipping email to {To} with subject: {Subject}", to, subject);
+                logger.LogInformation("Email content (dev only): {Body}", body);
                 return;
             }
 
@@ -46,16 +44,16 @@ namespace StudioStudio_Server.Services
             };
 
             await smtp.SendMailAsync(message);
-            _logger.LogInformation("Email sent successfully to {To}", to);
+            logger.LogInformation("Email sent successfully to {To}", to);
         }
 
         public async Task<bool> SendEmailWithPreferenceCheckAsync(string to, string subject, string body, Guid userId)
         {
             // Check user's email notification preference
-            var user = await _userRepository.GetByIdAsync(userId);
+            var user = await userRepository.GetByIdAsync(userId);
             if (user != null && !user.EmailNotificationEnabled)
             {
-                _logger.LogInformation(
+                logger.LogInformation(
                     "Skipping email to {To} because user {UserId} has email notifications disabled",
                     to, userId);
                 return false;
@@ -70,7 +68,7 @@ namespace StudioStudio_Server.Services
         {
             if (!user.EmailNotificationEnabled)
             {
-                _logger.LogInformation(
+                logger.LogInformation(
                     "Skipping email to {To} because user {UserId} has email notifications disabled",
                     to, user.UserId);
                 return false;

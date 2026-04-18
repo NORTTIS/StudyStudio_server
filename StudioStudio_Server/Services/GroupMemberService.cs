@@ -16,11 +16,6 @@ namespace StudioStudio_Server.Services
         IUserRepository userRepository,
         ILogger<GroupMemberService> logger) : IGroupMemberService
     {
-        private readonly IGroupRepository _groupRepository = groupRepository;
-        private readonly IGroupParticipantRepository _groupParticipantRepository = groupParticipantRepository;
-        private readonly IUserRepository _userRepository = userRepository;
-        private readonly ILogger<GroupMemberService> _logger = logger;
-
         /// <summary>
         /// Remove member from group
         /// Validate:
@@ -43,11 +38,10 @@ namespace StudioStudio_Server.Services
             if (request.UserId == currentUserId)
             {
                 throw new AppException(
-                    ErrorCodes.GroupCannotRemoveSelf,
-                    StatusCodes.Status400BadRequest);
+                    ErrorCodes.GroupCannotRemoveSelf);
             }
 
-            var targetMember = await _groupParticipantRepository
+            var targetMember = await groupParticipantRepository
                 .GetByGroupAndUserTrackedAsync(request.GroupId, request.UserId);
 
             if (targetMember == null)
@@ -60,8 +54,7 @@ namespace StudioStudio_Server.Services
             if (targetMember.Role == GroupRole.Owner)
             {
                 throw new AppException(
-                    ErrorCodes.GroupCannotRemoveOwner,
-                    StatusCodes.Status400BadRequest);
+                    ErrorCodes.GroupCannotRemoveOwner);
             }
 
             if (currentUserParticipant.Role == GroupRole.Moderator &&
@@ -74,9 +67,9 @@ namespace StudioStudio_Server.Services
 
             var removedUser = await GetUserOrThrowAsync(request.UserId);
 
-            await _groupParticipantRepository.RemoveAsync(targetMember);
+            await groupParticipantRepository.RemoveAsync(targetMember);
 
-            _logger.LogInformation(
+            logger.LogInformation(
                 "User {UserId} removed user {RemovedUserId} from group {GroupId}",
                 currentUserId, request.UserId, request.GroupId);
 
@@ -100,7 +93,7 @@ namespace StudioStudio_Server.Services
         {
             var group = await ValidateGroupExistsAsync(groupId);
 
-            var participant = await _groupParticipantRepository
+            var participant = await groupParticipantRepository
                 .GetByGroupAndUserAsync(groupId, userId);
 
             if (participant == null)
@@ -117,9 +110,9 @@ namespace StudioStudio_Server.Services
                     StatusCodes.Status403Forbidden);
             }
 
-            await _groupParticipantRepository.RemoveAsync(participant);
+            await groupParticipantRepository.RemoveAsync(participant);
 
-            _logger.LogInformation(
+            logger.LogInformation(
                 "User {UserId} left group {GroupId}",
                 userId, groupId);
 
@@ -144,11 +137,10 @@ namespace StudioStudio_Server.Services
             Guid currentUserId,
             AssignRoleRequest request)
         {
-            if (!Enum.TryParse<GroupRole>(request.Role, true, out GroupRole newRole))
+            if (!Enum.TryParse(request.Role, true, out GroupRole newRole))
             {
                 throw new AppException(
-                    ErrorCodes.InviteInvalidRole,
-                    StatusCodes.Status400BadRequest);
+                    ErrorCodes.InviteInvalidRole);
             }
 
             var group = await ValidateGroupExistsAsync(request.GroupId);
@@ -160,18 +152,17 @@ namespace StudioStudio_Server.Services
                     StatusCodes.Status403Forbidden);
             }
 
-            var currentUserParticipant = await ValidateUserIsOwnerAsync(
+            await ValidateUserIsOwnerAsync(
                 request.GroupId,
                 currentUserId);
 
             if (request.UserId == currentUserId)
             {
                 throw new AppException(
-                    ErrorCodes.GroupCannotChangeOwnRole,
-                    StatusCodes.Status400BadRequest);
+                    ErrorCodes.GroupCannotChangeOwnRole);
             }
 
-            var targetMember = await _groupParticipantRepository
+            var targetMember = await groupParticipantRepository
                 .GetByGroupAndUserTrackedAsync(request.GroupId, request.UserId);
 
             if (targetMember == null)
@@ -186,29 +177,27 @@ namespace StudioStudio_Server.Services
             if (newRole == GroupRole.Owner)
             {
                 throw new AppException(
-                    ErrorCodes.GroupOnlyOneOwner,
-                    StatusCodes.Status400BadRequest);
+                    ErrorCodes.GroupOnlyOneOwner);
             }
 
             if (newRole == GroupRole.Moderator)
             {
-                int moderatorCount = await _groupParticipantRepository
+                int moderatorCount = await groupParticipantRepository
                     .GetRoleCountByGroupIdAsync(request.GroupId, GroupRole.Moderator);
 
                 if (moderatorCount > 0 && targetMember.Role != GroupRole.Moderator)
                 {
                     throw new AppException(
-                        ErrorCodes.GroupOnlyOneModerator,
-                        StatusCodes.Status400BadRequest);
+                        ErrorCodes.GroupOnlyOneModerator);
                 }
             }
 
             targetMember.Role = newRole;
-            await _groupParticipantRepository.UpdateAsync(targetMember);
+            await groupParticipantRepository.UpdateAsync(targetMember);
 
             var user = await GetUserOrThrowAsync(request.UserId);
 
-            _logger.LogInformation(
+            logger.LogInformation(
                 "User {UserId} changed role of user {TargetUserId} from {OldRole} to {NewRole} in group {GroupId}",
                 currentUserId, request.UserId, oldRole, newRole, request.GroupId);
 
@@ -229,7 +218,7 @@ namespace StudioStudio_Server.Services
         /// </summary>
         private async Task<Group> ValidateGroupExistsAsync(Guid groupId)
         {
-            var group = await _groupRepository.GetByIdAsync(groupId);
+            var group = await groupRepository.GetByIdAsync(groupId);
 
             if (group == null)
             {
@@ -248,7 +237,7 @@ namespace StudioStudio_Server.Services
             Guid groupId,
             Guid userId)
         {
-            var participant = await _groupParticipantRepository
+            var participant = await groupParticipantRepository
                 .GetByGroupAndUserAsync(groupId, userId);
 
             if (participant == null ||
@@ -270,7 +259,7 @@ namespace StudioStudio_Server.Services
             Guid groupId,
             Guid userId)
         {
-            var participant = await _groupParticipantRepository
+            var participant = await groupParticipantRepository
                 .GetByGroupAndUserAsync(groupId, userId);
 
             if (participant == null || participant.Role != GroupRole.Owner)
@@ -284,31 +273,11 @@ namespace StudioStudio_Server.Services
         }
 
         /// <summary>
-        /// Get GroupParticipant or throw exception
-        /// </summary>
-        private async Task<GroupParticipant> GetParticipantOrThrowAsync(
-            Guid groupId,
-            Guid userId)
-        {
-            var participant = await _groupParticipantRepository
-                .GetByGroupAndUserAsync(groupId, userId);
-
-            if (participant == null)
-            {
-                throw new AppException(
-                    ErrorCodes.GroupMemberNotFound,
-                    StatusCodes.Status404NotFound);
-            }
-
-            return participant;
-        }
-
-        /// <summary>
         /// Get User or throw exception
         /// </summary>
         private async Task<User> GetUserOrThrowAsync(Guid userId)
         {
-            var user = await _userRepository.GetByIdAsync(userId);
+            var user = await userRepository.GetByIdAsync(userId);
 
             if (user == null)
             {

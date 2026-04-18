@@ -1,4 +1,3 @@
-using Microsoft.Extensions.DependencyInjection;
 using StudioStudio_Server.Repositories.Interfaces;
 using StudioStudio_Server.Services.Interfaces;
 
@@ -24,16 +23,12 @@ namespace StudioStudio_Server.Services.EmbeddingQueue
         IServiceScopeFactory serviceScopeFactory,
         ILogger<EmbeddingBackgroundService> logger) : BackgroundService
     {
-        private readonly IEmbeddingQueue _queue = queue;
-        private readonly IServiceScopeFactory _serviceScopeFactory = serviceScopeFactory;
-        private readonly ILogger<EmbeddingBackgroundService> _logger = logger;
-        
         private int _processedJobsCount = 0;
         private int _failedJobsCount = 0;
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            _logger.LogInformation(
+            logger.LogInformation(
                 "?? Embedding Background Service started. " +
                 "Token limit: 800K/minute, Batch processing enabled");
 
@@ -42,22 +37,22 @@ namespace StudioStudio_Server.Services.EmbeddingQueue
                 try
                 {
                     // Wait for next job
-                    var job = await _queue.DequeueAsync(stoppingToken);
+                    var job = await queue.DequeueAsync(stoppingToken);
                     
-                    _logger.LogInformation(
+                    logger.LogInformation(
                         "?? Processing job: {AttachmentId}, File: {FileName}, " +
                         "Estimated tokens: {Tokens:N0}, Attempt: {Retry}/{Max}",
                         job.AttachmentId, job.FileName, 
                         job.EstimatedTokens, job.RetryCount + 1, job.MaxRetries);
 
                     // Token-based rate limiting: Wait if budget exceeded
-                    bool canProcess = await _queue.TryReserveTokensAsync(job.EstimatedTokens, stoppingToken);
+                    bool canProcess = await queue.TryReserveTokensAsync(job.EstimatedTokens, stoppingToken);
                     
                     while (!canProcess && !stoppingToken.IsCancellationRequested)
                     {
-                        var budget = _queue.GetTokenBudget();
+                        var budget = queue.GetTokenBudget();
                         
-                        _logger.LogWarning(
+                        logger.LogWarning(
                             "??  Token budget exceeded. Waiting {Seconds:F0}s until reset. " +
                             "Current usage: {Used:N0}/{Max:N0} tokens ({Percent:F1}%)",
                             budget.TimeUntilReset.TotalSeconds,
@@ -69,11 +64,11 @@ namespace StudioStudio_Server.Services.EmbeddingQueue
                         await Task.Delay(budget.TimeUntilReset + TimeSpan.FromSeconds(1), stoppingToken);
                         
                         // Try again
-                        canProcess = await _queue.TryReserveTokensAsync(job.EstimatedTokens, stoppingToken);
+                        canProcess = await queue.TryReserveTokensAsync(job.EstimatedTokens, stoppingToken);
                     }
 
                     // Create a new scope for scoped services
-                    using var scope = _serviceScopeFactory.CreateScope();
+                    using var scope = serviceScopeFactory.CreateScope();
                     
                     var attachmentRepository = scope.ServiceProvider.GetRequiredService<IGroupAttachmentRepository>();
                     var fileStorageService = scope.ServiceProvider.GetRequiredService<IFileStorageService>();
@@ -91,7 +86,7 @@ namespace StudioStudio_Server.Services.EmbeddingQueue
                             fileStorageService,
                             embeddingService,
                             vectorDbService,
-                            _logger);
+                            logger);
 
                         // Invalidate AI document cache so AI sees the newly indexed document immediately
                         try
@@ -101,28 +96,28 @@ namespace StudioStudio_Server.Services.EmbeddingQueue
                         }
                         catch (Exception ex)
                         {
-                            _logger.LogWarning(ex,
+                            logger.LogWarning(ex,
                                 "Non-critical cache invalidation failed after embedding: AttachmentId={AttachmentId}, GroupId={GroupId}",
                                 job.AttachmentId, job.GroupId);
                         }
 
-                        _queue.UpdateJobStatus(job.AttachmentId, EmbeddingJobStatus.Completed);
+                        queue.UpdateJobStatus(job.AttachmentId, EmbeddingJobStatus.Completed);
                         
                         _processedJobsCount++;
                         
-                        _logger.LogInformation(
+                        logger.LogInformation(
                             "? Successfully processed: {AttachmentId}. " +
                             "Stats: Processed={Processed}, Failed={Failed}, Queue={Queue}",
-                            job.AttachmentId, _processedJobsCount, _failedJobsCount, _queue.GetQueueDepth());
+                            job.AttachmentId, _processedJobsCount, _failedJobsCount, queue.GetQueueDepth());
                     }
                     catch (Exception ex)
                     {
-                        _logger.LogError(ex, 
+                        logger.LogError(ex, 
                             "? Failed to process: {AttachmentId} (Attempt {Retry}/{Max})",
                             job.AttachmentId, job.RetryCount + 1, job.MaxRetries);
 
                         // Release reserved tokens since job failed
-                        _queue.ReleaseTokens(job.EstimatedTokens);
+                        queue.ReleaseTokens(job.EstimatedTokens);
 
                         // Retry logic
                         if (job.RetryCount < job.MaxRetries)
@@ -132,21 +127,21 @@ namespace StudioStudio_Server.Services.EmbeddingQueue
                             // Exponential backoff before retry
                             int delaySeconds = (int)Math.Pow(2, job.RetryCount) * 5; // 5s, 10s, 20s
                             
-                            _logger.LogWarning(
+                            logger.LogWarning(
                                 "?? Retrying job: {AttachmentId} in {Delay}s (Attempt {Retry}/{Max})",
                                 job.AttachmentId, delaySeconds, job.RetryCount + 1, job.MaxRetries);
                             
                             await Task.Delay(TimeSpan.FromSeconds(delaySeconds), stoppingToken);
                             
                             // Re-queue the job
-                            await _queue.EnqueueAsync(job, stoppingToken);
+                            await queue.EnqueueAsync(job, stoppingToken);
                         }
                         else
                         {
-                            _queue.UpdateJobStatus(job.AttachmentId, EmbeddingJobStatus.Failed, ex.Message);
+                            queue.UpdateJobStatus(job.AttachmentId, EmbeddingJobStatus.Failed, ex.Message);
                             _failedJobsCount++;
                             
-                            _logger.LogError(
+                            logger.LogError(
                                 "?? Job failed permanently: {AttachmentId} after {Retries} attempts",
                                 job.AttachmentId, job.MaxRetries);
                         }
@@ -159,17 +154,17 @@ namespace StudioStudio_Server.Services.EmbeddingQueue
                 catch (OperationCanceledException)
                 {
                     // Normal shutdown
-                    _logger.LogInformation("?? Embedding Background Service shutting down gracefully");
+                    logger.LogInformation("?? Embedding Background Service shutting down gracefully");
                     break;
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "??  Unexpected error in embedding background service");
+                    logger.LogError(ex, "??  Unexpected error in embedding background service");
                     await Task.Delay(TimeSpan.FromSeconds(5), stoppingToken);
                 }
             }
 
-            _logger.LogInformation(
+            logger.LogInformation(
                 "?? Embedding Background Service stopped. " +
                 "Final stats: Processed={Processed}, Failed={Failed}",
                 _processedJobsCount, _failedJobsCount);

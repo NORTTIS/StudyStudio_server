@@ -1,13 +1,12 @@
 using StudioStudio_Server.Models.Enums;
 using StudioStudio_Server.Resources.Localization;
 
-namespace StudioStudio_Server.Services.Interfaces
+namespace StudioStudio_Server.Services
 {
     public interface IMessageService
     {
         string GetMessage(string code);
         string GetMessage(string code, SupportedLanguage language);
-        SupportedLanguage GetCurrentLanguage();
     }
 
     /// <summary>
@@ -18,9 +17,6 @@ namespace StudioStudio_Server.Services.Interfaces
     /// </summary>
     public class MessageService(IWebHostEnvironment env, IHttpContextAccessor httpContextAccessor) : IMessageService
     {
-        private readonly IWebHostEnvironment _env = env;
-        private readonly IHttpContextAccessor _httpContextAccessor = httpContextAccessor;
-
         /// <summary>
         /// Get localized message by code
         /// Language is automatically detected from Accept-Language header
@@ -38,7 +34,7 @@ namespace StudioStudio_Server.Services.Interfaces
         public string GetMessage(string code, SupportedLanguage language)
         {
             var cultureCode = language.ToCultureCode();
-            var localizer = new JsonStringLocalizer(_env, cultureCode);
+            var localizer = new JsonStringLocalizer(env, cultureCode);
             return localizer.Get(code);
         }
 
@@ -49,7 +45,7 @@ namespace StudioStudio_Server.Services.Interfaces
         /// </summary>
         public SupportedLanguage GetCurrentLanguage()
         {
-            var context = _httpContextAccessor.HttpContext;
+            var context = httpContextAccessor.HttpContext;
             if (context == null)
             {
                 return SupportedLanguage.Vietnamese; // Default
@@ -57,16 +53,6 @@ namespace StudioStudio_Server.Services.Interfaces
 
             var acceptLanguage = context.Request.Headers["Accept-Language"].FirstOrDefault();
             return SupportedLanguageExtensions.FromCultureCode(acceptLanguage);
-        }
-
-        /// <summary>
-        /// Get culture code from current language
-        /// Helper method for localization
-        /// </summary>
-        private string GetCulture()
-        {
-            var language = GetCurrentLanguage();
-            return language.ToCultureCode();
         }
     }
 }

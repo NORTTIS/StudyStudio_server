@@ -11,16 +11,14 @@ namespace StudioStudio_Server.Services
     /// </summary>
     public class ActivityLogService(StudioDbContext context) : IActivityLogService
     {
-        private readonly StudioDbContext _context = context;
-
         /// <summary>
         /// Log a general user action with context
         /// </summary>
         public async Task LogAsync(ActivityLog log)
         {
             log.CreatedAt = DateTime.UtcNow;
-            _context.ActivityLogs.Add(log);
-            await _context.SaveChangesAsync();
+            context.ActivityLogs.Add(log);
+            await context.SaveChangesAsync();
         }
 
         /// <summary>
@@ -28,7 +26,7 @@ namespace StudioStudio_Server.Services
         /// </summary>
         public async Task<List<ActivityLog>> GetTaskDeleteLogsAsync(List<Guid> taskIds)
         {
-            return await _context.ActivityLogs
+            return await context.ActivityLogs
                 .Where(x => taskIds.Contains(x.TargetId!.Value) && x.ActionType == ActivityActionTypes.TASK_DELETE)
                 .OrderByDescending(x => x.CreatedAt)
                 .ToListAsync();
@@ -167,44 +165,6 @@ namespace StudioStudio_Server.Services
                 TargetType = ActivityTargetTypes.MESSAGE,
                 TargetId = messageId,
                 GroupId = groupId,
-                StudioId = studioId,
-                CreatedAt = DateTime.UtcNow
-            };
-
-            await LogAsync(log);
-        }
-
-        /// <summary>
-        /// Log group creation activity
-        /// </summary>
-        public async Task LogGroupCreateAsync(Guid userId, Guid groupId, Guid studioId)
-        {
-            var log = new ActivityLog
-            {
-                LogId = Guid.NewGuid(),
-                UserId = userId,
-                ActionType = ActivityActionTypes.GROUP_CREATE,
-                TargetType = ActivityTargetTypes.GROUP,
-                TargetId = groupId,
-                StudioId = studioId,
-                CreatedAt = DateTime.UtcNow
-            };
-
-            await LogAsync(log);
-        }
-
-        /// <summary>
-        /// Log group join activity
-        /// </summary>
-        public async Task LogGroupJoinAsync(Guid userId, Guid groupId, Guid studioId)
-        {
-            var log = new ActivityLog
-            {
-                LogId = Guid.NewGuid(),
-                UserId = userId,
-                ActionType = ActivityActionTypes.GROUP_JOIN,
-                TargetType = ActivityTargetTypes.GROUP,
-                TargetId = groupId,
                 StudioId = studioId,
                 CreatedAt = DateTime.UtcNow
             };

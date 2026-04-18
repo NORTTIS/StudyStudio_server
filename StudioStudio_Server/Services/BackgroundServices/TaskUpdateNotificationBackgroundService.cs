@@ -1,4 +1,3 @@
-using Microsoft.Extensions.DependencyInjection;
 using StudioStudio_Server.Models.BackgroundJobs;
 using StudioStudio_Server.Models.Entities;
 using StudioStudio_Server.Models.Enums;
@@ -12,20 +11,16 @@ namespace StudioStudio_Server.Services.BackgroundServices
         IServiceScopeFactory serviceScopeFactory,
         ILogger<TaskUpdateNotificationBackgroundService> logger) : BackgroundService
     {
-        private readonly ITaskUpdateNotificationQueue _queue = queue;
-        private readonly IServiceScopeFactory _serviceScopeFactory = serviceScopeFactory;
-        private readonly ILogger<TaskUpdateNotificationBackgroundService> _logger = logger;
-
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            _logger.LogInformation("Task update notification worker started");
+            logger.LogInformation("Task update notification worker started");
 
             while (!stoppingToken.IsCancellationRequested)
             {
                 TaskUpdateNotificationLease? lease = null;
                 try
                 {
-                    var dequeuedLease = await _queue.DequeueAsync(stoppingToken);
+                    var dequeuedLease = await queue.DequeueAsync(stoppingToken);
                     if (dequeuedLease is null)
                     {
                         continue;
@@ -34,7 +29,7 @@ namespace StudioStudio_Server.Services.BackgroundServices
                     lease = dequeuedLease;
                     var job = lease.Job;
 
-                    using var scope = _serviceScopeFactory.CreateScope();
+                    using var scope = serviceScopeFactory.CreateScope();
                     var userRepository = scope.ServiceProvider.GetRequiredService<IUserRepository>();
                     var participantRepository = scope.ServiceProvider.GetRequiredService<IGroupParticipantRepository>();
                     var notificationService = scope.ServiceProvider.GetRequiredService<INotificationService>();
@@ -94,11 +89,7 @@ namespace StudioStudio_Server.Services.BackgroundServices
                             if (recipientId == job.ActorUserId) continue;
                             if (!userDict.TryGetValue(recipientId, out var recipient)) continue;
 
-                            notificationTasks.Add(notificationService.NotifyTaskCompletedAsync(
-                                recipient,
-                                currentUser,
-                                job.TaskId,
-                                job.TaskTitle));
+                            notificationTasks.Add(notificationService.NotifyTaskCompletedAsync(recipient, currentUser, job.TaskId, job.TaskTitle, stoppingToken));
                         }
                     }
 
@@ -116,11 +107,7 @@ namespace StudioStudio_Server.Services.BackgroundServices
                             {
                                 if (oldAssignee.UserId != job.ActorUserId)
                                 {
-                                    notificationTasks.Add(notificationService.NotifyTaskUnassignedAsync(
-                                        oldAssignee,
-                                        currentUser,
-                                        job.TaskId,
-                                        job.TaskTitle));
+                                    notificationTasks.Add(notificationService.NotifyTaskUnassignedAsync(oldAssignee, currentUser, job.TaskId, job.TaskTitle, stoppingToken));
                                 }
                             }
                         }
@@ -141,23 +128,13 @@ namespace StudioStudio_Server.Services.BackgroundServices
 
                                 if (job.OldAssigneeId.HasValue && job.OldAssigneeId.Value != job.RequestedAssigneeId.Value && oldAssignee != null)
                                 {
-                                    notificationTasks.Add(notificationService.NotifyTaskReassignedAsync(
-                                        newAssignee,
-                                        oldAssignee,
-                                        currentUser,
-                                        job.TaskId,
-                                        job.TaskTitle));
+                                    notificationTasks.Add(notificationService.NotifyTaskReassignedAsync(newAssignee, oldAssignee, currentUser, job.TaskId, job.TaskTitle, stoppingToken));
                                 }
                                 else if (!job.OldAssigneeId.HasValue)
                                 {
                                     if (newAssignee.UserId != job.ActorUserId)
                                     {
-                                        notificationTasks.Add(notificationService.NotifyTaskAssignedAsync(
-                                            newAssignee,
-                                            currentUser,
-                                            job.TaskId,
-                                            job.TaskTitle,
-                                            job.DueDate));
+                                        notificationTasks.Add(notificationService.NotifyTaskAssignedAsync(newAssignee, currentUser, job.TaskId, job.TaskTitle, job.DueDate, stoppingToken));
                                     }
                                 }
                             }
@@ -171,13 +148,7 @@ namespace StudioStudio_Server.Services.BackgroundServices
                         && userDict.TryGetValue(job.OldAssigneeId.Value, out var statusAssignee))
                     {
                         var changedBy = $"{currentUser.FirstName} {currentUser.LastName}".Trim();
-                        notificationTasks.Add(notificationService.NotifyTaskStatusChangedAsync(
-                            statusAssignee,
-                            currentUser,
-                            job.TaskId,
-                            job.OldStatusName,
-                            job.NewStatusName,
-                            changedBy));
+                        notificationTasks.Add(notificationService.NotifyTaskStatusChangedAsync(statusAssignee, currentUser, job.TaskId, job.OldStatusName, job.NewStatusName, changedBy, stoppingToken));
                     }
 
                     if (notificationTasks.Count > 0)
@@ -185,7 +156,7 @@ namespace StudioStudio_Server.Services.BackgroundServices
                         await Task.WhenAll(notificationTasks);
                     }
 
-                    await _queue.AcknowledgeAsync(lease, stoppingToken);
+                    await queue.AcknowledgeAsync(lease, stoppingToken);
                     lease = null;
                 }
                 catch (OperationCanceledException)
@@ -194,17 +165,17 @@ namespace StudioStudio_Server.Services.BackgroundServices
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "Error while processing task update notification job");
+                    logger.LogError(ex, "Error while processing task update notification job");
                     if (lease != null)
                     {
-                        await _queue.AbandonAsync(lease, stoppingToken);
+                        await queue.AbandonAsync(lease, stoppingToken);
                     }
 
                     await Task.Delay(TimeSpan.FromSeconds(2), stoppingToken);
                 }
             }
 
-            _logger.LogInformation("Task update notification worker stopped");
+            logger.LogInformation("Task update notification worker stopped");
         }
     }
 }

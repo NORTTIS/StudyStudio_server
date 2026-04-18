@@ -1,13 +1,12 @@
-﻿using Microsoft.AspNetCore.Http;
-using Microsoft.IdentityModel.Tokens;
+﻿using Microsoft.IdentityModel.Tokens;
 using StudioStudio_Server.Exceptions;
 using StudioStudio_Server.Models.DTOs.Request;
 using StudioStudio_Server.Models.DTOs.Response;
-using StudioStudio_Server.Models.BackgroundJobs;
 using StudioStudio_Server.Models.Entities;
 using StudioStudio_Server.Models.Enums;
 using StudioStudio_Server.Repositories.Interfaces;
 using StudioStudio_Server.Services.Interfaces;
+using StudioStudio_Server.Services.TaskNotificationQueue;
 using StudioStudio_Server.Utils;
 
 namespace StudioStudio_Server.Services
@@ -27,20 +26,6 @@ namespace StudioStudio_Server.Services
         INotificationService notificationService,
         ITaskUpdateNotificationQueue taskUpdateNotificationQueue) : ITaskService
     {
-        private readonly ILogger<TaskService> _logger = logger;
-        private readonly IMessageService _messageService = message;
-        private readonly ITaskRepository _taskRepository = taskRepository;
-        private readonly IGroupRepository _groupRepository = groupRepository;
-        private readonly IGroupParticipantRepository _participantRepository = participantRepository;
-        private readonly IGroupTaskStatusRepository _groupTaskStatusRepository = groupTaskStatusRepository;
-        private readonly ITaskAssignmentRepository _taskAssignmentRepository = taskAssignmentRepository;
-        private readonly IUserRepository _userRepository = userRepository;
-        private readonly IPersonalTaskStatusRepository _personalTaskStatusRepository = personalTaskStatusRepository;
-        private readonly IHttpContextAccessor _httpContextAccessor = httpContextAccessor;
-        private readonly IActivityLogService _activityLogService = activityLogService;
-        private readonly INotificationService _notificationService = notificationService;
-        private readonly ITaskUpdateNotificationQueue _taskUpdateNotificationQueue = taskUpdateNotificationQueue;
-
         /// <summary>
         /// Validate TaskPriority enum value
         /// </summary>
@@ -48,7 +33,7 @@ namespace StudioStudio_Server.Services
         {
             if (!Enum.IsDefined(typeof(TaskPriority), priority))
             {
-                throw new AppException(ErrorCodes.TaskInvalidPriority, StatusCodes.Status400BadRequest);
+                throw new AppException(ErrorCodes.TaskInvalidPriority);
             }
         }
 
@@ -59,7 +44,7 @@ namespace StudioStudio_Server.Services
         {
             if (!Enum.IsDefined(typeof(TaskSeverity), severity))
             {
-                throw new AppException(ErrorCodes.TaskInvalidSeverity, StatusCodes.Status400BadRequest);
+                throw new AppException(ErrorCodes.TaskInvalidSeverity);
             }
         }
 
@@ -76,8 +61,7 @@ namespace StudioStudio_Server.Services
                 if (availableHours > 0 && (double)hours > availableHours)
                 {
                     throw new AppException(
-                        $"'{fieldName}' không được lớn hơn khoảng thời gian từ StartDate đến DueDate ({availableHours:F1} giờ).",
-                        StatusCodes.Status400BadRequest);
+                        $"'{fieldName}' không được lớn hơn khoảng thời gian từ StartDate đến DueDate ({availableHours:F1} giờ).");
                 }
             }
         }
@@ -88,14 +72,14 @@ namespace StudioStudio_Server.Services
             ValidateTaskPriority(request.TaskPriority);
             ValidateTaskSeverity(request.TaskSeverity);
 
-            var userRole = await _participantRepository.GetGroupRoleByUserIdAsync(userId, request.GroupId);
+            var userRole = await participantRepository.GetGroupRoleByUserIdAsync(userId, request.GroupId);
             if (userRole.Equals(GroupRole.Viewer) || userRole.Equals(GroupRole.Commenter))
             {
                 throw new AppException(ErrorCodes.GroupCreateTaskDenied, StatusCodes.Status403Forbidden);
             }
 
             // Check if group is archived (non-owner cannot interact)
-            var group = await _groupRepository.GetByIdAsync(request.GroupId);
+            var group = await groupRepository.GetByIdAsync(request.GroupId);
             if (group != null && group.IsArchived && userRole != GroupRole.Owner)
             {
                 throw new AppException(ErrorCodes.GroupIsArchived, StatusCodes.Status403Forbidden);
@@ -103,12 +87,12 @@ namespace StudioStudio_Server.Services
 
             if (!request.GroupStatusId.HasValue)
             {
-                throw new AppException(ErrorCodes.GroupCreateTaskDeniedMissingStatus, StatusCodes.Status400BadRequest);
+                throw new AppException(ErrorCodes.GroupCreateTaskDeniedMissingStatus);
             }
 
-            var groupStatus = await _groupTaskStatusRepository.GetDetailAsync(request.GroupStatusId.Value);
+            var groupStatus = await groupTaskStatusRepository.GetDetailAsync(request.GroupStatusId.Value);
 
-            var existingTask = await _taskRepository.GetAllTasksByStatusIdAsync(request.GroupStatusId.Value);
+            var existingTask = await taskRepository.GetAllTasksByStatusIdAsync(request.GroupStatusId.Value);
             int newTaskPosition = 0;
             if (existingTask.Any())
             {
@@ -135,7 +119,7 @@ namespace StudioStudio_Server.Services
             {
                 if (startDateUtc.Value > dueDateUtc.Value)
                 {
-                    throw new AppException(ErrorCodes.TaskDateTimeError, StatusCodes.Status400BadRequest);
+                    throw new AppException(ErrorCodes.TaskDateTimeError);
                 }
             }
 
@@ -164,10 +148,10 @@ namespace StudioStudio_Server.Services
                 UpdatedAt = now,
             };
 
-            await _taskRepository.AddAsync(taskItem);
+            await taskRepository.AddAsync(taskItem);
 
             // Log task creation activity with priority/severity for weighted contribution scoring
-            await _activityLogService.LogTaskCreateAsync(
+            await activityLogService.LogTaskCreateAsync(
                 userId, taskItem.TaskId, taskItem.GroupId, null,
                 (int)taskItem.Priority, (int)taskItem.Severity);
 
@@ -176,7 +160,7 @@ namespace StudioStudio_Server.Services
 
             if (assigneeId.HasValue && assigneeId.Value != Guid.Empty)
             {
-                var assignee = await _userRepository.GetByIdAsync(assigneeId.Value);
+                var assignee = await userRepository.GetByIdAsync(assigneeId.Value);
 
                 if (assignee == null)
                     throw new AppException(ErrorCodes.UserNotFound, StatusCodes.Status404NotFound);
@@ -188,7 +172,7 @@ namespace StudioStudio_Server.Services
                     LastName = assignee.LastName
                 };
 
-                await _taskAssignmentRepository.AddAsync(new TaskAssignment
+                await taskAssignmentRepository.AddAsync(new TaskAssignment
                 {
                     AssignmentId = Guid.NewGuid(),
                     AssignedTo = assigneeDetail.Id,
@@ -198,14 +182,14 @@ namespace StudioStudio_Server.Services
                 });
 
                 // Log task assignment activity
-                await _activityLogService.LogTaskAssignAsync(userId, taskItem.TaskId, assigneeDetail.Id, taskItem.GroupId);
+                await activityLogService.LogTaskAssignAsync(userId, taskItem.TaskId, assigneeDetail.Id, taskItem.GroupId);
 
                 // Load current user for notification
-                var currentUser = await _userRepository.GetByIdAsync(userId);
+                var currentUser = await userRepository.GetByIdAsync(userId);
                 if (currentUser != null)
                 {
                     // Notify assignment
-                    await _notificationService.NotifyTaskAssignedAsync(
+                    await notificationService.NotifyTaskAssignedAsync(
                         assignee,
                         currentUser,
                         taskItem.TaskId,
@@ -240,20 +224,20 @@ namespace StudioStudio_Server.Services
 
         public async Task<TaskItemResponse> UpdateGroupTaskAsync(Guid userId, Guid groupId, Guid taskId, UpdateTaskRequest request)
         {
-            var userRole = await _participantRepository.GetGroupRoleByUserIdAsync(userId, groupId);
+            var userRole = await participantRepository.GetGroupRoleByUserIdAsync(userId, groupId);
             if (userRole.Equals(GroupRole.Viewer) || userRole.Equals(GroupRole.Commenter))
             {
                 throw new AppException(ErrorCodes.GroupUpdatePermissionDenied, StatusCodes.Status403Forbidden);
             }
 
             // Check if group is archived (non-owner cannot interact)
-            var group = await _groupRepository.GetByIdAsync(groupId);
+            var group = await groupRepository.GetByIdAsync(groupId);
             if (group != null && group.IsArchived && userRole != GroupRole.Owner)
             {
                 throw new AppException(ErrorCodes.GroupIsArchived, StatusCodes.Status403Forbidden);
             }
 
-            var task = await _taskRepository.GetByIdAsync(taskId);
+            var task = await taskRepository.GetByIdAsync(taskId);
             if (task == null)
             {
                 throw new AppException(ErrorCodes.TaskNotFound, StatusCodes.Status404NotFound);
@@ -275,7 +259,7 @@ namespace StudioStudio_Server.Services
             var statusMap = new Dictionary<Guid, GroupTaskStatus>();
             if (statusIdsToLoad.Count > 0)
             {
-                var statuses = await _groupTaskStatusRepository.GetByIdsAndGroupIdAsync(
+                var statuses = await groupTaskStatusRepository.GetByIdsAndGroupIdAsync(
                     statusIdsToLoad.Distinct().ToList(), groupId);
                 statusMap = statuses.ToDictionary(s => s.StatusId);
             }
@@ -303,7 +287,7 @@ namespace StudioStudio_Server.Services
             {
                 if (startDateUtc.Value > dueDateUtc.Value)
                 {
-                    throw new AppException(ErrorCodes.TaskDateTimeError, StatusCodes.Status400BadRequest);
+                    throw new AppException(ErrorCodes.TaskDateTimeError);
                 }
             }
 
@@ -318,7 +302,7 @@ namespace StudioStudio_Server.Services
             // ============================================================
             // Preload assignees for validation and response
             // ============================================================
-            var existingAssignments = await _taskAssignmentRepository.GetAssigneesByTaskId(taskId);
+            var existingAssignments = await taskAssignmentRepository.GetAssigneesByTaskId(taskId);
             var oldAssigneeId = existingAssignments.FirstOrDefault()?.AssignedTo;
 
             var userIdsToLoad = new List<Guid?>();
@@ -328,7 +312,7 @@ namespace StudioStudio_Server.Services
             var userDict = new Dictionary<Guid, User>();
             if (validUserIds.Count > 0)
             {
-                var users = await _userRepository.GetByIdsAsync(validUserIds);
+                var users = await userRepository.GetByIdsAsync(validUserIds);
                 userDict = users.ToDictionary(u => u.UserId);
             }
 
@@ -400,12 +384,12 @@ namespace StudioStudio_Server.Services
 
                 if (reachedCompletion)
                 {
-                    await _activityLogService.LogTaskCompleteAsync(
+                    await activityLogService.LogTaskCompleteAsync(
                         completionCreditedUserId, task.TaskId, task.GroupId,
                         (int)task.Priority, (int)task.Severity);
                 }
 
-                await _activityLogService.LogTaskUpdateAsync(
+                await activityLogService.LogTaskUpdateAsync(
                     userId, task.TaskId, task.GroupId, null,
                     (int)task.Priority, (int)task.Severity);
             }
@@ -433,7 +417,7 @@ namespace StudioStudio_Server.Services
             // ============================================================
             // DB write
             // ============================================================
-            await _taskRepository.UpdateAsync(task);
+            await taskRepository.UpdateAsync(task);
             // ============================================================
             // Handle assignee changes (DB writes)
             // ============================================================
@@ -442,7 +426,7 @@ namespace StudioStudio_Server.Services
             {
                 if (existingAssignments.Any())
                 {
-                    await _taskAssignmentRepository.RemoveAsync(existingAssignments);
+                    await taskAssignmentRepository.RemoveAsync(existingAssignments);
                 }
             }
             else
@@ -457,9 +441,9 @@ namespace StudioStudio_Server.Services
                 if (!alreadyAssigned)
                 {
                     if (existingAssignments.Any())
-                        await _taskAssignmentRepository.RemoveAsync(existingAssignments);
+                        await taskAssignmentRepository.RemoveAsync(existingAssignments);
 
-                    await _taskAssignmentRepository.AddAsync(new TaskAssignment
+                    await taskAssignmentRepository.AddAsync(new TaskAssignment
                     {
                         AssignmentId = Guid.NewGuid(),
                         AssignedTo = request.AssigneeId.Value,
@@ -470,7 +454,7 @@ namespace StudioStudio_Server.Services
                 }
             }
 
-            await _taskUpdateNotificationQueue.EnqueueAsync(new TaskUpdateNotificationJob
+            await taskUpdateNotificationQueue.EnqueueAsync(new TaskUpdateNotificationJob
             {
                 TaskId = task.TaskId,
                 GroupId = groupId,
@@ -535,19 +519,19 @@ namespace StudioStudio_Server.Services
 
         public async Task SoftDeleteTaskAsync(Guid userId, Guid groupId, Guid taskId)
         {
-            var userRole = await _participantRepository.GetGroupRoleByUserIdAsync(userId, groupId);
+            var userRole = await participantRepository.GetGroupRoleByUserIdAsync(userId, groupId);
             if (!userRole.Equals(GroupRole.Owner) && !userRole.Equals(GroupRole.Moderator) && !userRole.Equals(GroupRole.Member))
             {
                 throw new AppException(ErrorCodes.GroupDeleteTaskDenined, StatusCodes.Status403Forbidden);
             }
 
-            var group = await _groupRepository.GetByIdAsync(groupId);
+            var group = await groupRepository.GetByIdAsync(groupId);
             if (group != null && group.IsArchived && userRole != GroupRole.Owner)
             {
                 throw new AppException(ErrorCodes.GroupIsArchived, StatusCodes.Status403Forbidden);
             }
 
-            var task = await _taskRepository.GetByIdAsync(taskId);
+            var task = await taskRepository.GetByIdAsync(taskId);
             if (task == null)
             {
                 throw new AppException(ErrorCodes.TaskNotFound, StatusCodes.Status404NotFound);
@@ -557,12 +541,12 @@ namespace StudioStudio_Server.Services
             var taskPriority = (int)task.Priority;
             var taskSeverity = (int)task.Severity;
 
-            await _taskRepository.SoftDeleteAsync(taskId);
+            await taskRepository.SoftDeleteAsync(taskId);
 
-            await _activityLogService.LogTaskDeleteAsync(userId, taskId, groupId, taskPriority, taskSeverity);
+            await activityLogService.LogTaskDeleteAsync(userId, taskId, groupId, taskPriority, taskSeverity);
 
             // Notify Owner/Moderator of the group (parallel, using preloaded users)
-            var participants = await _participantRepository.GetAllByGroupIdAsync(groupId);
+            var participants = await participantRepository.GetAllByGroupIdAsync(groupId);
             var ownerModeratorIds = participants
                 .Where(p => p.Role == GroupRole.Owner || p.Role == GroupRole.Moderator)
                 .Select(p => p.UserId)
@@ -570,12 +554,12 @@ namespace StudioStudio_Server.Services
                 .Distinct()
                 .ToList();
 
-            var currentUser = await _userRepository.GetByIdAsync(userId);
+            var currentUser = await userRepository.GetByIdAsync(userId);
             if (ownerModeratorIds.Count > 0 && currentUser != null)
             {
-                var omUsers = await _userRepository.GetByIdsAsync(ownerModeratorIds);
+                var omUsers = await userRepository.GetByIdsAsync(ownerModeratorIds);
                 var tasks = omUsers
-                    .Select(om => _notificationService.NotifyTaskDeletedAsync(om, currentUser, taskId, task.Title))
+                    .Select(om => notificationService.NotifyTaskDeletedAsync(om, currentUser, taskId, task.Title))
                     .ToList();
                 if (tasks.Count > 0)
                     await Task.WhenAll(tasks);
@@ -584,43 +568,43 @@ namespace StudioStudio_Server.Services
 
         public async Task DeletePersonalTaskAsync(Guid userId, Guid taskId)
         {
-            var user = await _userRepository.GetByIdAsync(userId);
+            var user = await userRepository.GetByIdAsync(userId);
             if (user == null)
             {
                 throw new AppException(ErrorCodes.UserNotFound, StatusCodes.Status403Forbidden);
             }
 
-            var task = await _taskRepository.GetByIdAsync(taskId);
+            var task = await taskRepository.GetByIdAsync(taskId);
             if (task == null || task.OwnerId != userId || task.GroupId.HasValue)
             {
                 throw new AppException(ErrorCodes.TaskNotFound, StatusCodes.Status404NotFound);
             }
 
-            await _taskRepository.PermanentDeleteAsync(taskId);
+            await taskRepository.PermanentDeleteAsync(taskId);
         }
 
         public async Task RestoreGroupTaskAsync(Guid userId, Guid groupId, Guid taskId)
         {
-            var userRole = await _participantRepository.GetGroupRoleByUserIdAsync(userId, groupId);
+            var userRole = await participantRepository.GetGroupRoleByUserIdAsync(userId, groupId);
             if (!userRole.Equals(GroupRole.Owner) && !userRole.Equals(GroupRole.Moderator))
             {
                 throw new AppException(ErrorCodes.GroupRestoreTaskDenined, StatusCodes.Status401Unauthorized);
             }
 
-            var group = await _groupRepository.GetByIdAsync(groupId);
+            var group = await groupRepository.GetByIdAsync(groupId);
             if (group != null && group.IsArchived && userRole != GroupRole.Owner)
             {
                 throw new AppException(ErrorCodes.GroupIsArchived, StatusCodes.Status403Forbidden);
             }
 
-            var task = await _taskRepository.GetDeletedByIdAsync(taskId);
+            var task = await taskRepository.GetDeletedByIdAsync(taskId);
 
             if (task == null)
             {
                 throw new AppException(ErrorCodes.TaskNotFound, StatusCodes.Status404NotFound);
             }
 
-            var statusList = await _groupTaskStatusRepository.GetByGroupIdAsync(groupId);
+            var statusList = await groupTaskStatusRepository.GetByGroupIdAsync(groupId);
 
             //case where group delete all status
             if (!statusList.Any())
@@ -633,7 +617,7 @@ namespace StudioStudio_Server.Services
             {
                 var firstStatus = statusList.OrderBy(s => s.Position).First();
                 task.GroupStatusId = firstStatus.StatusId;
-                var existingTask = await _taskRepository.GetAllTasksByStatusIdAsync(firstStatus.StatusId);
+                var existingTask = await taskRepository.GetAllTasksByStatusIdAsync(firstStatus.StatusId);
                 int newTaskPosition = 0;
                 if (existingTask.Any())
                 {
@@ -649,7 +633,7 @@ namespace StudioStudio_Server.Services
             //normal case
             if (task.GroupStatusId.HasValue)
             {
-                var statusExistTask = await _taskRepository.GetAllTasksByStatusIdAsync(task.GroupStatusId.Value);
+                var statusExistTask = await taskRepository.GetAllTasksByStatusIdAsync(task.GroupStatusId.Value);
                 int taskNewPosition = 0;
                 if (statusExistTask.Any())
                 {
@@ -663,19 +647,19 @@ namespace StudioStudio_Server.Services
             }
 
             task.UpdatedAt = DateTime.UtcNow;
-            await _taskRepository.RestoreAsync(task);
+            await taskRepository.RestoreAsync(task);
         }
         public async Task<List<TaskDeleteResponse>> GetDeleteTaskListAsync(Guid userId, Guid groupId)
         {
-            var existedUser = await _participantRepository.GetByGroupAndUserAsync(groupId, userId);
+            var existedUser = await participantRepository.GetByGroupAndUserAsync(groupId, userId);
             if (existedUser == null)
             {
                 throw new AppException(ErrorCodes.AuthForbidden, StatusCodes.Status403Forbidden);
             }
 
-            var taskList = await _taskRepository.GetSoftDeleteTaskByGroup(groupId);
+            var taskList = await taskRepository.GetSoftDeleteTaskByGroup(groupId);
             var taskListId = taskList.Select(t => t.TaskId).ToList();
-            var taskDeleteLogs = await _activityLogService.GetTaskDeleteLogsAsync(taskListId);
+            var taskDeleteLogs = await activityLogService.GetTaskDeleteLogsAsync(taskListId);
 
             var result = taskDeleteLogs.Select(t => new TaskDeleteResponse
             {
@@ -690,18 +674,18 @@ namespace StudioStudio_Server.Services
 
         public async Task ReorderTaskAsync(Guid userId, Guid groupId, ReorderTaskRequest request)
         {
-            var userRole = await _participantRepository.GetGroupRoleByUserIdAsync(userId, groupId);
+            var userRole = await participantRepository.GetGroupRoleByUserIdAsync(userId, groupId);
             if (userRole.Equals(GroupRole.Viewer) || userRole.Equals(GroupRole.Commenter))
             {
                 throw new AppException(ErrorCodes.GroupUpdatePermissionDenied, StatusCodes.Status403Forbidden);
             }
-            var task = await _taskRepository.GetByIdAsync(request.TaskId);
+            var task = await taskRepository.GetByIdAsync(request.TaskId);
             if (task == null)
             {
                 throw new AppException(ErrorCodes.TaskNotFound, StatusCodes.Status404NotFound);
             }
 
-            await _taskRepository.ReorderTaskAsync(
+            await taskRepository.ReorderTaskAsync(
             request.TaskId,
             request.TargetStatusId,
             request.PrevTaskId,
@@ -714,7 +698,7 @@ namespace StudioStudio_Server.Services
             ValidateTaskPriority(request.TaskPriority);
             ValidateTaskSeverity(request.TaskSeverity);
 
-            var user = await _userRepository.GetByIdAsync(userId);
+            var user = await userRepository.GetByIdAsync(userId);
             if (user == null)
             {
                 throw new AppException(ErrorCodes.UserNotFound, StatusCodes.Status404NotFound);
@@ -722,16 +706,16 @@ namespace StudioStudio_Server.Services
 
             if (!request.PersonalStatusId.HasValue)
             {
-                throw new AppException(ErrorCodes.PersonalCreateTaskDeniedMissingStatus, StatusCodes.Status400BadRequest);
+                throw new AppException(ErrorCodes.PersonalCreateTaskDeniedMissingStatus);
             }
 
-            var personalTaskStatus = await _personalTaskStatusRepository.GetDetailAsync(request.PersonalStatusId.Value);
+            var personalTaskStatus = await personalTaskStatusRepository.GetDetailAsync(request.PersonalStatusId.Value);
             if (personalTaskStatus == null || personalTaskStatus.UserId != userId)
             {
                 throw new AppException(ErrorCodes.StatusNotFound, StatusCodes.Status404NotFound);
             }
 
-            var existingTask = await _taskRepository.GetAllPersonalTasksByStatusIdAsync(request.PersonalStatusId.Value);
+            var existingTask = await taskRepository.GetAllPersonalTasksByStatusIdAsync(request.PersonalStatusId.Value);
             int newTaskPosition = 0;
             if (existingTask.Any())
             {
@@ -758,7 +742,7 @@ namespace StudioStudio_Server.Services
             {
                 if (startDateUtc.Value > dueDateUtc.Value)
                 {
-                    throw new AppException(ErrorCodes.TaskDateTimeError, StatusCodes.Status400BadRequest);
+                    throw new AppException(ErrorCodes.TaskDateTimeError);
                 }
             }
 
@@ -788,10 +772,10 @@ namespace StudioStudio_Server.Services
                 UpdatedAt = now,
             };
 
-            await _taskRepository.AddAsync(taskItem);
+            await taskRepository.AddAsync(taskItem);
 
             // Log task creation activity with priority/severity for weighted contribution scoring
-            await _activityLogService.LogTaskCreateAsync(
+            await activityLogService.LogTaskCreateAsync(
                 userId, taskItem.TaskId, null, null,
                 (int)taskItem.Priority, (int)taskItem.Severity);
 
@@ -819,7 +803,7 @@ namespace StudioStudio_Server.Services
                     Id = user.UserId,
                     FirstName = user.FirstName,
                     LastName = user.LastName,
-                    AvatarUrl = AvatarUrlHelper.BuildAbsoluteAvatarUrl(user.AvatarUrl, _httpContextAccessor.HttpContext)
+                    AvatarUrl = AvatarUrlHelper.BuildAbsoluteAvatarUrl(user.AvatarUrl, httpContextAccessor.HttpContext)
                 },
                 EstimatedHours = taskItem.EstimatedHours,
                 ActualHours = taskItem.ActualHours,
@@ -827,13 +811,13 @@ namespace StudioStudio_Server.Services
         }
         public async Task<TaskItemResponse> UpdatePersonalTaskAsync(Guid userId, Guid taskId, UpdatePersonalTaskRequest request)
         {
-            var user = await _userRepository.GetByIdAsync(userId);
+            var user = await userRepository.GetByIdAsync(userId);
             if (user == null)
             {
                 throw new AppException(ErrorCodes.UserNotFound, StatusCodes.Status404NotFound);
             }
 
-            var task = await _taskRepository.GetByIdAsync(taskId);
+            var task = await taskRepository.GetByIdAsync(taskId);
             if (task == null || task.OwnerId != userId || task.GroupId.HasValue)
             {
                 throw new AppException(ErrorCodes.TaskNotFound, StatusCodes.Status404NotFound);
@@ -842,7 +826,7 @@ namespace StudioStudio_Server.Services
             // Validate PersonalStatusId if provided
             if (request.PersonalStatusId.HasValue)
             {
-                var statusExists = await _personalTaskStatusRepository.GetDetailAsync(request.PersonalStatusId.Value);
+                var statusExists = await personalTaskStatusRepository.GetDetailAsync(request.PersonalStatusId.Value);
                 if (statusExists == null || statusExists.UserId != userId)
                 {
                     throw new AppException(ErrorCodes.StatusNotFound, StatusCodes.Status404NotFound);
@@ -863,7 +847,7 @@ namespace StudioStudio_Server.Services
             {
                 if (startDateUtc.Value > dueDateUtc.Value)
                 {
-                    throw new AppException(ErrorCodes.TaskDateTimeError, StatusCodes.Status400BadRequest);
+                    throw new AppException(ErrorCodes.TaskDateTimeError);
                 }
             }
 
@@ -930,13 +914,13 @@ namespace StudioStudio_Server.Services
                 if (reachedCompletion)
                 {
                     // Log with priority/severity for weighted contribution scoring
-                    await _activityLogService.LogTaskCompleteAsync(
+                    await activityLogService.LogTaskCompleteAsync(
                         userId, task.TaskId, task.GroupId,
                         (int)task.Priority, (int)task.Severity);
                 }
 
                 // Log task update activity for contribution scoring
-                await _activityLogService.LogTaskUpdateAsync(
+                await activityLogService.LogTaskUpdateAsync(
                     userId, task.TaskId, task.GroupId, null,
                     (int)task.Priority, (int)task.Severity);
             }
@@ -958,11 +942,11 @@ namespace StudioStudio_Server.Services
                 task.ActualHours = request.ActualHours.Value;
             }
 
-            await _taskRepository.UpdateAsync(task);
+            await taskRepository.UpdateAsync(task);
 
             // Prepare response
             var personalStatus = task.PersonalStatusId.HasValue
-                ? await _personalTaskStatusRepository.GetDetailAsync(task.PersonalStatusId.Value)
+                ? await personalTaskStatusRepository.GetDetailAsync(task.PersonalStatusId.Value)
                 : null;
 
             return new TaskItemResponse
@@ -989,7 +973,7 @@ namespace StudioStudio_Server.Services
                     Id = user.UserId,
                     FirstName = user.FirstName,
                     LastName = user.LastName,
-                    AvatarUrl = AvatarUrlHelper.BuildAbsoluteAvatarUrl(user.AvatarUrl, _httpContextAccessor.HttpContext)
+                    AvatarUrl = AvatarUrlHelper.BuildAbsoluteAvatarUrl(user.AvatarUrl, httpContextAccessor.HttpContext)
                 },
                 EstimatedHours = task.EstimatedHours,
                 ActualHours = task.ActualHours,
@@ -998,19 +982,19 @@ namespace StudioStudio_Server.Services
         }
         public async Task ReorderPersonalTaskAsync(Guid userId, ReorderTaskRequest request)
         {
-            var user = await _userRepository.GetByIdAsync(userId);
+            var user = await userRepository.GetByIdAsync(userId);
             if (user == null)
             {
                 throw new AppException(ErrorCodes.UserNotFound, StatusCodes.Status404NotFound);
             }
 
-            var task = await _taskRepository.GetByIdAsync(request.TaskId);
+            var task = await taskRepository.GetByIdAsync(request.TaskId);
             if (task == null || task.OwnerId != userId || task.GroupId.HasValue)
             {
                 throw new AppException(ErrorCodes.TaskNotFound, StatusCodes.Status404NotFound);
             }
 
-            var targetStatus = await _personalTaskStatusRepository.GetDetailAsync(request.TargetStatusId);
+            var targetStatus = await personalTaskStatusRepository.GetDetailAsync(request.TargetStatusId);
             if (targetStatus == null || targetStatus.UserId != userId)
             {
                 throw new AppException(ErrorCodes.StatusNotFound, StatusCodes.Status404NotFound);
@@ -1018,7 +1002,7 @@ namespace StudioStudio_Server.Services
 
             if (request.PrevTaskId.HasValue)
             {
-                var prevTask = await _taskRepository.GetByIdAsync(request.PrevTaskId.Value);
+                var prevTask = await taskRepository.GetByIdAsync(request.PrevTaskId.Value);
                 if (prevTask == null || prevTask.OwnerId != userId || prevTask.GroupId.HasValue || prevTask.PersonalStatusId != request.TargetStatusId)
                 {
                     throw new AppException(ErrorCodes.TaskNotFound, StatusCodes.Status404NotFound);
@@ -1027,14 +1011,14 @@ namespace StudioStudio_Server.Services
 
             if (request.NextTaskId.HasValue)
             {
-                var nextTask = await _taskRepository.GetByIdAsync(request.NextTaskId.Value);
+                var nextTask = await taskRepository.GetByIdAsync(request.NextTaskId.Value);
                 if (nextTask == null || nextTask.OwnerId != userId || nextTask.GroupId.HasValue || nextTask.PersonalStatusId != request.TargetStatusId)
                 {
                     throw new AppException(ErrorCodes.TaskNotFound, StatusCodes.Status404NotFound);
                 }
             }
 
-            await _taskRepository.ReorderPersonalTaskAsync(
+            await taskRepository.ReorderPersonalTaskAsync(
                 request.TaskId,
                 request.TargetStatusId,
                 request.PrevTaskId,
@@ -1043,13 +1027,13 @@ namespace StudioStudio_Server.Services
 
         public async Task PermanentDeleteGroupTaskAsync(Guid userId, Guid groupId, Guid taskId)
         {
-            var userRole = await _participantRepository.GetGroupRoleByUserIdAsync(userId, groupId);
+            var userRole = await participantRepository.GetGroupRoleByUserIdAsync(userId, groupId);
             if (!userRole.Equals(GroupRole.Owner) && !userRole.Equals(GroupRole.Moderator))
             {
                 throw new AppException(ErrorCodes.GroupDeleteTaskDenined, StatusCodes.Status403Forbidden);
             }
 
-            var task = await _taskRepository.GetDeletedByIdAsync(taskId);
+            var task = await taskRepository.GetDeletedByIdAsync(taskId);
             if (task == null || task.GroupId != groupId)
             {
                 throw new AppException(ErrorCodes.TaskNotFound, StatusCodes.Status404NotFound);
@@ -1057,10 +1041,10 @@ namespace StudioStudio_Server.Services
 
             if (!task.IsPendingDeleted)
             {
-                throw new AppException(ErrorCodes.TaskNotPendingDeleted, StatusCodes.Status400BadRequest);
+                throw new AppException(ErrorCodes.TaskNotPendingDeleted);
             }
 
-            await _taskRepository.PermanentDeleteAsync(taskId);
+            await taskRepository.PermanentDeleteAsync(taskId);
 
         }
 
@@ -1070,14 +1054,14 @@ namespace StudioStudio_Server.Services
         /// </summary>
         public async Task<TaskGroupResponse?> GetTaskGroupAsync(Guid taskId, Guid userId)
         {
-            var task = await _taskRepository.GetByIdAsync(taskId);
+            var task = await taskRepository.GetByIdAsync(taskId);
             if (task?.GroupId == null)
             {
                 return null;
             }
 
             var groupId = task.GroupId.Value;
-            if (!await _participantRepository.IsUserApprovedInGroupAsync(groupId, userId))
+            if (!await participantRepository.IsUserApprovedInGroupAsync(groupId, userId))
             {
                 return null;
             }

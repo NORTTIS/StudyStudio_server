@@ -5,6 +5,5 @@ namespace StudioStudio_Server.Services.Interfaces
     public interface IUserAnnouncementService
     {
         Task AddAnnouncementAsync(UserAnnouncementRequest request);
-        Task RemoveAnnouncementAsync(Guid announceId);
     }
 }

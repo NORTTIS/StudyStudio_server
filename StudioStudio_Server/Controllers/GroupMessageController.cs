@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using StudioStudio_Server.Exceptions;
 using StudioStudio_Server.Models.DTOs.Response;
+using StudioStudio_Server.Services;
 using StudioStudio_Server.Services.Interfaces;
 using System.Security.Claims;
 

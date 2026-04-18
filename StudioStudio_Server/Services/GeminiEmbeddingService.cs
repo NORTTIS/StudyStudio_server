@@ -180,17 +180,6 @@ namespace StudioStudio_Server.Services
         }
 
         /// <summary>
-        /// Generates embeddings for multiple texts (convenience overload without cancellation).
-        /// Used for batch document processing operations.
-        /// </summary>
-        /// <param name="texts">List of text chunks to generate embeddings for</param>
-        /// <returns>List of 768-dimensional embedding vectors, one per input text</returns>
-        public async Task<List<float[]>> GenerateBatchEmbeddingsAsync(List<string> texts)
-        {
-            return await GenerateBatchEmbeddingsAsync(texts, CancellationToken.None);
-        }
-
-        /// <summary>
         /// Generates embeddings for multiple texts with sequential processing to respect rate limits.
         /// Automatically splits large batches and adds configurable delays between requests.
         /// </summary>

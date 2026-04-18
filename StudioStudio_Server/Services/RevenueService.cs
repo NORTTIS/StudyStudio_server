@@ -3,19 +3,14 @@ using StudioStudio_Server.Data;
 using StudioStudio_Server.Models.DTOs.Request;
 using StudioStudio_Server.Models.DTOs.Response;
 using StudioStudio_Server.Models.Entities;
-using StudioStudio_Server.Models.Enums;
 using StudioStudio_Server.Services.Interfaces;
 using PaymentStatusEnum = StudioStudio_Server.Models.Enums.PaymentStatus;
 
 namespace StudioStudio_Server.Services
 {
     public class RevenueService(
-        StudioDbContext db,
-        ILogger<RevenueService> logger) : IRevenueService
+        StudioDbContext db) : IRevenueService
     {
-        private readonly StudioDbContext _db = db;
-        private readonly ILogger<RevenueService> _logger = logger;
-
         #region Revenue Overview
 
         public async Task<RevenueOverviewResponse> GetRevenueOverviewAsync()
@@ -25,29 +20,29 @@ namespace StudioStudio_Server.Services
             var startOfYear = new DateTime(now.Year, 1, 1, 0, 0, 0, DateTimeKind.Utc);
 
             // Total revenue (all time) - only SUCCESS payments
-            var totalRevenue = await _db.Payments
+            var totalRevenue = await db.Payments
                 .Where(p => p.PaymentStatus == PaymentStatusEnum.SUCCESS)
                 .SumAsync(p => p.Amount);
 
             // Monthly revenue
-            var monthlyRevenue = await _db.Payments
+            var monthlyRevenue = await db.Payments
                 .Where(p => p.PaymentStatus == PaymentStatusEnum.SUCCESS && p.CreatedAt >= startOfMonth)
                 .SumAsync(p => p.Amount);
 
             // Yearly revenue
-            var yearlyRevenue = await _db.Payments
+            var yearlyRevenue = await db.Payments
                 .Where(p => p.PaymentStatus == PaymentStatusEnum.SUCCESS && p.CreatedAt >= startOfYear)
                 .SumAsync(p => p.Amount);
 
             // Total transactions
-            var totalTransactions = await _db.Payments.CountAsync();
+            var totalTransactions = await db.Payments.CountAsync();
 
             // Successful transactions
-            var successfulTransactions = await _db.Payments
+            var successfulTransactions = await db.Payments
                 .CountAsync(p => p.PaymentStatus == PaymentStatusEnum.SUCCESS);
 
             // Failed transactions (CANCELLED or FAILED)
-            var failedTransactions = await _db.Payments
+            var failedTransactions = await db.Payments
                 .CountAsync(p => p.PaymentStatus == PaymentStatusEnum.CANCELLED || p.PaymentStatus == PaymentStatusEnum.FAILED);
 
             // Success rate
@@ -56,11 +51,11 @@ namespace StudioStudio_Server.Services
                 : 0;
 
             // Active subscriptions
-            var activeSubscriptions = await _db.UserSubscriptions
+            var activeSubscriptions = await db.UserSubscriptions
                 .CountAsync(u => u.IsActive && u.EndDate > now);
 
             // ARPU (Average Revenue Per User) - unique paying users
-            var payingUserCount = await _db.Payments
+            var payingUserCount = await db.Payments
                 .Where(p => p.PaymentStatus == PaymentStatusEnum.SUCCESS)
                 .Select(p => p.UserId)
                 .Distinct()
@@ -71,7 +66,7 @@ namespace StudioStudio_Server.Services
                 : 0;
 
             // MRR (Monthly Recurring Revenue) - active monthly subscriptions
-            var mrr = await _db.UserSubscriptions
+            var mrr = await db.UserSubscriptions
                 .Include(u => u.Plan)
                 .Where(u => u.IsActive && u.EndDate > now && u.Plan.BillingCycle == BillingCycle.Monthly)
                 .SumAsync(u => u.Plan.Price);
@@ -101,7 +96,7 @@ namespace StudioStudio_Server.Services
             var startDate = request.StartDate.ToUniversalTime();
             var endDate = request.EndDate.ToUniversalTime();
 
-            var query = _db.Payments
+            var query = db.Payments
                 .Include(p => p.User)
                 .Include(p => p.Plan)
                 .Where(p => p.PaymentStatus == PaymentStatusEnum.SUCCESS
@@ -265,11 +260,11 @@ namespace StudioStudio_Server.Services
             var endDate = (request.EndDate ?? DateTime.UtcNow).ToUniversalTime();
             var now = DateTime.UtcNow;
 
-            var plans = await _db.SubscriptionPlans.ToListAsync();
+            var plans = await db.SubscriptionPlans.ToListAsync();
             var planSummaries = new List<PlanRevenueSummary>();
 
             // Get total revenue in period for percentage calculation
-            var totalRevenueInPeriod = await _db.Payments
+            var totalRevenueInPeriod = await db.Payments
                 .Where(p => p.PaymentStatus == PaymentStatusEnum.SUCCESS
                     && p.CreatedAt >= startDate
                     && p.CreatedAt <= endDate)
@@ -278,7 +273,7 @@ namespace StudioStudio_Server.Services
             foreach (var plan in plans)
             {
                 // Revenue for this plan in period
-                var planRevenue = await _db.Payments
+                var planRevenue = await db.Payments
                     .Where(p => p.PaymentStatus == PaymentStatusEnum.SUCCESS
                         && p.PlanId == plan.PlanId
                         && p.CreatedAt >= startDate
@@ -286,14 +281,14 @@ namespace StudioStudio_Server.Services
                     .SumAsync(p => p.Amount);
 
                 // Transaction count
-                var transactionCount = await _db.Payments
+                var transactionCount = await db.Payments
                     .CountAsync(p => p.PaymentStatus == PaymentStatusEnum.SUCCESS
                         && p.PlanId == plan.PlanId
                         && p.CreatedAt >= startDate
                         && p.CreatedAt <= endDate);
 
                 // Active subscriptions
-                var activeSubscriptions = await _db.UserSubscriptions
+                var activeSubscriptions = await db.UserSubscriptions
                     .CountAsync(u => u.PlanId == plan.PlanId && u.IsActive && u.EndDate > now);
 
                 // Calculate percentage
@@ -303,7 +298,7 @@ namespace StudioStudio_Server.Services
 
                 // Calculate trend (compare to previous period)
                 var previousPeriodStart = startDate.AddDays(-(endDate - startDate).Days);
-                var previousPeriodRevenue = await _db.Payments
+                var previousPeriodRevenue = await db.Payments
                     .Where(p => p.PaymentStatus == PaymentStatusEnum.SUCCESS
                         && p.PlanId == plan.PlanId
                         && p.CreatedAt >= previousPeriodStart
@@ -353,22 +348,22 @@ namespace StudioStudio_Server.Services
             var previousEnd = currentStart.AddDays(-1);
 
             // Current period data
-            var currentRevenue = await _db.Payments
+            var currentRevenue = await db.Payments
                 .Where(p => p.PaymentStatus == PaymentStatusEnum.SUCCESS
                     && p.CreatedAt >= currentStart
                     && p.CreatedAt <= currentEnd)
                 .SumAsync(p => p.Amount);
 
-            var currentTransactions = await _db.Payments
+            var currentTransactions = await db.Payments
                 .CountAsync(p => p.PaymentStatus == PaymentStatusEnum.SUCCESS
                     && p.CreatedAt >= currentStart
                     && p.CreatedAt <= currentEnd);
 
-            var newCustomers = await _db.UserSubscriptions
+            var newCustomers = await db.UserSubscriptions
                 .CountAsync(u => u.StartDate >= currentStart && u.StartDate <= currentEnd);
 
             // Simplified churn calculation - users whose subscriptions ended in the period
-            var churnedCustomers = await _db.UserSubscriptions
+            var churnedCustomers = await db.UserSubscriptions
                 .CountAsync(u => u.EndDate >= currentStart && u.EndDate <= currentEnd && u.IsActive == false);
 
             var currentAOV = currentTransactions > 0
@@ -391,13 +386,13 @@ namespace StudioStudio_Server.Services
             TrendData? previousPeriodData = null;
             if (request.Comparison)
             {
-                var previousRevenue = await _db.Payments
+                var previousRevenue = await db.Payments
                     .Where(p => p.PaymentStatus == PaymentStatusEnum.SUCCESS
                         && p.CreatedAt >= previousStart
                         && p.CreatedAt <= previousEnd)
                     .SumAsync(p => p.Amount);
 
-                var previousTransactions = await _db.Payments
+                var previousTransactions = await db.Payments
                     .CountAsync(p => p.PaymentStatus == PaymentStatusEnum.SUCCESS
                         && p.CreatedAt >= previousStart
                         && p.CreatedAt <= previousEnd);
@@ -472,7 +467,7 @@ namespace StudioStudio_Server.Services
             var startDate = (request.StartDate ?? DateTime.UtcNow.AddMonths(-1)).ToUniversalTime();
             var endDate = (request.EndDate ?? DateTime.UtcNow).ToUniversalTime();
 
-            var plans = await _db.SubscriptionPlans.ToListAsync();
+            var plans = await db.SubscriptionPlans.ToListAsync();
             var now = DateTime.UtcNow;
 
             var topPlans = new List<TopPlanItem>();
@@ -481,7 +476,7 @@ namespace StudioStudio_Server.Services
             foreach (var plan in plans)
             {
                 // Revenue in period
-                var totalRevenue = await _db.Payments
+                var totalRevenue = await db.Payments
                     .Where(p => p.PaymentStatus == PaymentStatusEnum.SUCCESS
                         && p.PlanId == plan.PlanId
                         && p.CreatedAt >= startDate
@@ -489,23 +484,23 @@ namespace StudioStudio_Server.Services
                     .SumAsync(p => p.Amount);
 
                 // Active subscriptions
-                var activeSubscriptions = await _db.UserSubscriptions
+                var activeSubscriptions = await db.UserSubscriptions
                     .CountAsync(u => u.PlanId == plan.PlanId && u.IsActive && u.EndDate > now);
 
                 // New subscriptions in period
-                var newSubscriptions = await _db.UserSubscriptions
+                var newSubscriptions = await db.UserSubscriptions
                     .CountAsync(u => u.PlanId == plan.PlanId
                         && u.StartDate >= startDate
                         && u.StartDate <= endDate);
 
                 // Total paid users for this plan (for conversion rate)
-                var totalPaidUsers = await _db.Payments
+                var totalPaidUsers = await db.Payments
                     .Where(p => p.PaymentStatus == PaymentStatusEnum.SUCCESS && p.PlanId == plan.PlanId)
                     .Select(p => p.UserId)
                     .Distinct()
                     .CountAsync();
 
-                var totalUsers = await _db.Users.CountAsync();
+                var totalUsers = await db.Users.CountAsync();
                 var conversionRate = totalUsers > 0
                     ? Math.Round((decimal)totalPaidUsers / totalUsers * 100, 2)
                     : 0;
@@ -553,7 +548,7 @@ namespace StudioStudio_Server.Services
             var pageNumber = request.PageNumber < 1 ? 1 : request.PageNumber;
             var pageSize = Math.Min(request.PageSize > 0 ? request.PageSize : 20, 100);
 
-            var query = _db.Payments
+            var query = db.Payments
                 .Include(p => p.User)
                 .Include(p => p.Plan)
                 .AsQueryable();
@@ -643,7 +638,7 @@ namespace StudioStudio_Server.Services
                 var monthEnd = monthStart.AddMonths(1).AddDays(-1);
 
                 // Start MRR - subscriptions active at start of month
-                var startMRR = await _db.UserSubscriptions
+                var startMRR = await db.UserSubscriptions
                     .Include(u => u.Plan)
                     .Where(u => u.IsActive
                         && u.StartDate <= monthStart
@@ -652,7 +647,7 @@ namespace StudioStudio_Server.Services
                     .SumAsync(u => u.Plan.Price);
 
                 // End MRR - subscriptions active at end of month
-                var endMRR = await _db.UserSubscriptions
+                var endMRR = await db.UserSubscriptions
                     .Include(u => u.Plan)
                     .Where(u => u.IsActive
                         && u.StartDate <= monthEnd
@@ -661,7 +656,7 @@ namespace StudioStudio_Server.Services
                     .SumAsync(u => u.Plan.Price);
 
                 // New MRR - new subscriptions in this month
-                var newSubscriptions = await _db.UserSubscriptions
+                var newSubscriptions = await db.UserSubscriptions
                     .Include(u => u.Plan)
                     .Where(u => u.StartDate >= monthStart
                         && u.StartDate <= monthEnd
@@ -674,7 +669,7 @@ namespace StudioStudio_Server.Services
                 var expansionMRR = 0m;
 
                 // Churn MRR - subscriptions that ended in this month
-                var churnedSubscriptions = await _db.UserSubscriptions
+                var churnedSubscriptions = await db.UserSubscriptions
                     .Include(u => u.Plan)
                     .Where(u => u.EndDate >= monthStart
                         && u.EndDate <= monthEnd
@@ -726,7 +721,7 @@ namespace StudioStudio_Server.Services
             {
                 case "overview":
                     var overview = await GetRevenueOverviewAsync();
-                    fileContent = await GenerateOverviewExcel(overview);
+                    fileContent = await GenerateOverviewExcel();
                     break;
                 case "by-period":
                     var periodRequest = new RevenueByPeriodRequest
@@ -736,7 +731,7 @@ namespace StudioStudio_Server.Services
                         Period = request.Period ?? "daily"
                     };
                     var byPeriod = await GetRevenueByPeriodAsync(periodRequest);
-                    fileContent = await GenerateByPeriodExcel(byPeriod);
+                    fileContent = await GenerateByPeriodExcel();
                     break;
                 case "by-plan":
                     var planRequest = new RevenueByPlanRequest
@@ -745,7 +740,7 @@ namespace StudioStudio_Server.Services
                         EndDate = request.EndDate
                     };
                     var byPlan = await GetRevenueByPlanAsync(planRequest);
-                    fileContent = await GenerateByPlanExcel(byPlan);
+                    fileContent = await GenerateByPlanExcel();
                     break;
                 case "transactions":
                     var transRequest = new RevenueTransactionsRequest
@@ -756,11 +751,11 @@ namespace StudioStudio_Server.Services
                         PageSize = 1000
                     };
                     var transactions = await GetRevenueTransactionsAsync(transRequest);
-                    fileContent = await GenerateTransactionsExcel(transactions);
+                    fileContent = await GenerateTransactionsExcel();
                     break;
                 default:
                     var defaultOverview = await GetRevenueOverviewAsync();
-                    fileContent = await GenerateOverviewExcel(defaultOverview);
+                    fileContent = await GenerateOverviewExcel();
                     break;
             }
 
@@ -772,24 +767,24 @@ namespace StudioStudio_Server.Services
             };
         }
 
-        private Task<byte[]> GenerateOverviewExcel(RevenueOverviewResponse overview)
+        private Task<byte[]> GenerateOverviewExcel()
         {
             // Placeholder - would use ClosedXML in production
             // For now, return empty byte array
             return Task.FromResult(Array.Empty<byte>());
         }
 
-        private Task<byte[]> GenerateByPeriodExcel(RevenueByPeriodResponse data)
+        private Task<byte[]> GenerateByPeriodExcel()
         {
             return Task.FromResult(Array.Empty<byte>());
         }
 
-        private Task<byte[]> GenerateByPlanExcel(RevenueByPlanResponse data)
+        private Task<byte[]> GenerateByPlanExcel()
         {
             return Task.FromResult(Array.Empty<byte>());
         }
 
-        private Task<byte[]> GenerateTransactionsExcel(RevenueTransactionsResponse data)
+        private Task<byte[]> GenerateTransactionsExcel()
         {
             return Task.FromResult(Array.Empty<byte>());
         }

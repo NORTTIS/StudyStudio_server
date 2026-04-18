@@ -1,4 +1,3 @@
-using Microsoft.AspNetCore.Http;
 using StudioStudio_Server.Exceptions;
 using StudioStudio_Server.Models.DTOs.Response;
 using StudioStudio_Server.Models.Entities;
@@ -17,15 +16,8 @@ namespace StudioStudio_Server.Services
         IGroupMessageRepository messageRepository,
         IGroupParticipantRepository groupParticipantRepository,
         ILogger<GroupMessageService> logger,
-        IHttpContextAccessor httpContextAccessor,
-        IActivityLogService activityLogService) : IGroupMessageService
+        IHttpContextAccessor httpContextAccessor) : IGroupMessageService
     {
-        private readonly IGroupMessageRepository _messageRepository = messageRepository;
-        private readonly IGroupParticipantRepository _groupParticipantRepository = groupParticipantRepository;
-        private readonly ILogger<GroupMessageService> _logger = logger;
-        private readonly IHttpContextAccessor _httpContextAccessor = httpContextAccessor;
-        private readonly IActivityLogService _activityLogService = activityLogService;
-
         /// <summary>
         /// Get message history in group (pagination)
         /// Validate: User must be member of group
@@ -43,14 +35,14 @@ namespace StudioStudio_Server.Services
         {
             await ValidateUserIsGroupMemberAsync(groupId, userId);
 
-            var messages = await _messageRepository.GetByGroupIdAsync(groupId, limit, offset);
-            var totalCount = await _messageRepository.GetCountByGroupIdAsync(groupId);
+            var messages = await messageRepository.GetByGroupIdAsync(groupId, limit, offset);
+            var totalCount = await messageRepository.GetCountByGroupIdAsync(groupId);
 
             var messageDtos = messages
                 .Select(m => MapToGroupMessageDto(m, includeReplies: true))
                 .ToList();
 
-            _logger.LogInformation(
+            logger.LogInformation(
                 "Retrieved {Count} messages for group {GroupId} (Total: {Total}). UserId: {UserId}",
                 messageDtos.Count, groupId, totalCount, userId);
 
@@ -67,7 +59,7 @@ namespace StudioStudio_Server.Services
         /// </summary>
         private async Task ValidateUserIsGroupMemberAsync(Guid groupId, Guid userId)
         {
-            var isUserInGroup = await _groupParticipantRepository
+            var isUserInGroup = await groupParticipantRepository
                 .IsUserInGroupAsync(groupId, userId);
 
             if (!isUserInGroup)
@@ -98,7 +90,7 @@ namespace StudioStudio_Server.Services
                     Id = message.User.UserId,
                     FirstName = message.User.FirstName,
                     LastName = message.User.LastName,
-                    AvatarUrl = AvatarUrlHelper.BuildAbsoluteAvatarUrl(message.User.AvatarUrl, _httpContextAccessor.HttpContext)
+                    AvatarUrl = AvatarUrlHelper.BuildAbsoluteAvatarUrl(message.User.AvatarUrl, httpContextAccessor.HttpContext)
                 },
                 ReplyCount = message.Replies?.Count(r => !r.IsDeleted) ?? 0,
                 Replies = null

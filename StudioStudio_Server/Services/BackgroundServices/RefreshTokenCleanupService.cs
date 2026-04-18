@@ -11,13 +11,11 @@ namespace StudioStudio_Server.Services.BackgroundServices
         IServiceProvider serviceProvider,
         ILogger<RefreshTokenCleanupService> logger) : BackgroundService
     {
-        private readonly IServiceProvider _serviceProvider = serviceProvider;
-        private readonly ILogger<RefreshTokenCleanupService> _logger = logger;
         private static readonly TimeSpan CleanupInterval = TimeSpan.FromHours(24);
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            _logger.LogInformation("?? Refresh Token Cleanup Service started");
+            logger.LogInformation("?? Refresh Token Cleanup Service started");
 
             while (!stoppingToken.IsCancellationRequested)
             {
@@ -25,25 +23,25 @@ namespace StudioStudio_Server.Services.BackgroundServices
                 {
                     await Task.Delay(CleanupInterval, stoppingToken);
                     
-                    using var scope = _serviceProvider.CreateScope();
+                    using var scope = serviceProvider.CreateScope();
                     var refreshTokenRepository = scope.ServiceProvider
                         .GetRequiredService<IRefreshTokenRepository>();
 
-                    _logger.LogInformation("?? Starting refresh token cleanup...");
+                    logger.LogInformation("?? Starting refresh token cleanup...");
                     
                     var deletedCount = await refreshTokenRepository.CleanupExpiredTokensAsync();
                     
-                    _logger.LogInformation(
+                    logger.LogInformation(
                         "? Refresh token cleanup completed. Deleted {Count} expired/revoked tokens",
                         deletedCount);
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "? Error during refresh token cleanup");
+                    logger.LogError(ex, "? Error during refresh token cleanup");
                 }
             }
 
-            _logger.LogInformation("?? Refresh Token Cleanup Service stopped");
+            logger.LogInformation("?? Refresh Token Cleanup Service stopped");
         }
     }
 }

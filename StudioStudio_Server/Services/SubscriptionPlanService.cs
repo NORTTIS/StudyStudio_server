@@ -12,14 +12,9 @@ namespace StudioStudio_Server.Services
         IUserSubscriptionRepository userSubscriptionRepository,
         ICacheService cacheService) : ISubscriptionPlanService
     {
-        private readonly ISubscriptionPlanRepository _subscriptionPlanRepository = subscriptionPlanRepository;
-        private readonly IUserRepository _userRepository = userRepository;
-        private readonly IUserSubscriptionRepository _userSubscriptionRepository = userSubscriptionRepository;
-        private readonly ICacheService _cacheService = cacheService;
-
         public async Task<SubscriptionPlanResponse> GetAllAsync()
         {
-            var listPlan = await _subscriptionPlanRepository.GetAllAsync();
+            var listPlan = await subscriptionPlanRepository.GetAllAsync();
             var response = listPlan.Select(p => new SubscriptionPlanItem
             {
                 PlanId = p.PlanId,
@@ -49,10 +44,10 @@ namespace StudioStudio_Server.Services
         public async Task<SubscriptionStatisticsResponse> GetStatisticsAsync()
         {
             // Get total active users
-            int totalActiveUsers = await _userRepository.CountActiveUsersAsync();
+            int totalActiveUsers = await userRepository.CountActiveUsersAsync();
 
             // Get premium users count (users who have ever subscribed to paid plans)
-            int premiumUsers = await _userSubscriptionRepository.CountPremiumUsersAsync();
+            int premiumUsers = await userSubscriptionRepository.CountPremiumUsersAsync();
 
             // Calculate free users (active users who never subscribed to premium)
             int freeUsers = totalActiveUsers - premiumUsers;
@@ -63,10 +58,10 @@ namespace StudioStudio_Server.Services
                 : 0;
 
             // Get all plans including inactive
-            var allPlans = await _subscriptionPlanRepository.GetAllIncludingInactiveAsync();
+            var allPlans = await subscriptionPlanRepository.GetAllIncludingInactiveAsync();
 
             // Get subscriber counts per paid plan (active subscriptions only)
-            var subscriberCounts = await _userSubscriptionRepository.GetSubscriberCountsByPlanAsync();
+            var subscriberCounts = await userSubscriptionRepository.GetSubscriberCountsByPlanAsync();
 
             // Find Free Plan to add free users count
             var freePlan = allPlans.FirstOrDefault(p => p.BillingCycle == BillingCycle.Free);
@@ -114,7 +109,7 @@ namespace StudioStudio_Server.Services
         public async Task<SubscriptionPlanDetail> UpdatePlanAsync(UpdateSubscriptionPlanRequest request)
         {
             // Get plan by ID
-            var plan = await _subscriptionPlanRepository.GetByIdAsync(request.PlanId);
+            var plan = await subscriptionPlanRepository.GetByIdAsync(request.PlanId);
             
             if (plan == null)
             {
@@ -134,24 +129,24 @@ namespace StudioStudio_Server.Services
             plan.IsActive = request.IsActive;
 
             // Save changes
-            await _subscriptionPlanRepository.UpdateAsync(plan);
+            await subscriptionPlanRepository.UpdateAsync(plan);
 
             // ✅ INVALIDATE SUBSCRIPTION CACHES - Admin updated subscription plans
-            await _cacheService.InvalidateSubscriptionCachesAsync();
+            await cacheService.InvalidateSubscriptionCachesAsync();
 
             // Calculate subscriber count based on plan type
             int subscriberCount;
             if (plan.BillingCycle == BillingCycle.Free)
             {
                 // For Free Plan: calculate free users
-                int totalActiveUsers = await _userRepository.CountActiveUsersAsync();
-                int premiumUsers = await _userSubscriptionRepository.CountPremiumUsersAsync();
+                int totalActiveUsers = await userRepository.CountActiveUsersAsync();
+                int premiumUsers = await userSubscriptionRepository.CountPremiumUsersAsync();
                 subscriberCount = totalActiveUsers - premiumUsers;
             }
             else
             {
                 // For Paid Plans: get active subscription count
-                var subscriberCounts = await _userSubscriptionRepository.GetSubscriberCountsByPlanAsync();
+                var subscriberCounts = await userSubscriptionRepository.GetSubscriberCountsByPlanAsync();
                 subscriberCount = subscriberCounts.ContainsKey(plan.PlanId) ? subscriberCounts[plan.PlanId] : 0;
             }
 

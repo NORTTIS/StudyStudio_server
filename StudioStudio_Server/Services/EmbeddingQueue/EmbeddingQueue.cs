@@ -15,7 +15,6 @@ namespace StudioStudio_Server.Services.EmbeddingQueue
         public DateTime WindowStartTime { get; set; }
         public DateTime WindowEndTime => WindowStartTime.AddMinutes(1);
         public TimeSpan TimeUntilReset => WindowEndTime - DateTime.UtcNow;
-        public bool CanAccommodate(int tokens) => RemainingTokens >= tokens;
     }
 
     /// <summary>

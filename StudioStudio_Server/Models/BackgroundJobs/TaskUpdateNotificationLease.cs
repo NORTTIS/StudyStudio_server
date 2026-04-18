@@ -1,3 +1,5 @@
+using StudioStudio_Server.Services.TaskNotificationQueue;
+
 namespace StudioStudio_Server.Models.BackgroundJobs
 {
     /// <summary>

@@ -7,7 +7,6 @@ using Microsoft.AspNetCore.Identity;
 using StudioStudio_Server.Exceptions;
 using System.Text.RegularExpressions;
 using StudioStudio_Server.Models.DTOs.Response;
-using EnumsNET;
 
 namespace StudioStudio_Server.Services
 {
@@ -20,22 +19,11 @@ namespace StudioStudio_Server.Services
     public class UserService(
         IUserRepository userRepository,
         IPasswordHasher<User> passwordHasher,
-        IConfiguration configuration,
-        IHttpContextAccessor httpContextAccessor,
         IWebHostEnvironment environment,
         IUserSubscriptionRepository userSubscriptionRepository,
         IAIRequestLogRepository aiRequestLogRepository,
         ICacheService cacheService) : IUserService
     {
-        private readonly IUserRepository _userRepository = userRepository;
-        private readonly IPasswordHasher<User> _passwordHasher = passwordHasher;
-        private readonly IConfiguration _configuration = configuration;
-        private readonly IHttpContextAccessor _httpContextAccessor = httpContextAccessor;
-        private readonly IWebHostEnvironment _environment = environment;
-        private readonly IUserSubscriptionRepository _userSubscriptionRepository = userSubscriptionRepository;
-        private readonly IAIRequestLogRepository _aiRequestLogRepository = aiRequestLogRepository;
-        private readonly ICacheService _cacheService = cacheService;
-
         // Password must be 10-20 characters long, contain at least one uppercase letter, one lowercase letter, and one digit
         private readonly Regex PasswordRegex = new(@"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)[A-Za-z\d@$!%*?&]{10,20}$", RegexOptions.Compiled);
 
@@ -46,12 +34,12 @@ namespace StudioStudio_Server.Services
         /// </summary>
         public async Task<User?> GetByIdAsync(Guid userId)
         {
-            var cacheKey = _cacheService.GetUserProfileKey(userId);
+            var cacheKey = cacheService.GetUserProfileKey(userId);
             
-            return await _cacheService.GetOrSetAsync(
+            return await cacheService.GetOrSetAsync(
                 cacheKey,
-                async () => await _userRepository.GetByIdAsync(userId),
-                _cacheService.GetExpirationForKey(cacheKey)
+                async () => await userRepository.GetByIdAsync(userId),
+                cacheService.GetExpirationForKey(cacheKey)
             );
         }
 
@@ -61,7 +49,7 @@ namespace StudioStudio_Server.Services
         /// </summary>
         public async Task<User?> GetByEmailAsync(string email)
         {
-            return await _userRepository.GetByEmailAsync(email);
+            return await userRepository.GetByEmailAsync(email);
         }
 
         /// <summary>
@@ -72,10 +60,10 @@ namespace StudioStudio_Server.Services
         public async Task UpdateAsync(User user)
         {
             user.UpdatedAt = DateTime.UtcNow;
-            await _userRepository.UpdateAsync(user);
+            await userRepository.UpdateAsync(user);
             
             // Invalidate user cache
-            await _cacheService.InvalidateUserCacheAsync(user.UserId);
+            await cacheService.InvalidateUserCacheAsync(user.UserId);
         }
 
         /// <summary>
@@ -90,7 +78,7 @@ namespace StudioStudio_Server.Services
         /// </summary>
         public async Task DeleteAsync(Guid userId)
         {
-            var user = await _userRepository.GetByIdIncludingDeletedAsync(userId);
+            var user = await userRepository.GetByIdIncludingDeletedAsync(userId);
             if (user == null)
             {
                 throw new AppException(ErrorCodes.UserNotFound, StatusCodes.Status404NotFound);
@@ -98,7 +86,7 @@ namespace StudioStudio_Server.Services
 
             if (user.Status == UserStatus.Deleted)
             {
-                throw new AppException(ErrorCodes.UserAccountAlreadyDeleted, StatusCodes.Status400BadRequest);
+                throw new AppException(ErrorCodes.UserAccountAlreadyDeleted);
             }
 
             // Apply ghostUser: anonymize user data
@@ -109,17 +97,17 @@ namespace StudioStudio_Server.Services
             user.LastName = "User";
             // Generate random password hash to satisfy NOT NULL constraint
             // This password is unusable since user cannot login (Status = Deleted)
-            user.PasswordHash = _passwordHasher.HashPassword(user, Guid.NewGuid().ToString("N"));
+            user.PasswordHash = passwordHasher.HashPassword(user, Guid.NewGuid().ToString("N"));
             user.PhoneNumber = null;
             user.Bio = null;
             user.AvatarUrl = null;
             user.GoogleId = null;
             user.UpdatedAt = DateTime.UtcNow;
 
-            await _userRepository.UpdateAsync(user);
+            await userRepository.UpdateAsync(user);
 
             // Invalidate all user-related cache
-            await _cacheService.InvalidateUserCacheAsync(userId);
+            await cacheService.InvalidateUserCacheAsync(userId);
         }
 
         /// <summary>
@@ -134,47 +122,47 @@ namespace StudioStudio_Server.Services
         public async Task ChangePasswordAsync(Guid userId, ChangePasswordRequest request)
         {
             // Get user
-            var user = await _userRepository.GetByIdAsync(userId);
+            var user = await userRepository.GetByIdAsync(userId);
             if (user == null)
             {
                 throw new AppException(ErrorCodes.UserNotFound, StatusCodes.Status404NotFound);
             }
 
             // Verify current password
-            var verifyResult = _passwordHasher.VerifyHashedPassword(user, user.PasswordHash!, request.CurrentPassword);
+            var verifyResult = passwordHasher.VerifyHashedPassword(user, user.PasswordHash!, request.CurrentPassword);
             if (verifyResult != PasswordVerificationResult.Success)
             {
-                throw new AppException(ErrorCodes.AuthIncorrectCurrentPassword, StatusCodes.Status400BadRequest);
+                throw new AppException(ErrorCodes.AuthIncorrectCurrentPassword);
             }
 
             // Validate new password format
             if (!IsValidPassword(request.NewPassword))
             {
-                throw new AppException(ErrorCodes.ValidationInvalidPassword, StatusCodes.Status400BadRequest);
+                throw new AppException(ErrorCodes.ValidationInvalidPassword);
             }
 
             // Check password confirmation match
             if (request.NewPassword != request.ConfirmPassword)
             {
-                throw new AppException(ErrorCodes.ValidationPasswordMismatch, StatusCodes.Status400BadRequest);
+                throw new AppException(ErrorCodes.ValidationPasswordMismatch);
             }
 
 
 
             // Check if new password is the same as current password
-            var isSamePassword = _passwordHasher.VerifyHashedPassword(user, user.PasswordHash, request.NewPassword);
+            var isSamePassword = passwordHasher.VerifyHashedPassword(user, user.PasswordHash, request.NewPassword);
             if (isSamePassword == PasswordVerificationResult.Success)
             {
-                throw new AppException(ErrorCodes.ValidationNewPasswordSameAsCurrent, StatusCodes.Status400BadRequest);
+                throw new AppException(ErrorCodes.ValidationNewPasswordSameAsCurrent);
             }
 
             // Update password
-            user.PasswordHash = _passwordHasher.HashPassword(user, request.NewPassword);
+            user.PasswordHash = passwordHasher.HashPassword(user, request.NewPassword);
             user.UpdatedAt = DateTime.UtcNow;
-            await _userRepository.UpdateAsync(user);
+            await userRepository.UpdateAsync(user);
             
             // Invalidate user cache
-            await _cacheService.InvalidateUserCacheAsync(userId);
+            await cacheService.InvalidateUserCacheAsync(userId);
         }
 
         /// <summary>
@@ -188,7 +176,7 @@ namespace StudioStudio_Server.Services
         /// </summary>
         public async Task UpdateProfileAsync(Guid userId, UpdateUserProfileRequest request)
         {
-            var user = await _userRepository.GetByIdAsync(userId);
+            var user = await userRepository.GetByIdAsync(userId);
             if (user == null)
             {
                 throw new AppException(ErrorCodes.UserNotFound, StatusCodes.Status404NotFound);
@@ -218,10 +206,10 @@ namespace StudioStudio_Server.Services
             }
 
             user.UpdatedAt = DateTime.UtcNow;
-            await _userRepository.UpdateAsync(user);
+            await userRepository.UpdateAsync(user);
             
             // Invalidate all user-related cache after profile update
-            await _cacheService.InvalidateUserCacheAsync(userId);
+            await cacheService.InvalidateUserCacheAsync(userId);
         }
 
         /// <summary>
@@ -248,7 +236,7 @@ namespace StudioStudio_Server.Services
         {
             if (file.Length > 5 * 1024 * 1024) // 5MB limit
             {
-                throw new AppException(ErrorCodes.ValidationFileSizeExceeded, StatusCodes.Status400BadRequest);
+                throw new AppException(ErrorCodes.ValidationFileSizeExceeded);
             }
 
             var allowedExtensions = new[] { ".jpg", ".jpeg", ".png" };
@@ -256,10 +244,10 @@ namespace StudioStudio_Server.Services
 
             if (!allowedExtensions.Contains(fileExtension))
             {
-                throw new AppException(ErrorCodes.ValidationInvalidFileFormat, StatusCodes.Status400BadRequest);
+                throw new AppException(ErrorCodes.ValidationInvalidFileFormat);
             }
 
-            var webRootPath = _environment.WebRootPath ?? Path.Combine(Directory.GetCurrentDirectory(), "wwwroot");
+            var webRootPath = environment.WebRootPath;
             var uploadsFolder = Path.Combine(webRootPath, "uploads", "avatars");
             Directory.CreateDirectory(uploadsFolder);
 
@@ -310,14 +298,14 @@ namespace StudioStudio_Server.Services
 
             // Always query AI request count fresh for accurate rate limiting
             // (int cannot be cached with current ICacheService constraint)
-            int usedToday = await _aiRequestLogRepository.CountTodayRequestsAsync(userId, startOfDay);
+            int usedToday = await aiRequestLogRepository.CountTodayRequestsAsync(userId, startOfDay);
 
             // Cache subscription plan with proper expiration
-            var subscriptionKey = _cacheService.GetUserSubscriptionKey(userId);
-            SubscriptionPlan? subscriptionPlan = await _cacheService.GetOrSetAsync(
+            var subscriptionKey = cacheService.GetUserSubscriptionKey(userId);
+            SubscriptionPlan? subscriptionPlan = await cacheService.GetOrSetAsync(
                 subscriptionKey,
-                async () => await _userSubscriptionRepository.GetSubscriptionPlanByUserIdAsync(userId),
-                _cacheService.GetExpirationForKey(subscriptionKey)
+                async () => await userSubscriptionRepository.GetSubscriptionPlanByUserIdAsync(userId),
+                cacheService.GetExpirationForKey(subscriptionKey)
             );
 
             int dailyLimit = subscriptionPlan?.MaxAiRequestsPerDay ?? 20; // Default: Free Plan = 20
@@ -328,11 +316,11 @@ namespace StudioStudio_Server.Services
         public async Task<SubscriptionPlanItem> GetUserSubscriptionPlan(Guid userId)
         {
             // Cache subscription plan with proper expiration
-            var subscriptionKey = _cacheService.GetUserSubscriptionKey(userId);
-            SubscriptionPlan? subscriptionPlan = await _cacheService.GetOrSetAsync(
+            var subscriptionKey = cacheService.GetUserSubscriptionKey(userId);
+            SubscriptionPlan? subscriptionPlan = await cacheService.GetOrSetAsync(
                 subscriptionKey,
-                async () => await _userSubscriptionRepository.GetSubscriptionPlanByUserIdAsync(userId),
-                _cacheService.GetExpirationForKey(subscriptionKey)
+                async () => await userSubscriptionRepository.GetSubscriptionPlanByUserIdAsync(userId),
+                cacheService.GetExpirationForKey(subscriptionKey)
             );
 
             return new SubscriptionPlanItem

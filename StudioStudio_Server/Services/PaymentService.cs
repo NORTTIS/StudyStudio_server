@@ -27,36 +27,26 @@ namespace StudioStudio_Server.Services
     {
         private const int PAYOS_CANCEL_TIME = 15;
 
-        private readonly PayOSClient _payOSClient = payOSClient;
-        private readonly IPaymentRepository _paymentRepository = paymentRepository;
-        private readonly IUserSubscriptionRepository _subscriptionRepository = subscriptionRepository;
-        private readonly IUserRepository _userRepository = userRepository;
-        private readonly IEmailService _emailService = emailService;
-        private readonly StudioDbContext _db = db;
-        private readonly IConfiguration _configuration = configuration;
-        private readonly ILogger<PaymentService> _logger = logger;
-        private readonly ICacheService _cacheService = cacheService;
-
         public async Task<CreatePaymentResponse> CreatePaymentLinkAsync(Guid userId, CreatePaymentRequest request)
         {
-            var plan = await _db.SubscriptionPlans
+            var plan = await db.SubscriptionPlans
                 .FirstOrDefaultAsync(p => p.PlanId == request.PlanId && p.IsActive);
 
             if (plan == null)
                 throw new AppException(ErrorCodes.PaymentPlanNotFound, StatusCodes.Status404NotFound);
 
             if (plan.BillingCycle == BillingCycle.Free)
-                throw new AppException(ErrorCodes.PaymentCannotPayForFreePlan, StatusCodes.Status400BadRequest);
+                throw new AppException(ErrorCodes.PaymentCannotPayForFreePlan);
 
             if (plan.Price <= 0)
             {
-                throw new AppException(ErrorCodes.PaymentPriceInvalid, StatusCodes.Status400BadRequest);
+                throw new AppException(ErrorCodes.PaymentPriceInvalid);
             }
 
-            var currentPlan = await _subscriptionRepository.GetSubscriptionPlanByUserIdAsync(userId);
+            var currentPlan = await subscriptionRepository.GetSubscriptionPlanByUserIdAsync(userId);
             if (currentPlan != null && currentPlan.BillingCycle == BillingCycle.Monthly)
             {
-                throw new AppException(ErrorCodes.PaymentCantProceed, StatusCodes.Status400BadRequest);
+                throw new AppException(ErrorCodes.PaymentCantProceed);
             }
 
             await CancelAllPendingPaymentAsync(userId);
@@ -75,7 +65,7 @@ namespace StudioStudio_Server.Services
                 CreatedAt = DateTime.UtcNow
             };
 
-            var baseUrl = _configuration["Frontend:BaseUrl"] ?? "http://localhost:3000";
+            var baseUrl = configuration["Frontend:BaseUrl"] ?? "http://localhost:3000";
             var returnUrl = $"{baseUrl}/payment/success?orderCode={orderCode}";
             var cancelUrl = $"{baseUrl}/payment/cancel?orderCode={orderCode}";
 
@@ -98,10 +88,10 @@ namespace StudioStudio_Server.Services
                 ]
             };
 
-            var paymentLink = await _payOSClient.PaymentRequests.CreateAsync(createRequest);
+            var paymentLink = await payOSClient.PaymentRequests.CreateAsync(createRequest);
 
             payment.PaymentUrl = paymentLink.CheckoutUrl;
-            await _paymentRepository.AddAsync(payment);
+            await paymentRepository.AddAsync(payment);
 
             return new CreatePaymentResponse
             {
@@ -125,26 +115,26 @@ namespace StudioStudio_Server.Services
                 if (webhook == null)
                     throw new AppException(ErrorCodes.PaymentWebhookInvalid);
 
-                webhookData = await _payOSClient.Webhooks.VerifyAsync(webhook);
+                webhookData = await payOSClient.Webhooks.VerifyAsync(webhook);
             }
             catch (Exception ex) when (ex is not AppException)
             {
-                _logger.LogWarning(ex, "PayOS webhook verification failed");
+                logger.LogWarning(ex, "PayOS webhook verification failed");
                 throw new AppException(ErrorCodes.PaymentWebhookInvalid);
             }
 
-            var payment = await _paymentRepository.GetByOrderCodeAsync(webhookData.OrderCode);
+            var payment = await paymentRepository.GetByOrderCodeAsync(webhookData.OrderCode);
             if (payment == null)
             {
-                _logger.LogWarning("PayOS webhook received for unknown order code: {OrderCode}", webhookData.OrderCode);
+                logger.LogWarning("PayOS webhook received for unknown order code: {OrderCode}", webhookData.OrderCode);
                 return;
             }
 
             if (payment.PaymentStatus != PaymentStatusEnum.PENDING)
                 return;
 
-            var user = await _userRepository.GetByIdAsync(payment.UserId);
-            var plan = await _db.SubscriptionPlans.FindAsync(payment.PlanId);
+            var user = await userRepository.GetByIdAsync(payment.UserId);
+            var plan = await db.SubscriptionPlans.FindAsync(payment.PlanId);
             var language = user?.Language == "vi" ? Language.Vietnamese : Language.English;
 
             if (webhookData.Code == "00")
@@ -152,7 +142,7 @@ namespace StudioStudio_Server.Services
                 payment.PaymentStatus = PaymentStatusEnum.SUCCESS;
                 payment.TransactionId = webhookData.Reference;
                 payment.PaidAt = DateTime.UtcNow;
-                await _paymentRepository.UpdateAsync(payment);
+                await paymentRepository.UpdateAsync(payment);
 
                 await ActivateSubscriptionAsync(payment);
 
@@ -172,19 +162,19 @@ namespace StudioStudio_Server.Services
 
                     try
                     {
-                        await _emailService.SendLinkAsync(user.Email, "Payment Successful - Study Studio", emailBody);
-                        _logger.LogInformation("Payment success email sent to {Email}", user.Email);
+                        await emailService.SendLinkAsync(user.Email, "Payment Successful - Study Studio", emailBody);
+                        logger.LogInformation("Payment success email sent to {Email}", user.Email);
                     }
                     catch (Exception ex)
                     {
-                        _logger.LogWarning(ex, "Failed to send payment success email to {Email}", user.Email);
+                        logger.LogWarning(ex, "Failed to send payment success email to {Email}", user.Email);
                     }
                 }
             }
             else
             {
                 payment.PaymentStatus = PaymentStatusEnum.FAILED;
-                await _paymentRepository.UpdateAsync(payment);
+                await paymentRepository.UpdateAsync(payment);
 
                 // Send failed email
                 if (user != null && plan != null)
@@ -203,12 +193,12 @@ namespace StudioStudio_Server.Services
 
                     try
                     {
-                        await _emailService.SendLinkAsync(user.Email, "Payment Failed - Study Studio", emailBody);
-                        _logger.LogInformation("Payment failed email sent to {Email}", user.Email);
+                        await emailService.SendLinkAsync(user.Email, "Payment Failed - Study Studio", emailBody);
+                        logger.LogInformation("Payment failed email sent to {Email}", user.Email);
                     }
                     catch (Exception ex)
                     {
-                        _logger.LogWarning(ex, "Failed to send payment failed email to {Email}", user.Email);
+                        logger.LogWarning(ex, "Failed to send payment failed email to {Email}", user.Email);
                     }
                 }
             }
@@ -216,7 +206,7 @@ namespace StudioStudio_Server.Services
 
         public async Task<PaymentStatusResponse> GetPaymentStatusAsync(Guid userId, Guid paymentId)
         {
-            var payment = await _paymentRepository.GetByPaymentIdAsync(paymentId);
+            var payment = await paymentRepository.GetByPaymentIdAsync(paymentId);
 
             if (payment == null || payment.UserId != userId)
                 throw new AppException(ErrorCodes.PaymentNotFound, StatusCodes.Status404NotFound);
@@ -226,27 +216,27 @@ namespace StudioStudio_Server.Services
 
         public async Task<PaymentStatusResponse> CancelPaymentAsync(Guid userId, long orderCode)
         {
-            var payment = await _paymentRepository.GetByOrderCodeAsync(orderCode);
+            var payment = await paymentRepository.GetByOrderCodeAsync(orderCode);
 
             if (payment == null || payment.UserId != userId)
                 throw new AppException(ErrorCodes.PaymentNotFound, StatusCodes.Status404NotFound);
 
             if (payment.PaymentStatus != PaymentStatusEnum.PENDING)
-                throw new AppException(ErrorCodes.PaymentCannotCancel, StatusCodes.Status400BadRequest);
+                throw new AppException(ErrorCodes.PaymentCannotCancel);
 
-            await _payOSClient.PaymentRequests.CancelAsync(orderCode);
+            await payOSClient.PaymentRequests.CancelAsync(orderCode);
 
             payment.PaymentStatus = PaymentStatusEnum.CANCELLED;
-            await _paymentRepository.UpdateAsync(payment);
+            await paymentRepository.UpdateAsync(payment);
 
             return MapToStatusResponse(payment);
         }
 
         private async Task ActivateSubscriptionAsync(Payment payment)
         {
-            await _subscriptionRepository.DeactivateActiveSubscriptionsAsync(payment.UserId);
+            await subscriptionRepository.DeactivateActiveSubscriptionsAsync(payment.UserId);
 
-            var plan = await _db.SubscriptionPlans.FindAsync(payment.PlanId);
+            var plan = await db.SubscriptionPlans.FindAsync(payment.PlanId);
             if (plan == null) return;
 
             var startDate = DateTime.UtcNow;
@@ -264,12 +254,12 @@ namespace StudioStudio_Server.Services
                 IsActive = true
             };
 
-            await _subscriptionRepository.AddAsync(subscription);
+            await subscriptionRepository.AddAsync(subscription);
             
             // ? INVALIDATE USER SUBSCRIPTION CACHE - User purchased new subscription
-            await _cacheService.InvalidateUserCacheAsync(payment.UserId);
+            await cacheService.InvalidateUserCacheAsync(payment.UserId);
             
-            _logger.LogInformation("Subscription activated for user {UserId}, plan {PlanId}. Cache invalidated.", payment.UserId, payment.PlanId);
+            logger.LogInformation("Subscription activated for user {UserId}, plan {PlanId}. Cache invalidated.", payment.UserId, payment.PlanId);
         }
 
         private static PaymentStatusResponse MapToStatusResponse(Payment payment) => new()
@@ -285,7 +275,7 @@ namespace StudioStudio_Server.Services
 
         public async Task<PaymentHistoryResponse> GetPaymentHistoryAsync(Guid userId)
         {
-            var paymentList = await _paymentRepository.GetByUserIdAsync(userId);
+            var paymentList = await paymentRepository.GetByUserIdAsync(userId);
             var histories = paymentList.Select(p => new PaymentHistory
             {
                 PaymentId = p.PaymentId,
@@ -302,7 +292,7 @@ namespace StudioStudio_Server.Services
 
         private async Task CancelAllPendingPaymentAsync(Guid userId)
         {
-            var pendingPayments = await _paymentRepository.GetAllPendingByUserIdAsync(userId);
+            var pendingPayments = await paymentRepository.GetAllPendingByUserIdAsync(userId);
 
             if (!pendingPayments.Any()) return;
 
@@ -310,25 +300,25 @@ namespace StudioStudio_Server.Services
             {
                 try
                 {
-                    await _payOSClient.PaymentRequests.CancelAsync(
+                    await payOSClient.PaymentRequests.CancelAsync(
                         payment.OrderCode,
                         "Người dùng tạo đơn thanh toán mới"
                     );
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogWarning(ex,
+                    logger.LogWarning(ex,
                         "Could not cancel PayOS payment link for order {OrderCode}",
                         payment.OrderCode);
                 }
                 payment.PaymentStatus = PaymentStatusEnum.CANCELLED;
-                await _paymentRepository.UpdateAsync(payment);
+                await paymentRepository.UpdateAsync(payment);
             }
         }
 
         public async Task<BillingHistoryResponse> GetBillingHistoryAsync(GetBillingHistoryRequest request)
         {
-            var (items, totalCount) = await _paymentRepository.GetBillingHistoryAsync(
+            var (items, totalCount) = await paymentRepository.GetBillingHistoryAsync(
                 request.SearchTerm,
                 request.PaymentStatus,
                 request.PageNumber,

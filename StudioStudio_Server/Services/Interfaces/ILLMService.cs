@@ -16,20 +16,6 @@ namespace StudioStudio_Server.Services.Interfaces
     public interface ILLMService
     {
         /// <summary>
-        /// Goi LLM API de generate cau tra loi
-        /// </summary>
-        /// <param name="systemPrompt">System prompt de dinh nghia behavior cua AI</param>
-        /// <param name="userMessage">Cau hoi tu user</param>
-        /// <param name="context">Context tu documents va tasks</param>
-        /// <param name="cancellationToken">Cancellation token</param>
-        /// <returns>Cau tra loi tu LLM</returns>
-        Task<string> GenerateAnswerAsync(
-            string systemPrompt,
-            string userMessage,
-            string context,
-            CancellationToken cancellationToken = default);
-
-        /// <summary>
         /// Goi LLM API de generate cau tra loi + token usage
         /// </summary>
         /// <param name="systemPrompt">System prompt de dinh nghia behavior cua AI</param>

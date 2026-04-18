@@ -1,6 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
-using StudioStudio_Server.Data;
-using StudioStudio_Server.Models.DTOs.Request;
+﻿using StudioStudio_Server.Models.DTOs.Request;
 using StudioStudio_Server.Models.DTOs.Response;
 using StudioStudio_Server.Models.Enums;
 using StudioStudio_Server.Repositories.Interfaces;
@@ -12,9 +10,6 @@ namespace StudioStudio_Server.Services
         IAdminStatisticsRepository repository,
         ILogger<AdminStatisticsService> logger) : IAdminStatisticsService
     {
-        private readonly IAdminStatisticsRepository _repository = repository;
-        private readonly ILogger<AdminStatisticsService> _logger = logger;
-
         public async Task<HourlyActivityResponse> GetHourlyActivityAsync(HourlyActivityRequest request)
         {
             try
@@ -24,7 +19,7 @@ namespace StudioStudio_Server.Services
 
                 // Get user login activity data grouped by hour and day of week (excluding admin accounts)
                 // Data is obtained from RefreshToken creation time (when user logs in)
-                var hourlyData = await _repository.GetHourlyLoginActivityAsync(startDate, endDate);
+                var hourlyData = await repository.GetHourlyLoginActivityAsync(startDate, endDate);
 
                 var hourlyActivityPoints = hourlyData
                     .Select(x => new HourlyActivityDataPoint
@@ -45,7 +40,7 @@ namespace StudioStudio_Server.Services
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error getting hourly activity");
+                logger.LogError(ex, "Error getting hourly activity");
                 throw;
             }
         }
@@ -58,14 +53,14 @@ namespace StudioStudio_Server.Services
                 var endDate = request.EndDate ?? DateTime.UtcNow;
 
                 // Get all reports in date range (excluding reports from admin accounts)
-                var reports = await _repository.GetReportsAsync(startDate, endDate);
+                var reports = await repository.GetReportsAsync(startDate, endDate);
 
                 // Group by period
                 var groupedReports = reports
                     .GroupBy(r => new
                     {
-                        Year = r.CreatedAt.Year,
-                        Month = r.CreatedAt.Month,
+                        r.CreatedAt.Year,
+                        r.CreatedAt.Month,
                         Date = new DateTime(r.CreatedAt.Year, r.CreatedAt.Month, 1)
                     })
                     .Select(g => new ReportStatusDataPoint
@@ -91,7 +86,7 @@ namespace StudioStudio_Server.Services
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error getting report status");
+                logger.LogError(ex, "Error getting report status");
                 throw;
             }
         }
@@ -104,7 +99,7 @@ namespace StudioStudio_Server.Services
                 var endDate = request.EndDate ?? DateTime.UtcNow;
 
                 // Query users created in date range (excluding admin accounts)
-                var users = await _repository.GetUsersAsync(startDate, endDate);
+                var users = await repository.GetUsersAsync(startDate, endDate);
 
                 var activeCount = users.Count(u => u.Status == UserStatus.Active);
                 var inactiveCount = users.Count(u => u.Status == UserStatus.Inactive);
@@ -136,7 +131,7 @@ namespace StudioStudio_Server.Services
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error getting user distribution");
+                logger.LogError(ex, "Error getting user distribution");
                 throw;
             }
         }
@@ -149,11 +144,11 @@ namespace StudioStudio_Server.Services
                 var endDate = request.EndDate ?? DateTime.UtcNow;
 
                 // Get all ACTIVE users in date range
-                var users = await _repository.GetUsersAsync(startDate, endDate);
+                var users = await repository.GetUsersAsync(startDate, endDate);
                 var activeCount = users.Count(u => u.Status == UserStatus.Active);
 
                 // Get only PREMIUM subscriptions (filtered by date range) - free accounts have no subscription record
-                var premiumSubscriptions = await _repository.GetSubscriptionsAsync(startDate, endDate);
+                var premiumSubscriptions = await repository.GetSubscriptionsAsync(startDate, endDate);
                 var premiumCount = premiumSubscriptions.Count;
 
                 // Free users = Total active - Premium users
@@ -192,7 +187,7 @@ namespace StudioStudio_Server.Services
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error getting subscription distribution");
+                logger.LogError(ex, "Error getting subscription distribution");
                 throw;
             }
         }
@@ -209,11 +204,11 @@ namespace StudioStudio_Server.Services
                 var activityId = 1;
 
                 // New user signups (excluding admin accounts)
-                var newUserCount = await _repository.CountRecentUserSignupsAsync(startDate, endDate);
+                var newUserCount = await repository.CountRecentUserSignupsAsync(startDate, endDate);
 
                 if (newUserCount > 0)
                 {
-                    var lastUser = await _repository.GetMostRecentUserSignupAsync(startDate, endDate);
+                    var lastUser = await repository.GetMostRecentUserSignupAsync(startDate, endDate);
 
                     if (lastUser != null)
                     {
@@ -230,11 +225,11 @@ namespace StudioStudio_Server.Services
                 }
 
                 // Report submissions (excluding admin accounts)
-                var reportCount = await _repository.CountRecentReportsAsync(startDate, endDate);
+                var reportCount = await repository.CountRecentReportsAsync(startDate, endDate);
 
                 if (reportCount > 0)
                 {
-                    var lastReport = await _repository.GetMostRecentReportAsync(startDate, endDate);
+                    var lastReport = await repository.GetMostRecentReportAsync(startDate, endDate);
 
                     if (lastReport != null)
                     {
@@ -251,11 +246,11 @@ namespace StudioStudio_Server.Services
                 }
 
                 // Premium upgrades (excluding admin accounts)
-                var premiumUpgradeCount = await _repository.CountRecentPremiumUpgradesAsync(startDate, endDate);
+                var premiumUpgradeCount = await repository.CountRecentPremiumUpgradesAsync(startDate, endDate);
 
                 if (premiumUpgradeCount > 0)
                 {
-                    var lastUpgrade = await _repository.GetMostRecentPremiumUpgradeAsync(startDate, endDate);
+                    var lastUpgrade = await repository.GetMostRecentPremiumUpgradeAsync(startDate, endDate);
 
                     if (lastUpgrade.HasValue && lastUpgrade.Value.Plan != null)
                     {
@@ -272,11 +267,11 @@ namespace StudioStudio_Server.Services
                 }
 
                 // Group creations (excluding groups created by admins)
-                var groupCreateCount = await _repository.CountRecentGroupCreationsAsync(startDate, endDate);
+                var groupCreateCount = await repository.CountRecentGroupCreationsAsync(startDate, endDate);
 
                 if (groupCreateCount > 0)
                 {
-                    var lastGroup = await _repository.GetMostRecentGroupCreationAsync(startDate, endDate);
+                    var lastGroup = await repository.GetMostRecentGroupCreationAsync(startDate, endDate);
 
                     if (lastGroup != null)
                     {
@@ -307,7 +302,7 @@ namespace StudioStudio_Server.Services
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error getting recent activity");
+                logger.LogError(ex, "Error getting recent activity");
                 throw;
             }
         }
@@ -320,7 +315,7 @@ namespace StudioStudio_Server.Services
                 var endDate = request.EndDate ?? DateTime.UtcNow;
                 var topCount = request.TopCount;
 
-                var topGroups = await _repository.GetTopActiveGroupsAsync(startDate, endDate, topCount);
+                var topGroups = await repository.GetTopActiveGroupsAsync(startDate, endDate, topCount);
 
                 var result = topGroups
                     .Select((item) => new TopActiveGroupItem
@@ -346,7 +341,7 @@ namespace StudioStudio_Server.Services
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error getting top active groups");
+                logger.LogError(ex, "Error getting top active groups");
                 throw;
             }
         }

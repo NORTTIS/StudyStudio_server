@@ -1,4 +1,4 @@
-namespace StudioStudio_Server.Models.BackgroundJobs
+namespace StudioStudio_Server.Services.TaskNotificationQueue
 {
     /// <summary>
     /// Represents a queued task update event used by the background notification worker.
@@ -16,6 +16,5 @@ namespace StudioStudio_Server.Models.BackgroundJobs
         public bool ReachedCompletion { get; set; }
         public string? OldStatusName { get; set; }
         public string? NewStatusName { get; set; }
-        public DateTime QueuedAt { get; set; } = DateTime.UtcNow;
     }
 }

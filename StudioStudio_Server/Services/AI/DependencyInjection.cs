@@ -1,9 +1,7 @@
-using StudioStudio_Server.Services.AI;
 using StudioStudio_Server.Services.AI.Interfaces;
 using StudioStudio_Server.Services.AI.Tools;
-using StudioStudio_Server.Services.Interfaces;
 
-namespace Microsoft.Extensions.DependencyInjection;
+namespace StudioStudio_Server.Services.AI;
 
 /// <summary>
 /// Extension methods để đăng ký AI services

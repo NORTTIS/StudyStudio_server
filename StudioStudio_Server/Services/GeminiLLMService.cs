@@ -5,7 +5,6 @@ using StudioStudio_Server.Configurations;
 using StudioStudio_Server.Services.Interfaces;
 using System.Runtime.CompilerServices;
 using System.Text;
-using Microsoft.Extensions.DependencyInjection;
 using Polly;
 using Polly.CircuitBreaker;
 using Polly.Retry;
@@ -120,53 +119,6 @@ namespace StudioStudio_Server.Services
         }
 
         /// <summary>
-        /// Determines if a query is simple (factual retrieval, classification, listing)
-        /// and doesn't need extended thinking. Simple queries can save ~80% output tokens.
-        /// </summary>
-        private bool IsSimpleQuery(string question)
-        {
-            if (string.IsNullOrWhiteSpace(question))
-                return false;
-
-            var lowerQuestion = question.ToLowerInvariant();
-
-            // Check for simple query keywords
-            foreach (var keyword in SimpleQueryKeywords)
-            {
-                if (lowerQuestion.Contains(keyword))
-                    return true;
-            }
-
-            // Check for simple patterns
-            // - Questions starting with what/how/which (not "why" or "explain")
-            // - Requests for lists, counts, summaries
-            // - Questions with no complex reasoning indicators
-            var simplePatterns = new[]
-            {
-                "what is", "what are", "how many", "how much",
-                "which", "list", "show", "get", "give me",
-                "công việc", "task", "deadline", "thành viên"
-            };
-
-            foreach (var pattern in simplePatterns)
-            {
-                if (lowerQuestion.StartsWith(pattern) || lowerQuestion.Contains($" {pattern}"))
-                    return true;
-            }
-
-            // Complex queries that need thinking: why, explain, analyze, compare deeply, recommend
-            var complexIndicators = new[] { "tại sao", "why", "giải thích", "explain", "phân tích", "analyze", "so sánh chi tiết", "đề xuất", "recommend" };
-            foreach (var indicator in complexIndicators)
-            {
-                if (lowerQuestion.Contains(indicator))
-                    return false; // Explicitly complex
-            }
-
-            // Default: use thinking (safer)
-            return false;
-        }
-
-        /// <summary>
         /// Builds request body for streaming with optional cached content.
         /// Streaming version doesn't use responseSchema (causes JSON issues with streaming).
         /// </summary>
@@ -225,7 +177,7 @@ namespace StudioStudio_Server.Services
             {
                 return new
                 {
-                    cachedContent = cachedContent,
+                    cachedContent,
                     contents = new[]
                     {
                         new
@@ -395,7 +347,7 @@ namespace StudioStudio_Server.Services
                         topP = _config.TopP,
                         maxOutputTokens = _config.MaxTokens,
                         responseMimeType = responseSchema != null ? "application/json" : null,
-                        responseSchema = responseSchema
+                        responseSchema
                     }
                 };
             }
@@ -404,7 +356,7 @@ namespace StudioStudio_Server.Services
                 // Use cached content for system instructions
                 return new
                 {
-                    cachedContent = cachedContent,
+                    cachedContent,
                     contents = new[]
                     {
                         new
@@ -423,7 +375,7 @@ namespace StudioStudio_Server.Services
                         topP = _config.TopP,
                         maxOutputTokens = _config.MaxTokens,
                         responseMimeType = responseSchema != null ? "application/json" : null,
-                        responseSchema = responseSchema
+                        responseSchema
                     }
                 };
             }
@@ -501,70 +453,6 @@ namespace StudioStudio_Server.Services
                 },
                 ["required"] = new JsonArray { JsonValue.Create("action") }
             };
-        }
-
-        /// <summary>
-        /// Generates answer using Gemini LLM with automatic fallback on rate limit
-        /// Flow:
-        /// 1. Try PRIMARY_MODEL (gemini-2.5-flash)
-        /// 2. If 429 (rate limit), fallback to FALLBACK_MODEL (gemini-2.5-pro)
-        /// 3. If still fails, throw exception
-        /// </summary>
-        public async Task<string> GenerateAnswerAsync(
-            string systemPrompt,
-            string userMessage,
-            string context,
-            CancellationToken cancellationToken = default)
-        {
-            // Validate API key
-            if (string.IsNullOrEmpty(_config.ApiKey))
-            {
-                _logger.LogError("Gemini API Key not configured. Cannot generate answer.");
-                throw new InvalidOperationException("Gemini API Key is not configured");
-            }
-
-            // Try primary model first
-            try
-            {
-                _logger.LogInformation("Attempting answer generation with PRIMARY model: {Model}", PRIMARY_MODEL);
-                var result = await GenerateAnswerInternalAsync(
-                    PRIMARY_MODEL,
-                    systemPrompt,
-                    userMessage,
-                    context,
-                    cancellationToken,
-                    BuildAgentResponseSchema());
-                return result.Answer;
-            }
-            catch (HttpRequestException ex) when (IsRateLimitError(ex))
-            {
-                _logger.LogWarning(
-                    "Rate limit hit on PRIMARY model ({Model}). Falling back to FALLBACK model ({Fallback})",
-                    PRIMARY_MODEL, FALLBACK_MODEL);
-
-                // Fallback to alternative model
-                try
-                {
-                    var result = await GenerateAnswerInternalAsync(
-                        FALLBACK_MODEL,
-                        systemPrompt,
-                        userMessage,
-                        context,
-                        cancellationToken,
-                        BuildAgentResponseSchema());
-                    return result.Answer;
-                }
-                catch (Exception fallbackEx)
-                {
-                    _logger.LogError(fallbackEx, "FALLBACK model ({Model}) also failed", FALLBACK_MODEL);
-                    throw new Exception($"Both PRIMARY and FALLBACK models failed. Last error: {fallbackEx.Message}", fallbackEx);
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error calling PRIMARY model: {Model}", PRIMARY_MODEL);
-                throw;
-            }
         }
 
         /// <summary>
@@ -740,7 +628,7 @@ namespace StudioStudio_Server.Services
                     }
 
                     // Extract clean error message for non-retryable errors (402, 400, 401, 403, 404, 422)
-                    string cleanMessage = ExtractCleanErrorMessage(response.StatusCode, errorContent);
+                    string cleanMessage = ExtractCleanErrorMessage(errorContent);
                     throw new Exception($"Gemini API error ({response.StatusCode}): {cleanMessage}");
                 }
 
@@ -912,7 +800,7 @@ namespace StudioStudio_Server.Services
                     cancellationToken,
                     forceTextMode);
 
-                await foreach (var chunk in fallbackStream.WithCancellation(cancellationToken))
+                await foreach (var chunk in fallbackStream)
                 {
                     yield return chunk;
                 }
@@ -1017,7 +905,7 @@ namespace StudioStudio_Server.Services
                 }
 
                 // Extract clean error message - don't leak raw JSON
-                string cleanMessage = ExtractCleanErrorMessage(statusCode, errorContent);
+                string cleanMessage = ExtractCleanErrorMessage(errorContent);
                 throw new Exception($"Gemini Streaming API error ({(int)statusCode}): {cleanMessage}");
             }
 
@@ -1027,7 +915,7 @@ namespace StudioStudio_Server.Services
 
             while (!reader.EndOfStream && !cancellationToken.IsCancellationRequested)
             {
-                string? line = await reader.ReadLineAsync();
+                string? line = await reader.ReadLineAsync(cancellationToken);
                 if (string.IsNullOrWhiteSpace(line))
                     continue;
 
@@ -1069,7 +957,7 @@ namespace StudioStudio_Server.Services
         /// Extracts a clean, user-safe error message from Gemini API error responses.
         /// Never expose raw JSON in user-facing messages.
         /// </summary>
-        private string ExtractCleanErrorMessage(System.Net.HttpStatusCode statusCode, string rawJson)
+        private string ExtractCleanErrorMessage(string rawJson)
         {
             try
             {

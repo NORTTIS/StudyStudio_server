@@ -8,6 +8,7 @@ using StudioStudio_Server.Models.Enums;
 using StudioStudio_Server.Repositories.Interfaces;
 using StudioStudio_Server.Services;
 using StudioStudio_Server.Services.Interfaces;
+using StudioStudio_Server.Services.TaskNotificationQueue;
 using Xunit;
 
 namespace StudioStudio_Server.Tests.Services
@@ -569,7 +570,7 @@ namespace StudioStudio_Server.Tests.Services
             Assert.Equal(50, result.Progress);
             _taskRepoMock.Verify(x => x.UpdateAsync(It.IsAny<TaskItem>()), Times.Once);
             _activityLogMock.Verify(x => x.LogTaskUpdateAsync(_userId, _taskId, _groupId, null, (int)TaskPriority.Low, (int)TaskSeverity.Minor, null, null, null), Times.Once);
-            _notificationQueueMock.Verify(x => x.EnqueueAsync(It.IsAny<StudioStudio_Server.Models.BackgroundJobs.TaskUpdateNotificationJob>(), It.IsAny<CancellationToken>()), Times.Once);
+            _notificationQueueMock.Verify(x => x.EnqueueAsync(It.IsAny<TaskUpdateNotificationJob>(), It.IsAny<CancellationToken>()), Times.Once);
         }
 
         [Fact]

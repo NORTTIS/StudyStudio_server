@@ -1000,7 +1000,6 @@ public class AIAgent
                         cancellationToken,
                         isContinuation: true,
                         consecutiveDecideWithoutExecution: consecutiveDecideWithoutExec);
-                    continue; // LLM được retry — KHÔNG break
                 }
             }
 
@@ -1547,7 +1546,7 @@ public class AIAgent
     /// </summary>
     private static string BuildPromptForLLMSynthesis(string toolName, JsonObject data)
     {
-        var sb = new System.Text.StringBuilder();
+        var sb = new StringBuilder();
         sb.AppendLine($"Tool '{toolName}' returned the following data:");
         sb.AppendLine();
         sb.AppendLine(data.ToJsonString());
@@ -1662,333 +1661,6 @@ public class AIAgent
         return isEnglish
             ? "You are an AI assistant that turns tool data into a clean Markdown answer. Never return JSON. Use headings, bullet lists, and tables when useful. Include a short \"Next steps\" section when the data implies concrete actions."
             : "Ban la tro ly AI bien du lieu tu tool thanh cau tra loi Markdown sach se. Tuyet doi khong tra ve JSON. Hay dung tieu de, danh sach bullet va bang khi can. Neu du lieu goi y hanh dong cu the, hay them muc \"Goi y tiep theo\" ngan gon.";
-    }
-
-    /// <summary>
-    /// Generic formatter - convert tool result JSON thành readable markdown
-    /// Khong can handler riêng cho từng tool
-    /// </summary>
-    private static string FormatToolResultAsMarkdown(string toolName, JsonObject data)
-    {
-        var lines = new List<string>();
-        var toolTitle = GetToolDisplayName(toolName);
-
-        JsonArray? personalTasksArray = null;
-        if (data.TryGetPropertyValue("personal_tasks", out var personalTasksNode) && personalTasksNode is JsonArray personalTasksJsonArray)
-        {
-            personalTasksArray = personalTasksJsonArray;
-        }
-
-        JsonArray? groupTasksArray = null;
-        if (data.TryGetPropertyValue("group_tasks", out var groupTasksNode) && groupTasksNode is JsonArray groupTasksJsonArray)
-        {
-            groupTasksArray = groupTasksJsonArray;
-        }
-
-        if (personalTasksArray != null || groupTasksArray != null)
-        {
-            return FormatPersonalAndGroupTasksAsMarkdown(toolTitle, data, personalTasksArray, groupTasksArray);
-        }
-
-        // 1. Handle arrays (tasks, documents, members, etc.)
-        JsonArray? itemArray = null;
-        if (TryGetArray(data, "tasks", out var tasks)) { itemArray = tasks; }
-        else if (TryGetArray(data, "documents", out var docs)) { itemArray = docs; }
-        else if (TryGetArray(data, "members", out var members)) { itemArray = members; }
-        else if (TryGetArray(data, "deadlines", out var deadlines)) { itemArray = deadlines; }
-        else if (TryGetArray(data, "groups", out var groups)) { itemArray = groups; }
-        else if (TryGetArray(data, "results", out var results)) { itemArray = results; }
-
-        if (itemArray != null)
-        {
-            var count = itemArray.Count;
-
-            // Summary count
-            if (data.TryGetPropertyValue("total", out var totalNode) && totalNode != null)
-            {
-                lines.Add($"**{toolTitle}** - Tìm thấy {totalNode} kết quả:");
-            }
-            else if (data.TryGetPropertyValue("total_count", out var totalCountNode) && totalCountNode != null)
-            {
-                lines.Add($"**{toolTitle}** - Tổng cộng {totalCountNode} mục:");
-            }
-            else
-            {
-                lines.Add($"**{toolTitle}** - {count} kết quả:");
-            }
-
-            // Limit notice
-            if (data.TryGetPropertyValue("summary", out var summaryNode) && summaryNode != null)
-            {
-                lines.Add($"_{summaryNode.GetValue<string>()}_");
-            }
-
-            // Format each item
-            foreach (var item in itemArray.Take(10)) // Max 10 items displayed
-            {
-                if (item is not JsonObject obj) continue;
-                lines.Add(FormatItemAsMarkdown(obj));
-            }
-
-            if (itemArray.Count > 10)
-            {
-                lines.Add($"... và {itemArray.Count - 10} mục khác.");
-            }
-
-            return string.Join("\n", lines);
-        }
-
-        // 2. Handle stats/analytics objects
-        if (data.TryGetPropertyValue("task_statistics", out var statsNode) && statsNode is JsonObject stats)
-        {
-            lines.Add($"**{toolTitle}**");
-            lines.Add(FormatStatsAsMarkdown(stats));
-
-            // Group info if present
-            if (data.TryGetPropertyValue("group_info", out var groupInfoNode) && groupInfoNode is JsonObject groupInfo)
-            {
-                var groupName = groupInfo.TryGetPropertyValue("name", out var nameNode) && nameNode != null
-                    ? nameNode.GetValue<string>() : "Nhóm hiện tại";
-                lines.Insert(0, $"## {groupName}");
-            }
-
-            return string.Join("\n", lines);
-        }
-
-        if (data.TryGetPropertyValue("statistics", out var statisticsNode) && statisticsNode is JsonObject statistics)
-        {
-            lines.Add($"**{toolTitle}**");
-            lines.Add(FormatStatsAsMarkdown(statistics));
-            return string.Join("\n", lines);
-        }
-
-        // 3. Handle risk analysis
-        if (data.TryGetPropertyValue("risk_level", out var riskNode) && riskNode != null)
-        {
-            lines.Add($"**{toolTitle}**");
-            var riskLevel = riskNode.GetValue<string>();
-            var riskIcon = riskLevel switch
-            {
-                "HIGH" => "🔴",
-                "MEDIUM" => "🟡",
-                "LOW" => "🟢",
-                _ => "⚪"
-            };
-            lines.Add($"{riskIcon} Mức độ rủi ro: **{riskLevel}**");
-
-            if (data.TryGetPropertyValue("risk_factors", out var factorsNode) && factorsNode is JsonArray factors)
-            {
-                lines.Add("**Yếu tố rủi ro:**");
-                foreach (var factor in factors.Take(5))
-                {
-                    if (factor is JsonObject factorObj)
-                    {
-                        var desc = factorObj.TryGetPropertyValue("description", out var descNode) && descNode != null
-                            ? descNode.GetValue<string>() : factor.ToString();
-                        lines.Add($"- {desc}");
-                    }
-                }
-            }
-
-            return string.Join("\n", lines);
-        }
-
-        // 4. Handle single object with common fields
-        var commonTitle = data.TryGetPropertyValue("title", out var titleNode) && titleNode != null
-            ? titleNode.GetValue<string>()
-            : data.TryGetPropertyValue("name", out var nameObjNode) && nameObjNode != null
-                ? nameObjNode.GetValue<string>()
-                : toolTitle;
-
-        lines.Add($"**{commonTitle}**");
-
-        // Common fields
-        var commonFields = new[] { "description", "status", "progress", "priority", "severity", "completion_rate", "member_count" };
-        foreach (var field in commonFields)
-        {
-            if (data.TryGetPropertyValue(field, out var fieldNode) && fieldNode != null && fieldNode.GetValueKind() != JsonValueKind.Object && fieldNode.GetValueKind() != JsonValueKind.Array)
-            {
-                lines.Add($"- **{field.Replace("_", " ").ToUpperInvariant()}**: {fieldNode}");
-            }
-        }
-
-        // 5. Fallback - just show data summary
-        if (lines.Count <= 1)
-        {
-            return $"**{toolTitle}**: Đã lấy dữ liệu thành công. Xem chi tiết trong hệ thống.";
-        }
-
-        return string.Join("\n", lines);
-    }
-
-    private static string FormatPersonalAndGroupTasksAsMarkdown(
-        string toolTitle,
-        JsonObject data,
-        JsonArray? personalTasks,
-        JsonArray? groupTasks)
-    {
-        var lines = new List<string> { $"**{toolTitle}**" };
-
-        if (data.TryGetPropertyValue("summary", out var summaryNode) && summaryNode != null)
-        {
-            lines.Add($"_{summaryNode.GetValue<string>()}_");
-        }
-
-        if (data.TryGetPropertyValue("personal_count", out var personalCountNode) && personalCountNode != null)
-        {
-            var personalCount = personalCountNode.GetValue<int>();
-            var groupCount = data.TryGetPropertyValue("group_count", out var groupCountNode) && groupCountNode != null
-                ? groupCountNode.GetValue<int>()
-                : groupTasks?.Count ?? 0;
-            lines.Add($"- **Tổng quan**: {personalCount} công việc cá nhân, {groupCount} công việc nhóm.");
-        }
-
-        if (personalTasks != null)
-        {
-            lines.Add("");
-            lines.Add("### Công việc cá nhân");
-            if (personalTasks.Count == 0)
-            {
-                lines.Add("- Không có công việc cá nhân.");
-            }
-            else
-            {
-                foreach (var item in personalTasks.Take(10))
-                {
-                    if (item is JsonObject obj)
-                    {
-                        lines.Add(FormatItemAsMarkdown(obj));
-                    }
-                }
-
-                if (personalTasks.Count > 10)
-                {
-                    lines.Add($"... và {personalTasks.Count - 10} công việc cá nhân khác.");
-                }
-            }
-        }
-
-        if (groupTasks != null)
-        {
-            lines.Add("");
-            lines.Add("### Công việc nhóm");
-            if (groupTasks.Count == 0)
-            {
-                lines.Add("- Không có công việc nhóm.");
-            }
-            else
-            {
-                foreach (var item in groupTasks.Take(10))
-                {
-                    if (item is JsonObject obj)
-                    {
-                        lines.Add(FormatItemAsMarkdown(obj));
-                    }
-                }
-
-                if (groupTasks.Count > 10)
-                {
-                    lines.Add($"... và {groupTasks.Count - 10} công việc nhóm khác.");
-                }
-            }
-        }
-
-        if (data.TryGetPropertyValue("recommendation", out var recommendationNode) && recommendationNode != null)
-        {
-            lines.Add("");
-            lines.Add("**Khuyến nghị**");
-            lines.Add(recommendationNode.ToString());
-        }
-
-        return string.Join("\n", lines.Where(line => line != null));
-    }
-
-    private static bool TryGetArray(JsonObject data, string key, out JsonArray? array)
-    {
-        array = null;
-        if (data.TryGetPropertyValue(key, out var node) && node is JsonArray arr && arr.Count > 0)
-        {
-            array = arr;
-            return true;
-        }
-        return false;
-    }
-
-    private static string FormatItemAsMarkdown(JsonObject item)
-    {
-        var title = item.TryGetPropertyValue("title", out var t) && t != null ? t.GetValue<string>() : "N/A";
-        var status = item.TryGetPropertyValue("status", out var s) && s != null ? s.GetValue<string>() : null;
-        var priority = item.TryGetPropertyValue("priority", out var p) && p != null ? p.GetValue<string>() : null;
-        var dueDate = item.TryGetPropertyValue("due_date", out var d) && d != null ? d.GetValue<string>() : null;
-        var progress = item.TryGetPropertyValue("progress", out var pg) && pg != null ? $"{pg}%" : null;
-        var groupName = item.TryGetPropertyValue("group_name", out var g) && g != null ? $"[{g.GetValue<string>()}]" : null;
-        var source = item.TryGetPropertyValue("source", out var src) && src != null ? $"({src.GetValue<string>()})" : null;
-
-        var parts = new List<string> { $"- {title}" };
-        if (groupName != null) parts.Add(groupName);
-        if (status != null) parts.Add($"| Status: {status}");
-        if (priority != null) parts.Add($"| Priority: {priority}");
-        if (progress != null) parts.Add($"| Progress: {progress}");
-        if (dueDate != null && dueDate != "") parts.Add($"| Due: {dueDate}");
-        if (source != null) parts.Add(source);
-
-        return string.Join(" ", parts);
-    }
-
-    private static string FormatStatsAsMarkdown(JsonObject stats)
-    {
-        var lines = new List<string>();
-        var mappings = new Dictionary<string, string>
-        {
-            ["total_tasks"] = "Tổng task",
-            ["completed_tasks"] = "Đã hoàn thành",
-            ["in_progress_tasks"] = "Đang thực hiện",
-            ["not_started_tasks"] = "Chưa bắt đầu",
-            ["overdue_tasks"] = "Quá hạn",
-            ["completion_percentage"] = "Tỷ lệ hoàn thành",
-            ["active_groups"] = "Nhóm đang hoạt động",
-            ["total_members"] = "Tổng thành viên"
-        };
-
-        foreach (var (key, label) in mappings)
-        {
-            if (stats.TryGetPropertyValue(key, out var node) && node != null)
-            {
-                var value = node.GetValueKind() == JsonValueKind.Number
-                    ? node.GetValue<int>().ToString()
-                    : node.ToString();
-                lines.Add($"- **{label}**: {value}");
-            }
-        }
-
-        return lines.Count > 0 ? string.Join("\n", lines) : "- Không có dữ liệu thống kê.";
-    }
-
-    private static string GetToolDisplayName(string toolName)
-    {
-        var displayNames = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
-        {
-            ["get_tasks"] = "Danh sách công việc",
-            ["get_personal_tasks"] = "Công việc cá nhân",
-            ["get_group_stats"] = "Thống kê nhóm",
-            ["get_personal_stats"] = "Thống kê cá nhân",
-            ["get_studio_analytics"] = "Analytics Studio",
-            ["get_members"] = "Thành viên nhóm",
-            ["get_deadlines"] = "Deadline",
-            ["get_personal_deadlines"] = "Deadline cá nhân",
-            ["search_documents"] = "Tài liệu tìm kiếm",
-            ["search_studio_documents"] = "Tài liệu Studio",
-            ["get_group_documents"] = "Tài liệu nhóm",
-            ["get_studio_groups"] = "Danh sách nhóm",
-            ["get_group_risk"] = "Phân tích rủi ro nhóm",
-            ["get_risk_groups"] = "Nhóm rủi ro",
-            ["get_studio_health"] = "Tình trạng Studio",
-            ["compare_groups"] = "So sánh nhóm",
-            ["get_group_performance"] = "Hiệu suất nhóm",
-            ["get_member_permissions"] = "Quyền thành viên"
-        };
-
-        return displayNames.TryGetValue(toolName, out var name) ? name : toolName.Replace("_", " ").ToUpperInvariant();
     }
 
     private static bool HasTaskFilterParameters(JsonObject? parameters)
@@ -2272,7 +1944,7 @@ public class AIAgent
         int consecutiveDecideWithoutExecution = 0)
     {
         // Build prompt với context
-        var promptBuilder = new System.Text.StringBuilder();
+        var promptBuilder = new StringBuilder();
 
         // LUON include system prompt de LLM thay cac QUY TAC CHON TOOL (critical!)
         // Va LUON include tools manifest de LLM biet cac tool nao ton tai
@@ -2298,7 +1970,7 @@ public class AIAgent
             }
             
             // Context tracking per tool
-            var toolContextLog = new System.Text.StringBuilder();
+            var toolContextLog = new StringBuilder();
             toolContextLog.AppendLine("[CONTEXT-PER-TOOL]");
             int cumulativeChars = 0;
             
@@ -2432,7 +2104,7 @@ public class AIAgent
         }
 
         // Analyze prompt breakdown to see which sections consume most context
-        var promptBreakdown = new System.Text.StringBuilder("[CONTEXT-BREAKDOWN] Prompt sections:\n");
+        var promptBreakdown = new StringBuilder("[CONTEXT-BREAKDOWN] Prompt sections:\n");
         var systemPromptSection = systemPrompt;
         var toolsSection = $"=== AVAILABLE TOOLS ===\n{toolsManifest["tools"]?.ToString() ?? "[]"}";
         var questionSection = $"=== USER QUESTION ===\n{userQuestion}";

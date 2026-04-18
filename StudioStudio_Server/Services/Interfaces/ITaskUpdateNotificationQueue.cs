@@ -1,4 +1,5 @@
 using StudioStudio_Server.Models.BackgroundJobs;
+using StudioStudio_Server.Services.TaskNotificationQueue;
 
 namespace StudioStudio_Server.Services.Interfaces
 {
@@ -41,12 +42,5 @@ namespace StudioStudio_Server.Services.Interfaces
         /// Returns: Completed when the payload is moved back to the pending queue.
         /// </summary>
         ValueTask AbandonAsync(TaskUpdateNotificationLease lease, CancellationToken cancellationToken = default);
-
-        /// <summary>
-        /// Get the current queue depth.
-        /// Validate: none.
-        /// Returns: Number of pending jobs.
-        /// </summary>
-        int GetQueueDepth();
     }
 }

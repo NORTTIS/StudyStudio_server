@@ -1,10 +1,7 @@
-﻿using Microsoft.OpenApi.Validations;
-using StackExchange.Redis;
-using StudioStudio_Server.Exceptions;
+﻿using StackExchange.Redis;
 using StudioStudio_Server.Models.Entities;
 using StudioStudio_Server.Services.Interfaces;
 using System.Text.Json;
-using System.Text.Json.Serialization;
 
 namespace StudioStudio_Server.Services
 {
@@ -19,9 +16,7 @@ namespace StudioStudio_Server.Services
         IConnectionMultiplexer redis,
         ILogger<PasswordResetCacheService> logger) : IPasswordResetCacheService
     {
-        private readonly IConnectionMultiplexer _redis = redis;
         private readonly IDatabase _database = redis.GetDatabase();
-        private readonly ILogger<PasswordResetCacheService> _logger = logger;
 
         // Redis key prefixes
         private const string TOKEN_BY_EMAIL_PREFIX = "reset_password:token_by_email:";
@@ -46,7 +41,7 @@ namespace StudioStudio_Server.Services
 
                 if (!json.HasValue)
                 {
-                    _logger.LogWarning("Reset token not found: {Token}", token);
+                    logger.LogWarning("Reset token not found: {Token}", token);
                     return null;
                 }
 
@@ -55,7 +50,7 @@ namespace StudioStudio_Server.Services
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error getting reset data for token: {Token}", token);
+                logger.LogError(ex, "Error getting reset data for token: {Token}", token);
                 throw;
             }
         }
@@ -75,14 +70,14 @@ namespace StudioStudio_Server.Services
 
                 if (!currentCount.HasValue)
                 {
-                    _logger.LogInformation("No rate limit data for email: {Email}", email);
+                    logger.LogInformation("No rate limit data for email: {Email}", email);
                     return true;
                 }
 
                 int count = (int)currentCount;
                 bool canSend = count < MAX_REQUESTS_PER_WINDOW;
 
-                _logger.LogInformation(
+                logger.LogInformation(
                     "Rate limit check for {Email}: {Count}/{Max}, CanSend={CanSend}",
                     email, count, MAX_REQUESTS_PER_WINDOW, canSend);
 
@@ -90,7 +85,7 @@ namespace StudioStudio_Server.Services
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error checking rate limit for email: {Email}", email);
+                logger.LogError(ex, "Error checking rate limit for email: {Email}", email);
                 // Fail open - allow request if Redis is down
                 return true;
             }
@@ -119,12 +114,12 @@ namespace StudioStudio_Server.Services
 
                     await Task.WhenAll(deleteEmailTask, deleteTokenTask);
 
-                    _logger.LogInformation("Invalidated reset token for email: {Email}", email);
+                    logger.LogInformation("Invalidated reset token for email: {Email}", email);
                 }
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error invalidating reset token for email: {Email}", email);
+                logger.LogError(ex, "Error invalidating reset token for email: {Email}", email);
                 throw;
             }
         }
@@ -163,13 +158,13 @@ namespace StudioStudio_Server.Services
 
                 await Task.WhenAll(emailTask, tokenTask);
 
-                _logger.LogInformation(
+                logger.LogInformation(
                     "Stored reset token for email: {Email}, UserId: {UserId}, Expires in: {Expiry}",
                     email, userId, expiry);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error storing reset token for email: {Email}", email);
+                logger.LogError(ex, "Error storing reset token for email: {Email}", email);
                 throw;
             }
         }
@@ -191,7 +186,7 @@ namespace StudioStudio_Server.Services
                 {
                     // First request - set count to 1 with expiry
                     await _database.StringSetAsync(rateLimitKey, 1, RATE_LIMIT_WINDOW);
-                    _logger.LogInformation(
+                    logger.LogInformation(
                         "Initialized rate limit for {Email}: 1/{Max}, Window: {Window}",
                         email, MAX_REQUESTS_PER_WINDOW, RATE_LIMIT_WINDOW);
                 }
@@ -199,14 +194,14 @@ namespace StudioStudio_Server.Services
                 {
                     // Increment existing count
                     var newCount = await _database.StringIncrementAsync(rateLimitKey);
-                    _logger.LogInformation(
+                    logger.LogInformation(
                         "Incremented rate limit for {Email}: {Count}/{Max}",
                         email, newCount, MAX_REQUESTS_PER_WINDOW);
                 }
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error incrementing send count for email: {Email}", email);
+                logger.LogError(ex, "Error incrementing send count for email: {Email}", email);
                 throw;
             }
         }
