@@ -134,7 +134,7 @@ namespace StudioStudio_Server.Data
                     .IsUnique()
                     .HasFilter(@"""IsApproved"" = true");
 
-                e.HasOne<Group>()
+                e.HasOne(x => x.Group)
                     .WithMany(g => g.Participants)
                     .HasForeignKey(x => x.GroupId)
                     .OnDelete(DeleteBehavior.Cascade);

@@ -1023,7 +1023,7 @@ namespace StudioStudio_Server.Services
         {
             return await context.GroupParticipants
                 .AsNoTracking()
-                .Where(p => p.UserId == userId)
+                .Where(p => p.UserId == userId && p.Group.IsActive && p.Group.IsArchived == false)
                 .Select(p => p.GroupId)
                 .ToListAsync();
         }
@@ -1418,37 +1418,6 @@ namespace StudioStudio_Server.Services
                     Group = t.GroupName,
                     TaskId = t.TaskId,
                     DueDate = t.DueDate.ToString("yyyy-MM-dd")
-                });
-            }
-
-            // Lấy công việc sắp đến hạn (1-2 ngày tới)
-            var dueSoonTasks = await analyticsRepository.GetUserDueSoonTasksAsync(groupIds, userId, 1, limit);
-            foreach (var t in dueSoonTasks)
-            {
-                var daysUntil = (t.DueDate - DateTime.UtcNow).Days;
-                alerts.Add(new RiskAlertItem
-                {
-                    Type = "due_soon",
-                    Title = t.Title,
-                    Description = daysUntil <= 0 ? "Hạn chót: Hôm nay" : $"Hạn chót: Ngày mai",
-                    Group = t.GroupName,
-                    TaskId = t.TaskId,
-                    DueDate = t.DueDate.ToString("yyyy-MM-dd")
-                });
-            }
-
-            // Lấy công việc bị kẹt (không update 5+ ngày)
-            var stuckTasks = await analyticsRepository.GetUserStuckTasksAsync(groupIds, userId, 5, limit);
-            foreach (var t in stuckTasks)
-            {
-                var daysNoUpdate = (int)(DateTime.UtcNow - t.LastUpdated).TotalDays;
-                alerts.Add(new RiskAlertItem
-                {
-                    Type = "stuck",
-                    Title = t.Title,
-                    Description = $"Không cập nhật {daysNoUpdate} ngày",
-                    Group = t.GroupName,
-                    TaskId = t.TaskId
                 });
             }
 

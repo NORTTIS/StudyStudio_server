@@ -13,5 +13,7 @@
 
         // 🔹 ADDED: Approval status (true = auto-approved for open groups; must be approved for closed groups)
         public bool IsApproved { get; set; } = true;
+
+        public Group Group { get; set; } = null!;
     }
 }
