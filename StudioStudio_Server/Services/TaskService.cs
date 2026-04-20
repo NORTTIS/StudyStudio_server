@@ -230,9 +230,9 @@ namespace StudioStudio_Server.Services
                 throw new AppException(ErrorCodes.GroupUpdatePermissionDenied, StatusCodes.Status403Forbidden);
             }
 
-            // Check if group is archived (non-owner cannot interact)
+            // Check if group is archived
             var group = await groupRepository.GetByIdAsync(groupId);
-            if (group != null && group.IsArchived && userRole != GroupRole.Owner)
+            if (group != null && group.IsArchived)
             {
                 throw new AppException(ErrorCodes.GroupIsArchived, StatusCodes.Status403Forbidden);
             }
@@ -248,9 +248,7 @@ namespace StudioStudio_Server.Services
                 throw new AppException(ErrorCodes.TaskNotFound, StatusCodes.Status404NotFound);
             }
 
-            // ============================================================
-            // PHASE 2 OPTIMIZATION: Preload all statuses in one call
-            // ============================================================
+            // Preload all statuses in one call
             var statusIdsToLoad = new List<Guid>();
             if (request.GroupStatusId.HasValue)
                 statusIdsToLoad.Add(request.GroupStatusId.Value);
@@ -299,9 +297,7 @@ namespace StudioStudio_Server.Services
             ValidateHours(request.EstimatedHours, effectiveStartDate, effectiveDueDate, "EstimatedHours");
             ValidateHours(request.ActualHours, effectiveStartDate, effectiveDueDate, "ActualHours");
 
-            // ============================================================
             // Preload assignees for validation and response
-            // ============================================================
             var existingAssignments = await taskAssignmentRepository.GetAssigneesByTaskId(taskId);
             var oldAssigneeId = existingAssignments.FirstOrDefault()?.AssignedTo;
 
@@ -414,13 +410,8 @@ namespace StudioStudio_Server.Services
             if (request.EstimatedHours.HasValue) task.EstimatedHours = request.EstimatedHours.Value;
             if (request.ActualHours.HasValue) task.ActualHours = request.ActualHours.Value;
 
-            // ============================================================
-            // DB write
-            // ============================================================
             await taskRepository.UpdateAsync(task);
-            // ============================================================
-            // Handle assignee changes (DB writes)
-            // ============================================================
+
             // Unassign: null or Guid.Empty both trigger removal
             if (!request.AssigneeId.HasValue || request.AssigneeId.Value == Guid.Empty)
             {
@@ -471,9 +462,7 @@ namespace StudioStudio_Server.Services
                 NewStatusName = newStatusName
             });
 
-            // ============================================================
             // Prepare response
-            // ============================================================
             GroupTaskStatusDto? groupStatusDto = null;
             if (task.GroupStatusId.HasValue && statusMap.TryGetValue(task.GroupStatusId.Value, out var groupStatus))
             {

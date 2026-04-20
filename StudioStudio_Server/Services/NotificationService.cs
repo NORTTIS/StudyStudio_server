@@ -1,4 +1,6 @@
+using Microsoft.EntityFrameworkCore;
 using StudioStudio_Server.Configurations;
+using StudioStudio_Server.Data;
 using StudioStudio_Server.Models.DTOs.Request;
 using StudioStudio_Server.Models.Entities;
 using StudioStudio_Server.Models.Enums;
@@ -11,7 +13,7 @@ namespace StudioStudio_Server.Services
         IAnnouncementRepository announcementRepository,
         IUserAnnouncementService userAnnouncementService,
         IEmailService emailService,
-        ITaskRepository taskRepository,
+        IDbContextFactory<StudioDbContext> dbContextFactory,
         IConfiguration configuration,
         ILogger<NotificationService> logger) : INotificationService
     {
@@ -310,7 +312,10 @@ namespace StudioStudio_Server.Services
 
         private async Task<Guid?> _getGroupIdForTaskAsync(Guid taskId)
         {
-            var task = await taskRepository.GetByIdAsync(taskId);
+            await using var context = await dbContextFactory.CreateDbContextAsync();
+            var task = await context.Tasks
+                .AsNoTracking()
+                .FirstOrDefaultAsync(t => t.TaskId == taskId && !t.IsPendingDeleted);
             return task?.GroupId;
         }
 

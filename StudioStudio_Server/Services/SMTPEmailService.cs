@@ -60,8 +60,29 @@ namespace StudioStudio_Server.Services
             }
 
             // User has notifications enabled or user not found (default to sending)
-            await SendLinkAsync(to, subject, body);
-            return true;
+            try
+            {
+                await SendLinkAsync(to, subject, body);
+                return true;
+            }
+            catch (SmtpException ex)
+            {
+                logger.LogWarning(ex,
+                    "SMTP send failed for preferred email (userId: {UserId}, to: {To}, subject: {Subject}). Continuing without failing request.",
+                    userId,
+                    to,
+                    subject);
+                return false;
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex,
+                    "Unexpected email send failure (userId: {UserId}, to: {To}, subject: {Subject}). Continuing without failing request.",
+                    userId,
+                    to,
+                    subject);
+                return false;
+            }
         }
 
         public async Task<bool> SendEmailWithPreferenceCheckAsync(string to, string subject, string body, Models.Entities.User user)
@@ -74,8 +95,29 @@ namespace StudioStudio_Server.Services
                 return false;
             }
 
-            await SendLinkAsync(to, subject, body);
-            return true;
+            try
+            {
+                await SendLinkAsync(to, subject, body);
+                return true;
+            }
+            catch (SmtpException ex)
+            {
+                logger.LogWarning(ex,
+                    "SMTP send failed for preferred email (userId: {UserId}, to: {To}, subject: {Subject}). Continuing without failing request.",
+                    user.UserId,
+                    to,
+                    subject);
+                return false;
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex,
+                    "Unexpected email send failure (userId: {UserId}, to: {To}, subject: {Subject}). Continuing without failing request.",
+                    user.UserId,
+                    to,
+                    subject);
+                return false;
+            }
         }
     }
 }

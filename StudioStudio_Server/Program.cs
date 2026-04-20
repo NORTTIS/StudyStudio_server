@@ -200,6 +200,11 @@ builder.Services.AddDbContext<StudioDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection"))
            .AddInterceptors(new QueryCounterInterceptor()));
 
+builder.Services.AddDbContextFactory<StudioDbContext>(options =>
+    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection"))
+           .AddInterceptors(new QueryCounterInterceptor()),
+    ServiceLifetime.Scoped);
+
 // Add SignalR
 builder.Services.AddSignalR();
 

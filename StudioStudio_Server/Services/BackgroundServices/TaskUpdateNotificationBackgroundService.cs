@@ -69,7 +69,7 @@ namespace StudioStudio_Server.Services.BackgroundServices
                     users = users.Where(u => u.Status != UserStatus.Deleted).ToList();
                     var userDict = users.ToDictionary(u => u.UserId);
 
-                    var notificationTasks = new List<Task>();
+                    var notificationActions = new List<Func<Task>>();
 
                     if (job.ReachedCompletion && job.OldAssigneeId.HasValue)
                     {
@@ -89,7 +89,7 @@ namespace StudioStudio_Server.Services.BackgroundServices
                             if (recipientId == job.ActorUserId) continue;
                             if (!userDict.TryGetValue(recipientId, out var recipient)) continue;
 
-                            notificationTasks.Add(notificationService.NotifyTaskCompletedAsync(recipient, currentUser, job.TaskId, job.TaskTitle, stoppingToken));
+                            notificationActions.Add(() => notificationService.NotifyTaskCompletedAsync(recipient, currentUser, job.TaskId, job.TaskTitle, stoppingToken));
                         }
                     }
 
@@ -107,7 +107,7 @@ namespace StudioStudio_Server.Services.BackgroundServices
                             {
                                 if (oldAssignee.UserId != job.ActorUserId)
                                 {
-                                    notificationTasks.Add(notificationService.NotifyTaskUnassignedAsync(oldAssignee, currentUser, job.TaskId, job.TaskTitle, stoppingToken));
+                                    notificationActions.Add(() => notificationService.NotifyTaskUnassignedAsync(oldAssignee, currentUser, job.TaskId, job.TaskTitle, stoppingToken));
                                 }
                             }
                         }
@@ -128,13 +128,13 @@ namespace StudioStudio_Server.Services.BackgroundServices
 
                                 if (job.OldAssigneeId.HasValue && job.OldAssigneeId.Value != job.RequestedAssigneeId.Value && oldAssignee != null)
                                 {
-                                    notificationTasks.Add(notificationService.NotifyTaskReassignedAsync(newAssignee, oldAssignee, currentUser, job.TaskId, job.TaskTitle, stoppingToken));
+                                    notificationActions.Add(() => notificationService.NotifyTaskReassignedAsync(newAssignee, oldAssignee, currentUser, job.TaskId, job.TaskTitle, stoppingToken));
                                 }
                                 else if (!job.OldAssigneeId.HasValue)
                                 {
                                     if (newAssignee.UserId != job.ActorUserId)
                                     {
-                                        notificationTasks.Add(notificationService.NotifyTaskAssignedAsync(newAssignee, currentUser, job.TaskId, job.TaskTitle, job.DueDate, stoppingToken));
+                                        notificationActions.Add(() => notificationService.NotifyTaskAssignedAsync(newAssignee, currentUser, job.TaskId, job.TaskTitle, job.DueDate, stoppingToken));
                                     }
                                 }
                             }
@@ -148,12 +148,15 @@ namespace StudioStudio_Server.Services.BackgroundServices
                         && userDict.TryGetValue(job.OldAssigneeId.Value, out var statusAssignee))
                     {
                         var changedBy = $"{currentUser.FirstName} {currentUser.LastName}".Trim();
-                        notificationTasks.Add(notificationService.NotifyTaskStatusChangedAsync(statusAssignee, currentUser, job.TaskId, job.OldStatusName, job.NewStatusName, changedBy, stoppingToken));
+                        notificationActions.Add(() => notificationService.NotifyTaskStatusChangedAsync(statusAssignee, currentUser, job.TaskId, job.OldStatusName, job.NewStatusName, changedBy, stoppingToken));
                     }
 
-                    if (notificationTasks.Count > 0)
+                    if (notificationActions.Count > 0)
                     {
-                        await Task.WhenAll(notificationTasks);
+                        foreach (var notificationAction in notificationActions)
+                        {
+                            await notificationAction();
+                        }
                     }
 
                     await queue.AcknowledgeAsync(lease, stoppingToken);
