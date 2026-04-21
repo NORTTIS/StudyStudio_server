@@ -32,15 +32,5 @@ namespace StudioStudio_Server.Repositories.Interfaces
         /// <param name="startOfDay">Start of current day (UTC)</param>
         /// <returns>Total tokens used today</returns>
         Task<int> GetTodayTokenUsageAsync(Guid userId, DateTime startOfDay);
-
-        /// <summary>
-        /// Lấy chi tiết token usage trong ngày
-        /// Use case: Detailed analytics dashboard
-        /// </summary>
-        /// <param name="userId">User ID</param>
-        /// <param name="startOfDay">Start of current day (UTC)</param>
-        /// <returns>Tuple of (InputTokens, OutputTokens, CachedTokens, ThinkingTokens, ToolCalls)</returns>
-        Task<(int InputTokens, int OutputTokens, int CachedTokens, int ThinkingTokens, int ToolCalls)>
-            GetTodayTokenUsageDetailAsync(Guid userId, DateTime startOfDay);
     }
 }

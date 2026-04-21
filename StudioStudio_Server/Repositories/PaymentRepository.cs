@@ -8,37 +8,35 @@ namespace StudioStudio_Server.Repositories
 {
     public class PaymentRepository(StudioDbContext db) : IPaymentRepository
     {
-        private readonly StudioDbContext _db = db;
-
         public async Task<Payment?> GetByOrderCodeAsync(long orderCode)
         {
-            return await _db.Payments
+            return await db.Payments
                 .Include(p => p.Plan)
                 .FirstOrDefaultAsync(p => p.OrderCode == orderCode);
         }
 
         public async Task<Payment?> GetByPaymentIdAsync(Guid paymentId)
         {
-            return await _db.Payments
+            return await db.Payments
                 .Include(p => p.Plan)
                 .FirstOrDefaultAsync(p => p.PaymentId == paymentId);
         }
 
         public async Task AddAsync(Payment payment)
         {
-            await _db.Payments.AddAsync(payment);
-            await _db.SaveChangesAsync();
+            await db.Payments.AddAsync(payment);
+            await db.SaveChangesAsync();
         }
 
         public async Task UpdateAsync(Payment payment)
         {
-            _db.Payments.Update(payment);
-            await _db.SaveChangesAsync();
+            db.Payments.Update(payment);
+            await db.SaveChangesAsync();
         }
 
         public async Task<List<Payment>> GetByUserIdAsync(Guid userId)
         {
-            return await _db.Payments
+            return await db.Payments
                 .Where(p => p.UserId == userId)
                 .ToListAsync();
         }
@@ -49,7 +47,7 @@ namespace StudioStudio_Server.Repositories
             int pageNumber,
             int pageSize)
         {
-            var query = _db.Payments
+            var query = db.Payments
                 .Include(p => p.User)
                 .Include(p => p.Plan)
                 .AsQueryable();
@@ -86,7 +84,7 @@ namespace StudioStudio_Server.Repositories
 
         public async Task<List<Payment>> GetAllPendingByUserIdAsync(Guid userId)
         {
-            return await _db.Payments
+            return await db.Payments
                 .Where(p => p.UserId == userId && p.PaymentStatus == PaymentStatusEnum.PENDING)
                 .ToListAsync();
         }

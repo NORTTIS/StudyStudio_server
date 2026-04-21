@@ -10,15 +10,13 @@ namespace StudioStudio_Server.Repositories
     /// </summary>
     public class StudioParticipantRepository(StudioDbContext context) : IStudioParticipantRepository
     {
-        private readonly StudioDbContext _context = context;
-
         /// <summary>
         /// Add new participant to studio
         /// </summary>
         public async Task AddAsync(StudioParticipant participant)
         {
-            _context.StudioParticipants.Add(participant);
-            await _context.SaveChangesAsync();
+            context.StudioParticipants.Add(participant);
+            await context.SaveChangesAsync();
         }
 
         /// <summary>
@@ -27,7 +25,7 @@ namespace StudioStudio_Server.Repositories
         /// </summary>
         public async Task<bool> IsUserInStudioAsync(Guid studioId, Guid userId)
         {
-            return await _context.StudioParticipants
+            return await context.StudioParticipants
                 .Include(sp => sp.Studio)
                 .AnyAsync(sp => sp.StudioId == studioId && sp.UserId == userId && sp.Studio != null && !sp.Studio.IsDeleted);
         }
@@ -39,7 +37,7 @@ namespace StudioStudio_Server.Repositories
         /// </summary>
         public async Task<StudioParticipant?> GetByStudioAndUserAsync(Guid studioId, Guid userId)
         {
-            return await _context.StudioParticipants
+            return await context.StudioParticipants
                 .Include(sp => sp.Studio)
                 .AsNoTracking()
                 .FirstOrDefaultAsync(sp => sp.StudioId == studioId && sp.UserId == userId && sp.IsApproved && sp.Studio != null && !sp.Studio.IsDeleted);
@@ -52,7 +50,7 @@ namespace StudioStudio_Server.Repositories
         /// </summary>
         public async Task<StudioParticipant?> GetByStudioAndUserIncludeNonApprovedAsync(Guid studioId, Guid userId)
         {
-            return await _context.StudioParticipants
+            return await context.StudioParticipants
                 .Include(sp => sp.Studio)
                 .AsNoTracking()
                 .FirstOrDefaultAsync(sp => sp.StudioId == studioId && sp.UserId == userId && sp.Studio != null && !sp.Studio.IsDeleted);
@@ -65,7 +63,7 @@ namespace StudioStudio_Server.Repositories
         /// </summary>
         public async Task<int> GetParticipantCountByStudioIdAsync(Guid studioId)
         {
-            return await _context.StudioParticipants
+            return await context.StudioParticipants
                 .Where(sp => sp.StudioId == studioId)
                 .CountAsync();
         }
@@ -77,7 +75,7 @@ namespace StudioStudio_Server.Repositories
         /// </summary>
         public async Task<List<StudioParticipant>> GetParticipantsByStudioIdAsync(Guid studioId)
         {
-            return await _context.StudioParticipants
+            return await context.StudioParticipants
                 .Include(sp => sp.Studio)
                 .Where(sp => sp.StudioId == studioId && sp.IsApproved && sp.Studio != null && !sp.Studio.IsDeleted)
                 .Include(sp => sp.User)
@@ -92,7 +90,7 @@ namespace StudioStudio_Server.Repositories
         /// </summary>
         public async Task<List<StudioParticipant>> GetStudiosByUserIdAsync(Guid userId)
         {
-            return await _context.StudioParticipants
+            return await context.StudioParticipants
                 .Include(sp => sp.Studio)
                 .Where(sp => sp.UserId == userId && sp.Studio != null && !sp.Studio.IsDeleted)
                 .AsNoTracking()
@@ -104,8 +102,8 @@ namespace StudioStudio_Server.Repositories
         /// </summary>
         public async Task RemoveAsync(StudioParticipant participant)
         {
-            _context.StudioParticipants.Remove(participant);
-            await _context.SaveChangesAsync();
+            context.StudioParticipants.Remove(participant);
+            await context.SaveChangesAsync();
         }
 
         /// <summary>
@@ -113,7 +111,7 @@ namespace StudioStudio_Server.Repositories
         /// </summary>
         public async Task UpdateAsync(StudioParticipant participant)
         {
-            var existingEntry = _context.ChangeTracker.Entries<StudioParticipant>()
+            var existingEntry = context.ChangeTracker.Entries<StudioParticipant>()
                 .FirstOrDefault(e => e.Entity.ParticipantId == participant.ParticipantId);
 
             if (existingEntry != null)
@@ -122,10 +120,10 @@ namespace StudioStudio_Server.Repositories
             }
             else
             {
-                _context.StudioParticipants.Update(participant);
+                context.StudioParticipants.Update(participant);
             }
 
-            await _context.SaveChangesAsync();
+            await context.SaveChangesAsync();
         }
 
         // Pending membership & approval methods
@@ -136,7 +134,7 @@ namespace StudioStudio_Server.Repositories
         /// </summary>
         public async Task<List<StudioParticipant>> GetPendingByStudioIdAsync(Guid studioId)
         {
-            return await _context.StudioParticipants
+            return await context.StudioParticipants
                 .Include(sp => sp.User)
                 .Where(sp => sp.StudioId == studioId && !sp.IsApproved &&
                     sp.Studio != null && !sp.Studio.IsDeleted)
@@ -151,7 +149,7 @@ namespace StudioStudio_Server.Repositories
         /// </summary>
         public async Task<bool> IsUserApprovedInStudioAsync(Guid studioId, Guid userId)
         {
-            return await _context.StudioParticipants
+            return await context.StudioParticipants
                 .AnyAsync(sp => sp.StudioId == studioId && sp.UserId == userId && sp.IsApproved &&
                     sp.Studio != null && !sp.Studio.IsDeleted);
         }
@@ -162,7 +160,7 @@ namespace StudioStudio_Server.Repositories
         /// </summary>
         public async Task<StudioParticipant?> GetPendingByStudioAndUserAsync(Guid studioId, Guid userId)
         {
-            return await _context.StudioParticipants
+            return await context.StudioParticipants
                 .AsNoTracking()
                 .FirstOrDefaultAsync(sp => sp.StudioId == studioId && sp.UserId == userId && !sp.IsApproved);
         }
@@ -174,7 +172,7 @@ namespace StudioStudio_Server.Repositories
         /// </summary>
         public async Task<StudioParticipant?> GetByStudioAndUserTrackedAsync(Guid studioId, Guid userId)
         {
-            return await _context.StudioParticipants
+            return await context.StudioParticipants
                 .Include(sp => sp.Studio)
                 .FirstOrDefaultAsync(sp => sp.StudioId == studioId && sp.UserId == userId && sp.Studio != null && !sp.Studio.IsDeleted);
         }

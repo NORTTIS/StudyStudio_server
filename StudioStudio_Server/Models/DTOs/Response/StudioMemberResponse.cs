@@ -1,4 +1,3 @@
-using StudioStudio_Server.Models.Enums;
 
 namespace StudioStudio_Server.Models.DTOs.Response
 {

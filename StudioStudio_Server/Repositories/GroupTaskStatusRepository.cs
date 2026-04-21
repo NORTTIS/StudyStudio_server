@@ -12,7 +12,6 @@ namespace StudioStudio_Server.Repositories
     /// </summary>
     public class GroupTaskStatusRepository(StudioDbContext context) : IGroupTaskStatusRepository
     {
-        private readonly StudioDbContext _context = context;
         private const int MAX_RETRY = 3;
         private const long STEP = 1000;
 
@@ -23,7 +22,7 @@ namespace StudioStudio_Server.Repositories
         /// </summary>
         public async Task<List<GroupTaskStatus>> GetByGroupIdAsync(Guid groupId)
         {
-            return await _context.GroupTaskStatuses
+            return await context.GroupTaskStatuses
                 .Where(s => s.GroupId == groupId && !s.IsDeleted)
                 .OrderBy(s => s.Position)
                 .AsNoTracking()
@@ -36,7 +35,7 @@ namespace StudioStudio_Server.Repositories
         /// </summary>
         public async Task<bool> ExistsAsync(Guid statusId)
         {
-            return await _context.GroupTaskStatuses
+            return await context.GroupTaskStatuses
                 .AnyAsync(s => s.StatusId == statusId);
         }
 
@@ -45,8 +44,8 @@ namespace StudioStudio_Server.Repositories
         /// </summary>
         public async Task AddAsync(GroupTaskStatus status)
         {
-            _context.GroupTaskStatuses.Add(status);
-            await _context.SaveChangesAsync();
+            context.GroupTaskStatuses.Add(status);
+            await context.SaveChangesAsync();
         }
 
         /// <summary>
@@ -55,14 +54,14 @@ namespace StudioStudio_Server.Repositories
         /// </summary>
         public async Task AddRangeAsync(List<GroupTaskStatus> statuses)
         {
-            _context.GroupTaskStatuses.AddRange(statuses);
-            await _context.SaveChangesAsync();
+            context.GroupTaskStatuses.AddRange(statuses);
+            await context.SaveChangesAsync();
         }
 
         public async Task DeleteAsync(GroupTaskStatus status)
         {
-            _context.GroupTaskStatuses.Remove(status);
-            await _context.SaveChangesAsync();
+            context.GroupTaskStatuses.Remove(status);
+            await context.SaveChangesAsync();
         }
 
         /// <summary>
@@ -70,38 +69,34 @@ namespace StudioStudio_Server.Repositories
         /// </summary>
         public async Task RemoveRangeAsync(List<GroupTaskStatus> statuses)
         {
-            _context.GroupTaskStatuses.RemoveRange(statuses);
-            await _context.SaveChangesAsync();
+            context.GroupTaskStatuses.RemoveRange(statuses);
+            await context.SaveChangesAsync();
         }
 
         public async Task UpdateAsync(GroupTaskStatus status)
         {
-            _context.GroupTaskStatuses.Update(status);
-            await _context.SaveChangesAsync();
+            context.GroupTaskStatuses.Update(status);
+            await context.SaveChangesAsync();
         }
 
         public async Task<GroupTaskStatus?> GetDetailAsync(Guid statusId)
         {
-            return await _context.GroupTaskStatuses
+            return await context.GroupTaskStatuses
                 .AsNoTracking()
                 .FirstOrDefaultAsync(s => s.StatusId == statusId && !s.IsDeleted);
         }
 
         public async Task<List<GroupTaskStatus>> GetByIdsAndGroupIdAsync(List<Guid> statusIds, Guid groupId)
         {
-            return await _context.GroupTaskStatuses
+            return await context.GroupTaskStatuses
                 .Where(x => statusIds.Contains(x.StatusId) && x.GroupId == groupId && !x.IsDeleted)
                 .ToListAsync();
         }
 
-        public async Task SaveChangesAsync()
-        {
-            await _context.SaveChangesAsync();
-        }
 
         public async Task<bool> NameExistsInGroupAsync(GroupTaskStatus taskStatus)
         {
-            return await _context.GroupTaskStatuses.AnyAsync(t =>
+            return await context.GroupTaskStatuses.AnyAsync(t =>
                 t.StatusName == taskStatus.StatusName &&
                 t.GroupId == taskStatus.GroupId &&
                 t.StatusId != taskStatus.StatusId &&
@@ -111,7 +106,7 @@ namespace StudioStudio_Server.Repositories
 
         public async Task<List<GroupTaskStatus>> GetByGroupIdWithTrackingAsync(Guid groupId)
         {
-            return await _context.GroupTaskStatuses
+            return await context.GroupTaskStatuses
                 .Where(s => s.GroupId == groupId && !s.IsDeleted)
                 .OrderBy(s => s.Position)
                 .ToListAsync();
@@ -130,17 +125,17 @@ namespace StudioStudio_Server.Repositories
 
             for (int attempt = 1; attempt <= MAX_RETRY; attempt++)
             {
-                using (var transaction = await _context.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable))
+                using (var transaction = await context.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable))
                 {
                     try
                     {
                         var prev = prevStatusId.HasValue
-                            ? await _context.GroupTaskStatuses
+                            ? await context.GroupTaskStatuses
                                 .FirstOrDefaultAsync(s => s.StatusId == prevStatusId.Value && !s.IsDeleted)
                             : null;
 
                         var next = nextStatusId.HasValue
-                            ? await _context.GroupTaskStatuses
+                            ? await context.GroupTaskStatuses
                                 .FirstOrDefaultAsync(s => s.StatusId == nextStatusId.Value && !s.IsDeleted)
                             : null;
 
@@ -155,11 +150,11 @@ namespace StudioStudio_Server.Repositories
                                 await RebalanceColumnInternalAsync(groupId);
 
                                 prev = prevStatusId.HasValue
-                                    ? await _context.GroupTaskStatuses
+                                    ? await context.GroupTaskStatuses
                                         .FirstOrDefaultAsync(s => s.StatusId == prevStatusId.Value && !s.IsDeleted)
                                     : null;
                                 next = nextStatusId.HasValue
-                                    ? await _context.GroupTaskStatuses
+                                    ? await context.GroupTaskStatuses
                                         .FirstOrDefaultAsync(s => s.StatusId == nextStatusId.Value && !s.IsDeleted)
                                     : null;
                             }
@@ -179,7 +174,7 @@ namespace StudioStudio_Server.Repositories
                             throw new InvalidOperationException("Invalid prev/next status");
                         }
 
-                        var status = await _context.GroupTaskStatuses
+                        var status = await context.GroupTaskStatuses
                             .FirstOrDefaultAsync(s => s.StatusId == statusId);
 
                         if (status == null)
@@ -188,7 +183,7 @@ namespace StudioStudio_Server.Repositories
                         }
 
                         status.Position = (int)newPos;
-                        await _context.SaveChangesAsync();
+                        await context.SaveChangesAsync();
                         await transaction.CommitAsync();
                         return;
                     }
@@ -214,45 +209,13 @@ namespace StudioStudio_Server.Repositories
             throw new InvalidOperationException("Failed to reorder status after maximum retries");
         }
 
-        /// <summary>
-        /// Find next status after given position in the same group
-        /// </summary>
-        public async Task<GroupTaskStatus?> FindNextAfterAsync(Guid groupId, long position)
-        {
-            return await _context.GroupTaskStatuses
-                .Where(s => s.GroupId == groupId && s.Position > position && !s.IsDeleted)
-                .OrderBy(s => s.Position)
-                .AsNoTracking()
-                .FirstOrDefaultAsync();
-        }
-
-        /// <summary>
-        /// Rebalance all statuses in a group with proper spacing
-        /// Public method with transaction
-        /// </summary>
-        public async Task RebalanceColumnAsync(Guid groupId)
-        {
-            using (var transaction = await _context.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable))
-            {
-                try
-                {
-                    await RebalanceColumnInternalAsync(groupId);
-                    await transaction.CommitAsync();
-                }
-                catch
-                {
-                    await transaction.RollbackAsync();
-                    throw;
-                }
-            }
-        }
 
         /// <summary>
         /// Internal rebalance method (used within existing transactions)
         /// </summary>
         private async Task RebalanceColumnInternalAsync(Guid groupId)
         {
-            var statuses = await _context.GroupTaskStatuses
+            var statuses = await context.GroupTaskStatuses
                 .Where(s => s.GroupId == groupId && !s.IsDeleted)
                 .OrderBy(s => s.Position)
                 .ToListAsync();
@@ -264,7 +227,7 @@ namespace StudioStudio_Server.Repositories
                 pos += STEP;
             }
 
-            await _context.SaveChangesAsync();
+            await context.SaveChangesAsync();
         }
 
         /// <summary>

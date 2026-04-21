@@ -65,8 +65,6 @@ namespace StudioStudio_Server.Services
                     StatusCodes.Status403Forbidden);
             }
 
-            var removedUser = await GetUserOrThrowAsync(request.UserId);
-
             await groupParticipantRepository.RemoveAsync(targetMember);
 
             logger.LogInformation(
@@ -78,7 +76,7 @@ namespace StudioStudio_Server.Services
                 GroupId = group.GroupId,
                 GroupName = group.GroupName,
                 RemovedUserId = request.UserId,
-                RemovedUserName = $"{removedUser.FirstName} {removedUser.LastName}",
+                RemovedUserName = "Người dùng đã bị xóa", // Do we want to return the name of the removed user? For privacy, we can just say "User removed
                 RemovedAt = DateTime.UtcNow
             };
         }

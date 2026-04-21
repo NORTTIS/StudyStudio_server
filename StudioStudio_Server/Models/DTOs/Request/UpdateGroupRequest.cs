@@ -16,18 +16,13 @@ namespace StudioStudio_Server.Models.DTOs.Request
 
         public bool IsTemplate { get; set; } = false;
 
-        // 🔹 ADDED: Group personalization
         public string? AvatarUrl { get; set; }
         public string? ColorHex { get; set; }
         public string? IconEmoji { get; set; }
         public string? BannerUrl { get; set; }
         public string? Tagline { get; set; }
         public string? Alias { get; set; }
-
-        // 🔹 ADDED: Open/Closed group
         public bool? IsOpen { get; set; }
-
-        // 🔹 ADDED: Allow member to update task progress
         public bool? AllowMemberUpdateProgress { get; set; }
     }
 }

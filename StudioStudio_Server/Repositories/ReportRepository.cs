@@ -11,16 +11,14 @@ namespace StudioStudio_Server.Repositories
     /// </summary>
     public class ReportRepository(StudioDbContext context) : IReportRepository
     {
-        private readonly StudioDbContext _context = context;
-
         /// <summary>
         /// Add report to database
         /// Auto-set: ReportId, Status = Open, CreatedAt = UtcNow
         /// </summary>
         public async Task AddAsync(Report report)
         {
-            _context.Reports.Add(report);
-            await _context.SaveChangesAsync();
+            context.Reports.Add(report);
+            await context.SaveChangesAsync();
         }
 
         /// <summary>
@@ -36,7 +34,7 @@ namespace StudioStudio_Server.Repositories
             int pageNumber,
             int pageSize)
         {
-            var query = _context.Reports.AsQueryable();
+            var query = context.Reports.AsQueryable();
 
             if (!string.IsNullOrWhiteSpace(searchTerm))
             {
@@ -72,7 +70,7 @@ namespace StudioStudio_Server.Repositories
             ReportType? type,
             ReportStatus? status)
         {
-            var query = _context.Reports.AsQueryable();
+            var query = context.Reports.AsQueryable();
 
             if (!string.IsNullOrWhiteSpace(searchTerm))
             {
@@ -100,7 +98,7 @@ namespace StudioStudio_Server.Repositories
         /// </summary>
         public async Task<int> GetReportsCountByStatusAsync(ReportStatus status)
         {
-            return await _context.Reports
+            return await context.Reports
                 .Where(r => r.Status == status)
                 .CountAsync();
         }
@@ -110,7 +108,7 @@ namespace StudioStudio_Server.Repositories
         /// </summary>
         public async Task<Report?> GetReportByIdAsync(Guid reportId)
         {
-            return await _context.Reports
+            return await context.Reports
                 .FirstOrDefaultAsync(r => r.ReportId == reportId);
         }
 
@@ -119,8 +117,8 @@ namespace StudioStudio_Server.Repositories
         /// </summary>
         public async Task UpdateAsync(Report report)
         {
-            _context.Reports.Update(report);
-            await _context.SaveChangesAsync();
+            context.Reports.Update(report);
+            await context.SaveChangesAsync();
         }
     }
 }

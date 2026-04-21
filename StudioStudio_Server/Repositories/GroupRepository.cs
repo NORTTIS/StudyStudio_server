@@ -11,8 +11,6 @@ namespace StudioStudio_Server.Repositories
     /// </summary>
     public class GroupRepository(StudioDbContext db) : IGroupRepository
     {
-        private readonly StudioDbContext _db = db;
-
         /// <summary>
         /// Get list of groups user is member of
         /// Condition: Participants contains {userId} AND IsApproved = true AND IsActive = true
@@ -22,20 +20,20 @@ namespace StudioStudio_Server.Repositories
         public async Task<List<Group>> GetUserGroupsAsync(Guid userId)
         {
             // First get group IDs 
-            var approvedGroupIds = await _db.GroupParticipants
+            var approvedGroupIds = await db.GroupParticipants
                 .Where(p => p.UserId == userId)
                 .Select(p => p.GroupId)
                 .ToListAsync();
 
             // Then get groups with only approved participants (avoid EF Core eager-loading all participants)
-            var groups = await _db.Groups
+            var groups = await db.Groups
                 .Where(g => approvedGroupIds.Contains(g.GroupId) && g.IsActive)
                 .OrderByDescending(g => g.CreatedAt)
                 .AsNoTracking()
                 .ToListAsync();
 
             // Load only approved participants for these groups
-            var approvedParticipants = await _db.GroupParticipants
+            var approvedParticipants = await db.GroupParticipants
                 .Where(p => approvedGroupIds.Contains(p.GroupId) && p.IsApproved)
                 .ToListAsync();
 
@@ -58,13 +56,13 @@ namespace StudioStudio_Server.Repositories
         /// </summary>
         public async Task<Group?> GetByIdAsync(Guid groupId)
         {
-            var group = await _db.Groups
+            var group = await db.Groups
                 .FirstOrDefaultAsync(g => g.GroupId == groupId && g.IsActive);
 
             if (group != null)
             {
                 // Load only approved participants
-                var approvedParticipants = await _db.GroupParticipants
+                var approvedParticipants = await db.GroupParticipants
                     .Where(p => p.GroupId == groupId && p.IsApproved)
                     .ToListAsync();
 
@@ -81,14 +79,14 @@ namespace StudioStudio_Server.Repositories
         /// </summary>
         public async Task<Group?> GetGroupWithDetailsAsync(Guid groupId)
         {
-            var group = await _db.Groups
+            var group = await db.Groups
                 .AsNoTracking()
                 .FirstOrDefaultAsync(g => g.GroupId == groupId && g.IsActive);
 
             if (group != null)
             {
                 // Load only approved participants
-                var approvedParticipants = await _db.GroupParticipants
+                var approvedParticipants = await db.GroupParticipants
                     .Where(p => p.GroupId == groupId && p.IsApproved)
                     .ToListAsync();
 
@@ -105,7 +103,7 @@ namespace StudioStudio_Server.Repositories
         /// </summary>
         public async Task<List<Group>> GetStudioGroupsAsync(Guid studioId)
         {
-            return await _db.Groups
+            return await db.Groups
                 .Where(g => g.StudioId == studioId && g.IsActive)
                 .OrderByDescending(g => g.GroupName)
                 .ThenByDescending(g => g.CreatedAt)
@@ -118,7 +116,7 @@ namespace StudioStudio_Server.Repositories
         /// </summary>
         public async Task<List<Group>> GetByIdsAsync(List<Guid> groupIds)
         {
-            return await _db.Groups
+            return await db.Groups
                 .Where(g => groupIds.Contains(g.GroupId) && g.IsActive)
                 .ToListAsync();
         }
@@ -130,7 +128,7 @@ namespace StudioStudio_Server.Repositories
         /// </summary>
         public async Task<int> CountGroupsCreatedByUserAsync(Guid userId)
         {
-            return await _db.Groups
+            return await db.Groups
                 .Where(g => g.Participants.Any(p => p.UserId == userId && p.Role == GroupRole.Owner) && g.IsActive)
                 .CountAsync();
         }
@@ -141,7 +139,7 @@ namespace StudioStudio_Server.Repositories
         /// </summary>
         public async Task<int> GetGroupCountByStudioIdAsync(Guid studioId)
         {
-            return await _db.Groups
+            return await db.Groups
                 .Where(g => g.StudioId == studioId && g.IsActive)
                 .CountAsync();
         }
@@ -154,7 +152,7 @@ namespace StudioStudio_Server.Repositories
         public async Task<bool> GroupNameExistsInStudioAsync(Guid? studioId, string groupName, Guid? userId)
         {
             var trimmedName = groupName.Trim();
-            return await _db.Groups
+            return await db.Groups
                 .AnyAsync(g =>
                     g.GroupName.Trim() == trimmedName &&
                     g.IsActive &&
@@ -176,7 +174,7 @@ namespace StudioStudio_Server.Repositories
             Guid excludeGroupId)
         {
             var trimmedName = groupName.Trim();
-            return await _db.Groups
+            return await db.Groups
                 .AnyAsync(g => g.StudioId == studioId &&
                               g.GroupName.Trim() == trimmedName &&
                               g.GroupId != excludeGroupId &&
@@ -189,7 +187,7 @@ namespace StudioStudio_Server.Repositories
         /// </summary>
         public async Task<bool> IsUserGroupOwnerAsync(Guid groupId, Guid userId)
         {
-            return await _db.Groups
+            return await db.Groups
                 .Where(g => g.GroupId == groupId && g.IsActive)
                 .AnyAsync(g => g.Participants.Any(p => p.UserId == userId && p.Role == GroupRole.Owner));
         }
@@ -199,8 +197,8 @@ namespace StudioStudio_Server.Repositories
         /// </summary>
         public async Task AddAsync(Group group)
         {
-            _db.Groups.Add(group);
-            await _db.SaveChangesAsync();
+            db.Groups.Add(group);
+            await db.SaveChangesAsync();
         }
 
         /// <summary>
@@ -210,8 +208,8 @@ namespace StudioStudio_Server.Repositories
         public async Task UpdateAsync(Group group)
         {
             group.UpdatedAt = DateTime.UtcNow;
-            _db.Groups.Update(group);
-            await _db.SaveChangesAsync();
+            db.Groups.Update(group);
+            await db.SaveChangesAsync();
         }
 
         /// <summary>
@@ -220,7 +218,7 @@ namespace StudioStudio_Server.Repositories
         /// </summary>
         public async Task<Group?> GetByIdForUpdateAsync(Guid groupId)
         {
-            return await _db.Groups
+            return await db.Groups
                 .FirstOrDefaultAsync(g => g.GroupId == groupId && g.IsActive);
         }
 
@@ -233,8 +231,8 @@ namespace StudioStudio_Server.Repositories
         {
             group.IsActive = false;
             group.UpdatedAt = DateTime.UtcNow;
-            _db.Groups.Update(group);
-            await _db.SaveChangesAsync();
+            db.Groups.Update(group);
+            await db.SaveChangesAsync();
         }
 
         /// <summary>
@@ -244,7 +242,7 @@ namespace StudioStudio_Server.Repositories
         /// </summary>
         public async Task<Guid> GetGroupOwnerIdAsync(Guid groupId)
         {
-            var owner = await _db.GroupParticipants
+            var owner = await db.GroupParticipants
                 .Where(p => p.GroupId == groupId && p.Role == GroupRole.Owner)
                 .Select(p => p.UserId)
                 .FirstOrDefaultAsync();
@@ -259,7 +257,7 @@ namespace StudioStudio_Server.Repositories
         /// </summary>
         public async Task<List<string>> GetGroupNamesInStudioAsync(Guid? studioId)
         {
-            return await _db.Groups
+            return await db.Groups
                 .Where(g => g.StudioId == studioId && g.IsActive)
                 .Select(g => g.GroupName)
                 .ToListAsync();
@@ -267,7 +265,7 @@ namespace StudioStudio_Server.Repositories
 
         public async Task SaveChangesAsync()
         {
-            await _db.SaveChangesAsync();
+            await db.SaveChangesAsync();
         }
 
         /// <summary>
@@ -279,7 +277,7 @@ namespace StudioStudio_Server.Repositories
             int pageNumber,
             int pageSize)
         {
-            var query = _db.Groups.AsQueryable();
+            var query = db.Groups.AsQueryable();
 
             // Apply search filter
             if (!string.IsNullOrWhiteSpace(searchTerm))
@@ -324,7 +322,7 @@ namespace StudioStudio_Server.Repositories
                 return new Dictionary<Guid, int>();
             }
 
-            var counts = await _db.GroupParticipants
+            var counts = await db.GroupParticipants
                 .Where(p => groupIds.Contains(p.GroupId) && p.IsApproved)
                 .GroupBy(p => p.GroupId)
                 .Select(g => new { GroupId = g.Key, Count = g.Count() })
@@ -344,7 +342,7 @@ namespace StudioStudio_Server.Repositories
                 return new Dictionary<Guid, int>();
             }
 
-            var counts = await _db.Tasks
+            var counts = await db.Tasks
                 .Where(t => groupIds.Contains(t.GroupId!.Value))
                 .GroupBy(t => t.GroupId)
                 .Select(g => new { GroupId = g.Key!.Value, Count = g.Count() })
@@ -365,20 +363,20 @@ namespace StudioStudio_Server.Repositories
             }
 
             // Get group UpdatedAt
-            var groupUpdatedAt = await _db.Groups
+            var groupUpdatedAt = await db.Groups
                 .Where(g => groupIds.Contains(g.GroupId))
                 .Select(g => new { g.GroupId, g.UpdatedAt })
                 .ToDictionaryAsync(x => x.GroupId, x => (DateTime?)x.UpdatedAt);
 
             // Get max task UpdatedAt per group
-            var taskUpdatedAt = await _db.Tasks
+            var taskUpdatedAt = await db.Tasks
                 .Where(t => groupIds.Contains(t.GroupId!.Value))
                 .GroupBy(t => t.GroupId)
                 .Select(g => new { GroupId = g.Key!.Value, LastUpdated = g.Max(t => t.UpdatedAt) })
                 .ToDictionaryAsync(x => x.GroupId, x => (DateTime?)x.LastUpdated);
 
             // Get max message CreatedAt per group
-            var messageCreatedAt = await _db.GroupMessages
+            var messageCreatedAt = await db.GroupMessages
                 .Where(m => groupIds.Contains(m.GroupId))
                 .GroupBy(m => m.GroupId)
                 .Select(g => new { GroupId = g.Key, LastMessage = g.Max(m => m.CreatedAt) })
@@ -413,7 +411,7 @@ namespace StudioStudio_Server.Repositories
         /// </summary>
         public async Task<GroupListSummary> GetGroupSummaryAsync(string? groupType)
         {
-            var query = _db.Groups.AsQueryable();
+            var query = db.Groups.AsQueryable();
 
             // Apply group type filter
             if (!string.IsNullOrWhiteSpace(groupType))
@@ -445,7 +443,7 @@ namespace StudioStudio_Server.Repositories
         /// </summary>
         public async Task<Group?> GetByIdAdminAsync(Guid groupId)
         {
-            return await _db.Groups
+            return await db.Groups
                 .FirstOrDefaultAsync(g => g.GroupId == groupId);
         }
 
@@ -461,7 +459,7 @@ namespace StudioStudio_Server.Repositories
                 return new Dictionary<Guid, string>();
             }
 
-            var studios = await _db.Studios
+            var studios = await db.Studios
                 .Where(s => validIds.Contains(s.StudioId))
                 .Select(s => new { s.StudioId, s.StudioName })
                 .ToDictionaryAsync(x => x.StudioId, x => x.StudioName);
@@ -477,7 +475,7 @@ namespace StudioStudio_Server.Repositories
         {
             var trimmedName = groupName.Trim();
 
-            return await _db.Groups
+            return await db.Groups
                 .AnyAsync(g =>
                     g.GroupId != excludeGroupId &&
                     g.CreatedBy == ownerId &&

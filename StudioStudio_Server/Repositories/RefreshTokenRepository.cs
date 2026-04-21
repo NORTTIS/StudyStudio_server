@@ -10,8 +10,6 @@ namespace StudioStudio_Server.Repositories
     /// </summary>
     public class RefreshTokenRepository(StudioDbContext context) : IRefreshTokenRepository
     {
-        private readonly StudioDbContext _context = context;
-
         /// <summary>
         /// Get valid refresh token
         /// Condition: Token = {token} AND IsRevoked = false AND ExpiresAt > UtcNow
@@ -19,7 +17,7 @@ namespace StudioStudio_Server.Repositories
         /// </summary>
         public async Task<RefreshToken?> GetValidAsync(string token)
         {
-            return await _context.RefreshToken
+            return await context.RefreshToken
                 .Include(x => x.User)
                 .AsNoTracking()
                 .FirstOrDefaultAsync(x =>
@@ -33,8 +31,8 @@ namespace StudioStudio_Server.Repositories
         /// </summary>
         public async Task AddAsync(RefreshToken token)
         {
-            _context.RefreshToken.Add(token);
-            await _context.SaveChangesAsync();
+            context.RefreshToken.Add(token);
+            await context.SaveChangesAsync();
         }
 
         /// <summary>
@@ -44,7 +42,7 @@ namespace StudioStudio_Server.Repositories
         /// </summary>
         public async Task RevokeAsync(RefreshToken token)
         {
-            await _context.RefreshToken
+            await context.RefreshToken
                 .Where(t => t.Id == token.Id)
                 .ExecuteUpdateAsync(setters => setters.SetProperty(t => t.IsRevoked, true));
         }
@@ -56,7 +54,7 @@ namespace StudioStudio_Server.Repositories
         /// </summary>
         public async Task<int> RevokeAllUserTokensAsync(Guid userId)
         {
-            var revokedCount = await _context.RefreshToken
+            var revokedCount = await context.RefreshToken
                 .Where(t => t.UserId == userId && !t.IsRevoked)
                 .ExecuteUpdateAsync(setters => setters.SetProperty(t => t.IsRevoked, true));
 
@@ -72,7 +70,7 @@ namespace StudioStudio_Server.Repositories
         {
             var now = DateTime.UtcNow;
             
-            var deletedCount = await _context.RefreshToken
+            var deletedCount = await context.RefreshToken
                 .Where(t => t.UserId == userId && (t.IsRevoked || t.ExpiresAt < now))
                 .ExecuteDeleteAsync();
 
@@ -88,7 +86,7 @@ namespace StudioStudio_Server.Repositories
         {
             var now = DateTime.UtcNow;
             
-            var deletedCount = await _context.RefreshToken
+            var deletedCount = await context.RefreshToken
                 .Where(t => t.IsRevoked || t.ExpiresAt < now)
                 .ExecuteDeleteAsync();
 

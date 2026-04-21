@@ -1,5 +1,4 @@
 using StudioStudio_Server.Models.DTOs.Response;
-using StudioStudio_Server.Models.Entities;
 using StudioStudio_Server.Models.Enums;
 
 namespace StudioStudio_Server.Repositories.Interfaces
@@ -20,14 +19,9 @@ namespace StudioStudio_Server.Repositories.Interfaces
         Task<List<TaskItem>> GetAllTasksByStatusIdAsync(Guid statusId);
         Task<List<TaskItem>> GetAllPersonalTasksByStatusIdAsync(Guid statusId);
         Task<Dictionary<Guid, List<TaskItem>>> GetListTasksByListStatusId(List<Guid> listStatusIds);
-        Task SaveChangesAsync();
         Task ReorderTaskAsync(Guid taskId, Guid targetStatusId, Guid? prevTaskId, Guid? nextTaskId);
-        Task RebalanceTasksInStatusAsync(Guid statusId);
-        Task<TaskItem?> FindNextAfterAsync(Guid statusId, long position);
         Task ReorderPersonalTaskAsync(Guid taskId, Guid targetStatusId, Guid? prevTaskId, Guid? nextTaskId);
-        Task RebalancePersonalTasksInStatusAsync(Guid statusId);
         Task<Dictionary<Guid, List<TaskItem>>> GetPersonalListTasksByListStatusId(List<Guid> listStatusIds);
-        Task<TaskItem?> PersonalFindNextAfterAsync(Guid statusId, long position);
         Task<List<TaskItem>> GetPersonalTasksByOwnerAsync(Guid userId);
         Task<List<TaskItem>> GetPersonalTasksByOwnerAsync(Guid userId, int limit);
         Task<List<TaskItem>> GetPersonalTasksByOwnerWithDeadlineAsync(Guid userId, DateTime fromDate, DateTime toDate, int? limit = null);
@@ -63,6 +57,5 @@ namespace StudioStudio_Server.Repositories.Interfaces
             TaskPriority? minPriority = null,
             TaskSeverity? minSeverity = null);
         Task PermanentDeleteAsync(Guid taskId);
-        Task<Guid?> GetTaskGroupIdAsync(Guid taskId);
     }
 }

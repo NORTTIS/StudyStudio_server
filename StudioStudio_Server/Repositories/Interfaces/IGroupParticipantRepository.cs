@@ -18,10 +18,8 @@ namespace StudioStudio_Server.Repositories.Interfaces
         Task<List<GroupParticipant>> GetAllByGroupIdAsync(Guid groupId);
         Task<GroupRole> GetGroupRoleByUserIdAsync(Guid userId, Guid groupId);
         Task AddRangeAsync(IEnumerable<GroupParticipant> participants);
-        Task UpdateRangeAsync(IEnumerable<GroupParticipant> participants);
         Task RemoveRangeAsync(IEnumerable<GroupParticipant> participants);
 
-        // 🔹 ADDED: Pending membership & approval methods
         /// <summary>
         /// Get all pending (not yet approved) members of a group
         /// Condition: GroupId = {groupId} AND IsApproved = false

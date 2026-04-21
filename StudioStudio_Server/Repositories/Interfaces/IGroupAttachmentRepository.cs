@@ -11,11 +11,9 @@ namespace StudioStudio_Server.Repositories.Interfaces
         Task<GroupAttachment?> GetByIdAsync(Guid attachmentId);
         Task<List<GroupAttachment>> GetByGroupIdAsync(Guid groupId);
         Task<List<GroupAttachment>> GetByGroupIdPagedAsync(Guid groupId, int skip, int take);
-        Task<List<GroupAttachment>> GetByGroupIdWithStatusAsync(Guid groupId, DocumentStatus status);
         Task<int> CountByGroupIdAsync(Guid groupId);
         Task CreateAsync(GroupAttachment attachment);
         Task UpdateAsync(GroupAttachment attachment);
-        Task<bool> FileKeyExistsAsync(string fileKey);
         Task<long> GetTotalStorageUsedByGroupAsync(Guid groupId);
 
         /// <summary>
@@ -26,7 +24,6 @@ namespace StudioStudio_Server.Repositories.Interfaces
         /// <summary>
         /// Hard-delete multiple attachment records permanently
         /// </summary>
-        Task HardDeleteManyAsync(List<Guid> attachmentIds);
 
         /// <summary>
         /// Get stuck uploads (Uploading status older than threshold)

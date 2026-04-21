@@ -1,7 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using StudioStudio_Server.Data;
 using StudioStudio_Server.Models.Entities;
-using StudioStudio_Server.Models.Enums;
 using StudioStudio_Server.Repositories.Interfaces;
 
 namespace StudioStudio_Server.Repositories
@@ -11,8 +10,6 @@ namespace StudioStudio_Server.Repositories
     /// </summary>
     public class AdminStatisticsRepository(StudioDbContext context) : IAdminStatisticsRepository
     {
-        private readonly StudioDbContext _context = context;
-
         /// <summary>
         /// Get hourly login activity data grouped by hour and day of week
         /// Uses RefreshToken creation time to track login events
@@ -24,7 +21,7 @@ namespace StudioStudio_Server.Repositories
         {
             var adminUserIds = await GetAdminUserIdsAsync();
 
-            var hourlyData = await _context.RefreshToken
+            var hourlyData = await context.RefreshToken
                 .Include(rt => rt.User)
                 .Where(rt => !adminUserIds.Contains(rt.UserId) &&
                              rt.User.CreatedAt >= startDate &&
@@ -52,7 +49,7 @@ namespace StudioStudio_Server.Repositories
         {
             var adminUserIds = await GetAdminUserIdsAsync();
 
-            return await _context.Reports
+            return await context.Reports
                 .Where(r => !adminUserIds.Contains(r.UserId ?? Guid.Empty) &&
                             r.CreatedAt >= startDate &&
                             r.CreatedAt <= endDate)
@@ -67,7 +64,7 @@ namespace StudioStudio_Server.Repositories
             DateTime startDate,
             DateTime endDate)
         {
-            return await _context.Users
+            return await context.Users
                 .Where(u => !u.IsAdmin &&
                             u.CreatedAt >= startDate &&
                             u.CreatedAt <= endDate)
@@ -84,7 +81,7 @@ namespace StudioStudio_Server.Repositories
         {
             var adminUserIds = await GetAdminUserIdsAsync();
 
-            var subscriptions = await _context.UserSubscriptions
+            var subscriptions = await context.UserSubscriptions
                 .Include(us => us.User)
                 .Include(us => us.Plan)
                 .Where(us => !adminUserIds.Contains(us.UserId) &&
@@ -112,7 +109,7 @@ namespace StudioStudio_Server.Repositories
         /// </summary>
         public async Task<int> CountRecentUserSignupsAsync(DateTime startDate, DateTime endDate)
         {
-            return await _context.Users
+            return await context.Users
                 .CountAsync(u => !u.IsAdmin &&
                                  u.CreatedAt >= startDate &&
                                  u.CreatedAt <= endDate);
@@ -123,7 +120,7 @@ namespace StudioStudio_Server.Repositories
         /// </summary>
         public async Task<User?> GetMostRecentUserSignupAsync(DateTime startDate, DateTime endDate)
         {
-            return await _context.Users
+            return await context.Users
                 .Where(u => !u.IsAdmin &&
                             u.CreatedAt >= startDate &&
                             u.CreatedAt <= endDate)
@@ -139,7 +136,7 @@ namespace StudioStudio_Server.Repositories
         {
             var adminUserIds = await GetAdminUserIdsAsync();
 
-            return await _context.Reports
+            return await context.Reports
                 .CountAsync(r => !adminUserIds.Contains(r.UserId ?? Guid.Empty) &&
                                  r.CreatedAt >= startDate &&
                                  r.CreatedAt <= endDate);
@@ -152,7 +149,7 @@ namespace StudioStudio_Server.Repositories
         {
             var adminUserIds = await GetAdminUserIdsAsync();
 
-            return await _context.Reports
+            return await context.Reports
                 .Where(r => !adminUserIds.Contains(r.UserId ?? Guid.Empty) &&
                             r.CreatedAt >= startDate &&
                             r.CreatedAt <= endDate)
@@ -168,7 +165,7 @@ namespace StudioStudio_Server.Repositories
         {
             var adminUserIds = await GetAdminUserIdsAsync();
 
-            return await _context.UserSubscriptions
+            return await context.UserSubscriptions
                 .Include(us => us.Plan)
                 .CountAsync(us => !adminUserIds.Contains(us.UserId) &&
                                   us.Plan.BillingCycle == BillingCycle.Monthly &&
@@ -183,7 +180,7 @@ namespace StudioStudio_Server.Repositories
         {
             var adminUserIds = await GetAdminUserIdsAsync();
 
-            var upgrade = await _context.UserSubscriptions
+            var upgrade = await context.UserSubscriptions
                 .Include(us => us.User)
                 .Include(us => us.Plan)
                 .Where(us => !adminUserIds.Contains(us.UserId) &&
@@ -205,7 +202,7 @@ namespace StudioStudio_Server.Repositories
         {
             var adminUserIds = await GetAdminUserIdsAsync();
 
-            return await _context.Groups
+            return await context.Groups
                 .CountAsync(g => !adminUserIds.Contains(g.CreatedBy) &&
                                  g.CreatedAt >= startDate &&
                                  g.CreatedAt <= endDate);
@@ -218,7 +215,7 @@ namespace StudioStudio_Server.Repositories
         {
             var adminUserIds = await GetAdminUserIdsAsync();
 
-            return await _context.Groups
+            return await context.Groups
                 .Where(g => !adminUserIds.Contains(g.CreatedBy) &&
                             g.CreatedAt >= startDate &&
                             g.CreatedAt <= endDate)
@@ -237,7 +234,7 @@ namespace StudioStudio_Server.Repositories
         {
             var adminUserIds = await GetAdminUserIdsAsync();
 
-            var topGroups = await _context.Groups
+            var topGroups = await context.Groups
                 .Include(g => g.Participants)
                 .Where(g => !adminUserIds.Contains(g.CreatedBy) &&
                             g.CreatedAt >= startDate &&
@@ -249,8 +246,8 @@ namespace StudioStudio_Server.Repositories
                 {
                     Group = g,
                     MemberCount = g.Participants.Count,
-                    TotalTasks = _context.Tasks.Count(t => t.GroupId == g.GroupId && !t.IsPendingDeleted),
-                    CompletedTasks = _context.Tasks.Count(t => t.GroupId == g.GroupId && t.Progress >= 100 && !t.IsPendingDeleted)
+                    TotalTasks = context.Tasks.Count(t => t.GroupId == g.GroupId && !t.IsPendingDeleted),
+                    CompletedTasks = context.Tasks.Count(t => t.GroupId == g.GroupId && t.Progress >= 100 && !t.IsPendingDeleted)
                 })
                 .OrderByDescending(x => x.CompletedTasks)
                 .ThenByDescending(x => x.MemberCount)
@@ -266,7 +263,7 @@ namespace StudioStudio_Server.Repositories
         /// </summary>
         public async Task<List<Guid>> GetAdminUserIdsAsync()
         {
-            return await _context.Users
+            return await context.Users
                 .Where(u => u.IsAdmin)
                 .Select(u => u.UserId)
                 .ToListAsync();

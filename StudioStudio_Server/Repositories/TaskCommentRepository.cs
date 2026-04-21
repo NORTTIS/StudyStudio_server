@@ -10,15 +10,13 @@ namespace StudioStudio_Server.Repositories
     /// </summary>
     public class TaskCommentRepository(StudioDbContext context) : ITaskCommentRepository
     {
-        private readonly StudioDbContext _context = context;
-
         /// <summary>
         /// Th�m m?i m?t comment v�o database
         /// </summary>
         public async Task<TaskComment> AddAsync(TaskComment comment)
         {
-            _context.TaskComments.Add(comment);
-            await _context.SaveChangesAsync();
+            context.TaskComments.Add(comment);
+            await context.SaveChangesAsync();
             return comment;
         }
 
@@ -29,7 +27,7 @@ namespace StudioStudio_Server.Repositories
         /// </summary>
         public async Task<TaskComment?> GetByIdAsync(Guid commentId)
         {
-            return await _context.TaskComments
+            return await context.TaskComments
                 .Include(c => c.User)
                 .AsNoTracking()
                 .FirstOrDefaultAsync(c => c.CommentId == commentId);
@@ -43,7 +41,7 @@ namespace StudioStudio_Server.Repositories
         /// </summary>
         public async Task<TaskComment?> GetByIdWithRepliesAsync(Guid commentId)
         {
-            return await _context.TaskComments
+            return await context.TaskComments
                 .Include(c => c.User)
                 .Include(c => c.Replies)
                     .ThenInclude(r => r.User)
@@ -63,7 +61,7 @@ namespace StudioStudio_Server.Repositories
         /// </summary>
         public async Task<List<TaskComment>> GetByTaskIdAsync(Guid taskId, int limit = 100, int offset = 0)
         {
-            return await _context.TaskComments
+            return await context.TaskComments
                 .Where(c => c.TaskId == taskId && !c.IsDeleted && c.ParentCommentId == null)
                 .Include(c => c.User)
                 .Include(c => c.Replies.Where(r => !r.IsDeleted))
@@ -81,7 +79,7 @@ namespace StudioStudio_Server.Repositories
         /// </summary>
         public async Task<int> GetCountByTaskIdAsync(Guid taskId)
         {
-            return await _context.TaskComments
+            return await context.TaskComments
                 .Where(c => c.TaskId == taskId && !c.IsDeleted && c.ParentCommentId == null)
                 .CountAsync();
         }
@@ -92,7 +90,7 @@ namespace StudioStudio_Server.Repositories
         /// </summary>
         public async Task<int> GetReplyCountAsync(Guid commentId)
         {
-            return await _context.TaskComments
+            return await context.TaskComments
                 .Where(c => c.ParentCommentId == commentId && !c.IsDeleted)
                 .CountAsync();
         }
@@ -104,7 +102,7 @@ namespace StudioStudio_Server.Repositories
         /// </summary>
         public async Task SoftDeleteWithRepliesAsync(Guid commentId)
         {
-            var comment = await _context.TaskComments
+            var comment = await context.TaskComments
                 .Include(c => c.Replies)
                     .ThenInclude(r => r.Replies)
                 .FirstOrDefaultAsync(c => c.CommentId == commentId);
@@ -119,7 +117,7 @@ namespace StudioStudio_Server.Repositories
 
             SoftDeleteRepliesRecursive(comment);
 
-            await _context.SaveChangesAsync();
+            await context.SaveChangesAsync();
         }
 
         /// <summary>

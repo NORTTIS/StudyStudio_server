@@ -10,8 +10,6 @@ namespace StudioStudio_Server.Repositories
     /// </summary>
     public class UserSubscriptionRepository(StudioDbContext db) : IUserSubscriptionRepository
     {
-        private readonly StudioDbContext _db = db;
-
         /// <summary>
         /// Lấy subscription plan của user
         /// Điều kiện: 
@@ -26,7 +24,7 @@ namespace StudioStudio_Server.Repositories
             DateTime now = DateTime.UtcNow;
 
             // Try to get active paid subscription
-            SubscriptionPlan? activePlan = await _db.UserSubscriptions
+            SubscriptionPlan? activePlan = await db.UserSubscriptions
                 .Where(us => us.UserId == userId &&
                             us.IsActive &&
                             us.EndDate > now)
@@ -40,36 +38,29 @@ namespace StudioStudio_Server.Repositories
             }
 
             // Otherwise, return Free Plan (BillingCycle = Free)
-            SubscriptionPlan? freePlan = await _db.SubscriptionPlans
+            SubscriptionPlan? freePlan = await db.SubscriptionPlans
                 .Where(sp => sp.BillingCycle == BillingCycle.Free && sp.IsActive)
                 .AsNoTracking()
                 .FirstOrDefaultAsync();
             return freePlan;
         }
 
-        public async Task<UserSubscription?> GetActiveSubscriptionAsync(Guid userId)
-        {
-            DateTime now = DateTime.UtcNow;
-            return await _db.UserSubscriptions
-                .FirstOrDefaultAsync(us => us.UserId == userId && us.IsActive && us.EndDate > now);
-        }
-
         public async Task DeactivateActiveSubscriptionsAsync(Guid userId)
         {
-            var activeSubscriptions = await _db.UserSubscriptions
+            var activeSubscriptions = await db.UserSubscriptions
                 .Where(us => us.UserId == userId && us.IsActive)
                 .ToListAsync();
 
             foreach (var sub in activeSubscriptions)
                 sub.IsActive = false;
 
-            await _db.SaveChangesAsync();
+            await db.SaveChangesAsync();
         }
 
         public async Task AddAsync(UserSubscription subscription)
         {
-            await _db.UserSubscriptions.AddAsync(subscription);
-            await _db.SaveChangesAsync();
+            await db.UserSubscriptions.AddAsync(subscription);
+            await db.SaveChangesAsync();
         }
 
         /// <summary>
@@ -81,7 +72,7 @@ namespace StudioStudio_Server.Repositories
         {
             DateTime now = DateTime.UtcNow;
 
-            return await _db.UserSubscriptions
+            return await db.UserSubscriptions
                 .Where(us => us.IsActive && us.EndDate > now)
                 .GroupBy(us => us.PlanId)
                 .Select(g => new { PlanId = g.Key, Count = g.Count() })
@@ -96,7 +87,7 @@ namespace StudioStudio_Server.Repositories
         /// </summary>
         public async Task<int> CountPremiumUsersAsync()
         {
-            return await _db.UserSubscriptions
+            return await db.UserSubscriptions
                 .Include(us => us.Plan)
                 .Where(us => us.Plan.BillingCycle != BillingCycle.Free)
                 .Select(us => us.UserId)

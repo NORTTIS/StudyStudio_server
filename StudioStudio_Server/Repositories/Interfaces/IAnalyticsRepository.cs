@@ -7,20 +7,13 @@ namespace StudioStudio_Server.Repositories.Interfaces
     public interface IAnalyticsRepository
     {
         // Group Analytics
-        Task<GroupAnalytics?> GetGroupAnalyticsByDateAsync(Guid groupId, DateOnly date);
         Task<List<GroupAnalytics>> GetGroupAnalyticsRangeAsync(Guid groupId, DateOnly startDate, DateOnly endDate);
-        Task<List<GroupAnalytics>> GetGroupAnalyticsRangeAsync(StudioDbContext context, Guid groupId, DateOnly startDate, DateOnly endDate);
-        Task<List<GroupAnalytics>> GetAllGroupAnalyticsRangeAsync(DateOnly startDate, DateOnly endDate);
         Task<Dictionary<Guid, List<GroupAnalytics>>> GetGroupAnalyticsRangeBatchAsync(List<Guid> groupIds, DateOnly startDate, DateOnly endDate);
         Task UpsertGroupAnalyticsAsync(GroupAnalytics analytics);
 
         // Aggregation helpers for ETL jobs
         Task<Dictionary<Guid, int>> AggregateTasksByGroupAsync(Guid groupId, DateTime from, DateTime to);
         Task<Dictionary<Guid, int>> AggregateCompletedTasksByGroupAsync(Guid groupId, DateTime from, DateTime to);
-        Task<Dictionary<Guid, int>> AggregateOverdueTasksByGroupAsync(Guid groupId, DateTime from, DateTime to);
-        Task<Dictionary<Guid, int>> AggregateActiveMembersByGroupAsync(Guid groupId, DateTime from, DateTime to);
-        Task<Dictionary<Guid, int>> AggregateMessagesByGroupAsync(Guid groupId, DateTime from, DateTime to);
-        Task<Dictionary<Guid, int>> AggregateCommentsByGroupAsync(Guid groupId, DateTime from, DateTime to);
 
         // === GROUP ANALYTICS ENHANCED: Task status per member ===
         /// <summary>
@@ -36,14 +29,11 @@ namespace StudioStudio_Server.Repositories.Interfaces
         /// </summary>
         Task<Dictionary<Guid, Dictionary<DateOnly, int>>> GetMemberDailyCompletionsAsync(
             Guid groupId, DateOnly startDate, DateOnly endDate);
-        Task<Dictionary<Guid, Dictionary<DateOnly, int>>> GetMemberDailyCompletionsAsync(
-            StudioDbContext context, Guid groupId, DateOnly startDate, DateOnly endDate);
 
         /// <summary>
         /// Get last activity datetime per member in a group
         /// </summary>
         Task<Dictionary<Guid, DateTime?>> GetMemberLastActivityAsync(Guid groupId);
-        Task<Dictionary<Guid, DateTime?>> GetMemberLastActivityAsync(StudioDbContext context, Guid groupId);
 
         /// <summary>
         /// Get task status counts per member WITHOUT date filter (all time) - for summary endpoint
@@ -51,17 +41,7 @@ namespace StudioStudio_Server.Repositories.Interfaces
         Task<Dictionary<Guid, (int Done, int InProgress, int Todo, int Overdue, int InProgressOverdue, int TodoOverdue, int Total)>> GetMemberTaskStatusBreakdownAllTimeAsync(Guid groupId);
 
         // ==================== PERSONAL ANALYTICS ====================
-
-        /// <summary>
-        /// Get all personal tasks (GroupId = null) for a user
-        /// </summary>
-        Task<List<(Guid? GroupId, int Progress, DateTime? CompletedAt, DateTime? DueDate, int Priority)>> GetUserPersonalTasksAsync(Guid userId);
-
-        /// <summary>
-        /// Get all tasks in all groups user belongs to
-        /// </summary>
-        Task<List<(Guid GroupId, Guid OwnerId, string GroupName, int Progress, DateTime? CompletedAt, DateTime? DueDate, int Priority)>> GetUserGroupsTasksAsync(List<Guid> groupIds);
-
+       
         /// <summary>
         /// Get user's personal tasks completion times (from CreatedAt to CompletedAt)
         /// </summary>
@@ -73,13 +53,6 @@ namespace StudioStudio_Server.Repositories.Interfaces
         /// </summary>
         Task<Dictionary<Guid, double>> GetUserGroupActivityScoresAsync(List<Guid> groupIds, Guid userId, DateTime? from = null, DateTime? to = null);
 
-        /// <summary>
-        /// Get activity scores for ALL members across the given groups (all time).
-        /// Returns: Dictionary&lt;GroupId, Dictionary&lt;UserId, TotalScore&gt;&gt;
-        /// Used by GetUserGroupRankingsAsync to compute each user's contribution % within each group.
-        /// </summary>
-        Task<Dictionary<Guid, Dictionary<Guid, double>>> GetAllMembersGroupActivityScoresAsync(
-            List<Guid> groupIds, DateTime? from = null, DateTime? to = null);
 
         /// <summary>
         /// Get per-member total scores and messages for a SINGLE group (all time).
@@ -100,18 +73,6 @@ namespace StudioStudio_Server.Repositories.Interfaces
         /// </summary>
         Task<List<(Guid? GroupId, Guid? TaskId, string Title, string GroupName, DateTime DueDate)>> GetUserOverdueTasksAsync(
             List<Guid> groupIds, Guid userId, int limit = 10);
-
-        /// <summary>
-        /// Get user's tasks due within N days across all groups + personal
-        /// </summary>
-        Task<List<(Guid? GroupId, Guid? TaskId, string Title, string GroupName, DateTime DueDate)>> GetUserDueSoonTasksAsync(
-            List<Guid> groupIds, Guid userId, int days = 1, int limit = 10);
-
-        /// <summary>
-        /// Get user's stuck tasks (no status update in N days)
-        /// </summary>
-        Task<List<(Guid? GroupId, Guid? TaskId, string Title, string GroupName, DateTime LastUpdated)>> GetUserStuckTasksAsync(
-            List<Guid> groupIds, Guid userId, int noUpdateDays = 5, int limit = 10);
 
         /// <summary>
         /// Get user's weekly completion stats (last N weeks) for benchmark

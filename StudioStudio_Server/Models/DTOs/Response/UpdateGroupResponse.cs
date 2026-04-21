@@ -10,8 +10,6 @@ namespace StudioStudio_Server.Models.DTOs.Response
         public bool IsTemplate { get; set; }
         public Guid? TemplateId { get; set; }
         public DateTime UpdatedAt { get; set; }
-
-        // 🔹 ADDED: Group personalization
         public string? AvatarUrl { get; set; }
         public string? ColorHex { get; set; }
         public string? IconEmoji { get; set; }

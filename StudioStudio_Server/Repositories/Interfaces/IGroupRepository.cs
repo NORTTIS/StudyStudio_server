@@ -1,5 +1,4 @@
-﻿using Microsoft.AspNetCore.SignalR;
-using StudioStudio_Server.Models.Entities;
+﻿using StudioStudio_Server.Models.Entities;
 
 using StudioStudio_Server.Models.DTOs.Response;
 

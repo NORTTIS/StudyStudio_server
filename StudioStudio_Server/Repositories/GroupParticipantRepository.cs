@@ -10,8 +10,6 @@ namespace StudioStudio_Server.Repositories
     /// </summary>
     public class GroupParticipantRepository(StudioDbContext context) : IGroupParticipantRepository
     {
-        private readonly StudioDbContext _context = context;
-
         /// <summary>
         /// Get participant record by GroupId and UserId
         /// Condition: GroupId = {groupId} AND UserId = {userId} AND Group.IsActive = true
@@ -19,10 +17,10 @@ namespace StudioStudio_Server.Repositories
         /// </summary>
         public async Task<GroupParticipant?> GetByGroupAndUserAsync(Guid groupId, Guid userId)
         {
-            return await _context.GroupParticipants
+            return await context.GroupParticipants
                 .AsNoTracking()
                 .FirstOrDefaultAsync(gp => gp.GroupId == groupId && gp.UserId == userId &&
-                    _context.Groups.Any(g => g.GroupId == gp.GroupId && g.IsActive));
+                    context.Groups.Any(g => g.GroupId == gp.GroupId && g.IsActive));
         }
 
         /// <summary>
@@ -32,7 +30,7 @@ namespace StudioStudio_Server.Repositories
         /// </summary>
         public async Task<GroupParticipant?> GetByGroupAndUserTrackedAsync(Guid groupId, Guid userId)
         {
-            return await _context.GroupParticipants
+            return await context.GroupParticipants
                 .FirstOrDefaultAsync(gp => gp.GroupId == groupId && gp.UserId == userId);
         }
 
@@ -42,10 +40,10 @@ namespace StudioStudio_Server.Repositories
         /// </summary>
         public async Task<GroupParticipant?> GetByUserAndGroupAsync(Guid userId, Guid groupId)
         {
-            return await _context.GroupParticipants
+            return await context.GroupParticipants
                 .AsNoTracking()
                 .FirstOrDefaultAsync(gp => gp.GroupId == groupId && gp.UserId == userId &&
-                    _context.Groups.Any(g => g.GroupId == gp.GroupId && g.IsActive));
+                    context.Groups.Any(g => g.GroupId == gp.GroupId && g.IsActive));
         }
 
         /// <summary>
@@ -55,9 +53,9 @@ namespace StudioStudio_Server.Repositories
         /// </summary>
         public async Task<List<GroupParticipant>> GetAllByGroupIdAsync(Guid groupId)
         {
-            return await _context.GroupParticipants
+            return await context.GroupParticipants
                 .Where(gp => gp.GroupId == groupId && gp.IsApproved &&
-                    _context.Groups.Any(g => g.GroupId == gp.GroupId && g.IsActive))
+                    context.Groups.Any(g => g.GroupId == gp.GroupId && g.IsActive))
                 .OrderBy(gp => gp.CreatedAt)
                 .AsNoTracking()
                 .ToListAsync();
@@ -71,9 +69,9 @@ namespace StudioStudio_Server.Repositories
         /// </summary>
         public async Task<List<GroupParticipant>> GetByGroupIdsAsync(List<Guid> groupIds)
         {
-            return await _context.GroupParticipants
+            return await context.GroupParticipants
                 .Where(gp => groupIds.Contains(gp.GroupId) && gp.IsApproved &&
-                    _context.Groups.Any(g => g.GroupId == gp.GroupId && g.IsActive))
+                    context.Groups.Any(g => g.GroupId == gp.GroupId && g.IsActive))
                 .OrderBy(gp => gp.CreatedAt)
                 .AsNoTracking()
                 .ToListAsync();
@@ -86,10 +84,10 @@ namespace StudioStudio_Server.Repositories
                 return new Dictionary<Guid, int>();
             }
 
-            var counts = await _context.GroupParticipants
+            var counts = await context.GroupParticipants
                 .Where(gp => groupIds.Contains(gp.GroupId)
                              && gp.IsApproved
-                             && _context.Groups.Any(g => g.GroupId == gp.GroupId && g.IsActive))
+                             && context.Groups.Any(g => g.GroupId == gp.GroupId && g.IsActive))
                 .GroupBy(gp => gp.GroupId)
                 .Select(g => new { GroupId = g.Key, Count = g.Count() })
                 .ToListAsync();
@@ -104,10 +102,10 @@ namespace StudioStudio_Server.Repositories
         /// </summary>
         public async Task<int> GetParticipantCountByGroupIdAsync(Guid groupId)
         {
-            return await _context.GroupParticipants
+            return await context.GroupParticipants
                 .Where(gp => gp.GroupId == groupId
                              && gp.IsApproved
-                             && _context.Groups.Any(g => g.GroupId == gp.GroupId && g.IsActive))
+                             && context.Groups.Any(g => g.GroupId == gp.GroupId && g.IsActive))
                 .CountAsync();
         }
 
@@ -118,11 +116,11 @@ namespace StudioStudio_Server.Repositories
         /// </summary>
         public async Task<int> GetRoleCountByGroupIdAsync(Guid groupId, GroupRole role)
         {
-            return await _context.GroupParticipants
+            return await context.GroupParticipants
                 .Where(gp => gp.GroupId == groupId
                              && gp.Role == role
                              && gp.IsApproved
-                             && _context.Groups.Any(g => g.GroupId == gp.GroupId && g.IsActive))
+                             && context.Groups.Any(g => g.GroupId == gp.GroupId && g.IsActive))
                 .CountAsync();
         }
 
@@ -132,9 +130,9 @@ namespace StudioStudio_Server.Repositories
         /// </summary>
         public async Task<bool> IsUserInGroupAsync(Guid groupId, Guid userId)
         {
-            return await _context.GroupParticipants
+            return await context.GroupParticipants
                 .AnyAsync(gp => gp.GroupId == groupId && gp.UserId == userId &&
-                    _context.Groups.Any(g => g.GroupId == gp.GroupId && g.IsActive));
+                    context.Groups.Any(g => g.GroupId == gp.GroupId && g.IsActive));
         }
 
         /// <summary>
@@ -142,8 +140,8 @@ namespace StudioStudio_Server.Repositories
         /// </summary>
         public async Task AddAsync(GroupParticipant participant)
         {
-            _context.GroupParticipants.Add(participant);
-            await _context.SaveChangesAsync();
+            context.GroupParticipants.Add(participant);
+            await context.SaveChangesAsync();
         }
 
         /// <summary>
@@ -151,7 +149,7 @@ namespace StudioStudio_Server.Repositories
         /// </summary>
         public async Task UpdateAsync(GroupParticipant participant)
         {
-            var existingEntry = _context.ChangeTracker.Entries<GroupParticipant>()
+            var existingEntry = context.ChangeTracker.Entries<GroupParticipant>()
                 .FirstOrDefault(e => e.Entity.ParticipantId == participant.ParticipantId);
 
             if (existingEntry != null)
@@ -160,10 +158,10 @@ namespace StudioStudio_Server.Repositories
             }
             else
             {
-                _context.GroupParticipants.Update(participant);
+                context.GroupParticipants.Update(participant);
             }
             
-            await _context.SaveChangesAsync();
+            await context.SaveChangesAsync();
         }
 
         /// <summary>
@@ -172,19 +170,19 @@ namespace StudioStudio_Server.Repositories
         /// </summary>
         public async Task RemoveAsync(GroupParticipant participant)
         {
-            var existingEntry = _context.ChangeTracker.Entries<GroupParticipant>()
+            var existingEntry = context.ChangeTracker.Entries<GroupParticipant>()
                 .FirstOrDefault(e => e.Entity.ParticipantId == participant.ParticipantId);
 
             if (existingEntry != null)
             {
-                _context.GroupParticipants.Remove(existingEntry.Entity);
+                context.GroupParticipants.Remove(existingEntry.Entity);
             }
             else
             {
-                _context.GroupParticipants.Remove(participant);
+                context.GroupParticipants.Remove(participant);
             }
             
-            await _context.SaveChangesAsync();
+            await context.SaveChangesAsync();
         }
 
         /// <summary>
@@ -193,9 +191,9 @@ namespace StudioStudio_Server.Repositories
         /// </summary>
         public async Task<GroupRole> GetGroupRoleByUserIdAsync(Guid userId, Guid groupId)
         {
-            var user = await _context.GroupParticipants
+            var user = await context.GroupParticipants
                 .FirstOrDefaultAsync(gp => gp.UserId == userId && gp.GroupId == groupId &&
-                    _context.Groups.Any(g => g.GroupId == gp.GroupId && g.IsActive));
+                    context.Groups.Any(g => g.GroupId == gp.GroupId && g.IsActive));
             return user?.Role ?? GroupRole.Viewer;
         }
 
@@ -204,8 +202,8 @@ namespace StudioStudio_Server.Repositories
         /// </summary>
         public async Task AddRangeAsync(IEnumerable<GroupParticipant> participants)
         {
-            _context.GroupParticipants.AddRange(participants);
-            await _context.SaveChangesAsync();
+            context.GroupParticipants.AddRange(participants);
+            await context.SaveChangesAsync();
         }
 
         /// <summary>
@@ -213,8 +211,8 @@ namespace StudioStudio_Server.Repositories
         /// </summary>
         public async Task UpdateRangeAsync(IEnumerable<GroupParticipant> participants)
         {
-            _context.GroupParticipants.UpdateRange(participants);
-            await _context.SaveChangesAsync();
+            context.GroupParticipants.UpdateRange(participants);
+            await context.SaveChangesAsync();
         }
 
         /// <summary>
@@ -222,8 +220,8 @@ namespace StudioStudio_Server.Repositories
         /// </summary>
         public async Task RemoveRangeAsync(IEnumerable<GroupParticipant> participants)
         {
-            _context.GroupParticipants.RemoveRange(participants);
-            await _context.SaveChangesAsync();
+            context.GroupParticipants.RemoveRange(participants);
+            await context.SaveChangesAsync();
         }
 
         // 🔹 ADDED: Pending membership & approval methods
@@ -234,9 +232,9 @@ namespace StudioStudio_Server.Repositories
         /// </summary>
         public async Task<List<GroupParticipant>> GetPendingByGroupIdAsync(Guid groupId)
         {
-            return await _context.GroupParticipants
+            return await context.GroupParticipants
                 .Where(gp => gp.GroupId == groupId && !gp.IsApproved &&
-                    _context.Groups.Any(g => g.GroupId == gp.GroupId && g.IsActive))
+                    context.Groups.Any(g => g.GroupId == gp.GroupId && g.IsActive))
                 .OrderBy(gp => gp.CreatedAt)
                 .AsNoTracking()
                 .ToListAsync();
@@ -248,9 +246,9 @@ namespace StudioStudio_Server.Repositories
         /// </summary>
         public async Task<bool> IsUserApprovedInGroupAsync(Guid groupId, Guid userId)
         {
-            return await _context.GroupParticipants
+            return await context.GroupParticipants
                 .AnyAsync(gp => gp.GroupId == groupId && gp.UserId == userId && gp.IsApproved &&
-                    _context.Groups.Any(g => g.GroupId == gp.GroupId && g.IsActive));
+                    context.Groups.Any(g => g.GroupId == gp.GroupId && g.IsActive));
         }
 
         /// <summary>
@@ -259,7 +257,7 @@ namespace StudioStudio_Server.Repositories
         /// </summary>
         public async Task<GroupParticipant?> GetPendingByGroupAndUserAsync(Guid groupId, Guid userId)
         {
-            return await _context.GroupParticipants
+            return await context.GroupParticipants
                 .AsNoTracking()
                 .FirstOrDefaultAsync(gp => gp.GroupId == groupId && gp.UserId == userId && !gp.IsApproved);
         }
@@ -270,9 +268,9 @@ namespace StudioStudio_Server.Repositories
         /// </summary>
         public async Task<List<GroupParticipant>> GetPendingByGroupIdsAsync(List<Guid> groupIds)
         {
-            return await _context.GroupParticipants
+            return await context.GroupParticipants
                 .Where(gp => groupIds.Contains(gp.GroupId) && !gp.IsApproved &&
-                    _context.Groups.Any(g => g.GroupId == gp.GroupId && g.IsActive))
+                    context.Groups.Any(g => g.GroupId == gp.GroupId && g.IsActive))
                 .AsNoTracking()
                 .ToListAsync();
         }

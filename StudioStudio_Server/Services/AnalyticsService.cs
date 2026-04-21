@@ -9,7 +9,7 @@ using StudioStudio_Server.Services.Interfaces;
 namespace StudioStudio_Server.Services
 {
     /// Service xử lý analytics và dữ liệu dashboard
-    public class AnalyticsService(StudioDbContext context, IAnalyticsRepository analyticsRepository) : IAnalyticsService
+    public class AnalyticsService(StudioDbContext context, IAnalyticsRepository analyticsRepository, ILogger<AnalyticsService> logger) : IAnalyticsService
     {
         // DTO cho truy vấn phân bổ urgency - tránh anonymous type với List<> inference
         private record UrgencyTaskDto(DateTime? CompletedAt, DateTime? DueDate, int Progress, TaskSeverity Severity);
@@ -1138,7 +1138,7 @@ namespace StudioStudio_Server.Services
             var startDate = today.AddDays(-(periodDays - 1));
             var endDate = today;
 
-            // Lấy tất cả công việc của user (không lọc CreatedAt - date range chỉ để hiển thị)
+            // Lấy tất cả công việc của user
             var personalTasks = await context.Tasks
                 .AsNoTracking()
                 .Where(t => t.OwnerId == userId && !t.GroupId.HasValue && !t.IsPendingDeleted)
@@ -1161,7 +1161,7 @@ namespace StudioStudio_Server.Services
             {
                 // Npgsql đọc timestamptz là UTC -> chuyển sang local (SE Asia Standard Time / UTC+7) để lấy đúng ngày
                 // Ví dụ: DB "2026-03-30 18:23:39 UTC" → Convert về local = "2026-03-31 01:23:39" → DateOnly = 2026-03-31 ✓
-                var zoneId = TimeZoneInfo.TryConvertIanaIdToWindowsId("Asia/Bangkok", out var windowsId)
+                var zoneId = TimeZoneInfo.TryConvertIanaIdToWindowsId("Asia/Ho_Chi_Minh", out var windowsId)
                     ? windowsId
                     : "SE Asia Standard Time";
                 DateOnly ToLocalDate(DateTime dt) => DateOnly.FromDateTime(TimeZoneInfo.ConvertTimeFromUtc(
@@ -1174,18 +1174,19 @@ namespace StudioStudio_Server.Services
                 // Tracking quá hạn lifetime: task quá hạn vào ngày D nếu:
                 //   1. Chưa hoàn thành VÀ DueDate < D → quá hạn từ DueDate+1
                 //   2. Hoàn thành muộn (CompletedAt > DueDate) → quá hạn từ DueDate+1 đến ngày hoàn thành
-                // Lưu ý: CompletedAt == DueDate (cùng ngày) = KHÔNG quá hạn (đúng hạn)
+                // Lưu ý: CompletedAt == DueDate (cùng ngày) = KHÔNG quá hạn (đúng hạn) và kể từ ngày completedAt task đó không còn là overdue nữa
                 var overdueTaskIds = all
                     .Where(t =>
                         // Case 1: chưa hoàn thành, đã qua hạn
                         (t.CompletedAt == null && t.DueDate.HasValue && ToLocalDate(t.DueDate.Value) <= date)
-                        // Case 2: hoàn thành muộn → quá hạn từ DueDate+1 đến ngày hoàn thành
+                        // Case 2: hoàn thành muộn
                         || (t.CompletedAt.HasValue && t.DueDate.HasValue
                             && ToLocalDate(t.CompletedAt.Value) > ToLocalDate(t.DueDate.Value)
-                            && ToLocalDate(t.DueDate.Value) < date))
+                            && ToLocalDate(t.DueDate.Value) < date)
+                            && ToLocalDate(t.CompletedAt.Value) > date)
                     .Select(t => t.TaskId)
                     .ToList();
-
+                logger.LogInformation("overdueTaskIds: {TaskIds}", overdueTaskIds);
                 trend.Add(new ProductivityTrendPoint
                 {
                     Date = date.ToString("yyyy-MM-dd"),

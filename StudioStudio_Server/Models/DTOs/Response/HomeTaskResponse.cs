@@ -1,20 +1,10 @@
-﻿namespace StudioStudio_Server.Models.DTOs.Response
+﻿using StudioStudio_Server.Models.Enums;
+
+namespace StudioStudio_Server.Models.DTOs.Response
 {
     public class PersonalTaskBoardResponse
     {
         public List<TaskStatusDto> PersonalTaskStatuses { get; set; } = new();
-    }
-
-    public class AssignedGroupResponse
-    {
-        public Guid TaskId { get; set; }
-        public string TaskName { get; set; } = string.Empty;
-        public Guid GroupId { get; set; }
-        public string GroupName { get; set; } = string.Empty;
-        public string StatusName { get; set; } = string.Empty;
-        public int Priority { get; set; }
-        public int Severity { get; set; }
-        public DateTime? DueDate { get; set; }
     }
 
     public class HomeSummaryResponse
@@ -43,8 +33,8 @@
         public string SourceName { get; set; } = string.Empty;
         public Guid? GroupId { get; set; }
         public string StatusName { get; set; } = string.Empty;
-        public Models.Enums.TaskSeverity TaskSeverity { get; set; }
-        public Models.Enums.TaskPriority TaskPriority { get; set; }
+        public TaskSeverity TaskSeverity { get; set; }
+        public TaskPriority TaskPriority { get; set; }
         public int Progress { get; set; }
         public DateTime? DueDate { get; set; }
         public string GroupName { get; set; } = string.Empty;

@@ -12,16 +12,14 @@ namespace StudioStudio_Server.Repositories
     /// </summary>
     public class TaskAssignmentRepository(StudioDbContext db) : ITaskAssignmentRepository
     {
-        private readonly StudioDbContext _db = db;
-
         /// <summary>
         /// Add new task assignment to database
         /// Creates assignment record linking task to assignee
         /// </summary>
         public async Task AddAsync(TaskAssignment assignee)
         {
-            _db.TaskAssignments.Add(assignee);
-            await _db.SaveChangesAsync();
+            db.TaskAssignments.Add(assignee);
+            await db.SaveChangesAsync();
         }
 
         /// <summary>
@@ -31,7 +29,7 @@ namespace StudioStudio_Server.Repositories
         /// </summary>
         public async Task<List<TaskAssignment>> GetAssigneesByTaskId(Guid taskId)
         {
-            return await _db.TaskAssignments
+            return await db.TaskAssignments
                 .Where(t => t.TaskId == taskId)
                 .AsNoTracking()
                 .ToListAsync();
@@ -45,9 +43,9 @@ namespace StudioStudio_Server.Repositories
         {
             foreach (var assignee in assignees)
             {
-                _db.TaskAssignments.Remove(assignee);
+                db.TaskAssignments.Remove(assignee);
             }
-            await _db.SaveChangesAsync();
+            await db.SaveChangesAsync();
         }
 
         /// <summary>
@@ -61,23 +59,11 @@ namespace StudioStudio_Server.Repositories
             if (taskIds == null || taskIds.Count == 0)
                 return new List<TaskAssignment>();
 
-            return await _db.TaskAssignments
+            return await db.TaskAssignments
                 .Where(a => taskIds.Contains(a.TaskId))
                 .AsNoTracking()
                 .ToListAsync();
         }
         
-        /// <summary>
-        /// Get all task assignments for a user
-        /// Condition: AssignedTo = {userId}
-        /// Use case: Get list of tasks assigned to user
-        /// </summary>
-        public async Task<List<TaskAssignment>> GetListTaskIdByUserIdAsync(Guid userId)
-        {
-            return await _db.TaskAssignments
-                .Where(a => a.AssignedTo == userId)
-                .AsNoTracking()
-                .ToListAsync();
-        }
     }
 }

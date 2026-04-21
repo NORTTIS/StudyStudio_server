@@ -10,9 +10,6 @@ namespace StudioStudio_Server.Repositories
     /// </summary>
     public class GroupMessageRepository(StudioDbContext context, ILogger<GroupMessageRepository> logger) : IGroupMessageRepository
     {
-        private readonly StudioDbContext _context = context;
-        private readonly ILogger<GroupMessageRepository> _logger = logger;
-
         /// <summary>
         /// Th�m m?i m?t message v�o database
         /// Include logging �? track message creation v� threading
@@ -21,14 +18,14 @@ namespace StudioStudio_Server.Repositories
         {
             try
             {
-                _logger.LogInformation(
+                logger.LogInformation(
                     "Adding GroupMessage: MessageId={MessageId}, GroupId={GroupId}, ParentMessageId={ParentId}",
                     message.MessageId, message.GroupId, message.ParentMessageId);
 
-                _context.GroupMessages.Add(message);
-                var rowsAffected = await _context.SaveChangesAsync();
+                context.GroupMessages.Add(message);
+                var rowsAffected = await context.SaveChangesAsync();
 
-                _logger.LogInformation(
+                logger.LogInformation(
                     "GroupMessage saved: MessageId={MessageId}, RowsAffected={Rows}, ParentMessageId={ParentId}",
                     message.MessageId, rowsAffected, message.ParentMessageId);
 
@@ -36,7 +33,7 @@ namespace StudioStudio_Server.Repositories
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex,
+                logger.LogError(ex,
                     "Error saving GroupMessage: MessageId={MessageId}, ParentMessageId={ParentId}",
                     message.MessageId, message.ParentMessageId);
                 throw;
@@ -50,7 +47,7 @@ namespace StudioStudio_Server.Repositories
         /// </summary>
         public async Task<GroupMessage?> GetByIdAsync(Guid messageId)
         {
-            return await _context.GroupMessages
+            return await context.GroupMessages
                 .Include(m => m.User)
                 .AsNoTracking()
                 .FirstOrDefaultAsync(m => m.MessageId == messageId);
@@ -64,7 +61,7 @@ namespace StudioStudio_Server.Repositories
         /// </summary>
         public async Task<GroupMessage?> GetByIdWithRepliesAsync(Guid messageId)
         {
-            return await _context.GroupMessages
+            return await context.GroupMessages
                 .Include(m => m.User)
                 .Include(m => m.Replies)
                     .ThenInclude(r => r.User)
@@ -84,7 +81,7 @@ namespace StudioStudio_Server.Repositories
         /// </summary>
         public async Task<List<GroupMessage>> GetByGroupIdAsync(Guid groupId, int limit = 100, int offset = 0)
         {
-            var messages = await _context.GroupMessages
+            var messages = await context.GroupMessages
                 .Where(m => m.GroupId == groupId && !m.IsDeleted && m.ParentMessageId == null)
                 .Include(m => m.User)
                 .Include(m => m.Replies.Where(r => !r.IsDeleted))
@@ -95,13 +92,13 @@ namespace StudioStudio_Server.Repositories
                 .AsNoTracking()
                 .ToListAsync();
 
-            _logger.LogInformation(
+            logger.LogInformation(
                 "GetByGroupIdAsync: GroupId={GroupId}, Found {Count} parent messages",
                 groupId, messages.Count);
 
             foreach (var msg in messages)
             {
-                _logger.LogInformation(
+                logger.LogInformation(
                     "Message {MessageId} has {ReplyCount} replies",
                     msg.MessageId, msg.Replies?.Count ?? 0);
             }
@@ -115,7 +112,7 @@ namespace StudioStudio_Server.Repositories
         /// </summary>
         public async Task<int> GetCountByGroupIdAsync(Guid groupId)
         {
-            return await _context.GroupMessages
+            return await context.GroupMessages
                 .Where(m => m.GroupId == groupId && !m.IsDeleted && m.ParentMessageId == null)
                 .CountAsync();
         }
@@ -126,7 +123,7 @@ namespace StudioStudio_Server.Repositories
         /// </summary>
         public async Task<int> GetReplyCountAsync(Guid messageId)
         {
-            return await _context.GroupMessages
+            return await context.GroupMessages
                 .Where(m => m.ParentMessageId == messageId && !m.IsDeleted)
                 .CountAsync();
         }
@@ -138,7 +135,7 @@ namespace StudioStudio_Server.Repositories
         /// </summary>
         public async Task SoftDeleteWithRepliesAsync(Guid messageId)
         {
-            var message = await _context.GroupMessages
+            var message = await context.GroupMessages
                 .Include(m => m.Replies)
                     .ThenInclude(r => r.Replies)
                 .FirstOrDefaultAsync(m => m.MessageId == messageId);
@@ -153,7 +150,7 @@ namespace StudioStudio_Server.Repositories
 
             SoftDeleteRepliesRecursive(message);
 
-            await _context.SaveChangesAsync();
+            await context.SaveChangesAsync();
         }
 
         /// <summary>

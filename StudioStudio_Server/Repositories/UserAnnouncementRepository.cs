@@ -10,15 +10,13 @@ namespace StudioStudio_Server.Repositories
     /// </summary>
     public class UserAnnouncementRepository(StudioDbContext context) : IUserAnnouccementRepository
     {
-        private readonly StudioDbContext _context = context;
-
         /// <summary>
         /// Thêm mới một UserAnnouncement vào database
         /// </summary>
         public async Task AddAsync(UserAnnouncement userAnnouncement)
         {
-            _context.UserAnnouncements.Add(userAnnouncement);
-            await _context.SaveChangesAsync();
+            context.UserAnnouncements.Add(userAnnouncement);
+            await context.SaveChangesAsync();
         }
 
         /// <summary>
@@ -26,7 +24,7 @@ namespace StudioStudio_Server.Repositories
         /// </summary>
         public async Task DeleteAsync(Guid userAnnouncementId)
         {
-            var userAnnouncement = await _context.UserAnnouncements
+            var userAnnouncement = await context.UserAnnouncements
                 .FirstOrDefaultAsync(a => a.UserAnnouncementId == userAnnouncementId);
 
             if (userAnnouncement == null)
@@ -36,22 +34,9 @@ namespace StudioStudio_Server.Repositories
 
             userAnnouncement.IsDelete = true;
             userAnnouncement.UpdatedAt = DateTime.UtcNow;
-            await _context.SaveChangesAsync();
+            await context.SaveChangesAsync();
         }
 
-        /// <summary>
-        /// Lấy danh sách UserAnnouncements của user theo userId
-        /// Điều kiện: MentionedId = userId AND IsDelete = false
-        /// Sắp xếp: CreatedAt DESC (mới nhất trước)
-        /// </summary>
-        public async Task<List<UserAnnouncement>> GetByUserIdAsync(Guid userId)
-        {
-            return await _context.UserAnnouncements
-                .Where(ua => ua.MentionedId == userId && !ua.IsDelete)
-                .OrderByDescending(ua => ua.CreatedAt)
-                .AsNoTracking()
-                .ToListAsync();
-        }
 
         /// <summary>
         /// Lấy UserAnnouncement theo ID
@@ -59,7 +44,7 @@ namespace StudioStudio_Server.Repositories
         /// </summary>
         public async Task<UserAnnouncement?> GetByIdAsync(Guid userAnnouncementId)
         {
-            return await _context.UserAnnouncements
+            return await context.UserAnnouncements
                 .FirstOrDefaultAsync(ua => 
                     ua.UserAnnouncementId == userAnnouncementId && 
                     !ua.IsDelete);
@@ -71,8 +56,8 @@ namespace StudioStudio_Server.Repositories
         public async Task UpdateAsync(UserAnnouncement userAnnouncement)
         {
             userAnnouncement.UpdatedAt = DateTime.UtcNow;
-            _context.UserAnnouncements.Update(userAnnouncement);
-            await _context.SaveChangesAsync();
+            context.UserAnnouncements.Update(userAnnouncement);
+            await context.SaveChangesAsync();
         }
 
         /// <summary>
@@ -80,7 +65,7 @@ namespace StudioStudio_Server.Repositories
         /// </summary>
         public async Task<UserAnnouncement?> GetByAnnouncementAndUserAsync(Guid announcementId, Guid userId)
         {
-            return await _context.UserAnnouncements
+            return await context.UserAnnouncements
                 .FirstOrDefaultAsync(ua =>
                     ua.AnnouncementId == announcementId &&
                     ua.MentionedId == userId &&

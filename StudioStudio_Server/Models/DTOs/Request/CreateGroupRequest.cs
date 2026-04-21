@@ -16,15 +16,12 @@ namespace StudioStudio_Server.Models.DTOs.Request
 
         public Guid? TemplateId { get; set; } = null;
 
-        // 🔹 ADDED: Group personalization
         public string? AvatarUrl { get; set; }
         public string? ColorHex { get; set; }
         public string? IconEmoji { get; set; }
         public string? BannerUrl { get; set; }
         public string? Tagline { get; set; }
         public string? Alias { get; set; }
-
-        // 🔹 ADDED: Open/Closed group (true = anyone with invite can join directly)
         public bool IsOpen { get; set; } = true;
     }
 }

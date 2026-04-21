@@ -67,14 +67,6 @@ namespace StudioStudio_Server.Models.DTOs.Response
     }
 
     /// <summary>
-    /// On-time vs overdue donut chart
-    /// </summary>
-    public class UserOnTimeOverviewResponse
-    {
-        public List<TaskStatusSegment> Segments { get; set; } = new();
-    }
-
-    /// <summary>
     /// Task distribution by priority level
     /// </summary>
     public class UserPriorityDistributionResponse

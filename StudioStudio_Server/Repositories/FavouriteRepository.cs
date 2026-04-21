@@ -10,8 +10,6 @@ namespace StudioStudio_Server.Repositories
     /// </summary>
     public class FavouriteRepository(StudioDbContext context) : IFavouriteRepository
     {
-        private readonly StudioDbContext _context = context;
-
         /// <summary>
         /// Get favourite record of user and group
         /// Condition: UserId = {userId} AND GroupId = {groupId} AND Group.IsActive = true
@@ -19,12 +17,12 @@ namespace StudioStudio_Server.Repositories
         /// </summary>
         public async Task<Favourite?> GetByUserAndGroupIdAsync(Guid userId, Guid groupId)
         {
-            var activeGroupIds = await _context.Groups
+            var activeGroupIds = await context.Groups
                 .Where(g => g.IsActive)
                 .Select(g => g.GroupId)
                 .ToListAsync();
 
-            return await _context.Favourites
+            return await context.Favourites
                 .AsNoTracking()
                 .FirstOrDefaultAsync(f => f.UserId == userId && f.GroupId == groupId && activeGroupIds.Contains(f.GroupId));
         }
@@ -37,12 +35,12 @@ namespace StudioStudio_Server.Repositories
         /// </summary>
         public async Task<List<Favourite>> GetByUserAndGroupIdsAsync(Guid userId, List<Guid> groupIds)
         {
-            var activeGroupIds = await _context.Groups
+            var activeGroupIds = await context.Groups
                 .Where(g => g.IsActive)
                 .Select(g => g.GroupId)
                 .ToListAsync();
 
-            return await _context.Favourites
+            return await context.Favourites
                 .Where(f => f.UserId == userId && groupIds.Contains(f.GroupId) && activeGroupIds.Contains(f.GroupId))
                 .OrderByDescending(f => f.CreatedAt)
                 .AsNoTracking()
@@ -55,12 +53,12 @@ namespace StudioStudio_Server.Repositories
         /// </summary>
         public async Task<bool> IsFavouriteAsync(Guid userId, Guid groupId)
         {
-            var isActive = await _context.Groups
+            var isActive = await context.Groups
                 .AnyAsync(g => g.GroupId == groupId && g.IsActive);
 
             if (!isActive) return false;
 
-            return await _context.Favourites
+            return await context.Favourites
                 .AnyAsync(f => f.UserId == userId && f.GroupId == groupId);
         }
 
@@ -70,12 +68,12 @@ namespace StudioStudio_Server.Repositories
         /// </summary>
         public async Task<bool> ExistsAsync(Guid userId, Guid groupId)
         {
-            var isActive = await _context.Groups
+            var isActive = await context.Groups
                 .AnyAsync(g => g.GroupId == groupId && g.IsActive);
 
             if (!isActive) return false;
 
-            return await _context.Favourites
+            return await context.Favourites
                 .AnyAsync(f => f.UserId == userId && f.GroupId == groupId);
         }
 
@@ -84,8 +82,8 @@ namespace StudioStudio_Server.Repositories
         /// </summary>
         public async Task AddAsync(Favourite favourite)
         {
-            _context.Favourites.Add(favourite);
-            await _context.SaveChangesAsync();
+            context.Favourites.Add(favourite);
+            await context.SaveChangesAsync();
         }
 
         /// <summary>
@@ -93,8 +91,8 @@ namespace StudioStudio_Server.Repositories
         /// </summary>
         public async Task RemoveAsync(Favourite favourite)
         {
-            _context.Favourites.Remove(favourite);
-            await _context.SaveChangesAsync();
+            context.Favourites.Remove(favourite);
+            await context.SaveChangesAsync();
         }
     }
 }

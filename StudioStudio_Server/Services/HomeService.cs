@@ -54,6 +54,9 @@ namespace StudioStudio_Server.Services
                              CreatedAt = t.CreatedAt,
                              StartDate = t.StartDate,
                              DueDate = t.DueDate,
+                             EstimatedHours = t.EstimatedHours,
+                             ActualHours = t.ActualHours,
+                             CompletedAt = t.CompletedAt,
                              Assignee = new UserDto
                              {
                                  Id = userId,

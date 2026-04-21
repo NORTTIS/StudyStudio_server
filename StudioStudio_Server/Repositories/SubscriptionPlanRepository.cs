@@ -11,11 +11,9 @@ namespace StudioStudio_Server.Repositories
     /// </summary>
     public class SubscriptionPlanRepository(StudioDbContext db) : ISubscriptionPlanRepository
     {
-        private readonly StudioDbContext _db = db;
-
         public async Task<List<SubscriptionPlan>> GetAllAsync()
         {
-            return await _db.SubscriptionPlans
+            return await db.SubscriptionPlans
                 .Where(s => s.IsActive)
                 .AsNoTracking()
                 .ToListAsync();
@@ -23,21 +21,21 @@ namespace StudioStudio_Server.Repositories
 
         public async Task<List<SubscriptionPlan>> GetAllIncludingInactiveAsync()
         {
-            return await _db.SubscriptionPlans
+            return await db.SubscriptionPlans
                 .AsNoTracking()
                 .ToListAsync();
         }
 
         public async Task<SubscriptionPlan?> GetByIdAsync(Guid planId)
         {
-            return await _db.SubscriptionPlans
+            return await db.SubscriptionPlans
                 .FirstOrDefaultAsync(p => p.PlanId == planId);
         }
 
         public async Task UpdateAsync(SubscriptionPlan plan)
         {
-            _db.SubscriptionPlans.Update(plan);
-            await _db.SaveChangesAsync();
+            db.SubscriptionPlans.Update(plan);
+            await db.SaveChangesAsync();
         }
     }
 }

@@ -81,10 +81,5 @@ namespace StudioStudio_Server.Repositories.Interfaces
             DateTime startDate,
             DateTime endDate,
             int topCount);
-
-        /// <summary>
-        /// Get admin user IDs
-        /// </summary>
-        Task<List<Guid>> GetAdminUserIdsAsync();
     }
 }

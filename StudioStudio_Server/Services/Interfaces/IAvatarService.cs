@@ -37,12 +37,9 @@ namespace StudioStudio_Server.Services.Interfaces
         /// </summary>
         Task DeleteStudioAvatarAsync(Guid userId, Guid studioId);
 
-        // 🔹 ADDED: Group Banner
         Task<AvatarUploadResponse> RequestGroupBannerUploadAsync(Guid userId, Guid groupId, RequestAvatarUploadRequest request);
         Task CompleteGroupBannerUploadAsync(Guid userId, Guid groupId, CompleteAvatarUploadRequest request);
         Task DeleteGroupBannerAsync(Guid userId, Guid groupId);
-
-        // 🔹 ADDED: Studio Banner
         Task<AvatarUploadResponse> RequestStudioBannerUploadAsync(Guid userId, Guid studioId, RequestAvatarUploadRequest request);
         Task CompleteStudioBannerUploadAsync(Guid userId, Guid studioId, CompleteAvatarUploadRequest request);
         Task DeleteStudioBannerAsync(Guid userId, Guid studioId);

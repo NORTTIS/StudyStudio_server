@@ -1,8 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using StudioStudio_Server.Data;
-using StudioStudio_Server.Models.Entities;
 using StudioStudio_Server.Repositories.Interfaces;
-using System.Threading.Tasks;
 
 namespace StudioStudio_Server.Repositories
 {
@@ -13,7 +11,6 @@ namespace StudioStudio_Server.Repositories
     /// </summary>
     public class PersonalTaskStatusRepository(StudioDbContext db) : IPersonalTaskStatusRepository
     {
-        private readonly StudioDbContext _db = db;
         private const int MAX_RETRY = 3;
         private const long STEP = 1000;
 
@@ -22,8 +19,8 @@ namespace StudioStudio_Server.Repositories
         /// </summary>
         public async Task AddAsync(PersonalTaskStatus personalTaskStatus)
         {
-            _db.PersonalTaskStatuses.Add(personalTaskStatus);
-            await _db.SaveChangesAsync();
+            db.PersonalTaskStatuses.Add(personalTaskStatus);
+            await db.SaveChangesAsync();
         }
 
         /// <summary>
@@ -33,7 +30,7 @@ namespace StudioStudio_Server.Repositories
         /// </summary>
         public async Task<List<PersonalTaskStatus>> GetAllByUserIdAsync(Guid userId)
         {
-            return await _db.PersonalTaskStatuses
+            return await db.PersonalTaskStatuses
                 .Where(s => s.UserId == userId)
                 .AsNoTracking()
                 .OrderBy(s => s.Position)
@@ -45,8 +42,8 @@ namespace StudioStudio_Server.Repositories
         /// </summary>
         public async Task DeletePersonalStatusAsync(PersonalTaskStatus status)
         {
-            _db.PersonalTaskStatuses.Remove(status);
-            await _db.SaveChangesAsync();
+            db.PersonalTaskStatuses.Remove(status);
+            await db.SaveChangesAsync();
         }
 
         /// <summary>
@@ -54,26 +51,10 @@ namespace StudioStudio_Server.Repositories
         /// </summary>
         public async Task UpdatePersonalStatusAsync(PersonalTaskStatus status)
         {
-            _db.PersonalTaskStatuses.Update(status);
-            await _db.SaveChangesAsync();
+            db.PersonalTaskStatuses.Update(status);
+            await db.SaveChangesAsync();
         }
         
-        /// <summary>
-        /// Add personal task status to database (alias of AddAsync)
-        /// </summary>
-        public async Task AddPersonalStatusAsync(PersonalTaskStatus status)
-        {
-            _db.PersonalTaskStatuses.Add(status);
-            await _db.SaveChangesAsync();
-        }
-
-        /// <summary>
-        /// Save changes to database
-        /// </summary>
-        public async Task SaveChangesAsync()
-        {
-            await _db.SaveChangesAsync();
-        }
 
         /// <summary>
         /// Check if status name already exists for user
@@ -82,7 +63,7 @@ namespace StudioStudio_Server.Repositories
         /// </summary>
         public async Task<bool> IsNameExist(PersonalTaskStatus status)
         {
-            return await _db.PersonalTaskStatuses.AnyAsync(t =>
+            return await db.PersonalTaskStatuses.AnyAsync(t =>
                 t.StatusName == status.StatusName &&
                 t.UserId == status.UserId &&
                 t.StatusId != status.StatusId);
@@ -102,18 +83,18 @@ namespace StudioStudio_Server.Repositories
 
             for (int attempt = 1; attempt <= MAX_RETRY; attempt++)
             {
-                using (var transaction = await _db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable))
+                using (var transaction = await db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable))
                 {
                     try
                     {
                         // Load previous and next statuses
                         var prev = prevStatusId.HasValue
-                            ? await _db.PersonalTaskStatuses
+                            ? await db.PersonalTaskStatuses
                                 .FirstOrDefaultAsync(s => s.StatusId == prevStatusId.Value)
                             : null;
 
                         var next = nextStatusId.HasValue
-                            ? await _db.PersonalTaskStatuses
+                            ? await db.PersonalTaskStatuses
                                 .FirstOrDefaultAsync(s => s.StatusId == nextStatusId.Value)
                             : null;
 
@@ -131,11 +112,11 @@ namespace StudioStudio_Server.Repositories
 
                                 // Reload after rebalance
                                 prev = prevStatusId.HasValue
-                                    ? await _db.PersonalTaskStatuses
+                                    ? await db.PersonalTaskStatuses
                                         .FirstOrDefaultAsync(s => s.StatusId == prevStatusId.Value)
                                     : null;
                                 next = nextStatusId.HasValue
-                                    ? await _db.PersonalTaskStatuses
+                                    ? await db.PersonalTaskStatuses
                                         .FirstOrDefaultAsync(s => s.StatusId == nextStatusId.Value)
                                     : null;
                             }
@@ -158,7 +139,7 @@ namespace StudioStudio_Server.Repositories
                         }
 
                         // Update status position
-                        var status = await _db.PersonalTaskStatuses
+                        var status = await db.PersonalTaskStatuses
                             .FirstOrDefaultAsync(s => s.StatusId == statusId);
 
                         if (status == null)
@@ -167,7 +148,7 @@ namespace StudioStudio_Server.Repositories
                         }
 
                         status.Position = (int)newPos;
-                        await _db.SaveChangesAsync();
+                        await db.SaveChangesAsync();
                         await transaction.CommitAsync();
                         return;
                     }
@@ -194,48 +175,12 @@ namespace StudioStudio_Server.Repositories
         }
 
         /// <summary>
-        /// Find next status after given position for user
-        /// Condition: UserId = {userId} AND Position > {position}
-        /// Order by: Position ASC (get the immediate next)
-        /// </summary>
-        public async Task<PersonalTaskStatus?> FindNextAfterAsync(Guid userId, long position)
-        {
-            return await _db.PersonalTaskStatuses
-                .Where(s => s.UserId == userId && s.Position > position)
-                .OrderBy(s => s.Position)
-                .AsNoTracking()
-                .FirstOrDefaultAsync();
-        }
-
-        /// <summary>
-        /// Rebalance all statuses for a user with proper spacing
-        /// Public method with transaction
-        /// Use case: When positions are too close together
-        /// </summary>
-        public async Task RebalanceColumnAsync(Guid userId)
-        {
-            using (var transaction = await _db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable))
-            {
-                try
-                {
-                    await RebalanceColumnInternalAsync(userId);
-                    await transaction.CommitAsync();
-                }
-                catch
-                {
-                    await transaction.RollbackAsync();
-                    throw;
-                }
-            }
-        }
-
-        /// <summary>
         /// Internal rebalance method (used within existing transactions)
         /// Redistributes position values with STEP spacing (1000, 2000, 3000, ...)
         /// </summary>
         private async Task RebalanceColumnInternalAsync(Guid userId)
         {
-            var statuses = await _db.PersonalTaskStatuses
+            var statuses = await db.PersonalTaskStatuses
                 .Where(s => s.UserId == userId)
                 .OrderBy(s => s.Position)
                 .ToListAsync();
@@ -247,7 +192,7 @@ namespace StudioStudio_Server.Repositories
                 pos += STEP;
             }
 
-            await _db.SaveChangesAsync();
+            await db.SaveChangesAsync();
         }
 
         /// <summary>
@@ -265,7 +210,7 @@ namespace StudioStudio_Server.Repositories
         /// </summary>
         public async Task<PersonalTaskStatus?> GetDetailAsync(Guid statusId)
         {
-            return await _db.PersonalTaskStatuses
+            return await db.PersonalTaskStatuses
                 .FirstOrDefaultAsync(t => t.StatusId == statusId);
         }
     }

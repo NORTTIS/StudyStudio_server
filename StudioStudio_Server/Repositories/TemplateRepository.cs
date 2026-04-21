@@ -10,8 +10,6 @@ namespace StudioStudio_Server.Repositories
     /// </summary>
     public class TemplateRepository(StudioDbContext context) : ITemplateRepository
     {
-        private readonly StudioDbContext _context = context;
-
         /// <summary>
         /// Get template by ID
         /// Condition: TemplateId = {templateId} AND IsActive = true
@@ -19,7 +17,7 @@ namespace StudioStudio_Server.Repositories
         /// </summary>
         public async Task<Template?> GetByIdAsync(Guid templateId)
         {
-            return await _context.Templates
+            return await context.Templates
                 .Include(t => t.Group)
                 .Include(t => t.User)
                 .AsNoTracking()
@@ -34,7 +32,7 @@ namespace StudioStudio_Server.Repositories
         /// </summary>
         public async Task<Template?> GetByGroupIdAsync(Guid groupId)
         {
-            return await _context.Templates
+            return await context.Templates
                 .Include(t => t.Group)
                 .Include(t => t.User)
                 .AsNoTracking()
@@ -48,7 +46,7 @@ namespace StudioStudio_Server.Repositories
         /// </summary>
         public async Task<List<Template>> GetAllAsync()
         {
-            return await _context.Templates
+            return await context.Templates
                 .Where(t => t.IsActive)
                 .Include(t => t.Group)
                 .Include(t => t.User)
@@ -63,7 +61,7 @@ namespace StudioStudio_Server.Repositories
         /// </summary>
         public async Task<List<Template>> GetByUserIdAsync(Guid userId)
         {
-            return await _context.Templates
+            return await context.Templates
                 .Where(t => t.UserId == userId && t.IsActive)
                 .Include(t => t.Group)
                 .Include(t => t.User)
@@ -78,7 +76,7 @@ namespace StudioStudio_Server.Repositories
         /// </summary>
         public async Task<List<Template>> GetSystemTemplatesAsync()
         {
-            return await _context.Templates
+            return await context.Templates
                 .Where(t => t.IsSystemTemplate && t.IsActive)
                 .Include(t => t.Group)
                 .Include(t => t.User)
@@ -93,7 +91,7 @@ namespace StudioStudio_Server.Repositories
         /// </summary>
         public async Task<List<Template>> GetAllSystemTemplatesAsync()
         {
-            return await _context.Templates
+            return await context.Templates
                 .Where(t => t.IsSystemTemplate)
                 .Include(t => t.Group)
                 .Include(t => t.User)
@@ -108,7 +106,7 @@ namespace StudioStudio_Server.Repositories
         /// </summary>
         public async Task<List<Template>> GetUserTemplatesAsync(Guid userId)
         {
-            return await _context.Templates
+            return await context.Templates
                 .Where(t => t.UserId == userId && !t.IsSystemTemplate && t.IsActive)
                 .Include(t => t.Group)
                 .Include(t => t.User)
@@ -122,7 +120,7 @@ namespace StudioStudio_Server.Repositories
         /// </summary>
         public async Task<bool> ExistsAsync(Guid templateId)
         {
-            return await _context.Templates
+            return await context.Templates
                 .AnyAsync(t => t.TemplateId == templateId && t.IsActive);
         }
 
@@ -131,8 +129,8 @@ namespace StudioStudio_Server.Repositories
         /// </summary>
         public async Task AddAsync(Template template)
         {
-            _context.Templates.Add(template);
-            await _context.SaveChangesAsync();
+            context.Templates.Add(template);
+            await context.SaveChangesAsync();
         }
 
         /// <summary>
@@ -142,8 +140,8 @@ namespace StudioStudio_Server.Repositories
         {
             // Mark only the root Template as modified to avoid attaching navigation graph
             // (can conflict when Group/User with same keys are already tracked in this DbContext).
-            _context.Entry(template).State = EntityState.Modified;
-            await _context.SaveChangesAsync();
+            context.Entry(template).State = EntityState.Modified;
+            await context.SaveChangesAsync();
         }
 
         /// <summary>
@@ -154,8 +152,8 @@ namespace StudioStudio_Server.Repositories
         {
             template.IsActive = false;
             template.UpdatedAt = DateTime.UtcNow;
-            _context.Templates.Update(template);
-            await _context.SaveChangesAsync();
+            context.Templates.Update(template);
+            await context.SaveChangesAsync();
         }
 
         /// <summary>
@@ -163,9 +161,9 @@ namespace StudioStudio_Server.Repositories
         /// </summary>
         public async Task HardDeleteAsync(Template template)
         {
-            _context.Templates.Attach(template);
-            _context.Templates.Remove(template);
-            await _context.SaveChangesAsync();
+            context.Templates.Attach(template);
+            context.Templates.Remove(template);
+            await context.SaveChangesAsync();
         }
 
         /// <summary>
@@ -173,7 +171,7 @@ namespace StudioStudio_Server.Repositories
         /// </summary>
         public async Task<Template?> GetByIdIncludingInactiveAsync(Guid templateId)
         {
-            return await _context.Templates
+            return await context.Templates
                 .Include(t => t.Group)
                 .Include(t => t.User)
                 .AsNoTracking()

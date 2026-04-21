@@ -1,10 +1,8 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using StudioStudio_Server.Data;
 using StudioStudio_Server.Models.DTOs.Response;
-using StudioStudio_Server.Models.Entities;
 using StudioStudio_Server.Models.Enums;
 using StudioStudio_Server.Repositories.Interfaces;
-using System.Collections.Generic;
 
 namespace StudioStudio_Server.Repositories
 {
@@ -13,7 +11,6 @@ namespace StudioStudio_Server.Repositories
     /// </summary>
     public class TaskRepository(StudioDbContext context) : ITaskRepository
     {
-        private readonly StudioDbContext _context = context;
         private const int STEP = 1000;
         private const int MAX_TRY = 3;
 
@@ -23,14 +20,14 @@ namespace StudioStudio_Server.Repositories
         /// </summary>
         public async Task<TaskItem?> GetByIdAsync(Guid taskId)
         {
-            return await _context.Tasks
+            return await context.Tasks
                 .AsNoTracking()
                 .FirstOrDefaultAsync(t => t.TaskId == taskId && !t.IsPendingDeleted);
         }
 
         public async Task<TaskItem?> GetDeletedByIdAsync(Guid taskId)
         {
-            return await _context.Tasks
+            return await context.Tasks
                 .AsNoTracking()
                 .FirstOrDefaultAsync(t => t.TaskId == taskId && t.IsPendingDeleted);
         }
@@ -41,7 +38,7 @@ namespace StudioStudio_Server.Repositories
         /// </summary>
         public async Task<int> GetTaskCountByGroupIdAsync(Guid groupId)
         {
-            return await _context.Tasks
+            return await context.Tasks
                 .Where(t => t.GroupId == groupId && !t.IsPendingDeleted)
                 .CountAsync();
         }
@@ -54,7 +51,7 @@ namespace StudioStudio_Server.Repositories
         /// </summary>
         public async Task<Dictionary<Guid, int>> GetTaskCountByGroupIdsAsync(List<Guid> groupIds)
         {
-            var taskCounts = await _context.Tasks
+            var taskCounts = await context.Tasks
                 .Where(t => t.GroupId.HasValue && groupIds.Contains(t.GroupId.Value) && t.IsPendingDeleted == false)
                 .GroupBy(t => t.GroupId.Value)
                 .Select(g => new { GroupId = g.Key, Count = g.Count() })
@@ -72,7 +69,7 @@ namespace StudioStudio_Server.Repositories
         {
             DateTime now = DateTime.UtcNow;
 
-            List<TaskItem> tasks = await _context.Tasks
+            List<TaskItem> tasks = await context.Tasks
                 .Where(t => t.GroupId == groupId && !t.IsPendingDeleted)
                 .AsNoTracking()
                 .ToListAsync();
@@ -148,7 +145,7 @@ namespace StudioStudio_Server.Repositories
             DateTime now = DateTime.UtcNow;
 
             // Single query: load all tasks for all groups
-            var allTasks = await _context.Tasks
+            var allTasks = await context.Tasks
                 .Where(t => groupIds.Contains(t.GroupId ?? Guid.Empty) && !t.IsPendingDeleted)
                 .AsNoTracking()
                 .ToListAsync();
@@ -207,8 +204,8 @@ namespace StudioStudio_Server.Repositories
         /// </summary>
         public async Task AddAsync(TaskItem task)
         {
-            _context.Tasks.Add(task);
-            await _context.SaveChangesAsync();
+            context.Tasks.Add(task);
+            await context.SaveChangesAsync();
         }
 
         /// <summary>
@@ -219,8 +216,8 @@ namespace StudioStudio_Server.Repositories
         {
             task.IsPendingDeleted = false;
             task.UpdatedAt = DateTime.UtcNow;
-            _context.Tasks.Update(task);
-            await _context.SaveChangesAsync();
+            context.Tasks.Update(task);
+            await context.SaveChangesAsync();
         }
 
         /// <summary>
@@ -229,13 +226,13 @@ namespace StudioStudio_Server.Repositories
         /// </summary>
         public async Task SoftDeleteAsync(Guid taskId)
         {
-            var task = await _context.Tasks.FirstOrDefaultAsync(t => t.TaskId == taskId);
+            var task = await context.Tasks.FirstOrDefaultAsync(t => t.TaskId == taskId);
             if (task != null)
             {
                 task.IsPendingDeleted = true;
                 task.UpdatedAt = DateTime.UtcNow;
-                _context.Tasks.Update(task);
-                await _context.SaveChangesAsync();
+                context.Tasks.Update(task);
+                await context.SaveChangesAsync();
             }
         }
 
@@ -246,8 +243,8 @@ namespace StudioStudio_Server.Repositories
         public async Task UpdateAsync(TaskItem task)
         {
             task.UpdatedAt = DateTime.UtcNow;
-            _context.Tasks.Update(task);
-            await _context.SaveChangesAsync();
+            context.Tasks.Update(task);
+            await context.SaveChangesAsync();
         }
 
         /// <summary>
@@ -257,7 +254,7 @@ namespace StudioStudio_Server.Repositories
         /// </summary>
         public async Task<List<TaskItem>> GetSoftDeleteTaskByGroup(Guid groupId)
         {
-            return await _context.Tasks
+            return await context.Tasks
                 .Where(t => t.GroupId == groupId && t.IsPendingDeleted)
                 .OrderBy(t => t.UpdatedAt)
                 .ThenByDescending(t => t.Title)
@@ -267,7 +264,7 @@ namespace StudioStudio_Server.Repositories
 
         public async Task<List<TaskItem>> GetAllTasksByStatusIdAsync(Guid statusId)
         {
-            return await _context.Tasks
+            return await context.Tasks
                 .Where(t => t.GroupStatusId == statusId && !t.IsPendingDeleted)
                 .AsNoTracking()
                 .OrderBy(t => t.Position)
@@ -279,15 +276,11 @@ namespace StudioStudio_Server.Repositories
         /// </summary>
         public async Task<List<TaskItem>> GetAllPersonalTasksByStatusIdAsync(Guid statusId)
         {
-            return await _context.Tasks
+            return await context.Tasks
                 .Where(t => t.PersonalStatusId == statusId && !t.GroupId.HasValue && !t.IsPendingDeleted)
                 .AsNoTracking()
                 .OrderBy(t => t.Position)
                 .ToListAsync();
-        }
-        public async Task SaveChangesAsync()
-        {
-            await _context.SaveChangesAsync();
         }
 
         public async Task<Dictionary<Guid, List<TaskItem>>> GetListTasksByListStatusId(List<Guid> listStatusIds)
@@ -298,7 +291,7 @@ namespace StudioStudio_Server.Repositories
             }
 
             // Single set-based query instead of N+1 per-status loops
-            var allTasks = await _context.Tasks
+            var allTasks = await context.Tasks
                 .Where(t => t.GroupStatusId.HasValue
                           && listStatusIds.Contains(t.GroupStatusId.Value)
                           && !t.IsPendingDeleted)
@@ -329,7 +322,7 @@ namespace StudioStudio_Server.Repositories
             }
 
             // Single set-based query instead of N+1 per-status loops
-            var allTasks = await _context.Tasks
+            var allTasks = await context.Tasks
                 .Where(t => t.PersonalStatusId.HasValue
                          && listStatusIds.Contains(t.PersonalStatusId.Value)
                          && !t.GroupId.HasValue
@@ -359,7 +352,7 @@ namespace StudioStudio_Server.Repositories
         /// </summary>
         public async Task<List<TaskItem>> GetPersonalTasksByOwnerAsync(Guid userId)
         {
-            return await _context.Tasks
+            return await context.Tasks
                 .Where(t => t.OwnerId == userId
                          && !t.GroupId.HasValue
                          && t.PersonalStatusId.HasValue
@@ -377,7 +370,7 @@ namespace StudioStudio_Server.Repositories
         /// </summary>
         public async Task<List<TaskItem>> GetPersonalTasksByOwnerAsync(Guid userId, int limit)
         {
-            return await _context.Tasks
+            return await context.Tasks
                 .Where(t => t.OwnerId == userId
                          && !t.GroupId.HasValue
                          && t.PersonalStatusId.HasValue
@@ -397,7 +390,7 @@ namespace StudioStudio_Server.Repositories
         public async Task<List<TaskItem>> GetPersonalTasksByOwnerWithDeadlineAsync(
             Guid userId, DateTime fromDate, DateTime toDate, int? limit = null)
         {
-            var baseQuery = _context.Tasks
+            var baseQuery = context.Tasks
                 .Where(t => t.OwnerId == userId
                          && !t.GroupId.HasValue
                          && t.PersonalStatusId.HasValue
@@ -420,7 +413,7 @@ namespace StudioStudio_Server.Repositories
         /// </summary>
         public async Task<List<TaskItem>> GetAssignedGroupTasksByUserAsync(Guid userId, int limit)
         {
-            var taskIds = await _context.TaskAssignments
+            var taskIds = await context.TaskAssignments
                 .Where(a => a.AssignedTo == userId)
                 .Select(a => a.TaskId)
                 .ToListAsync();
@@ -428,7 +421,7 @@ namespace StudioStudio_Server.Repositories
             if (!taskIds.Any())
                 return new List<TaskItem>();
 
-            return await _context.Tasks
+            return await context.Tasks
                 .Where(t => taskIds.Contains(t.TaskId) && t.GroupId.HasValue && !t.IsPendingDeleted)
                 .Include(t => t.Group)
                 .Include(t => t.GroupStatus)
@@ -446,7 +439,7 @@ namespace StudioStudio_Server.Repositories
         /// </summary>
         public async Task<List<TaskItem>> GetAssignedGroupTasksByUserAsync(Guid userId)
         {
-            var taskIds = await _context.TaskAssignments
+            var taskIds = await context.TaskAssignments
                 .Where(a => a.AssignedTo == userId)
                 .Select(a => a.TaskId)
                 .ToListAsync();
@@ -456,7 +449,7 @@ namespace StudioStudio_Server.Repositories
                 return new List<TaskItem>();
             }
 
-            return await _context.Tasks
+            return await context.Tasks
                 .Where(t => taskIds.Contains(t.TaskId) && t.GroupId.HasValue && !t.IsPendingDeleted)
                 .Include(t => t.Group)
                 .Include(t => t.GroupStatus)
@@ -480,7 +473,7 @@ namespace StudioStudio_Server.Repositories
             bool sortAscending = true)
         {
             // Get task IDs assigned to user
-            var taskIds = await _context.TaskAssignments
+            var taskIds = await context.TaskAssignments
                 .Where(a => a.AssignedTo == userId)
                 .Select(a => a.TaskId)
                 .ToListAsync();
@@ -491,7 +484,7 @@ namespace StudioStudio_Server.Repositories
             }
 
             // Build base query
-            var query = _context.Tasks
+            var query = context.Tasks
                 .Where(t => taskIds.Contains(t.TaskId) && t.GroupId.HasValue && !t.IsPendingDeleted)
                 .Include(t => t.Group)
                 .Include(t => t.GroupStatus)
@@ -587,7 +580,7 @@ namespace StudioStudio_Server.Repositories
             }
 
             // Build base query
-            var query = _context.Tasks
+            var query = context.Tasks
                 .Where(t => t.GroupId == groupId && !t.IsPendingDeleted)
                 .Include(t => t.GroupStatus)
                 .Include(t => t.Owner)
@@ -605,7 +598,7 @@ namespace StudioStudio_Server.Repositories
             // Apply assignee filter
             if (assigneeId.HasValue)
             {
-                var assignedTaskIds = await _context.TaskAssignments
+                var assignedTaskIds = await context.TaskAssignments
                     .Where(a => a.AssignedTo == assigneeId.Value)
                     .Select(a => a.TaskId)
                     .ToListAsync();
@@ -688,7 +681,7 @@ namespace StudioStudio_Server.Repositories
             // Apply has no assignee filter
             if (hasNoAssignee == true)
             {
-                query = query.Where(t => !_context.TaskAssignments.Any(a => a.TaskId == t.TaskId));
+                query = query.Where(t => !context.TaskAssignments.Any(a => a.TaskId == t.TaskId));
             }
 
             // Apply has no due date filter
@@ -741,22 +734,22 @@ namespace StudioStudio_Server.Repositories
         {
             for (int attemp = 1; attemp <= MAX_TRY; attemp++)
             {
-                using var transaction = await _context.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
+                using var transaction = await context.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
 
                 try
                 {
-                    var targetStatus = await _context.GroupTaskStatuses
+                    var targetStatus = await context.GroupTaskStatuses
                         .FirstOrDefaultAsync(s => s.StatusId == targetStatusId && !s.IsDeleted)
                     ?? throw new InvalidOperationException($"Status {targetStatusId} not found");
 
                     // Load task to be moved first
-                    var task = await _context.Tasks
+                    var task = await context.Tasks
                         .FirstOrDefaultAsync(t => t.TaskId == taskId && !t.IsPendingDeleted)
                         ?? throw new InvalidOperationException($"Task {taskId} not found");
 
                     // Load prev/next task (must belong to targetStatus and exclude the moving task)
                     var prev = prevTaskId.HasValue
-                        ? await _context.Tasks
+                        ? await context.Tasks
                             .FirstOrDefaultAsync(t => t.TaskId == prevTaskId.Value
                                                    && t.GroupStatusId == targetStatusId
                                                    && t.TaskId != taskId
@@ -764,7 +757,7 @@ namespace StudioStudio_Server.Repositories
                         : null;
 
                     var next = nextTaskId.HasValue
-                        ? await _context.Tasks
+                        ? await context.Tasks
                             .FirstOrDefaultAsync(t => t.TaskId == nextTaskId.Value
                                                    && t.GroupStatusId == targetStatusId
                                                    && t.TaskId != taskId
@@ -777,7 +770,7 @@ namespace StudioStudio_Server.Repositories
                     if (prev == null && next == null)
                     {
                         // Check if there are other tasks in the target status (excluding the moving task)
-                        var existingTasks = await _context.Tasks
+                        var existingTasks = await context.Tasks
                             .Where(t => t.GroupStatusId == targetStatusId
                                      && t.TaskId != taskId
                                      && !t.IsPendingDeleted)
@@ -805,9 +798,9 @@ namespace StudioStudio_Server.Repositories
                             await RebalanceTasksInStatusInternalAsync(targetStatusId);
 
                             // Reload after rebalance
-                            prev = await _context.Tasks
+                            prev = await context.Tasks
                                 .FirstOrDefaultAsync(t => t.TaskId == prevTaskId!.Value && !t.IsPendingDeleted);
-                            next = await _context.Tasks
+                            next = await context.Tasks
                                 .FirstOrDefaultAsync(t => t.TaskId == nextTaskId!.Value && !t.IsPendingDeleted);
                         }
 
@@ -828,7 +821,7 @@ namespace StudioStudio_Server.Repositories
                         {
                             await RebalanceTasksInStatusInternalAsync(targetStatusId);
 
-                            next = await _context.Tasks
+                            next = await context.Tasks
                                 .FirstOrDefaultAsync(t => t.TaskId == nextTaskId!.Value && !t.IsPendingDeleted);
 
 
@@ -845,7 +838,7 @@ namespace StudioStudio_Server.Repositories
                     task.GroupStatusId = targetStatusId;
                     task.UpdatedAt = DateTime.UtcNow;
 
-                    await _context.SaveChangesAsync();
+                    await context.SaveChangesAsync();
                     await transaction.CommitAsync();
                     return;
                 }
@@ -869,40 +862,9 @@ namespace StudioStudio_Server.Repositories
             throw new InvalidOperationException("Failed to reorder task after maximum retries");
         }
 
-        /// <summary>
-        /// Rebalance all tasks in status (public method with separate transaction)
-        /// </summary>
-        public async Task RebalanceTasksInStatusAsync(Guid statusId)
-        {
-            using var transaction = await _context.Database
-                .BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
-            try
-            {
-                await RebalanceTasksInStatusInternalAsync(statusId);
-                await transaction.CommitAsync();
-            }
-            catch
-            {
-                await transaction.RollbackAsync();
-                throw;
-            }
-        }
-
-        /// <summary>
-        /// Find next task after position in same status
-        /// </summary>
-        public async Task<TaskItem?> FindNextAfterAsync(Guid statusId, long position)
-        {
-            return await _context.Tasks
-                .Where(t => t.GroupStatusId == statusId && t.Position > position && !t.IsPendingDeleted)
-                .OrderBy(t => t.Position)
-                .AsNoTracking()
-                .FirstOrDefaultAsync();
-        }
-
         private async Task RebalanceTasksInStatusInternalAsync(Guid statusId)
         {
-            var tasks = await _context.Tasks
+            var tasks = await context.Tasks
                 .Where(t => t.GroupStatusId == statusId && !t.IsPendingDeleted)
                 .OrderBy(t => t.Position)
                 .ToListAsync();
@@ -914,7 +876,7 @@ namespace StudioStudio_Server.Repositories
                 pos += STEP;
             }
 
-            await _context.SaveChangesAsync();
+            await context.SaveChangesAsync();
         }
 
 
@@ -926,22 +888,22 @@ namespace StudioStudio_Server.Repositories
         {
             for (int attemp = 1; attemp <= MAX_TRY; attemp++)
             {
-                using var transaction = await _context.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
+                using var transaction = await context.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
 
                 try
                 {
-                    var targetStatus = await _context.PersonalTaskStatuses
+                    var targetStatus = await context.PersonalTaskStatuses
                         .FirstOrDefaultAsync(s => s.StatusId == targetStatusId)
                     ?? throw new InvalidOperationException($"Status {targetStatusId} not found");
 
                     // Load task to be moved first
-                    var task = await _context.Tasks
+                    var task = await context.Tasks
                         .FirstOrDefaultAsync(t => t.TaskId == taskId && !t.IsPendingDeleted)
                         ?? throw new InvalidOperationException($"Task {taskId} not found");
 
                     // Load prev/next task (must belong to targetStatus and exclude the moving task)
                     var prev = prevTaskId.HasValue
-                        ? await _context.Tasks
+                        ? await context.Tasks
                             .FirstOrDefaultAsync(t => t.TaskId == prevTaskId.Value
                                                    && t.PersonalStatusId == targetStatusId
                                                    && t.TaskId != taskId
@@ -949,7 +911,7 @@ namespace StudioStudio_Server.Repositories
                         : null;
 
                     var next = nextTaskId.HasValue
-                        ? await _context.Tasks
+                        ? await context.Tasks
                             .FirstOrDefaultAsync(t => t.TaskId == nextTaskId.Value
                                                    && t.PersonalStatusId == targetStatusId
                                                    && t.TaskId != taskId
@@ -962,7 +924,7 @@ namespace StudioStudio_Server.Repositories
                     if (prev == null && next == null)
                     {
                         // Check if there are other tasks in the target status (excluding the moving task)
-                        var existingTasks = await _context.Tasks
+                        var existingTasks = await context.Tasks
                             .Where(t => t.PersonalStatusId == targetStatusId
                                      && t.TaskId != taskId
                                      && !t.IsPendingDeleted)
@@ -990,9 +952,9 @@ namespace StudioStudio_Server.Repositories
                             await RebalancePersonalTasksInStatusInternalAsync(targetStatusId);
 
                             // Reload after rebalance
-                            prev = await _context.Tasks
+                            prev = await context.Tasks
                                 .FirstOrDefaultAsync(t => t.TaskId == prevTaskId!.Value && !t.IsPendingDeleted);
-                            next = await _context.Tasks
+                            next = await context.Tasks
                                 .FirstOrDefaultAsync(t => t.TaskId == nextTaskId!.Value && !t.IsPendingDeleted);
                         }
 
@@ -1013,7 +975,7 @@ namespace StudioStudio_Server.Repositories
                         {
                             await RebalancePersonalTasksInStatusInternalAsync(targetStatusId);
 
-                            next = await _context.Tasks
+                            next = await context.Tasks
                                 .FirstOrDefaultAsync(t => t.TaskId == nextTaskId!.Value && !t.IsPendingDeleted);
 
 
@@ -1030,7 +992,7 @@ namespace StudioStudio_Server.Repositories
                     task.PersonalStatusId = targetStatusId;
                     task.UpdatedAt = DateTime.UtcNow;
 
-                    await _context.SaveChangesAsync();
+                    await context.SaveChangesAsync();
                     await transaction.CommitAsync();
                     return;
                 }
@@ -1054,40 +1016,9 @@ namespace StudioStudio_Server.Repositories
             throw new InvalidOperationException("Failed to reorder task after maximum retries");
         }
 
-        /// <summary>
-        /// Rebalance all tasks in status (public method with separate transaction)
-        /// </summary>
-        public async Task RebalancePersonalTasksInStatusAsync(Guid statusId)
-        {
-            using var transaction = await _context.Database
-                .BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
-            try
-            {
-                await RebalancePersonalTasksInStatusInternalAsync(statusId);
-                await transaction.CommitAsync();
-            }
-            catch
-            {
-                await transaction.RollbackAsync();
-                throw;
-            }
-        }
-
-        /// <summary>
-        /// Find next task after position in same status
-        /// </summary>
-        public async Task<TaskItem?> PersonalFindNextAfterAsync(Guid statusId, long position)
-        {
-            return await _context.Tasks
-                .Where(t => t.PersonalStatusId == statusId && t.Position > position && !t.IsPendingDeleted)
-                .OrderBy(t => t.Position)
-                .AsNoTracking()
-                .FirstOrDefaultAsync();
-        }
-
         private async Task RebalancePersonalTasksInStatusInternalAsync(Guid statusId)
         {
-            var tasks = await _context.Tasks
+            var tasks = await context.Tasks
                 .Where(t => t.PersonalStatusId == statusId && !t.IsPendingDeleted)
                 .OrderBy(t => t.Position)
                 .ToListAsync();
@@ -1099,7 +1030,7 @@ namespace StudioStudio_Server.Repositories
                 pos += STEP;
             }
 
-            await _context.SaveChangesAsync();
+            await context.SaveChangesAsync();
         }
         private static long Midpoint(long a, long b)
         {
@@ -1112,33 +1043,33 @@ namespace StudioStudio_Server.Repositories
         /// </summary>
         public async Task PermanentDeleteAsync(Guid taskId)
         {
-            using var transaction = await _context.Database.BeginTransactionAsync();
+            using var transaction = await context.Database.BeginTransactionAsync();
             try
             {
-                var activityLogs = await _context.ActivityLogs
+                var activityLogs = await context.ActivityLogs
                     .Where(h => h.TargetId == taskId && h.TargetType == "TASK")
                     .ToListAsync();
                 if (activityLogs.Any())
                 {
-                    _context.ActivityLogs.RemoveRange(activityLogs);
+                    context.ActivityLogs.RemoveRange(activityLogs);
                 }
 
-                var taskAssignments = await _context.TaskAssignments
+                var taskAssignments = await context.TaskAssignments
                     .Where(a => a.TaskId == taskId)
                     .ToListAsync();
                 if (taskAssignments.Any())
                 {
-                    _context.TaskAssignments.RemoveRange(taskAssignments);
+                    context.TaskAssignments.RemoveRange(taskAssignments);
                 }
 
-                var task = await _context.Tasks
+                var task = await context.Tasks
                     .FirstOrDefaultAsync(t => t.TaskId == taskId);
                 if (task != null)
                 {
-                    _context.Tasks.Remove(task);
+                    context.Tasks.Remove(task);
                 }
 
-                await _context.SaveChangesAsync();
+                await context.SaveChangesAsync();
                 await transaction.CommitAsync();
             }
             catch
@@ -1148,18 +1079,5 @@ namespace StudioStudio_Server.Repositories
             }
         }
 
-        /// <summary>
-        /// Get the GroupId for a given task (used for task deep-link URL resolution)
-        /// Returns null if task not found or is soft-deleted
-        /// </summary>
-        public async Task<Guid?> GetTaskGroupIdAsync(Guid taskId)
-        {
-            var task = await _context.Tasks
-                .Where(t => t.TaskId == taskId && !t.IsPendingDeleted)
-                .Select(t => new { t.GroupId })
-                .FirstOrDefaultAsync();
-
-            return task?.GroupId;
-        }
     }
 }

@@ -9,8 +9,6 @@ namespace StudioStudio_Server.Models.DTOs.Response
         public string GroupType { get; set; } = string.Empty;
         public Guid CreatedBy { get; set; }
         public DateTime CreatedAt { get; set; }
-
-        // 🔹 FIX: Added missing personalization fields
         public string? AvatarUrl { get; set; }
         public string? ColorHex { get; set; }
         public string? IconEmoji { get; set; }

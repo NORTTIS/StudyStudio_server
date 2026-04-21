@@ -1,5 +1,3 @@
-using StudioStudio_Server.Models.Entities;
-
 namespace StudioStudio_Server.Models.DTOs.Response
 {
     /// <summary>

@@ -62,15 +62,4 @@ namespace StudioStudio_Server.Services.Interfaces
         /// </summary>
         Task TestConnectionAsync();
     }
-
-    /// <summary>
-    /// Vector search result
-    /// </summary>
-    public class VectorSearchResult
-    {
-        public string Id { get; set; } = string.Empty;
-        public float Score { get; set; }
-        public Dictionary<string, object> Payload { get; set; } = new();
-        public float[]? Vector { get; set; }
-    }
 }

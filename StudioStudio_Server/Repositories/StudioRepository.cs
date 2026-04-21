@@ -10,15 +10,13 @@ namespace StudioStudio_Server.Repositories
     /// </summary>
     public class StudioRepository(StudioDbContext context) : IStudioRepository
     {
-        private readonly StudioDbContext _context = context;
-
         /// <summary>
         /// Get studio by ID
         /// Condition: StudioId = {studioId} AND IsDeleted = false
         /// </summary>
         public async Task<Studio?> GetByIdAsync(Guid studioId)
         {
-            return await _context.Studios
+            return await context.Studios
                 .AsNoTracking()
                 .FirstOrDefaultAsync(s => s.StudioId == studioId && !s.IsDeleted);
         }
@@ -35,7 +33,7 @@ namespace StudioStudio_Server.Repositories
                 return new List<Studio>();
             }
 
-            return await _context.Studios
+            return await context.Studios
                 .Where(s => studioIds.Contains(s.StudioId) && !s.IsDeleted)
                 .AsNoTracking()
                 .ToListAsync();
@@ -48,7 +46,7 @@ namespace StudioStudio_Server.Repositories
         /// </summary>
         public async Task<List<Studio>> GetByOwnerIdAsync(Guid ownerId)
         {
-            return await _context.Studios
+            return await context.Studios
                 .Where(s => s.OwnerId == ownerId && !s.IsDeleted)
                 .OrderByDescending(s => s.StudioName)
                 .ThenByDescending(s => s.CreatedAt)
@@ -63,7 +61,7 @@ namespace StudioStudio_Server.Repositories
         /// </summary>
         public async Task<int> CountStudioCreatedByUserAsync(Guid userId)
         {
-            return await _context.Studios
+            return await context.Studios
                 .Where(s => s.OwnerId == userId && !s.IsDeleted)
                 .CountAsync();
         }
@@ -74,7 +72,7 @@ namespace StudioStudio_Server.Repositories
         /// </summary>
         public async Task<bool> IsUserStudioOwnerAsync(Guid studioId, Guid userId)
         {
-            return await _context.Studios
+            return await context.Studios
                 .AnyAsync(s => s.StudioId == studioId && s.OwnerId == userId && !s.IsDeleted);
         }
 
@@ -83,8 +81,8 @@ namespace StudioStudio_Server.Repositories
         /// </summary>
         public async Task CreateStudioAsync(Studio studio)
         {
-            _context.Studios.Add(studio);
-            await _context.SaveChangesAsync();
+            context.Studios.Add(studio);
+            await context.SaveChangesAsync();
         }
 
         /// <summary>
@@ -92,8 +90,8 @@ namespace StudioStudio_Server.Repositories
         /// </summary>
         public async Task UpdateStudioAsync(Studio studio)
         {
-            _context.Studios.Update(studio);
-            await _context.SaveChangesAsync();
+            context.Studios.Update(studio);
+            await context.SaveChangesAsync();
         }
 
         /// <summary>
@@ -101,7 +99,7 @@ namespace StudioStudio_Server.Repositories
         /// </summary>
         public async Task<Studio?> GetByIdForUpdateAsync(Guid studioId)
         {
-            return await _context.Studios
+            return await context.Studios
                 .FirstOrDefaultAsync(s => s.StudioId == studioId && !s.IsDeleted);
         }
 
@@ -112,8 +110,8 @@ namespace StudioStudio_Server.Repositories
         {
             studio.IsDeleted = true;
             studio.UpdatedAt = DateTime.UtcNow;
-            _context.Studios.Update(studio);
-            await _context.SaveChangesAsync();
+            context.Studios.Update(studio);
+            await context.SaveChangesAsync();
         }
 
         /// <summary>
@@ -122,7 +120,7 @@ namespace StudioStudio_Server.Repositories
         /// </summary>
         public async Task<List<Group>> GetGroupsByStudioIdAsync(Guid studioId)
         {
-            return await _context.Groups
+            return await context.Groups
                 .Where(g => g.StudioId == studioId && g.IsActive)
                 .Include(g => g.Participants)
                 .AsNoTracking()
@@ -132,7 +130,7 @@ namespace StudioStudio_Server.Repositories
         public async Task<bool> IsStudioNameExistByOwnerIdAsync(string studioName, Guid ownerId)
         {
             var trimmedName = studioName.Trim();
-            return await _context.Studios
+            return await context.Studios
                 .AnyAsync(s => s.StudioName.Trim() == trimmedName && s.OwnerId == ownerId && !s.IsDeleted);
         }
 
@@ -142,7 +140,7 @@ namespace StudioStudio_Server.Repositories
         public async Task<bool> IsStudioNameExistExcludingStudioAsync(string studioName, Guid ownerId, Guid excludeStudioId)
         {
             var trimmedName = studioName.Trim();
-            return await _context.Studios
+            return await context.Studios
                 .AnyAsync(s => s.StudioName.Trim() == trimmedName && s.OwnerId == ownerId && !s.IsDeleted && s.StudioId != excludeStudioId);
         }
         
@@ -151,7 +149,7 @@ namespace StudioStudio_Server.Repositories
         /// </summary>
         public async Task<Studio?> GetByIdAdminAsync(Guid studioId)
         {
-            return await _context.Studios
+            return await context.Studios
                 .FirstOrDefaultAsync(g => g.StudioId == studioId);
         }
 
@@ -163,7 +161,7 @@ namespace StudioStudio_Server.Repositories
             int pageNumber,
             int pageSize)
         {
-            var query = _context.Studios.AsQueryable();
+            var query = context.Studios.AsQueryable();
 
             // Apply search filter
             if (!string.IsNullOrWhiteSpace(searchTerm))
@@ -190,14 +188,14 @@ namespace StudioStudio_Server.Repositories
         /// </summary>
         public async Task<(int TotalStudios, int ActiveStudios, int InactiveStudios, int TotalMembers, int TotalGroups)> GetStudioSummaryAsync()
         {
-            var studios = _context.Studios.Where(s => !s.IsDeleted);
+            var studios = context.Studios.Where(s => !s.IsDeleted);
             var studioIdList = studios.Select(s => s.StudioId).ToList();
 
-            var totalMembers = await _context.StudioParticipants
+            var totalMembers = await context.StudioParticipants
                 .Where(sp => studioIdList.Contains(sp.StudioId) && sp.IsApproved)
                 .CountAsync();
 
-            var totalGroups = await _context.Groups
+            var totalGroups = await context.Groups
                 .Where(g => g.StudioId.HasValue && studioIdList.Contains(g.StudioId.Value) && g.IsActive)
                 .CountAsync();
 
@@ -218,7 +216,7 @@ namespace StudioStudio_Server.Repositories
                 return new Dictionary<Guid, int>();
             }
 
-            var counts = await _context.StudioParticipants
+            var counts = await context.StudioParticipants
                 .Where(sp => studioIds.Contains(sp.StudioId) && sp.IsApproved)
                 .GroupBy(sp => sp.StudioId)
                 .Select(g => new { StudioId = g.Key, Count = g.Count() })
@@ -237,7 +235,7 @@ namespace StudioStudio_Server.Repositories
                 return new Dictionary<Guid, int>();
             }
 
-            var counts = await _context.Groups
+            var counts = await context.Groups
                 .Where(g => g.StudioId.HasValue && studioIds.Contains(g.StudioId.Value) && g.IsActive)
                 .GroupBy(g => g.StudioId!.Value)
                 .Select(g => new { StudioId = g.Key, Count = g.Count() })
@@ -257,14 +255,14 @@ namespace StudioStudio_Server.Repositories
             }
 
             // Get group IDs for all studios
-            var groupIdsByStudio = await _context.Groups
+            var groupIdsByStudio = await context.Groups
                 .Where(g => g.StudioId.HasValue && studioIds.Contains(g.StudioId.Value) && g.IsActive)
                 .Select(g => new { g.StudioId, g.GroupId })
                 .ToListAsync();
 
             var groupIds = groupIdsByStudio.Select(x => x.GroupId).ToList();
 
-            var taskCounts = await _context.Tasks
+            var taskCounts = await context.Tasks
                 .Where(t => groupIds.Contains(t.GroupId!.Value))
                 .GroupBy(t => t.GroupId)
                 .Select(g => new { GroupId = g.Key!.Value, Count = g.Count() })
@@ -293,13 +291,13 @@ namespace StudioStudio_Server.Repositories
             }
 
             // Get studio UpdatedAt
-            var studioUpdatedAt = await _context.Studios
+            var studioUpdatedAt = await context.Studios
                 .Where(s => studioIds.Contains(s.StudioId))
                 .Select(s => new { s.StudioId, s.UpdatedAt })
                 .ToDictionaryAsync(x => x.StudioId, x => (DateTime?)x.UpdatedAt);
 
             // Get group IDs per studio
-            var groupIdsByStudio = await _context.Groups
+            var groupIdsByStudio = await context.Groups
                 .Where(g => g.StudioId.HasValue && studioIds.Contains(g.StudioId.Value) && g.IsActive)
                 .Select(g => new { g.StudioId, g.GroupId })
                 .ToListAsync();
@@ -307,14 +305,14 @@ namespace StudioStudio_Server.Repositories
             var groupIds = groupIdsByStudio.Select(x => x.GroupId).ToList();
 
             // Get max group UpdatedAt per studio
-            var groupUpdatedAt = await _context.Groups
+            var groupUpdatedAt = await context.Groups
                 .Where(g => g.StudioId.HasValue && studioIds.Contains(g.StudioId.Value) && g.IsActive)
                 .GroupBy(g => g.StudioId!.Value)
                 .Select(g => new { StudioId = g.Key, LastUpdated = g.Max(x => x.UpdatedAt) })
                 .ToDictionaryAsync(x => x.StudioId, x => (DateTime?)x.LastUpdated);
 
             // Get max task UpdatedAt per group, then aggregate to studio
-            var taskUpdatedAtByGroup = await _context.Tasks
+            var taskUpdatedAtByGroup = await context.Tasks
                 .Where(t => groupIds.Contains(t.GroupId!.Value))
                 .GroupBy(t => t.GroupId)
                 .Select(g => new { GroupId = g.Key!.Value, LastUpdated = g.Max(t => t.UpdatedAt) })
@@ -329,7 +327,7 @@ namespace StudioStudio_Server.Repositories
             }
 
             // Get max message CreatedAt per group, then aggregate to studio
-            var messageCreatedAtByGroup = await _context.GroupMessages
+            var messageCreatedAtByGroup = await context.GroupMessages
                 .Where(m => groupIds.Contains(m.GroupId))
                 .GroupBy(m => m.GroupId)
                 .Select(g => new { GroupId = g.Key, LastMessage = g.Max(m => m.CreatedAt) })
@@ -377,7 +375,7 @@ namespace StudioStudio_Server.Repositories
                 return new Dictionary<Guid, (string Name, string Email)>();
             }
 
-            var users = await _context.Users
+            var users = await context.Users
                 .Where(u => validIds.Contains(u.UserId))
                 .Select(u => new { u.UserId, FullName = u.FirstName + " " + u.LastName, u.Email })
                 .ToDictionaryAsync(
@@ -395,7 +393,7 @@ namespace StudioStudio_Server.Repositories
         {
             var trimmedName = studioName.Trim();
 
-            return await _context.Studios
+            return await context.Studios
                 .AnyAsync(s =>
                     s.StudioId != excludeStudioId &&
                     s.OwnerId == ownerId &&

@@ -11,15 +11,13 @@ namespace StudioStudio_Server.Repositories
     /// </summary>
     public class UserRepository(StudioDbContext context) : IUserRepository
     {
-        private readonly StudioDbContext _context = context;
-
         /// <summary>
         /// Add new user to database
         /// </summary>
         public async Task AddAsync(User user)
         {
-            _context.Users.Add(user);
-            await _context.SaveChangesAsync();
+            context.Users.Add(user);
+            await context.SaveChangesAsync();
         }
 
         /// <summary>
@@ -29,7 +27,7 @@ namespace StudioStudio_Server.Repositories
         /// </summary>
         public async Task<User?> GetByEmailAsync(string email)
         {
-            return await _context.Users
+            return await context.Users
                 .Include(u => u.RefreshTokens)
                 .AsNoTracking()
                 .FirstOrDefaultAsync(u => u.Email == email && u.Status != UserStatus.Deleted);
@@ -42,7 +40,7 @@ namespace StudioStudio_Server.Repositories
         /// </summary>
         public async Task<User?> GetByIdAsync(Guid id)
         {
-            return await _context.Users
+            return await context.Users
                 .Include(u => u.RefreshTokens)
                 .AsNoTracking()
                 .FirstOrDefaultAsync(u => u.UserId == id && u.Status != UserStatus.Deleted);
@@ -56,7 +54,7 @@ namespace StudioStudio_Server.Repositories
         /// </summary>
         public async Task<User?> GetByIdIncludingDeletedAsync(Guid id)
         {
-            return await _context.Users
+            return await context.Users
                 .Include(u => u.RefreshTokens)
                 .AsNoTracking()
                 .FirstOrDefaultAsync(u => u.UserId == id);
@@ -67,8 +65,8 @@ namespace StudioStudio_Server.Repositories
         /// </summary>
         public async Task UpdateAsync(User user)
         {
-            _context.Users.Update(user);
-            await _context.SaveChangesAsync();
+            context.Users.Update(user);
+            await context.SaveChangesAsync();
         }
 
         /// <summary>
@@ -78,7 +76,7 @@ namespace StudioStudio_Server.Repositories
         /// </summary>
         public async Task<List<User>> GetByIdsAsync(List<Guid> userIds)
         {
-            return await _context.Users
+            return await context.Users
                 .Where(u => userIds.Contains(u.UserId) && u.Status != UserStatus.Deleted)
                 .AsNoTracking()
                 .ToListAsync();
@@ -91,7 +89,7 @@ namespace StudioStudio_Server.Repositories
         /// </summary>
         public async Task<int> CountActiveUsersAsync()
         {
-            return await _context.Users
+            return await context.Users
                 .Where(u => u.Status != UserStatus.Deleted && u.Status == UserStatus.Active)
                 .CountAsync();
         }
@@ -109,7 +107,7 @@ namespace StudioStudio_Server.Repositories
             int pageNumber,
             int pageSize)
         {
-            var query = _context.Users
+            var query = context.Users
                 .Include(u => u.GroupParticipants)
                 .Include(u => u.UserSubscriptions)
                     .ThenInclude(us => us.Plan)
@@ -170,7 +168,7 @@ namespace StudioStudio_Server.Repositories
             if (!userIds.Any())
                 return new Dictionary<Guid, int>();
 
-            var studioCounts = await _context.Studios
+            var studioCounts = await context.Studios
                 .Where(s => userIds.Contains(s.OwnerId) && !s.IsDeleted)
                 .GroupBy(s => s.OwnerId)
                 .Select(g => new { OwnerId = g.Key, Count = g.Count() })
@@ -186,7 +184,7 @@ namespace StudioStudio_Server.Repositories
         /// </summary>
         public async Task<User?> GetByIdWithDetailsAsync(Guid userId)
         {
-            return await _context.Users
+            return await context.Users
                 .Include(u => u.GroupParticipants)
                 .Include(u => u.UserSubscriptions)
                     .ThenInclude(us => us.Plan)
@@ -200,7 +198,7 @@ namespace StudioStudio_Server.Repositories
         /// </summary>
         public async Task<(int TotalUsers, int ActiveUsers, int InactiveUsers, int DeletedUsers, int PremiumUsers, int FreeUsers)> GetUserSummaryAsync()
         {
-            var allUsers = await _context.Users
+            var allUsers = await context.Users
                 .Where(u => !u.IsAdmin)
                 .AsNoTracking()
                 .ToListAsync();
@@ -211,7 +209,7 @@ namespace StudioStudio_Server.Repositories
             var deletedUsers = allUsers.Count(u => u.Status == UserStatus.Deleted);
 
             // Get premium users (users with active non-free subscription)
-            var premiumUserIds = await _context.UserSubscriptions
+            var premiumUserIds = await context.UserSubscriptions
                 .Where(us => us.Plan.BillingCycle > 0 && us.IsActive && us.EndDate > DateTime.UtcNow)
                 .Select(us => us.UserId)
                 .Distinct()
@@ -230,12 +228,12 @@ namespace StudioStudio_Server.Repositories
         /// </summary>
         public async Task UpdateUserStatusAsync(Guid userId, UserStatus status)
         {
-            var user = await _context.Users.FindAsync(userId);
+            var user = await context.Users.FindAsync(userId);
             if (user != null)
             {
                 user.Status = status;
                 user.UpdatedAt = DateTime.UtcNow;
-                await _context.SaveChangesAsync();
+                await context.SaveChangesAsync();
             }
         }
     }
