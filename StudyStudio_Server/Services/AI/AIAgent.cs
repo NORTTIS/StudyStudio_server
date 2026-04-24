@@ -1,10 +1,6 @@
 using System.Text.Json.Nodes;
-using Microsoft.Extensions.Options;
-using StudioStudio_Server.Configurations;
-using StudioStudio_Server.Services.AI.Interfaces;
-using StudioStudio_Server.Services.AI.Models;
 using StudioStudio_Server.Services.AI.Pipeline;
-using StudioStudio_Server.Services.Interfaces;
+using StudioStudio_Server.Services.AI.Models;
 
 namespace StudioStudio_Server.Services.AI;
 
@@ -41,7 +37,7 @@ public class AIAgentResult
     /// Lý do khi fallback fire — null nếu LLM trả lời thật.
     /// </summary>
     public string? FallbackReason { get; set; }
-    public global::StudioStudio_Server.Services.Interfaces.TokenUsage? TokenUsage { get; set; }
+    public TokenUsage? TokenUsage { get; set; }
 }
 
 /// <summary>
@@ -51,7 +47,7 @@ public class AgentDecision
 {
     public bool ShouldCallTool { get; set; }
     public string? ToolName { get; set; }
-    public global::System.Text.Json.Nodes.JsonObject? ToolParameters { get; set; }
+    public JsonObject? ToolParameters { get; set; }
     public string? FinalAnswer { get; set; }
 }
 
@@ -78,5 +74,5 @@ internal class AIStreamResult
     public int ToolCount { get; set; }
     public long ProcessingTimeMs { get; set; }
     public List<AIStreamChunk> Chunks { get; set; } = new();
-    public global::StudioStudio_Server.Services.Interfaces.TokenUsage? TokenUsage { get; set; }
+    public TokenUsage? TokenUsage { get; set; }
 }

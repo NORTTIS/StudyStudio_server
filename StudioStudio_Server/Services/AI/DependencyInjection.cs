@@ -19,9 +19,6 @@ public static class AIServiceExtensions
         // Register AI Agent (Scoped) - đã inject IServiceProvider để resolve tools
         services.AddScoped<AIAgent>();
 
-        // Register AI Tool Cache Service (Scoped) - caching tool results với invalidation support
-        services.AddScoped<AIToolCacheService>();
-
         // Register all tools (Scoped) - chỉ đăng ký concrete type
         // IAITool resolve sẽ tự động tìm các tool đã đăng ký theo Type
         services.AddScoped<GetTasksTool>();

@@ -31,27 +31,7 @@ namespace StudioStudio_Server.Services
         // Polly resilience pipeline for circuit breaker + retry
         private readonly ResiliencePipeline<HttpResponseMessage> _resiliencePipeline;
 
-        // Context caching for system instructions (saves ~60% input token costs)
-        // Cached content name from Gemini API
-        private string? _cachedContentName;
-        private DateTime _cachedContentExpiry = DateTime.MinValue;
-        private readonly TimeSpan _cacheDuration = TimeSpan.FromMinutes(55); // Gemini max TTL is 60min, use 55 for safety
-        private bool _isContextCachingDisabled;
-        private readonly SemaphoreSlim _cacheLock = new(1, 1);
-
-        // Keywords that indicate simple queries (no complex reasoning needed)
-        private static readonly string[] SimpleQueryKeywords = new[]
-        {
-            "thống kê", "statistic", "stats", "tổng quan", "overview", "summary",
-            "bao nhiêu", "how many", "count", "đếm",
-            "liệt kê", "list", "danh sách", "show me", "hiển thị",
-            "cho biết", "tell me", "cho tôi biết",
-            "công việc của tôi", "my tasks", "task của",
-            "thành viên", "members", "người dùng",
-            "deadline", "hạn chót", "ngày đến hạn",
-            "tiến độ", "progress", "đã làm", "chưa làm",
-            "hoàn thành", "completed", "done", "xong"
-        };
+        // Context caching is disabled because the current Gemini model/API key does not support it reliably.
 
         public GeminiLLMService(
             HttpClient httpClient,
@@ -99,12 +79,12 @@ namespace StudioStudio_Server.Services
                         _logger.LogWarning("Gemini API circuit breaker OPENED. Will retry after {Duration}s", args.BreakDuration.TotalSeconds);
                         return ValueTask.CompletedTask;
                     },
-                    OnClosed = args =>
+                    OnClosed = _ =>
                     {
                         _logger.LogInformation("Gemini API circuit breaker CLOSED. Normal operation resumed.");
                         return ValueTask.CompletedTask;
                     },
-                    OnHalfOpened = args =>
+                    OnHalfOpened = _ =>
                     {
                         _logger.LogInformation("Gemini API circuit breaker HALF-OPEN. Testing with next request...");
                         return ValueTask.CompletedTask;
@@ -119,15 +99,12 @@ namespace StudioStudio_Server.Services
         }
 
         /// <summary>
-        /// Builds request body for streaming with optional cached content.
+        /// Builds request body for streaming without context caching.
         /// Streaming version doesn't use responseSchema (causes JSON issues with streaming).
         /// </summary>
         private object BuildRequestBodyForStreaming(
-            string modelName,
             string systemPrompt,
             string userMessage,
-            string userQuestion,
-            string? cachedContent,
             bool forceTextMode = false)
         {
             // Base generation config — responseMimeType only set for JSON mode (tool-calling decisions)
@@ -148,237 +125,70 @@ namespace StudioStudio_Server.Services
                 maxOutputTokens = _config.MaxTokens
             };
 
-            if (string.IsNullOrEmpty(cachedContent))
+            return new
             {
-                return new
+                system_instruction = new
                 {
-                    system_instruction = new
+                    parts = new[]
                     {
+                        new { text = systemPrompt }
+                    }
+                },
+                contents = new[]
+                {
+                    new
+                    {
+                        role = "user",
                         parts = new[]
                         {
-                            new { text = systemPrompt }
+                            new { text = userMessage }
                         }
-                    },
-                    contents = new[]
-                    {
-                        new
-                        {
-                            role = "user",
-                            parts = new[]
-                            {
-                                new { text = userMessage }
-                            }
-                        }
-                    },
-                    generationConfig = forceTextMode ? textGenConfig : jsonGenConfig
-                };
-            }
-            else
-            {
-                return new
-                {
-                    cachedContent,
-                    contents = new[]
-                    {
-                        new
-                        {
-                            role = "user",
-                            parts = new[]
-                            {
-                                new { text = userMessage }
-                            }
-                        }
-                    },
-                    generationConfig = forceTextMode ? textGenConfig : jsonGenConfig
-                };
-            }
+                    }
+                },
+                generationConfig = forceTextMode ? textGenConfig : jsonGenConfig
+            };
         }
 
         /// <summary>
-        /// Gets or creates cached content for system instructions.
-        /// Context Caching saves ~60% input token costs by caching repetitive system prompts.
-        /// </summary>
-        private async Task<string?> GetOrCreateCachedContentAsync(string systemPrompt, CancellationToken cancellationToken)
-        {
-            var lockAcquired = false;
-
-            // Create new cache
-            try
-            {
-                if (_isContextCachingDisabled)
-                {
-                    return null;
-                }
-
-                // Check if we have a valid cached content
-                if (!string.IsNullOrEmpty(_cachedContentName) && DateTime.UtcNow < _cachedContentExpiry)
-                {
-                    _logger.LogDebug("Using cached content: {CacheName}", _cachedContentName);
-                    return _cachedContentName;
-                }
-
-                await _cacheLock.WaitAsync(cancellationToken);
-                lockAcquired = true;
-
-                if (_isContextCachingDisabled)
-                {
-                    return null;
-                }
-
-                // Double-check after lock to avoid duplicate cache creation.
-                if (!string.IsNullOrEmpty(_cachedContentName) && DateTime.UtcNow < _cachedContentExpiry)
-                {
-                    _logger.LogDebug("Using cached content after lock: {CacheName}", _cachedContentName);
-                    return _cachedContentName;
-                }
-
-                var cacheRequest = new
-                {
-                    contents = new[]
-                    {
-                        new
-                        {
-                            parts = new[]
-                            {
-                                new { text = systemPrompt }
-                            }
-                        }
-                    }
-                };
-
-                string jsonRequest = JsonSerializer.Serialize(cacheRequest, new JsonSerializerOptions
-                {
-                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-                });
-
-                var content = new StringContent(jsonRequest, Encoding.UTF8, "application/json");
-                var url = $"{GEMINI_ENDPOINT}/{PRIMARY_MODEL}:saveContext?key={_config.ApiKey}";
-
-                _logger.LogInformation("Creating new context cache for system prompt...");
-
-                // Cache creation doesn't use resilience pipeline (single request, simple operation)
-                HttpResponseMessage response = await _httpClient.PostAsync(url, content, cancellationToken);
-
-                if (!response.IsSuccessStatusCode)
-                {
-                    string errorContent = await response.Content.ReadAsStringAsync(cancellationToken);
-                    _logger.LogWarning("Failed to create context cache: {Status} - {Error}", response.StatusCode, errorContent);
-
-                    if ((int)response.StatusCode == 404 || (int)response.StatusCode == 400)
-                    {
-                        _isContextCachingDisabled = true;
-                        _logger.LogWarning(
-                            "Context caching appears unsupported for this model/API key. Disabling saveContext attempts for subsequent requests.");
-                    }
-
-                    return null;
-                }
-
-                string jsonResponse = await response.Content.ReadAsStringAsync(cancellationToken);
-                using var doc = JsonDocument.Parse(jsonResponse);
-                var root = doc.RootElement;
-
-                // Extract cached content name
-                if (root.TryGetProperty("cachedContent", out JsonElement cachedContent) &&
-                    cachedContent.TryGetProperty("name", out JsonElement cacheName))
-                {
-                    _cachedContentName = cacheName.GetString();
-                    _cachedContentExpiry = DateTime.UtcNow.Add(_cacheDuration);
-                    _logger.LogInformation("Context cache created: {CacheName}, expires at {Expiry}",
-                        _cachedContentName, _cachedContentExpiry);
-                    return _cachedContentName;
-                }
-
-                _logger.LogWarning("Could not extract cached content name from response");
-                return null;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "Error creating context cache");
-                return null;
-            }
-            finally
-            {
-                if (lockAcquired)
-                {
-                    _cacheLock.Release();
-                }
-            }
-        }
-
-        /// <summary>
-        /// Builds request body with optional cached content for system instructions.
+        /// Builds request body without context caching.
         /// </summary>
         private object BuildRequestBody(
-            string modelName,
             string systemPrompt,
             string userMessage,
             JsonObject? responseSchema,
-            string userQuestion,
-            string? cachedContent)
+            string userQuestion)
         {
-            if (string.IsNullOrEmpty(cachedContent))
+            _ = userQuestion;
+            return new
             {
-                // No cache available, use system_instruction directly
-                return new
+                system_instruction = new
                 {
-                    system_instruction = new
+                    parts = new[]
                     {
+                        new { text = systemPrompt }
+                    }
+                },
+                contents = new[]
+                {
+                    new
+                    {
+                        role = "user",
                         parts = new[]
                         {
-                            new { text = systemPrompt }
+                            new { text = userMessage }
                         }
-                    },
-                    contents = new[]
-                    {
-                        new
-                        {
-                            role = "user",
-                            parts = new[]
-                            {
-                                new { text = userMessage }
-                            }
-                        }
-                    },
-                    generationConfig = new
-                    {
-                        temperature = _config.Temperature,
-                        topK = _config.TopK,
-                        topP = _config.TopP,
-                        maxOutputTokens = _config.MaxTokens,
-                        responseMimeType = responseSchema != null ? "application/json" : null,
-                        responseSchema
                     }
-                };
-            }
-            else
-            {
-                // Use cached content for system instructions
-                return new
+                },
+                generationConfig = new
                 {
-                    cachedContent,
-                    contents = new[]
-                    {
-                        new
-                        {
-                            role = "user",
-                            parts = new[]
-                            {
-                                new { text = userMessage }
-                            }
-                        }
-                    },
-                    generationConfig = new
-                    {
-                        temperature = _config.Temperature,
-                        topK = _config.TopK,
-                        topP = _config.TopP,
-                        maxOutputTokens = _config.MaxTokens,
-                        responseMimeType = responseSchema != null ? "application/json" : null,
-                        responseSchema
-                    }
-                };
-            }
+                    temperature = _config.Temperature,
+                    topK = _config.TopK,
+                    topP = _config.TopP,
+                    maxOutputTokens = _config.MaxTokens,
+                    responseMimeType = responseSchema != null ? "application/json" : null,
+                    responseSchema
+                }
+            };
         }
 
         /// <summary>
@@ -537,8 +347,7 @@ namespace StudioStudio_Server.Services
                     systemPrompt,
                     userMessage,
                     context,
-                    cancellationToken,
-                    null);
+                    cancellationToken);
                 return result.Answer;
             }
             catch (HttpRequestException ex) when (IsRateLimitError(ex))
@@ -552,8 +361,7 @@ namespace StudioStudio_Server.Services
                     systemPrompt,
                     userMessage,
                     context,
-                    cancellationToken,
-                    null);
+                    cancellationToken);
                 return result.Answer;
             }
         }
@@ -578,17 +386,12 @@ namespace StudioStudio_Server.Services
                 // Build request URL
                 string url = $"{GEMINI_ENDPOINT}/{modelName}:generateContent?key={_config.ApiKey}";
 
-                // Get or create cached content for system instructions (saves ~60% input tokens)
-                var cachedContent = await GetOrCreateCachedContentAsync(systemPrompt, cancellationToken);
-
                 // Build request body according to Gemini API format
                 var requestBody = BuildRequestBody(
-                    modelName,
                     systemPrompt,
                     fullMessage,
                     responseSchema,
-                    userMessage,
-                    cachedContent);
+                    userMessage);
 
                 string jsonRequest = JsonSerializer.Serialize(requestBody, new JsonSerializerOptions
                 {
@@ -840,16 +643,10 @@ namespace StudioStudio_Server.Services
             // Build request URL with streaming
             string url = $"{GEMINI_ENDPOINT}/{modelName}:streamGenerateContent?key={_config.ApiKey}&alt=sse";
 
-            // Get or create cached content for system instructions (saves ~60% input tokens)
-            var cachedContent = await GetOrCreateCachedContentAsync(systemPrompt, cancellationToken);
-
             // Build request body according to Gemini API format
             var requestBody = BuildRequestBodyForStreaming(
-                modelName,
                 systemPrompt,
                 fullMessage,
-                userMessage,
-                cachedContent,
                 forceTextMode);
 
             string jsonRequest = JsonSerializer.Serialize(requestBody, new JsonSerializerOptions
