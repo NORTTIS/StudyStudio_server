@@ -68,20 +68,13 @@ public class GetStudioHealthTool(
             var totalOverdueAll = groupStats.Sum(g => g.overdue);
             var avgMembersActive = groupStats.Count > 0 ? groupStats.Average(g => g.members) : 0;
 
-            var baseScore = 70;
-            var completionRateScore = totalTasksAll > 0
-                ? (int)Math.Round((double)totalCompletedAll / totalTasksAll * 40)
-                : 20;
-            var overduePenalty = Math.Max(0, totalOverdueAll * 2);
-            var engagementScore = avgMembersActive >= 5 ? 10 : avgMembersActive >= 3 ? 5 : 0;
+            var completionRatePercent = totalTasksAll > 0
+               ? Math.Round((double)totalCompletedAll / totalTasksAll * 100, 1)
+               : 0.0;
 
-            var healthScore = Math.Min(100, Math.Max(0, baseScore + completionRateScore - overduePenalty + engagementScore));
-
-            if (completionRateScore >= 35) contributingFactors.Add("Ty le hoan thanh tot");
-            if (engagementScore >= 8) contributingFactors.Add("Thanh vien hoat dong nhieu");
+            if (completionRatePercent >= 85) contributingFactors.Add("Ty le hoan thanh tot");
+            if (avgMembersActive >= 5) contributingFactors.Add("Thanh vien hoat dong nhieu");
             if (totalOverdueAll > 5) contributingFactors.Add("So luong cong viec qua han nhieu");
-
-            var healthStatus = healthScore >= 85 ? "excellent" : healthScore >= 70 ? "good" : healthScore >= 50 ? "warning" : "critical";
 
             foreach (var gs in groupStats)
             {
@@ -103,12 +96,9 @@ public class GetStudioHealthTool(
             {
                 ["studio_id"] = studioId.ToString(),
                 ["studio_name"] = studio.StudioName,
-                ["health_score"] = healthScore,
-                ["health_status"] = healthStatus,
                 ["contributing_factors"] = new JsonArray(contributingFactors.Select(f => JsonValue.Create(f)).ToArray()),
                 ["top_risks"] = new JsonArray(topRisks.ToArray()),
-                ["summary"] = $"Studio '{studio.StudioName}' co diem suc khoe {healthScore}/100 - trang thai: {healthStatus}. " +
-                              $"Tong {totalTasksAll} cong viec, {totalCompletedAll} hoan thanh, {totalOverdueAll} qua han."
+                ["summary"] = $"Studio '{studio.StudioName}' co tong {totalTasksAll} cong viec, {totalCompletedAll} hoan thanh, {totalOverdueAll} qua han."
             }, sw.ElapsedMilliseconds);
         }
         catch (Exception ex)

@@ -8,6 +8,19 @@ namespace StudioStudio_Server.Services.AI.Pipeline;
 
 public partial class AIAgent
 {
+    private static string BuildNeedsFixFinalAnswer(string? reviewNote)
+    {
+        if (string.IsNullOrWhiteSpace(reviewNote))
+        {
+            return "Ban can bo sung thong tin de he thong xu ly dung yeu cau.";
+        }
+
+        var cleaned = reviewNote.Replace("[needs_fix]", string.Empty, StringComparison.OrdinalIgnoreCase).Trim();
+        return string.IsNullOrWhiteSpace(cleaned)
+            ? "Ban can bo sung thong tin de he thong xu ly dung yeu cau."
+            : cleaned;
+    }
+
     public async Task<AIAgentResult> ProcessAsync(
         string userQuestion,
         AIQueryContext context,
@@ -126,6 +139,17 @@ public partial class AIAgent
                         };
                         reasoningSteps.Add($"[REVIEW] Switching to suggested tool: {reviewed.SuggestedToolName}");
                         continue;
+                    }
+
+                    if (reviewed.ReviewState.Equals("needs_fix", StringComparison.OrdinalIgnoreCase))
+                    {
+                        reasoningSteps.Add("[REVIEW] Needs user clarification. Finalize without further tool planning.");
+                        decision = new AgentDecision
+                        {
+                            ShouldCallTool = false,
+                            FinalAnswer = BuildNeedsFixFinalAnswer(reviewed.ReviewNote)
+                        };
+                        break;
                     }
 
                     if (reviewed.ToolParameters != null
@@ -557,6 +581,17 @@ public partial class AIAgent
                         ToolParameters = reviewed.SuggestedParameters ?? reviewed.ToolParameters
                     };
                     continue;
+                }
+
+                if (reviewed.ReviewState.Equals("needs_fix", StringComparison.OrdinalIgnoreCase))
+                {
+                    reasoningSteps.Add("[REVIEW] Needs user clarification. Finalize without further tool planning.");
+                    decision = new AgentDecision
+                    {
+                        ShouldCallTool = false,
+                        FinalAnswer = BuildNeedsFixFinalAnswer(reviewed.ReviewNote)
+                    };
+                    break;
                 }
 
                 if (reviewed.ToolParameters != null

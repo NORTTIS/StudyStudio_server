@@ -26,7 +26,6 @@ public static class AIServiceExtensions
         services.AddScoped<GetMembersTool>();
         services.AddScoped<GetDeadlinesTool>();
         services.AddScoped<SearchDocumentsTool>();
-        services.AddScoped<SearchStudioDocumentsTool>();
         services.AddScoped<GetStudioGroupsTool>();
         services.AddScoped<GetStudioAnalyticsTool>();
         services.AddScoped<GetGroupDocumentsTool>();
@@ -60,7 +59,6 @@ public static class AIServiceExtensions
             typeof(GetMembersTool),
             typeof(GetDeadlinesTool),
             typeof(SearchDocumentsTool),
-            typeof(SearchStudioDocumentsTool),
             typeof(GetStudioGroupsTool),
             typeof(GetStudioAnalyticsTool),
             typeof(GetGroupDocumentsTool),

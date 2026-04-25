@@ -24,6 +24,12 @@ public class SearchDocumentsTool(
         + "IMPORTANT: query la tham so BAT BUOC (bat buoc phai co). "
         + "Dien noi dung cau hoi hoac tu khoa tim kiem vao query. "
         + "group_id duoc tu dong cung cap boi he thong. Khong can truyen group_id.";
+    public string? OutputFormatHint => "Document detail mode (uu tien khi dung search_documents): "
+        + "Tra loi CHI TIET, cover DAY DU noi dung tu ket qua tool, khong tom tat qua ngan. "
+        + "Khong bo qua muc nao da tra ve. "
+        + "Neu mot truong khong co trong tool result thi ghi ro 'Khong co du lieu' thay vi bo trong. "
+        + "Neu co nhieu muc, sap xep theo do lien quan giam dan va tach ro rang tung muc de nguoi dung de do doi. "
+        + "Chi ket luan sau khi da trinh bay day du bang chung tu ket qua.";
 
     public JsonObject ParametersSchema => new JsonObject
     {

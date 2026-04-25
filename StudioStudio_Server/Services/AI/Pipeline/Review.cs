@@ -426,6 +426,26 @@ public partial class AIAgent
         return refs.Count > 1;
     }
 
+    private static bool HasAnyExplicitGroupReference(string userQuestion)
+    {
+        if (string.IsNullOrWhiteSpace(userQuestion))
+        {
+            return false;
+        }
+
+        if (System.Text.RegularExpressions.Regex.IsMatch(
+            userQuestion,
+            @"\b[0-9a-fA-F]{8}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{12}\b"))
+        {
+            return true;
+        }
+
+        return System.Text.RegularExpressions.Regex.IsMatch(
+            userQuestion,
+            @"\b(?:group|nhom)\s+(?:(?:so|number)\s+)?([a-zA-Z0-9][a-zA-Z0-9\-_]*)\b",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+    }
+
     private async Task<AIFlowDecision> ReviewPlannedToolAsync(string userQuestion, AIQueryContext context, AgentDecision decision, ToolExecutionHistory history, CancellationToken cancellationToken)
     {
         var reviewedParameters = EnsureToolParameters(decision.ToolParameters);
@@ -537,6 +557,7 @@ public partial class AIAgent
                 }
                 else
                 {
+                    var hasExplicitGroupReference = HasAnyExplicitGroupReference(userQuestion);
                     var hasStudioGroups = history.Calls.Any(c =>
                         c.ToolName.Equals("get_studio_groups", StringComparison.OrdinalIgnoreCase) && c.Result.IsSuccess);
 
@@ -546,10 +567,14 @@ public partial class AIAgent
                         ToolParameters: reviewedParameters,
                         IsAccepted: false,
                         ReviewState: "needs_fix",
-                        ReviewNote: hasStudioGroups
-                            ? "[needs_fix] Khong tim thay group nao khop chinh xac 100% voi ten group trong cau hoi. Hay nhap dung exact group name hoac group_id."
-                            : "[needs_fix] Group tool in Studio scope requires group_id. Goi get_studio_groups truoc de lay danh sach group va id.",
-                        SuggestedToolName: hasStudioGroups ? decision.ToolName : "get_studio_groups");
+                        ReviewNote: !hasExplicitGroupReference
+                            ? "[needs_fix] Ban chua chi dinh nhom cu the. Vui long neu ro ten nhom hoac group_id (vi du: 'chi tiet tai lieu testint.md cua nhom Alpha')."
+                            : hasStudioGroups
+                                ? "[needs_fix] Khong tim thay group nao khop chinh xac 100% voi ten group trong cau hoi. Hay nhap dung exact group name hoac group_id."
+                                : "[needs_fix] Da nhan thong tin nhom nhung chua co mapping group_id. Goi get_studio_groups de map group name -> group_id roi goi lai group tool.",
+                        SuggestedToolName: !hasExplicitGroupReference
+                            ? null
+                            : hasStudioGroups ? decision.ToolName : "get_studio_groups");
                 }
             }
         }
@@ -828,7 +853,8 @@ public partial class AIAgent
             else
             {
                 promptBuilder.AppendLine("- STUDIO SCOPE RULE: for any Group-level tool call (get_tasks/get_group_stats/get_members/get_deadlines/get_group_performance/get_group_documents/get_group_risk/search_documents), you MUST include a valid group_id GUID.");
-                promptBuilder.AppendLine("- If group_id is not known yet, call get_studio_groups first, then map the user-mentioned group name to its id and call the Group-level tool with that group_id.");
+                promptBuilder.AppendLine("- If the user has not specified a concrete group (group name or group_id), ask the user to clarify the target group first. Do NOT call a Group-level tool without a target group.");
+                promptBuilder.AppendLine("- If the user already specified group name/group_id but group_id is not resolved yet, call get_studio_groups to map group name -> group_id, then call the Group-level tool.");
             }
             promptBuilder.AppendLine("- Use query/search only for explicit keyword search across task title or description. Never use query/search to represent a filter intent.");
             promptBuilder.AppendLine("- If the user asks for any filter, you MUST use structured filter fields. Do not answer a filter question with an unfiltered task list.");
