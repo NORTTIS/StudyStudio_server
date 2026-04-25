@@ -19,7 +19,7 @@ public class AIToolRegistry(ILogger<AIToolRegistry> logger) : IAIToolRegistry
     // Tool categories for role-based filtering
     private static readonly HashSet<string> PersonalTools = new(StringComparer.OrdinalIgnoreCase)
     {
-        "get_personal_tasks", "get_personal_deadlines", "get_personal_stats"
+        "get_personal_tasks", "get_personal_group_task", "get_personal_deadlines", "get_personal_stats"
     };
 
     private static readonly HashSet<string> GroupTools = new(StringComparer.OrdinalIgnoreCase)
@@ -32,7 +32,7 @@ public class AIToolRegistry(ILogger<AIToolRegistry> logger) : IAIToolRegistry
     private static readonly HashSet<string> StudioTools = new(StringComparer.OrdinalIgnoreCase)
     {
         "get_studio_groups", "get_studio_analytics", "get_group_comparison",
-        "get_storage_usage", "get_member_permissions", "get_risk_groups",
+        "get_risk_groups",
         "get_studio_health", "compare_groups"
     };
 
@@ -89,7 +89,8 @@ public class AIToolRegistry(ILogger<AIToolRegistry> logger) : IAIToolRegistry
                 {
                     ["name"] = tool.Name,
                     ["description"] = tool.Description,
-                    ["parameters"] = tool.ParametersSchema
+                    ["parameters"] = tool.ParametersSchema,
+                    ["planning_hint"] = string.IsNullOrWhiteSpace(tool.PlanningHint) ? null : tool.PlanningHint
                 }
             });
         }
@@ -112,7 +113,7 @@ public class AIToolRegistry(ILogger<AIToolRegistry> logger) : IAIToolRegistry
         if (context.StudioId.HasValue)
         {
            return _toolInstances.Values
-                .Where(t => StudioTools.Contains(t.Name))
+                .Where(t => StudioTools.Contains(t.Name) || GroupTools.Contains(t.Name))
                 .ToList()
                 .AsReadOnly();
         }

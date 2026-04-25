@@ -26,6 +26,32 @@ namespace StudioStudio_Server.Repositories
                 .ToListAsync();
         }
 
+        public async Task<GroupAttachment?> FindLatestByGroupIdAndDocumentNameAsync(Guid groupId, string documentName, DateTime? uploadedAt = null)
+        {
+            var normalizedDocumentName = documentName.Trim();
+            var normalizedWithoutExtension = Path.GetFileNameWithoutExtension(normalizedDocumentName);
+            var escapedDocumentName = EscapeLikePattern(normalizedDocumentName);
+            var escapedWithoutExtension = EscapeLikePattern(normalizedWithoutExtension);
+
+            var query = context.GroupAttachments
+                .Where(a => a.GroupId == groupId && !a.IsDeleted);
+
+            if (uploadedAt.HasValue)
+            {
+                query = query.Where(a => a.UploadedAt <= uploadedAt.Value);
+            }
+
+            return await query
+                .Where(a =>
+                    EF.Functions.ILike(a.FileName, escapedDocumentName, "\\") ||
+                    EF.Functions.ILike(a.FileName, $"%{escapedDocumentName}%", "\\") ||
+                    EF.Functions.ILike(a.FileName, escapedWithoutExtension, "\\") ||
+                    EF.Functions.ILike(a.FileName, $"{escapedWithoutExtension}.%", "\\"))
+                .OrderByDescending(a => a.UploadedAt)
+                .AsNoTracking()
+                .FirstOrDefaultAsync();
+        }
+
         public async Task<List<GroupAttachment>> GetByGroupIdPagedAsync(Guid groupId, int skip, int take)
         {
             return await context.GroupAttachments
@@ -78,6 +104,14 @@ namespace StudioStudio_Server.Repositories
                 .Where(a => a.ProcessingStatus == DocumentStatus.Uploading && a.UploadedAt < cutoff)
                 .AsNoTracking()
                 .ToListAsync();
+        }
+
+        private static string EscapeLikePattern(string input)
+        {
+            return input
+                .Replace("\\", "\\\\", StringComparison.Ordinal)
+                .Replace("%", "\\%", StringComparison.Ordinal)
+                .Replace("_", "\\_", StringComparison.Ordinal);
         }
     }
 }

@@ -1,7 +1,6 @@
 using System.Globalization;
 using System.Text;
 using System.Text.Json.Nodes;
-using StudioStudio_Server.Services.AI;
 using StudioStudio_Server.Services.AI.Models;
 
 #pragma warning disable IDE0130
@@ -161,6 +160,97 @@ public partial class AIAgent
         return normalizedParameters;
     }
 
+    private static JsonObject NormalizeGetPersonalDeadlinesParameters(string userQuestion, JsonObject? parameters)
+    {
+        var normalizedParameters = parameters ?? new JsonObject();
+        var question = NormalizeText(userQuestion);
+
+        if (string.IsNullOrWhiteSpace(question))
+        {
+            return normalizedParameters;
+        }
+
+        static bool HasNumericValue(JsonNode? node)
+        {
+            if (node is not JsonValue value)
+            {
+                return false;
+            }
+
+            return value.TryGetValue<int>(out _)
+                   || value.TryGetValue<long>(out _)
+                   || value.TryGetValue<double>(out _)
+                   || value.TryGetValue<decimal>(out _);
+        }
+
+        if (HasNumericValue(normalizedParameters["days_ahead"]))
+        {
+            return normalizedParameters;
+        }
+
+        var matches = System.Text.RegularExpressions.Regex.Matches(
+            question,
+            @"\b(\d{1,3})\s*(ngay|day|days)\b",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+        if (matches.Count > 0 && int.TryParse(matches[0].Groups[1].Value, out var daysAhead) && daysAhead > 0)
+        {
+            normalizedParameters["days_ahead"] = JsonValue.Create(daysAhead);
+        }
+
+        return normalizedParameters;
+    }
+
+    private static JsonObject NormalizeGetMembersParameters(string userQuestion, JsonObject? parameters)
+    {
+        var normalizedParameters = parameters ?? new JsonObject();
+        var explicitGroupReference = ExtractExplicitGroupReference(userQuestion);
+
+        if (!string.IsNullOrWhiteSpace(explicitGroupReference))
+        {
+            normalizedParameters["requested_group_reference"] = JsonValue.Create(explicitGroupReference);
+        }
+
+        return normalizedParameters;
+    }
+
+    private static string? ExtractExplicitGroupReference(string userQuestion)
+    {
+        var question = NormalizeText(userQuestion);
+        if (string.IsNullOrWhiteSpace(question))
+        {
+            return null;
+        }
+
+        var matches = System.Text.RegularExpressions.Regex.Matches(
+            question,
+            @"\b(?:group|nhom)\s+(?:(?:so|number)\s+)?([a-z0-9][a-z0-9\-_]*)\b",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+        foreach (System.Text.RegularExpressions.Match match in matches)
+        {
+            if (!match.Success)
+            {
+                continue;
+            }
+
+            var reference = match.Groups[1].Value.Trim();
+            if (string.IsNullOrWhiteSpace(reference))
+            {
+                continue;
+            }
+
+            if (reference is "nay" or "hien" or "this" or "current")
+            {
+                continue;
+            }
+
+            return reference;
+        }
+
+        return null;
+    }
+
     private static bool IsTaskTool(string toolName)
     {
         return toolName.Equals("get_tasks", StringComparison.OrdinalIgnoreCase)
@@ -180,6 +270,7 @@ public partial class AIAgent
     private static bool IsPersonalTool(string toolName)
     {
         return toolName.Equals("get_personal_tasks", StringComparison.OrdinalIgnoreCase)
+            || toolName.Equals("get_personal_group_task", StringComparison.OrdinalIgnoreCase)
             || toolName.Equals("get_personal_deadlines", StringComparison.OrdinalIgnoreCase)
             || toolName.Equals("get_personal_stats", StringComparison.OrdinalIgnoreCase);
     }
@@ -193,44 +284,115 @@ public partial class AIAgent
 
         var docNames = new List<string>();
 
-        var fileMatches = System.Text.RegularExpressions.Regex.Matches(
-            userQuestion,
-            @"[A-Za-z0-9_\-\. ]+\.(pdf|docx|xlsx|txt|pptx|doc|xls|ppt|jpg|png|jpeg)",
-            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-
-        foreach (System.Text.RegularExpressions.Match match in fileMatches)
+        void AddDocName(string? raw)
         {
-            var value = match.Value.Trim();
+            var value = raw?.Trim();
             if (!string.IsNullOrWhiteSpace(value) && !docNames.Contains(value, StringComparer.OrdinalIgnoreCase))
             {
                 docNames.Add(value);
             }
         }
 
+        // Match strict file token with extension (avoid capturing surrounding words).
+        var fileMatches = System.Text.RegularExpressions.Regex.Matches(
+            userQuestion,
+            @"\b[A-Za-z0-9][A-Za-z0-9_\-\.]*\.(pdf|docx|xlsx|txt|pptx|doc|xls|ppt|jpg|png|jpeg|md|markdown|csv)\b",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+        foreach (System.Text.RegularExpressions.Match match in fileMatches)
+        {
+            AddDocName(match.Value);
+        }
+
         if (docNames.Count == 0)
         {
-            var keywordPatterns = new[] { @"file\s+([^\s,\.]+)", @"tài liệu\s+([^\s,\.]+)", @"document\s+([^\s,\.]+)" };
+            // Match explicit slug-like names without extension, e.g. team-meeting-notes.
+            var slugMatches = System.Text.RegularExpressions.Regex.Matches(
+                userQuestion,
+                @"\b[A-Za-z0-9]+(?:[-_][A-Za-z0-9]+){1,}(?:\.[A-Za-z0-9]+)?\b",
+                System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+            foreach (System.Text.RegularExpressions.Match match in slugMatches)
+            {
+                AddDocName(match.Value);
+            }
+        }
+
+        if (docNames.Count == 0)
+        {
+            // Support quoted file names, including names with spaces.
+            var quotedMatches = System.Text.RegularExpressions.Regex.Matches(
+                userQuestion,
+                "[\\\"'`](?<name>[^\\\"'`]{2,})[\\\"'`]",
+                System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+            foreach (System.Text.RegularExpressions.Match match in quotedMatches)
+            {
+                if (match.Groups["name"].Success)
+                {
+                    AddDocName(match.Groups["name"].Value);
+                }
+            }
+        }
+
+        if (docNames.Count == 0)
+        {
+            var keywordPatterns = new[]
+            {
+                @"file\s+([^\s,]+)",
+                @"document\s+([^\s,]+)",
+                @"tai\s+lieu\s+([^\s,]+)",
+                @"tài\s+liệu\s+([^\s,]+)"
+            };
+
             foreach (var pattern in keywordPatterns)
             {
                 var matches = System.Text.RegularExpressions.Regex.Matches(
                     userQuestion,
                     pattern,
                     System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
                 foreach (System.Text.RegularExpressions.Match m in matches)
                 {
                     if (m.Groups.Count > 1)
                     {
-                        var name = m.Groups[1].Value.Trim();
-                        if (!string.IsNullOrWhiteSpace(name) && !docNames.Contains(name))
-                        {
-                            docNames.Add(name);
-                        }
+                        AddDocName(m.Groups[1].Value);
                     }
                 }
             }
         }
 
         return docNames;
+    }
+
+    private static bool HasExplicitDocumentName(string userQuestion) =>
+        ExtractDocumentNamesFromQuestion(userQuestion).Count > 0;
+
+    private static bool TryResolveRequestedDocumentId(
+        string userQuestion,
+        AIQueryResult docListResult,
+        out string? documentId,
+        out string? matchedDocumentName)
+    {
+        documentId = null;
+        matchedDocumentName = null;
+
+        var mentionedDocNames = ExtractDocumentNamesFromQuestion(userQuestion);
+        if (mentionedDocNames.Count == 0)
+        {
+            return false;
+        }
+
+        var matchedIds = MatchDocumentNamesAndExtractIds(mentionedDocNames, docListResult);
+        if (matchedIds.Count == 0)
+        {
+            matchedDocumentName = mentionedDocNames[0];
+            return false;
+        }
+
+        documentId = matchedIds[0];
+        matchedDocumentName = mentionedDocNames[0];
+        return true;
     }
 
     private static List<string> MatchDocumentNamesAndExtractIds(
@@ -250,17 +412,22 @@ public partial class AIAgent
         foreach (var searchName in searchNames)
         {
             var searchNameLower = searchName.ToLower();
+            var candidates = new List<(string DocumentId, DateTime CreatedAt)>();
 
             foreach (var doc in docs)
             {
-                if (doc is not JsonObject docObj || !docObj.TryGetPropertyValue("file_name", out var fileNameNode))
+                if (doc is not JsonObject docObj || !docObj.TryGetPropertyValue("file_name", out var fileNameNode) || fileNameNode == null)
                     continue;
 
-                var fileName = fileNameNode?.GetValue<string>()?.ToLower() ?? "";
+                var fileName = fileNameNode.ToString().ToLowerInvariant();
+                var extensionIndex = fileName.LastIndexOf('.');
+                var fileNameWithoutExtension = extensionIndex > 0
+                    ? fileName[..extensionIndex]
+                    : fileName;
 
                 if (fileName.Equals(searchNameLower) ||
                     fileName.Contains(searchNameLower) ||
-                    searchNameLower.Contains(System.IO.Path.GetFileNameWithoutExtension(fileName)))
+                    searchNameLower.Contains(fileNameWithoutExtension))
                 {
                     string? docId = null;
                     if (docObj.TryGetPropertyValue("document_id", out var idNode))
@@ -272,16 +439,52 @@ public partial class AIAgent
                         }
                     }
 
-                    if (!string.IsNullOrWhiteSpace(docId) && !matchedIds.Contains(docId))
+                    if (!string.IsNullOrWhiteSpace(docId))
                     {
-                        matchedIds.Add(docId);
+                        candidates.Add((docId, ExtractDocumentCreatedAt(docObj)));
                     }
-                    break;
                 }
+            }
+
+            var bestCandidate = candidates
+                .OrderByDescending(x => x.CreatedAt)
+                .FirstOrDefault();
+
+            if (!string.IsNullOrWhiteSpace(bestCandidate.DocumentId) && !matchedIds.Contains(bestCandidate.DocumentId))
+            {
+                matchedIds.Add(bestCandidate.DocumentId);
             }
         }
 
         return matchedIds;
+    }
+
+    private static DateTime ExtractDocumentCreatedAt(JsonObject docObj)
+    {
+        if (TryParseDocumentTimestamp(docObj["created_at"], out var createdAt))
+        {
+            return createdAt;
+        }
+
+        if (TryParseDocumentTimestamp(docObj["uploaded_at"], out var uploadedAt))
+        {
+            return uploadedAt;
+        }
+
+        return DateTime.MinValue;
+    }
+
+    private static bool TryParseDocumentTimestamp(JsonNode? node, out DateTime timestamp)
+    {
+        timestamp = default;
+        if (node == null)
+        {
+            return false;
+        }
+
+        var raw = node.GetValue<string>();
+        return !string.IsNullOrWhiteSpace(raw)
+            && DateTime.TryParse(raw, out timestamp);
     }
 
     private static JsonObject MergeJsonObjects(JsonObject current, JsonObject updates)
@@ -294,34 +497,6 @@ public partial class AIAgent
         }
 
         return merged;
-    }
-
-    private static string BuildPromptForLLMSynthesis(string toolName, JsonObject data)
-    {
-        var sb = new StringBuilder();
-        sb.AppendLine($"Tool '{toolName}' returned the following data:");
-        sb.AppendLine();
-        sb.AppendLine(data.ToJsonString());
-        sb.AppendLine();
-        sb.AppendLine("TASK: Use the data above to answer the user's request in Vietnamese.");
-        sb.AppendLine();
-        sb.AppendLine("RULES:");
-        sb.AppendLine("- Choose the best response format yourself: paragraph, bullets, table, or a mix.");
-        sb.AppendLine("- DO NOT return JSON.");
-        sb.AppendLine("- Highlight important items such as overdue tasks, high priority work, missing deadlines, or risks.");
-        sb.AppendLine("- If the data suggests what to do next, include a short 'Gợi ý tiếp theo' section with 1-3 concrete actions.");
-        sb.AppendLine("- Keep the answer concise but useful. Prefer readable markdown.");
-        return sb.ToString();
-    }
-
-    private static string? BuildForcedAnswerFromToolResult(string toolName, JsonObject? data)
-    {
-        if (data == null)
-        {
-            return null;
-        }
-
-        return BuildPromptForLLMSynthesis(toolName, data);
     }
 
     private static string BuildCompactToolResultForPrompt(AIQueryResult result)
@@ -465,8 +640,104 @@ public partial class AIAgent
         var isEnglish = language.Equals("en", StringComparison.OrdinalIgnoreCase);
 
         return isEnglish
-            ? "You are an AI assistant that turns tool data into a clean Markdown answer. Never return JSON. Prefer concise output. If the answer contains a task list, render it as a Markdown table (columns: Task, Status, Priority, Severity, Assignee, Due date). If the answer contains a group member list, render it as a Markdown table (columns: Member, Role). Keep pagination status explicit (current page/total pages, has next page). Include a short \"Next steps\" section only when the data implies concrete actions."
-            : "Ban la tro ly AI bien du lieu tu tool thanh cau tra loi Markdown sach se. Tuyet doi khong tra ve JSON. Uu tien cau tra loi ngan gon. Neu co danh sach cong viec, bat buoc trinh bay bang bang Markdown (cot: Cong viec, Trang thai, Uu tien, Muc do, Nguoi phu trach, Han chot). Neu co danh sach thanh vien nhom, trinh bay bang bang Markdown (cot: Thanh vien, Vai tro). Luon neu ro thong tin phan trang (trang hien tai/tong so trang, co trang tiep theo hay khong). Chi them muc \"Goi y tiep theo\" khi du lieu thuc su goi y hanh dong cu the.";
+            ? "You are an AI assistant that turns tool data into a clean Markdown answer. Never return JSON. If the answer contains a task list, render it as a Markdown table (columns: Task, Status, Priority, Severity, Assignee, Due date). If the answer contains a group member list, render it as a Markdown table (columns: Member, Role). Show pagination status only when tool results explicitly provide pagination fields. Include a short \"Next steps\" section only when the data implies concrete actions."
+            : "Ban la tro ly AI bien du lieu tu tool thanh cau tra loi Markdown sach se. Tuyet doi khong tra ve JSON. Neu co danh sach cong viec, bat buoc trinh bay bang bang Markdown (cot: Cong viec, Trang thai, Uu tien, Muc do, Nguoi phu trach, Han chot). Neu co danh sach thanh vien nhom, trinh bay bang bang Markdown (cot: Thanh vien, Vai tro). Chi neu thong tin phan trang khi tool tra ve day du current_page/total_pages/has_next_page. Chi them muc \"Goi y tiep theo\" khi du lieu thuc su goi y hanh dong cu the.";
+    }
+
+    private void AppendToolSpecificAnswerHints(StringBuilder promptBuilder, ToolExecutionHistory history)
+    {
+        var toolHints = history.Calls
+            .Select(call => _toolRegistry.GetTool(call.ToolName))
+            .Where(tool => tool != null)
+            .DistinctBy(tool => tool!.Name, StringComparer.OrdinalIgnoreCase)
+            .Where(tool => !string.IsNullOrWhiteSpace(tool!.AnswerStyleHint) || !string.IsNullOrWhiteSpace(tool.OutputFormatHint))
+            .ToList();
+
+        if (toolHints.Count == 0)
+        {
+            return;
+        }
+
+        promptBuilder.AppendLine("=== TOOL-SPECIFIC ANSWER HINTS ===");
+        foreach (var tool in toolHints)
+        {
+            promptBuilder.AppendLine($"Tool: {tool!.Name}");
+            if (!string.IsNullOrWhiteSpace(tool.AnswerStyleHint))
+            {
+                promptBuilder.AppendLine($"AnswerStyleHint: {tool.AnswerStyleHint}");
+            }
+
+            if (!string.IsNullOrWhiteSpace(tool.OutputFormatHint))
+            {
+                promptBuilder.AppendLine($"OutputFormatHint: {tool.OutputFormatHint}");
+            }
+
+            promptBuilder.AppendLine();
+        }
+
+        promptBuilder.AppendLine("- Prefer these tool-specific hints when phrasing the final answer.");
+        promptBuilder.AppendLine("- Never let style hints override the actual tool data.");
+        promptBuilder.AppendLine();
+    }
+
+    private string BuildPromptForSynthesis(string draftAnswer, ToolExecutionHistory history)
+    {
+        var promptBuilder = new StringBuilder();
+        promptBuilder.AppendLine("=== DRAFT ANSWER ===");
+        promptBuilder.AppendLine(draftAnswer);
+        promptBuilder.AppendLine();
+
+        if (history.Calls.Count > 0)
+        {
+            promptBuilder.AppendLine("=== TOOL RESULTS (FOR FACT CHECK) ===");
+            var recentCalls = history.Calls.TakeLast(5).ToList();
+            foreach (var call in recentCalls)
+            {
+                var resultForSynthesis = call.ToolName.Equals("search_documents", StringComparison.OrdinalIgnoreCase)
+                    ? call.Result.ToJson()
+                    : BuildCompactToolResultForPrompt(call.Result);
+
+                // Keep near-full document evidence for search_documents, but still cap to protect context window.
+                if (resultForSynthesis.Length > 12000)
+                {
+                    resultForSynthesis = resultForSynthesis[..12000] + "... [truncated]";
+                }
+
+                promptBuilder.AppendLine($"Tool: {call.ToolName}");
+                promptBuilder.AppendLine($"Parameters: {call.Parameters}");
+                promptBuilder.AppendLine($"Result: {resultForSynthesis}");
+                promptBuilder.AppendLine();
+            }
+        }
+
+        AppendToolSpecificAnswerHints(promptBuilder, history);
+        promptBuilder.AppendLine("=== INSTRUCTIONS ===");
+        promptBuilder.AppendLine("- Rewrite the draft answer into a clean final answer.");
+        promptBuilder.AppendLine("- Keep the answer faithful to the tool data.");
+        promptBuilder.AppendLine("- Expand the answer beyond one short paragraph when data is available: include key findings, supporting details, and caveats.");
+        promptBuilder.AppendLine("- If tool data includes metrics, numbers, dates, file names, or statuses, explicitly include the most relevant ones.");
+        promptBuilder.AppendLine("- Keep the response concise only when tool data is minimal.");
+        promptBuilder.AppendLine("- Remove vague filler phrases such as acknowledgements that do not add information.");
+        promptBuilder.AppendLine("- Only show pagination when the tool result explicitly contains pagination fields (current_page/total_pages/has_next_page).");
+        promptBuilder.AppendLine("- If those fields are absent, do NOT output pagination lines such as 'Trang hien tai: ...' or 'Co trang tiep theo: ...', and do not infer default values like 1/1.");
+
+        var hasSearchDocumentData = history.Calls.Any(c =>
+            c.ToolName.Equals("search_documents", StringComparison.OrdinalIgnoreCase)
+            && c.Result.IsSuccess
+            && c.Result.Data != null
+            && c.Result.Data.TryGetPropertyValue("documents", out var docsNode)
+            && docsNode is JsonArray docsArr
+            && docsArr.Count > 0);
+
+        if (hasSearchDocumentData)
+        {
+            promptBuilder.AppendLine("- DOCUMENT DETAIL MODE (IMPORTANT):");
+            promptBuilder.AppendLine("- If the user asks for details/content of a document, do not over-summarize.");
+            promptBuilder.AppendLine("- Cover the retrieved content comprehensively:");
+            promptBuilder.AppendLine("- Preserve concrete facts from tool results (dates, attendees, statuses, deadlines, named actions).");
+            promptBuilder.AppendLine("- If a section is not present in retrieved content, state that clearly instead of skipping silently.");
+        }
+        return promptBuilder.ToString();
     }
 
     private static bool IsTaskPaginationFollowup(string question)
@@ -506,14 +777,21 @@ public partial class AIAgent
             }
         }
 
+        AppendToolSpecificAnswerHints(promptBuilder, history);
+
         promptBuilder.AppendLine("=== INSTRUCTIONS ===");
         promptBuilder.AppendLine("- Based on the tool results above, provide a clear and helpful answer");
         promptBuilder.AppendLine("- Format your answer in Vietnamese with proper markdown if needed");
+        promptBuilder.AppendLine("- Do not answer in only one or two short lines when tool data is available. Cover key points and supporting evidence.");
+        promptBuilder.AppendLine("- Prioritize completeness and factual grounding over brevity.");
         promptBuilder.AppendLine("- If task list data exists, present tasks as a markdown table with columns: Cong viec, Trang thai, Uu tien, Muc do, Nguoi phu trach, Han chot.");
         promptBuilder.AppendLine("- If group member list data exists, present members as a markdown table with columns: Thanh vien, Vai tro.");
-        promptBuilder.AppendLine("- Always show pagination state clearly when available (current_page/total_pages/has_next_page).");
+        promptBuilder.AppendLine("- Only show pagination when the tool result explicitly contains pagination fields (current_page/total_pages/has_next_page).");
+        promptBuilder.AppendLine("- If those fields are absent, do NOT output pagination lines such as 'Trang hien tai: ...' or 'Co trang tiep theo: ...', and do not infer default values like 1/1.");
+        promptBuilder.AppendLine("- For deadline responses, separate upcoming_deadlines and overdue_tasks clearly. If total_upcoming = 0 but total_overdue > 0, state both facts explicitly to avoid contradiction.");
         promptBuilder.AppendLine("- If tool results are empty or insufficient, say so honestly");
 
         return promptBuilder.ToString();
     }
 }
+

@@ -16,6 +16,7 @@ public class SearchDocumentsTool(
     IVectorDatabaseService qdrantService,
     IEmbeddingService embeddingService,
     IGroupParticipantRepository participantRepository,
+    IGroupAttachmentRepository attachmentRepository,
     ILogger<SearchDocumentsTool> logger) : IAITool
 {
     public string Name => "search_documents";
@@ -41,8 +42,10 @@ public class SearchDocumentsTool(
     private static Guid? Jg(JsonNode? n) =>
         string.IsNullOrWhiteSpace(Js(n)) ? null : Guid.TryParse(Js(n), out var g) ? g : null;
 
-    public bool ValidateParameters(JsonObject p) =>
-        !string.IsNullOrWhiteSpace(Js(p["query"]));
+    public bool ValidateParameters(JsonObject p)
+    {
+        return !string.IsNullOrWhiteSpace(Js(p["query"]));
+    }
 
     public async Task<AIQueryResult> ExecuteAsync(
         AIQueryContext context, JsonObject parameters, CancellationToken cancellationToken = default)
@@ -56,8 +59,24 @@ public class SearchDocumentsTool(
             var query = Js(parameters["query"])!;
             var groupId = context.GroupId.Value;
             var topK = Ji(parameters["top_k"]);
+            var rawDocumentId = Js(parameters["document_id"]);
             var documentId = Jg(parameters["document_id"]);
             if (topK <= 0) topK = 3;
+
+            if (!string.IsNullOrWhiteSpace(rawDocumentId) && !documentId.HasValue)
+            {
+                documentId = await ResolveLatestDocumentIdAsync(groupId, rawDocumentId);
+                if (!documentId.HasValue)
+                {
+                    return AIQueryResult.Error("document_id khong hop le - khong resolve duoc filename sang attachment/document GUID moi nhat trong nhom");
+                }
+
+                logger.LogInformation(
+                    "[TOOL-RESOLVE-DOC] search_documents | input={Input} resolvedDocumentId={DocumentId} groupId={GroupId}",
+                    rawDocumentId,
+                    documentId.Value,
+                    groupId);
+            }
 
             logger.LogInformation("[TOOL-START] search_documents | query={Query} groupId={GroupId} topK={TopK}",
                 query, groupId, topK);
@@ -103,7 +122,7 @@ public class SearchDocumentsTool(
             var result = AIQueryResult.Success(new JsonObject
             {
                 ["query"] = query,
-                ["documents"] = new JsonArray(docs.ToArray()),
+                ["documents"] = new JsonArray(docs.Cast<JsonNode?>().ToArray()),
                 ["total_found"] = docs.Count,
                 ["qdrant_reachable"] = true,
                 ["summary"] = isEnglish
@@ -126,5 +145,21 @@ public class SearchDocumentsTool(
             logger.LogError(ex, "[TOOL-ERROR] search_documents | query={Query} — Unexpected error", Js(parameters["query"]));
             return AIQueryResult.Error($"search_documents failed: {ex.Message}");
         }
+    }
+
+    private async Task<Guid?> ResolveLatestDocumentIdAsync(Guid groupId, string rawDocumentId)
+    {
+        var documentName = rawDocumentId.Trim();
+        if (string.IsNullOrWhiteSpace(documentName))
+        {
+            return null;
+        }
+
+        var matchedAttachment = await attachmentRepository.FindLatestByGroupIdAndDocumentNameAsync(
+            groupId,
+            documentName,
+            DateTime.UtcNow);
+
+        return matchedAttachment?.GroupAttachmentId;
     }
 }

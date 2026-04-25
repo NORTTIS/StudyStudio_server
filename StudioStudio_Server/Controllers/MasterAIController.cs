@@ -13,7 +13,7 @@ namespace StudioStudio_Server.Controllers;
 /// <summary>
 /// Controller for Master AI (AI Toàn Studio)
 /// Route: /api/ai/master
-/// Tools: get_studio_analytics, get_studio_groups, get_studio_health, get_group_comparison, get_risk_groups, get_member_permissions, get_storage_usage, search_studio_documents
+/// Tools: get_studio_analytics, get_studio_groups, get_studio_health, get_group_comparison, get_risk_groups, search_studio_documents
 /// Chỉ Owner của Studio mới có quyền sử dụng
 /// </summary>
 [Route("api/ai/master")]
@@ -186,7 +186,8 @@ public class MasterAIController(
             {
                 UserId = userId.Value,
                 Language = language,
-                StudioId = request.StudioId
+                StudioId = request.StudioId,
+                StudioOwnerId = userId.Value
             };
 
             // Stream chunks from AIAgent

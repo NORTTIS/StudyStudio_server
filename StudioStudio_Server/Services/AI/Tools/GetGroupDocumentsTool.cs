@@ -25,7 +25,6 @@ public class GetGroupDocumentsTool(
         ["required"] = new JsonArray()
     };
 
-    private static string? Js(JsonNode? n) => n?.GetValue<string>();
     private static int Ji(JsonNode? n) => n?.GetValue<int>() ?? 0;
 
     public bool ValidateParameters(JsonObject p) => true;
@@ -65,11 +64,16 @@ public class GetGroupDocumentsTool(
                 .ToList();
 
             sw.Stop();
+            var documentsArray = new JsonArray();
+            foreach (var doc in shownList)
+            {
+                documentsArray.Add(doc);
+            }
 
             var result = AIQueryResult.Success(new JsonObject
             {
                 ["group_id"] = groupId.ToString(),
-                ["documents"] = new JsonArray(shownList.ToArray()),
+                ["documents"] = documentsArray,
                 ["total_count"] = totalCount,
                 ["shown_count"] = shownList.Count,
                 ["summary"] = totalCount > 0

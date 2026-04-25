@@ -10,6 +10,7 @@ namespace StudioStudio_Server.Repositories.Interfaces
     {
         Task<GroupAttachment?> GetByIdAsync(Guid attachmentId);
         Task<List<GroupAttachment>> GetByGroupIdAsync(Guid groupId);
+        Task<GroupAttachment?> FindLatestByGroupIdAndDocumentNameAsync(Guid groupId, string documentName, DateTime? uploadedAt = null);
         Task<List<GroupAttachment>> GetByGroupIdPagedAsync(Guid groupId, int skip, int take);
         Task<int> CountByGroupIdAsync(Guid groupId);
         Task CreateAsync(GroupAttachment attachment);

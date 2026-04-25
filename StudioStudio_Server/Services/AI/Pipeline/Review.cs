@@ -11,6 +11,12 @@ public partial class AIAgent
     private static AIIntentAnalysis AnalyzeIntent(string userQuestion, AIQueryContext context)
     {
         var normalizedQuestion = NormalizeText(userQuestion);
+        var hasLetterOrDigit = normalizedQuestion.Any(char.IsLetterOrDigit);
+        var letterOrDigitCount = normalizedQuestion.Count(char.IsLetterOrDigit);
+        var punctuationCount = normalizedQuestion.Count(ch => !char.IsLetterOrDigit(ch) && !char.IsWhiteSpace(ch));
+        var tokenCount = normalizedQuestion
+            .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Length;
 
         var isFollowUp = normalizedQuestion.Contains("xem tiep", StringComparison.Ordinal)
             || normalizedQuestion.Contains("trang tiep", StringComparison.Ordinal)
@@ -38,10 +44,38 @@ public partial class AIAgent
                 ? (isTaskIntent ? "group-task" : isDocumentIntent ? "group-document" : "group-general")
                 : "personal";
 
-        var requiresTool = true;
-        var summary = $"category={category}, taskIntent={isTaskIntent}, documentIntent={isDocumentIntent}, followUp={isFollowUp}";
+        var looksLikeNoise = !string.IsNullOrWhiteSpace(userQuestion)
+            && (!hasLetterOrDigit
+                || (letterOrDigitCount <= 6 && punctuationCount >= 2)
+                || (tokenCount <= 1 && !isTaskIntent && !isDocumentIntent && !isFollowUp && punctuationCount > 0));
 
-        return new AIIntentAnalysis(category, requiresTool, isTaskIntent, isDocumentIntent, isFollowUp, summary);
+        var isUnclearIntent = !isTaskIntent && !isDocumentIntent && !isFollowUp && looksLikeNoise;
+        var requiresTool = !isUnclearIntent;
+        var summary = $"category={category}, taskIntent={isTaskIntent}, documentIntent={isDocumentIntent}, followUp={isFollowUp}, unclear={isUnclearIntent}";
+
+        return new AIIntentAnalysis(category, requiresTool, isTaskIntent, isDocumentIntent, isFollowUp, isUnclearIntent, summary);
+    }
+
+    private static string BuildClarificationQuestion(AIQueryContext context)
+    {
+        return context.Language.Equals("en", StringComparison.OrdinalIgnoreCase)
+            ? "I couldn't determine your intent. Do you want to ask about personal tasks, deadlines, productivity stats, or group-assigned tasks?"
+            : "Mình chưa xác định được ý bạn. Bạn muốn hỏi về công việc cá nhân, deadline, thống kê năng suất, hay các task được giao từ group?";
+    }
+
+    private static bool LooksLikePromptLeakage(string text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return false;
+        }
+
+        var normalized = NormalizeText(text);
+
+        return normalized.Contains("tro ly ai bien du lieu tu tool thanh cau tra loi markdown", StringComparison.Ordinal)
+               || normalized.Contains("you are an ai assistant that turns tool data into a clean markdown answer", StringComparison.Ordinal)
+               || normalized.Contains("tuyet doi khong tra ve json", StringComparison.Ordinal)
+               || normalized.Contains("never return json", StringComparison.Ordinal);
     }
 
     private static AIReviewVerdict ReviewToolFit(AIIntentAnalysis intent, AgentDecision decision)
@@ -217,7 +251,182 @@ public partial class AIAgent
         return ParseParameterReviewResponse(rawResponse);
     }
 
-    private async Task<AIFlowDecision> ReviewPlannedToolAsync(string userQuestion, AIQueryContext context, AgentDecision decision, CancellationToken cancellationToken)
+    private static AIQueryResult? GetLatestSuccessfulToolResult(ToolExecutionHistory history, string toolName)
+    {
+        return history.Calls
+            .Where(c => c.ToolName.Equals(toolName, StringComparison.OrdinalIgnoreCase) && c.Result.IsSuccess)
+            .OrderByDescending(c => c.ExecutedAt)
+            .Select(c => c.Result)
+            .FirstOrDefault();
+    }
+
+    private static bool IsNamedDocumentSearchWithoutResolvedId(string userQuestion, AgentDecision decision, JsonObject parameters)
+    {
+        if (!string.Equals(decision.ToolName, "search_documents", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        if (!HasExplicitDocumentName(userQuestion))
+        {
+            return false;
+        }
+
+        var rawDocumentId = parameters.TryGetPropertyValue("document_id", out var node)
+            ? node?.GetValue<string>()
+            : null;
+
+        return !Guid.TryParse(rawDocumentId, out _);
+    }
+
+    private static bool IsStudioGroupTool(string? toolName)
+    {
+        if (string.IsNullOrWhiteSpace(toolName))
+        {
+            return false;
+        }
+
+        return toolName.Equals("get_tasks", StringComparison.OrdinalIgnoreCase)
+            || toolName.Equals("get_group_stats", StringComparison.OrdinalIgnoreCase)
+            || toolName.Equals("get_members", StringComparison.OrdinalIgnoreCase)
+            || toolName.Equals("get_deadlines", StringComparison.OrdinalIgnoreCase)
+            || toolName.Equals("search_documents", StringComparison.OrdinalIgnoreCase)
+            || toolName.Equals("get_group_performance", StringComparison.OrdinalIgnoreCase)
+            || toolName.Equals("get_group_documents", StringComparison.OrdinalIgnoreCase)
+            || toolName.Equals("get_group_risk", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool TryReadGuidParameter(JsonObject parameters, string key, out Guid value)
+    {
+        value = Guid.Empty;
+        if (!parameters.TryGetPropertyValue(key, out var node) || node == null)
+        {
+            return false;
+        }
+
+        var raw = node.GetValue<string>();
+        return Guid.TryParse(raw, out value);
+    }
+
+    private static bool ContainsExactGroupName(string question, string groupName)
+    {
+        if (string.IsNullOrWhiteSpace(question) || string.IsNullOrWhiteSpace(groupName))
+        {
+            return false;
+        }
+
+        var startIndex = 0;
+        while (true)
+        {
+            var idx = question.IndexOf(groupName, startIndex, StringComparison.OrdinalIgnoreCase);
+            if (idx < 0)
+            {
+                return false;
+            }
+
+            var beforeOk = idx == 0 || !char.IsLetterOrDigit(question[idx - 1]);
+            var afterIndex = idx + groupName.Length;
+            var afterOk = afterIndex >= question.Length || !char.IsLetterOrDigit(question[afterIndex]);
+
+            if (beforeOk && afterOk)
+            {
+                return true;
+            }
+
+            startIndex = idx + 1;
+        }
+    }
+
+    private static bool TryResolveGroupIdFromStudioGroups(
+        string userQuestion,
+        ToolExecutionHistory history,
+        out Guid groupId)
+    {
+        groupId = Guid.Empty;
+
+        // Priority 1: user explicitly provided GUID in question
+        var guidMatches = System.Text.RegularExpressions.Regex.Matches(
+            userQuestion,
+            @"\b[0-9a-fA-F]{8}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{12}\b");
+        if (guidMatches.Count > 0 && Guid.TryParse(guidMatches[0].Value, out var parsedGuid))
+        {
+            groupId = parsedGuid;
+            return true;
+        }
+
+        var groupsResult = GetLatestSuccessfulToolResult(history, "get_studio_groups");
+        if (groupsResult?.Data == null)
+        {
+            return false;
+        }
+
+        if (!groupsResult.Data.TryGetPropertyValue("groups", out var groupsNode) || groupsNode is not JsonArray groupsArr)
+        {
+            return false;
+        }
+
+        var candidates = new List<Guid>();
+
+        foreach (var groupNode in groupsArr)
+        {
+            if (groupNode is not JsonObject groupObj)
+            {
+                continue;
+            }
+
+            var idRaw = groupObj["id"]?.GetValue<string>();
+            var nameRaw = groupObj["name"]?.GetValue<string>();
+            if (!Guid.TryParse(idRaw, out var candidateId) || string.IsNullOrWhiteSpace(nameRaw))
+            {
+                continue;
+            }
+
+            if (ContainsExactGroupName(userQuestion, nameRaw))
+            {
+                candidates.Add(candidateId);
+            }
+        }
+
+        if (candidates.Count != 1)
+        {
+            return false;
+        }
+
+        groupId = candidates[0];
+        return true;
+    }
+
+    private static bool HasMultipleExplicitGroupReferences(string userQuestion)
+    {
+        if (string.IsNullOrWhiteSpace(userQuestion))
+        {
+            return false;
+        }
+
+        var matches = System.Text.RegularExpressions.Regex.Matches(
+            userQuestion,
+            @"\b(?:group|nhom)\s+(?:(?:so|number)\s+)?([a-zA-Z0-9][a-zA-Z0-9\-_]*)\b",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+        var refs = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (System.Text.RegularExpressions.Match match in matches)
+        {
+            if (!match.Success || match.Groups.Count < 2)
+            {
+                continue;
+            }
+
+            var value = match.Groups[1].Value.Trim();
+            if (!string.IsNullOrWhiteSpace(value))
+            {
+                refs.Add(value);
+            }
+        }
+
+        return refs.Count > 1;
+    }
+
+    private async Task<AIFlowDecision> ReviewPlannedToolAsync(string userQuestion, AIQueryContext context, AgentDecision decision, ToolExecutionHistory history, CancellationToken cancellationToken)
     {
         var reviewedParameters = EnsureToolParameters(decision.ToolParameters);
 
@@ -248,6 +457,101 @@ public partial class AIAgent
         if (decision.ToolName.Equals("get_tasks", StringComparison.OrdinalIgnoreCase))
         {
             reviewedParameters = NormalizeGetTasksParameters(userQuestion, reviewedParameters);
+        }
+
+        if (decision.ToolName.Equals("get_personal_deadlines", StringComparison.OrdinalIgnoreCase))
+        {
+            reviewedParameters = NormalizeGetPersonalDeadlinesParameters(userQuestion, reviewedParameters);
+        }
+
+        if (decision.ToolName.Equals("get_members", StringComparison.OrdinalIgnoreCase))
+        {
+            reviewedParameters = NormalizeGetMembersParameters(userQuestion, reviewedParameters);
+        }
+
+        if (decision.ToolName.Equals("search_documents", StringComparison.OrdinalIgnoreCase)
+            && context.GroupId.HasValue
+            && HasExplicitDocumentName(userQuestion))
+        {
+            if (!reviewedParameters.TryGetPropertyValue("document_id", out var documentIdNode)
+                || documentIdNode == null
+                || string.IsNullOrWhiteSpace(documentIdNode.GetValue<string>()))
+            {
+                var mentionedDocNames = ExtractDocumentNamesFromQuestion(userQuestion);
+                if (mentionedDocNames.Count > 0)
+                {
+                    reviewedParameters["document_id"] = JsonValue.Create(mentionedDocNames[0]);
+                }
+            }
+        }
+
+        if (decision.ToolName.Equals("search_documents", StringComparison.OrdinalIgnoreCase))
+        {
+            if (!reviewedParameters.TryGetPropertyValue("query", out var queryNode)
+                || queryNode == null
+                || string.IsNullOrWhiteSpace(queryNode.GetValue<string>()))
+            {
+                reviewedParameters["query"] = JsonValue.Create(userQuestion.Trim());
+            }
+        }
+
+        if (context.StudioId.HasValue
+            && !context.GroupId.HasValue
+            && IsStudioGroupTool(decision.ToolName))
+        {
+            if (HasMultipleExplicitGroupReferences(userQuestion))
+            {
+                return new AIFlowDecision(
+                    StepName: "parameter-review",
+                    Decision: decision,
+                    ToolParameters: reviewedParameters,
+                    IsAccepted: false,
+                    ReviewState: "needs_fix",
+                    ReviewNote: "[needs_fix] He thong chi ho tro 1 group cho moi lan goi group tool. Ban dang chi dinh nhieu group, hay chon 1 group duy nhat.",
+                    SuggestedToolName: decision.ToolName);
+            }
+
+            if (reviewedParameters.TryGetPropertyValue("group_ids", out var groupIdsNode)
+                && groupIdsNode is JsonArray groupIdsArray
+                && groupIdsArray.Count > 1)
+            {
+                return new AIFlowDecision(
+                    StepName: "parameter-review",
+                    Decision: decision,
+                    ToolParameters: reviewedParameters,
+                    IsAccepted: false,
+                    ReviewState: "needs_fix",
+                    ReviewNote: "[needs_fix] Group-level tools chi nhan 1 group_id, khong ho tro nhieu group_ids.",
+                    SuggestedToolName: decision.ToolName);
+            }
+
+            if (!TryReadGuidParameter(reviewedParameters, "group_id", out _))
+            {
+                if (TryResolveGroupIdFromStudioGroups(userQuestion, history, out var resolvedGroupId))
+                {
+                    reviewedParameters["group_id"] = JsonValue.Create(resolvedGroupId.ToString());
+                    _logger.LogInformation(
+                        "[PARAM-REVIEW] Resolved group_id={GroupId} for tool={Tool} from get_studio_groups + user question",
+                        resolvedGroupId,
+                        decision.ToolName);
+                }
+                else
+                {
+                    var hasStudioGroups = history.Calls.Any(c =>
+                        c.ToolName.Equals("get_studio_groups", StringComparison.OrdinalIgnoreCase) && c.Result.IsSuccess);
+
+                    return new AIFlowDecision(
+                        StepName: "parameter-review",
+                        Decision: decision,
+                        ToolParameters: reviewedParameters,
+                        IsAccepted: false,
+                        ReviewState: "needs_fix",
+                        ReviewNote: hasStudioGroups
+                            ? "[needs_fix] Khong tim thay group nao khop chinh xac 100% voi ten group trong cau hoi. Hay nhap dung exact group name hoac group_id."
+                            : "[needs_fix] Group tool in Studio scope requires group_id. Goi get_studio_groups truoc de lay danh sach group va id.",
+                        SuggestedToolName: hasStudioGroups ? decision.ToolName : "get_studio_groups");
+                }
+            }
         }
 
         if (reviewedParameters.Count == 0)
@@ -517,7 +821,15 @@ public partial class AIAgent
             promptBuilder.AppendLine("- Analyze the question carefully");
             promptBuilder.AppendLine("- If you need data, call the appropriate tool(s)");
             promptBuilder.AppendLine("- If you have enough information, provide the answer directly");
-            promptBuilder.AppendLine("- If the user asks for a generic task list ('task list', 'all tasks', 'group tasks', 'show tasks in this group'), call get_tasks with query/search empty and no filter fields unless a filter is explicitly requested.");
+            if (!context.StudioId.HasValue)
+            {
+                promptBuilder.AppendLine("- If the user asks for a generic task list ('task list', 'all tasks', 'group tasks', 'show tasks in this group'), call get_tasks with query/search empty and no filter fields unless a filter is explicitly requested.");
+            }
+            else
+            {
+                promptBuilder.AppendLine("- STUDIO SCOPE RULE: for any Group-level tool call (get_tasks/get_group_stats/get_members/get_deadlines/get_group_performance/get_group_documents/get_group_risk/search_documents), you MUST include a valid group_id GUID.");
+                promptBuilder.AppendLine("- If group_id is not known yet, call get_studio_groups first, then map the user-mentioned group name to its id and call the Group-level tool with that group_id.");
+            }
             promptBuilder.AppendLine("- Use query/search only for explicit keyword search across task title or description. Never use query/search to represent a filter intent.");
             promptBuilder.AppendLine("- If the user asks for any filter, you MUST use structured filter fields. Do not answer a filter question with an unfiltered task list.");
             promptBuilder.AppendLine("- Filter mapping rules:");
@@ -534,12 +846,22 @@ public partial class AIAgent
             promptBuilder.AppendLine("  * severity moderate and above / medium or higher severity => min_severity = Moderate");
             promptBuilder.AppendLine("  * severity high and above / high or higher severity / muc do cao tro len / muc cao tro len / tu muc cao tro len => min_severity = Major");
             promptBuilder.AppendLine("- Example tool calls:");
-            promptBuilder.AppendLine("  * {\"tool_name\":\"get_tasks\",\"parameters\":{}} for a generic list request.");
-            promptBuilder.AppendLine("  * {\"tool_name\":\"get_tasks\",\"parameters\":{\"status_category\":\"Completed\"}} for completed tasks.");
-            promptBuilder.AppendLine("  * {\"tool_name\":\"get_tasks\",\"parameters\":{\"min_priority\":\"Medium\"}} for medium and above priority.");
-            promptBuilder.AppendLine("  * {\"tool_name\":\"get_tasks\",\"parameters\":{\"min_priority\":\"High\"}} for high and above priority.");
-            promptBuilder.AppendLine("  * {\"tool_name\":\"get_tasks\",\"parameters\":{\"min_severity\":\"Major\"}} for high severity and above.");
-            promptBuilder.AppendLine("- Neu get_tasks tra ve phan trang (current_page, total_pages, page_size), hay hien thi ro cac thong tin nay cho user.");
+            if (!context.StudioId.HasValue)
+            {
+                promptBuilder.AppendLine("  * {\"tool_name\":\"get_tasks\",\"parameters\":{}} for a generic list request.");
+                promptBuilder.AppendLine("  * {\"tool_name\":\"get_tasks\",\"parameters\":{\"status_category\":\"Completed\"}} for completed tasks.");
+                promptBuilder.AppendLine("  * {\"tool_name\":\"get_tasks\",\"parameters\":{\"min_priority\":\"Medium\"}} for medium and above priority.");
+                promptBuilder.AppendLine("  * {\"tool_name\":\"get_tasks\",\"parameters\":{\"min_priority\":\"High\"}} for high and above priority.");
+                promptBuilder.AppendLine("  * {\"tool_name\":\"get_tasks\",\"parameters\":{\"min_severity\":\"Major\"}} for high severity and above.");
+            }
+            else
+            {
+                promptBuilder.AppendLine("  * {\"tool_name\":\"get_studio_groups\",\"parameters\":{}} to fetch groups and ids.");
+                promptBuilder.AppendLine("  * {\"tool_name\":\"get_tasks\",\"parameters\":{\"group_id\":\"<group-guid>\"}} for a group's task list.");
+                promptBuilder.AppendLine("  * {\"tool_name\":\"get_tasks\",\"parameters\":{\"group_id\":\"<group-guid>\",\"status_category\":\"Completed\"}} for completed tasks in that group.");
+            }
+            promptBuilder.AppendLine("- Chi hien thi thong tin phan trang khi ket qua tool THUC SU co cac truong current_page/total_pages/has_next_page.");
+            promptBuilder.AppendLine("- Neu ket qua tool khong co cac truong phan trang, TUYET DOI khong tu them dong 'Trang hien tai: ...' hoac 'Co trang tiep theo: ...' va khong duoc suy dien 1/1.");
             promptBuilder.AppendLine("- IMPORTANT - JSON FORMAT: Your response MUST be a valid single-line JSON object.");
             promptBuilder.AppendLine("- Tool execution policy: a tool may be retried only if its previous call failed. Never call the same tool again after it has succeeded in the current turn.");
             promptBuilder.AppendLine("  - Tool call: {\"action\": \"tool_call\", \"tool_name\": \"tool_name_here\", \"parameters\": {\"key\": \"value\"}}");
@@ -547,10 +869,11 @@ public partial class AIAgent
             promptBuilder.AppendLine("  - NEVER omit the parameters field. If tool needs no params, use {\"parameters\": {}}");
             promptBuilder.AppendLine("- final_answer: chi la van ban thuan tuy. Khong dat trong ```, khong dat trong JSON object. Neu can xuong dong, dung \\n. Khong dung danh sach bullet dac biet.");
             promptBuilder.AppendLine("- DOCUMENT SEARCH STRATEGY:");
-            promptBuilder.AppendLine("  * get_group_documents: ONLY to LIST file names/metadata. Does NOT search content.");
             promptBuilder.AppendLine("  * search_documents: For finding CONTENT within documents. Use with: query (required), document_id (optional), top_k (optional).");
             promptBuilder.AppendLine("  * If user asks about document CONTENT (\"what is...\", \"find...\", \"search in...\") -> use search_documents with semantic query.");
-            promptBuilder.AppendLine("  * If user mentions specific file like \"2003.txt\" -> extract filename and use search_documents with document_id filter.");
+            promptBuilder.AppendLine("  * If user mentions specific file like \"2003.txt\" -> call search_documents directly and pass that filename in document_id.");
+            promptBuilder.AppendLine("  * document_id can be GUID or filename. The tool will resolve filename to the latest uploaded attachment in DB.");
+            promptBuilder.AppendLine("  * If query is missing, reuse the full user question as query.");
             promptBuilder.AppendLine("- search_documents EXAMPLES:");
             promptBuilder.AppendLine("  * Generic content search: {\"query\": \"cac neu can tim kiem\"}");
             promptBuilder.AppendLine("  * Search in specific file: {\"query\": \"cac yeu cau\", \"document_id\": \"2003.txt\"}");
@@ -563,7 +886,8 @@ public partial class AIAgent
             promptBuilder.AppendLine("- Do not call get_tasks again after it has succeeded once in this turn. Use the returned data to answer immediately.");
             promptBuilder.AppendLine("- If the tool result is an unfiltered task list and the user actually asked for a filter, you should refine only once by calling get_tasks with the correct structured filters.");
             promptBuilder.AppendLine("- After any successful get_tasks call, do not call get_tasks again in the same turn. Use the returned data to answer immediately.");
-            promptBuilder.AppendLine("- Neu get_tasks tra ve phan trang (current_page, total_pages, page_size), final_answer PHAI hien thi ro cac thong tin nay.");
+            promptBuilder.AppendLine("- Chi hien thi thong tin phan trang khi ket qua tool THUC SU co cac truong current_page/total_pages/has_next_page.");
+            promptBuilder.AppendLine("- Neu ket qua tool khong co cac truong phan trang, TUYET DOI khong tu them dong 'Trang hien tai: ...' hoac 'Co trang tiep theo: ...' va khong duoc suy dien 1/1.");
             promptBuilder.AppendLine("- IMPORTANT - JSON FORMAT: Your response MUST be a valid single-line JSON object.");
             promptBuilder.AppendLine("- Tool execution policy: a tool may be retried only if its previous call failed. Never call the same tool again after it has succeeded in the current turn.");
             promptBuilder.AppendLine("  - Tool call: {\"action\": \"tool_call\", \"tool_name\": \"tool_name_here\", \"parameters\": {\"key\": \"value\"}}");
@@ -573,19 +897,25 @@ public partial class AIAgent
 
             if (history.Calls.Any(c => c.ToolName == "search_documents" && !c.Result.IsSuccess))
             {
-                promptBuilder.AppendLine("- PREVIOUS FAILURE: search_documents that bai vi thieu query. "
-                    + "Dieu nay xay ra vi ban khong biet trong nhom co nhung tai lieu gi. "
-                    + "Goi get_group_documents (khong can tham so) de lay danh sach tai lieu co san. "
-                    + "Sau do dua tren danh sach do, ban se biet phai tim kiem noi dung gi.");
+                promptBuilder.AppendLine("- PREVIOUS FAILURE: search_documents failed due to invalid/missing params. "
+                    + "Retry search_documents with a valid semantic query taken from the user question. "
+                    + "Do not call get_group_documents as an automatic fallback.");
             }
 
             bool hasCalledGetTasks = history.Calls.Any(c => c.ToolName == "get_tasks" && c.Result.IsSuccess);
             if (!hasCalledGetTasks)
             {
-                promptBuilder.AppendLine("- IMPORTANT: Neu cau hoi lien quan den CONG VIEC (task, deadline, tien do, "
-                    + "thanh vien, diem score) ma CHUA goi get_tasks -> GOI GET_TASKS NGAY. "
-                    + "Ket qua tu documents (get_group_documents/search_documents) KHONG phai la task data. "
-                    + "Phai goi get_tasks de lay danh sach cong viec.");
+                if (!context.StudioId.HasValue)
+                {
+                    promptBuilder.AppendLine("- IMPORTANT: Neu cau hoi lien quan den CONG VIEC (task, deadline, tien do, "
+                        + "thanh vien, diem score) ma CHUA goi get_tasks -> GOI GET_TASKS NGAY. "
+                        + "Ket qua tu documents (get_group_documents/search_documents) KHONG phai la task data. "
+                        + "Phai goi get_tasks de lay danh sach cong viec.");
+                }
+                else
+                {
+                    promptBuilder.AppendLine("- IMPORTANT (Studio scope): Neu cau hoi lien quan den cong viec cua mot group cu the, goi get_tasks voi group_id GUID da map tu get_studio_groups. KHONG goi get_tasks voi parameters rong.");
+                }
             }
 
             if (history.Calls.Any(c => c.Result.IsSuccess))

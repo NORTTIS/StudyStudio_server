@@ -50,13 +50,41 @@ public partial class AIAgent
             return AIQueryResult.Error($"Tool '{toolName}' không resolve được");
         }
 
+        var effectiveContext = context;
+        if (context.StudioId.HasValue
+            && !context.GroupId.HasValue
+            && IsStudioRoutedGroupTool(toolName))
+        {
+            var requestedGroupIdRaw = parameters.TryGetPropertyValue("group_id", out var groupIdNode)
+                ? groupIdNode?.GetValue<string>()
+                : null;
+
+            if (!Guid.TryParse(requestedGroupIdRaw, out var requestedGroupId))
+            {
+                return AIQueryResult.Error(
+                    "Master scope dang goi group tool nhung thieu/khong hop le group_id. Hay goi get_studio_groups de lay group_id GUID truoc.");
+            }
+
+            effectiveContext = new AIQueryContext
+            {
+                UserId = context.UserId,
+                Language = context.Language,
+                GroupId = requestedGroupId,
+                StudioId = context.StudioId,
+                SubscriptionPlan = context.SubscriptionPlan,
+                StudioOwnerId = context.StudioOwnerId,
+                StartTime = context.StartTime,
+                SessionId = context.SessionId
+            };
+        }
+
         if (!tool.ValidateParameters(parameters))
         {
             var schema = tool.ParametersSchema;
             var neededParams = new List<string>();
             if (schema.TryGetPropertyValue("properties", out var props) && props is JsonObject)
             {
-                var propsObj = (JsonObject)props!;
+                var propsObj = (JsonObject)props;
                 foreach (var prop in propsObj)
                 {
                     var key = prop.Key;
@@ -73,15 +101,12 @@ public partial class AIAgent
 
         try
         {
-            var result = await tool.ExecuteAsync(context, parameters, cancellationToken);
+            var result = await tool.ExecuteAsync(effectiveContext, parameters, cancellationToken);
             var resultData = result.Data?.ToString() ?? "";
-            var truncatedResult = resultData.Length > 100
-                ? resultData[..100] + "..."
-                : resultData;
 
             _logger.LogWarning(
                 "[TOOL-RESULT] Tool={ToolName} Success={Success} TimeMs={TimeMs} Result={Result}",
-                toolName, result.IsSuccess, result.ExecutionTimeMs, truncatedResult);
+                toolName, result.IsSuccess, result.ExecutionTimeMs, resultData);
 
             return result;
         }
@@ -92,55 +117,63 @@ public partial class AIAgent
         }
     }
 
-    private string GetTaskPaginationSessionKey(AIQueryContext context)
+    private static bool IsStudioRoutedGroupTool(string toolName)
+    {
+        return toolName.Equals("get_tasks", StringComparison.OrdinalIgnoreCase)
+            || toolName.Equals("get_group_stats", StringComparison.OrdinalIgnoreCase)
+            || toolName.Equals("get_members", StringComparison.OrdinalIgnoreCase)
+            || toolName.Equals("get_deadlines", StringComparison.OrdinalIgnoreCase)
+            || toolName.Equals("search_documents", StringComparison.OrdinalIgnoreCase)
+            || toolName.Equals("get_group_performance", StringComparison.OrdinalIgnoreCase)
+            || toolName.Equals("get_group_documents", StringComparison.OrdinalIgnoreCase)
+            || toolName.Equals("get_group_risk", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private string GetTaskPaginationSessionKey(AIQueryContext context, string toolName)
     {
         if (!context.GroupId.HasValue)
         {
-            return $"ai:task_pagination:{context.UserId}:nogroup:{context.SessionId ?? "default"}";
+            return $"ai:task_pagination:{context.UserId}:nogroup:{toolName}:{context.SessionId ?? "default"}";
         }
 
         var session = string.IsNullOrWhiteSpace(context.SessionId)
             ? "default"
             : context.SessionId.Trim();
 
-        return $"ai:task_pagination:{context.UserId}:{context.GroupId.Value}:{session}";
+        return $"ai:task_pagination:{context.UserId}:{context.GroupId.Value}:{toolName}:{session}";
     }
 
-    private string GetTaskPaginationBaseKey(AIQueryContext context)
+    private string GetTaskPaginationBaseKey(AIQueryContext context, string toolName)
     {
         if (!context.GroupId.HasValue)
         {
-            return $"ai:task_pagination:{context.UserId}:nogroup:default";
+            return $"ai:task_pagination:{context.UserId}:nogroup:{toolName}:default";
         }
 
-        return $"ai:task_pagination:{context.UserId}:{context.GroupId.Value}:default";
+        return $"ai:task_pagination:{context.UserId}:{context.GroupId.Value}:{toolName}:default";
     }
+
+    private static IReadOnlyList<string> GetTaskPaginationToolNames() => new[]
+    {
+        "get_personal_tasks",
+        "get_personal_group_task"
+    };
 
     private async Task<AITaskPaginationSessionState?> GetTaskPaginationStateAsync(AIQueryContext context)
     {
         try
         {
-            var key = GetTaskPaginationSessionKey(context);
-            var state = await _cacheService.GetAsync<AITaskPaginationSessionState>(key);
-            if (state != null)
+            var latestState = await GetTaskPaginationStateAsync(context, "get_tasks");
+            foreach (var toolName in GetTaskPaginationToolNames())
             {
-                return state;
-            }
-
-            var baseKey = GetTaskPaginationBaseKey(context);
-            if (!string.Equals(baseKey, key, StringComparison.Ordinal))
-            {
-                state = await _cacheService.GetAsync<AITaskPaginationSessionState>(baseKey);
-                if (state != null)
+                var state = await GetTaskPaginationStateAsync(context, toolName);
+                if (state != null && (latestState == null || state.UpdatedAt > latestState.UpdatedAt))
                 {
-                    _logger.LogInformation(
-                        "[FOLLOWUP] Session key miss, fallback to base pagination state: baseKey={BaseKey}",
-                        baseKey);
-                    return state;
+                    latestState = state;
                 }
             }
 
-            return null;
+            return latestState;
         }
         catch (Exception ex)
         {
@@ -149,13 +182,40 @@ public partial class AIAgent
         }
     }
 
+    private async Task<AITaskPaginationSessionState?> GetTaskPaginationStateAsync(AIQueryContext context, string toolName)
+    {
+        var key = GetTaskPaginationSessionKey(context, toolName);
+        var state = await _cacheService.GetAsync<AITaskPaginationSessionState>(key);
+        if (state != null)
+        {
+            return state;
+        }
+
+        var baseKey = GetTaskPaginationBaseKey(context, toolName);
+        if (!string.Equals(baseKey, key, StringComparison.Ordinal))
+        {
+            state = await _cacheService.GetAsync<AITaskPaginationSessionState>(baseKey);
+            if (state != null)
+            {
+                _logger.LogInformation(
+                    "[FOLLOWUP] Session key miss, fallback to base pagination state: baseKey={BaseKey}",
+                    baseKey);
+                return state;
+            }
+        }
+
+        return null;
+    }
+
     private async Task SaveTaskPaginationStateIfNeededAsync(
         AIQueryContext context,
         string toolName,
         JsonObject parameters,
         AIQueryResult result)
     {
-        if (!toolName.Equals("get_tasks", StringComparison.OrdinalIgnoreCase))
+        if (!toolName.Equals("get_tasks", StringComparison.OrdinalIgnoreCase)
+            && !toolName.Equals("get_personal_tasks", StringComparison.OrdinalIgnoreCase)
+            && !toolName.Equals("get_personal_group_task", StringComparison.OrdinalIgnoreCase))
         {
             return;
         }
@@ -168,6 +228,7 @@ public partial class AIAgent
         int page = 0;
         int pageSize = 20;
         int totalPages = 1;
+        var normalizedToolName = toolName.Trim();
 
         if (result.Data.TryGetPropertyValue("current_page", out var pNode) && pNode != null)
         {
@@ -207,14 +268,15 @@ public partial class AIAgent
             LastPage = page,
             LastPageSize = pageSize,
             LastTotalPages = totalPages,
+            LastToolName = normalizedToolName,
             UpdatedAt = DateTime.UtcNow
         };
 
         try
         {
-            var key = GetTaskPaginationSessionKey(context);
+            var key = GetTaskPaginationSessionKey(context, normalizedToolName);
             await _cacheService.SetAsync(key, state, TimeSpan.FromMinutes(30));
-            var baseKey = GetTaskPaginationBaseKey(context);
+            var baseKey = GetTaskPaginationBaseKey(context, normalizedToolName);
             if (!string.Equals(baseKey, key, StringComparison.Ordinal))
             {
                 await _cacheService.SetAsync(baseKey, state, TimeSpan.FromMinutes(30));
@@ -255,17 +317,19 @@ public partial class AIAgent
             ["page_size"] = state.LastPageSize > 0 ? state.LastPageSize : 20
         };
 
-        _logger.LogInformation(
-            "[FOLLOWUP] Auto-call get_tasks for follow-up question={Question} with page={Page} pageSize={PageSize}",
-            userQuestion, nextPage, state.LastPageSize);
+        var followupToolName = string.IsNullOrWhiteSpace(state.LastToolName) ? "get_tasks" : state.LastToolName;
 
-        var result = await ExecuteToolAsync("get_tasks", followupParams, context, cancellationToken);
-        history.AddCall("get_tasks", followupParams, result);
-        await SaveTaskPaginationStateIfNeededAsync(context, "get_tasks", followupParams, result);
+        _logger.LogInformation(
+            "[FOLLOWUP] Auto-call {Tool} for follow-up question={Question} with page={Page} pageSize={PageSize}",
+            followupToolName, userQuestion, nextPage, state.LastPageSize);
+
+        var result = await ExecuteToolAsync(followupToolName, followupParams, context, cancellationToken);
+        history.AddCall(followupToolName, followupParams, result);
+        await SaveTaskPaginationStateIfNeededAsync(context, followupToolName, followupParams, result);
 
         reasoningSteps.Add(result.IsSuccess
-            ? $"[FOLLOWUP] Auto loaded get_tasks page={nextPage}, page_size={state.LastPageSize}"
-            : $"[FOLLOWUP] Auto get_tasks failed: {result.ErrorMessage}");
+            ? $"[FOLLOWUP] Auto loaded {followupToolName} page={nextPage}, page_size={state.LastPageSize}"
+            : $"[FOLLOWUP] Auto {followupToolName} failed: {result.ErrorMessage}");
     }
 
     private async Task AutoFetchDocumentContextAsync(
@@ -277,12 +341,17 @@ public partial class AIAgent
     {
         reasoningSteps.Add("[METHOD-A] Auto-fetching document context...");
 
+        var docListParams = new JsonObject
+        {
+            ["limit"] = JsonValue.Create(100)
+        };
+
         var docListResult = await ExecuteToolAsync(
             "get_group_documents",
-            new JsonObject(),
+            docListParams,
             context,
             cancellationToken);
-        history.AddCall("get_group_documents", new JsonObject(), docListResult);
+        history.AddCall("get_group_documents", docListParams, docListResult);
         reasoningSteps.Add($"[METHOD-A] get_group_documents: {(docListResult.IsSuccess ? "OK" : $"FAIL ({docListResult.ErrorMessage})")}");
         if (docListResult.IsSuccess)
         {
@@ -307,6 +376,12 @@ public partial class AIAgent
                 {
                     reasoningSteps.Add($"[METHOD-A] Matched {matchedDocIds.Count} document ID(s). Filtering Qdrant search...");
                     _logger.LogInformation("[AUTO-DOC] Matched documents: {Ids}", string.Join(",", matchedDocIds));
+                }
+                else
+                {
+                    reasoningSteps.Add($"[METHOD-A] No matching document found for '{mentionedDocNames[0]}'. Skip broad Qdrant search.");
+                    _logger.LogInformation("[AUTO-DOC] Named document not found in group docs. Skip search_documents. names={Names}", string.Join(",", mentionedDocNames));
+                    return;
                 }
             }
 

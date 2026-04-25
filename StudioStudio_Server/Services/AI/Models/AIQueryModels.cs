@@ -56,7 +56,7 @@ public class AIQueryResult
             if (prop.Value is JsonValue val && val.TryGetValue<int>(out _))
                 return $"{prop.Key}:{val}";
         }
-        return Data.ToString() ?? "empty";
+        return Data.ToString();
     }
 }
 
@@ -114,6 +114,7 @@ public class AITaskPaginationSessionState
     public int LastPage { get; set; }
     public int LastPageSize { get; set; } = 20;
     public int LastTotalPages { get; set; } = 1;
+    public string LastToolName { get; set; } = "";
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 }
 

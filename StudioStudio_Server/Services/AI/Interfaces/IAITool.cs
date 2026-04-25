@@ -24,6 +24,12 @@ namespace StudioStudio_Server.Services.AI.Interfaces
         /// </summary>
         JsonObject ParametersSchema { get; }
 
+        string? PlanningHint => null;
+
+        string? AnswerStyleHint => null;
+
+        string? OutputFormatHint => null;
+
         /// <summary>
         /// Thực thi tool với parameters
         /// </summary>

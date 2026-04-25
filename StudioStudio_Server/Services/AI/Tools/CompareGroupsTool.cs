@@ -1,7 +1,5 @@
 using System.Diagnostics;
-using System.Text.Json;
 using System.Text.Json.Nodes;
-using StudioStudio_Server.Models.Entities;
 using StudioStudio_Server.Repositories.Interfaces;
 using StudioStudio_Server.Services.AI.Interfaces;
 using StudioStudio_Server.Services.AI.Models;

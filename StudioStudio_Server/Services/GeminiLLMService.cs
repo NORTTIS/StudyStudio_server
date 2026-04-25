@@ -228,7 +228,7 @@ namespace StudioStudio_Server.Services
                     "get_personal_tasks", "get_personal_deadlines", "get_personal_stats",
                     // Studio/Owner tools
                     "get_studio_groups", "get_studio_analytics", "get_group_comparison",
-                    "get_storage_usage", "get_member_permissions", "get_risk_groups"
+                    "get_risk_groups", "get_studio_health", "compare_groups"
                 };
                 foreach (var t in knownTools)
                     toolNames.Add(JsonValue.Create(t));

@@ -40,6 +40,7 @@ public partial class AIAgent
         bool IsTaskIntent,
         bool IsDocumentIntent,
         bool IsFollowUp,
+        bool IsUnclearIntent,
         string Summary);
 
     protected sealed record AIFlowDecision(

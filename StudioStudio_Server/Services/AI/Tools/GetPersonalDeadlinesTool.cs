@@ -12,17 +12,18 @@ namespace StudioStudio_Server.Services.AI.Tools;
 /// </summary>
 public class GetPersonalDeadlinesTool(ITaskRepository taskRepository, ILogger<GetPersonalDeadlinesTool> logger) : IAITool
 {
-    private const int DefaultDaysAhead = 30;
+    private const int DefaultDaysAhead = 7;
+    private const int MaxDaysAhead = 365;
 
     public string Name => "get_personal_deadlines";
-    public string Description => $"Lay danh sach deadline cua cong viec ca nhan. Parameters: days_ahead (so ngay, default {DefaultDaysAhead}), limit (default 10). Khong can group_id.";
+    public string Description => $"Lay danh sach deadline cua cong viec ca nhan. Parameters: days_ahead (so ngay, default {DefaultDaysAhead}, max {MaxDaysAhead}), limit (default 10). Khong can group_id.";
 
     public JsonObject ParametersSchema => new JsonObject
     {
         ["type"] = "object",
         ["properties"] = new JsonObject
         {
-            ["days_ahead"] = new JsonObject { ["type"] = "number", ["description"] = $"So ngay de xem deadline (default {DefaultDaysAhead})" },
+            ["days_ahead"] = new JsonObject { ["type"] = "number", ["description"] = $"So ngay de xem deadline (default {DefaultDaysAhead}, max {MaxDaysAhead})" },
             ["limit"] = new JsonObject { ["type"] = "number", ["description"] = "So luong toi da (default 10)" }
         },
         ["required"] = new JsonArray()
@@ -40,6 +41,7 @@ public class GetPersonalDeadlinesTool(ITaskRepository taskRepository, ILogger<Ge
         {
             var daysAhead = Ji(parameters["days_ahead"]);
             if (daysAhead <= 0) daysAhead = DefaultDaysAhead;
+            if (daysAhead > MaxDaysAhead) daysAhead = MaxDaysAhead;
 
             var limit = Ji(parameters["limit"]);
             if (limit <= 0) limit = 10;
@@ -56,25 +58,47 @@ public class GetPersonalDeadlinesTool(ITaskRepository taskRepository, ILogger<Ge
             var overdueTasks = await taskRepository.GetPersonalTasksByOwnerWithDeadlineAsync(
                 context.UserId, now.AddDays(-30), now, 5);
 
-            var deadlines = deadlineTasks.Select(t => new JsonObject
+            var deadlines = deadlineTasks.Select(t =>
             {
-                ["task_id"] = t.TaskId.ToString(),
-                ["title"] = t.Title ?? "",
-                ["due_date"] = t.DueDate!.Value.ToString("yyyy-MM-dd HH:mm"),
-                ["days_remaining"] = (int)(t.DueDate.Value - now).TotalDays,
-                ["hours_remaining"] = (int)(t.DueDate.Value - now).TotalHours,
-                ["status"] = t.PersonalStatus?.StatusName ?? "Unknown",
-                ["priority"] = t.Priority.ToString()
+                var isCompleted = t.Progress >= 100;
+                return new JsonObject
+                {
+                    ["id"] = t.TaskId.ToString(),
+                    ["task_id"] = t.TaskId.ToString(),
+                    ["title"] = t.Title ?? "",
+                    ["status"] = t.PersonalStatus?.StatusName ?? "Unknown",
+                    ["priority"] = t.Priority.ToString(),
+                    ["severity"] = t.Severity.ToString(),
+                    ["due_date"] = t.DueDate!.Value.ToString("yyyy-MM-dd HH:mm"),
+                    ["is_overdue"] = false,
+                    ["is_completed"] = isCompleted,
+                    ["source"] = "personal",
+                    ["group_name"] = "",
+                    ["days_remaining"] = (int)(t.DueDate.Value - now).TotalDays,
+                    ["hours_remaining"] = (int)(t.DueDate.Value - now).TotalHours,
+                    ["assignee_name"] = ""
+                };
             }).ToList();
 
-            var overdue = overdueTasks.Select(t => new JsonObject
+            var overdue = overdueTasks.Select(t =>
             {
-                ["task_id"] = t.TaskId.ToString(),
-                ["title"] = t.Title ?? "",
-                ["due_date"] = t.DueDate!.Value.ToString("yyyy-MM-dd HH:mm"),
-                ["days_overdue"] = (int)(now - t.DueDate.Value).TotalDays,
-                ["status"] = t.PersonalStatus?.StatusName ?? "Unknown",
-                ["priority"] = t.Priority.ToString()
+                var isCompleted = t.Progress >= 100;
+                return new JsonObject
+                {
+                    ["id"] = t.TaskId.ToString(),
+                    ["task_id"] = t.TaskId.ToString(),
+                    ["title"] = t.Title ?? "",
+                    ["status"] = t.PersonalStatus?.StatusName ?? "Unknown",
+                    ["priority"] = t.Priority.ToString(),
+                    ["severity"] = t.Severity.ToString(),
+                    ["due_date"] = t.DueDate!.Value.ToString("yyyy-MM-dd HH:mm"),
+                    ["is_overdue"] = true,
+                    ["is_completed"] = isCompleted,
+                    ["source"] = "personal",
+                    ["group_name"] = "",
+                    ["days_overdue"] = (int)(now - t.DueDate.Value).TotalDays,
+                    ["assignee_name"] = ""
+                };
             }).ToList();
 
             sw.Stop();
@@ -86,6 +110,7 @@ public class GetPersonalDeadlinesTool(ITaskRepository taskRepository, ILogger<Ge
                 ["overdue_tasks"] = new JsonArray(overdue.ToArray()),
                 ["total_upcoming"] = deadlines.Count,
                 ["total_overdue"] = overdue.Count,
+                ["days_ahead"] = daysAhead,
                 ["date_range"] = new JsonObject
                 {
                     ["from"] = now.ToString("yyyy-MM-dd"),

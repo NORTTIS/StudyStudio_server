@@ -21,6 +21,9 @@ public class GetGroupRiskTool(
 {
     public string Name => "get_group_risk";
     public string Description => "Phan tich rui ro cua nhom hien tai. Khong can tham so - tu dong su dung GroupId tu context.";
+    public string? PlanningHint => "Dung tool nay khi user hoi muc do rui ro cua nhom hien tai, ly do nhom dang an toan hay dang gap van de, hoac can giai thich bang so lieu vi sao nhom co rui ro.";
+    public string? AnswerStyleHint => "Tra loi theo thu tu: so lieu truoc, danh gia sau. Neu ket luan nhom co rui ro, phai neu ro tung risk factor kem so lieu cu the, vi du ty le hoan thanh, so cong viec qua han, so thanh vien hoat dong. Khong mo dau bang cum mo ho nhu 'Da ro' hoac 'Minh hieu roi'.";
+    public string? OutputFormatHint => "Trinh bay ngan gon theo 3 phan: (1) tom tat so lieu chinh cua nhom, (2) danh gia muc do rui ro, (3) risk factors va goi y tiep theo. Khong hien thi risk score dang so hoc nhu 'diem rui ro: 40'. Khi liet ke risk factors, moi factor phai kem so lieu cu the giai thich tai sao no la rui ro.";
     public JsonObject ParametersSchema => new JsonObject
     {
         ["type"] = "object",
@@ -68,13 +71,84 @@ public class GetGroupRiskTool(
             var hasRecentActivity = recentActivity != null && (recentActivity.ActiveMembers > 0 || recentActivity.MessagesCount > 0 || recentActivity.CompletedTasks > 0);
             var recentMessages = recentActivity?.MessagesCount ?? 0;
             var recentActiveMembers = recentActivity?.ActiveMembers ?? 0;
+            var recentCompletedTasks = recentActivity?.CompletedTasks ?? 0;
 
             // Risk factors
             var riskFactors = new List<string>();
-            if (completionRate < 50) riskFactors.Add("Ty le hoan thanh thap");
-            else if (completionRate < 70) riskFactors.Add("Ty le hoan thanh chua tot");
-            if (overdueTasks > 0) riskFactors.Add($"Co {overdueTasks} cong viec qua han");
-            if (!hasRecentActivity) riskFactors.Add("Khong co hoat dong gan day");
+            var riskFactorDetails = new JsonArray();
+            if (completionRate < 50)
+            {
+                riskFactors.Add($"Ty le hoan thanh thap: {completedTasks}/{totalTasks} cong viec da hoan thanh ({completionRate}%), duoi nguong 50%");
+                riskFactorDetails.Add(new JsonObject
+                {
+                    ["factor"] = "completion_rate",
+                    ["severity"] = "high",
+                    ["reason"] = "Ty le hoan thanh thap",
+                    ["current_value"] = completionRate,
+                    ["unit"] = "percent",
+                    ["threshold"] = "< 50",
+                    ["evidence"] = $"{completedTasks}/{totalTasks} cong viec da hoan thanh trong nhom"
+                });
+            }
+            else if (completionRate < 70)
+            {
+                riskFactors.Add($"Ty le hoan thanh chua tot: {completedTasks}/{totalTasks} cong viec da hoan thanh ({completionRate}%), duoi muc ky vong 70%");
+                riskFactorDetails.Add(new JsonObject
+                {
+                    ["factor"] = "completion_rate",
+                    ["severity"] = "medium",
+                    ["reason"] = "Ty le hoan thanh chua tot",
+                    ["current_value"] = completionRate,
+                    ["unit"] = "percent",
+                    ["threshold"] = "< 70",
+                    ["evidence"] = $"{completedTasks}/{totalTasks} cong viec da hoan thanh trong nhom"
+                });
+            }
+
+            if (overdueTasks > 0)
+            {
+                riskFactors.Add($"Co {overdueTasks} cong viec qua han trong tong {pendingTasks} cong viec chua hoan thanh");
+                riskFactorDetails.Add(new JsonObject
+                {
+                    ["factor"] = "overdue_tasks",
+                    ["severity"] = overdueTasks >= 3 ? "high" : "medium",
+                    ["reason"] = "Cong viec qua han",
+                    ["current_value"] = overdueTasks,
+                    ["unit"] = "tasks",
+                    ["threshold"] = overdueTasks >= 3 ? ">= 3" : "> 0",
+                    ["evidence"] = $"{overdueTasks} cong viec qua han, {pendingTasks} cong viec chua hoan thanh"
+                });
+            }
+
+            if (!hasRecentActivity)
+            {
+                riskFactors.Add($"Khong co hoat dong dang ke trong 7 ngay gan day: {recentActiveMembers} thanh vien active, {recentMessages} tin nhan, {recentCompletedTasks} cong viec hoan thanh");
+                riskFactorDetails.Add(new JsonObject
+                {
+                    ["factor"] = "recent_activity",
+                    ["severity"] = "high",
+                    ["reason"] = "Khong co hoat dong gan day",
+                    ["current_value"] = 0,
+                    ["unit"] = "activity",
+                    ["threshold"] = "> 0",
+                    ["evidence"] = $"{recentActiveMembers} thanh vien active, {recentMessages} tin nhan, {recentCompletedTasks} cong viec hoan thanh trong 7 ngay"
+                });
+            }
+
+            if (pendingTasks > 10)
+            {
+                riskFactors.Add($"Ton dong nhieu cong viec: {pendingTasks} cong viec chua hoan thanh");
+                riskFactorDetails.Add(new JsonObject
+                {
+                    ["factor"] = "pending_tasks",
+                    ["severity"] = "medium",
+                    ["reason"] = "Luong cong viec ton dong cao",
+                    ["current_value"] = pendingTasks,
+                    ["unit"] = "tasks",
+                    ["threshold"] = "> 10",
+                    ["evidence"] = $"{pendingTasks} cong viec dang cho, chi {completedTasks} cong viec da hoan thanh"
+                });
+            }
 
             // Risk level
             var riskScore = 0;
@@ -109,11 +183,12 @@ public class GetGroupRiskTool(
                     ["completion_rate"] = completionRate,
                     ["recent_messages"] = recentMessages,
                     ["recent_active_members"] = recentActiveMembers,
+                    ["recent_completed_tasks"] = recentCompletedTasks,
                     ["has_recent_activity"] = hasRecentActivity
                 },
                 ["risk_level"] = riskLevel,
-                ["risk_score"] = riskScore,
                 ["risk_factors"] = new JsonArray(riskFactors.Select(f => JsonValue.Create(f)).ToArray()),
+                ["risk_factor_details"] = riskFactorDetails,
                 ["recommendations"] = new JsonArray(recommendations.Select(r => JsonValue.Create(r)).ToArray()),
                 ["generated_at"] = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss")
             }, sw.ElapsedMilliseconds);

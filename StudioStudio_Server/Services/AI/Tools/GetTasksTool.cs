@@ -14,7 +14,7 @@ public class GetTasksTool(
     IGroupParticipantRepository participantRepository,
     ILogger<GetTasksTool> logger) : IAITool
 {
-    private const int DefaultPageSize = 20;
+    private const int DefaultPageSize = 10;
     private const int MaxPageSize = 20;
 
     public string Name => "get_tasks";
@@ -208,6 +208,8 @@ public class GetTasksTool(
                 ["priority"] = t.Priority.ToString(),
                 ["progress"] = t.Progress,
                 ["group_id"] = t.GroupId.ToString(),
+                ["completed_at"] = t.CompletedAt?.ToString("yyyy-MM-dd HH:mm") ?? "",
+                ["task_description"] = t.Description ?? "",
                 ["due_date"] = t.DueDate?.ToString("yyyy-MM-dd HH:mm") ?? "",
                 ["assignee_name"] = t.Owner != null ? $"{t.Owner.FirstName} {t.Owner.LastName}".Trim() : "Unassigned",
                 ["is_completed"] = t.Progress >= 100,

@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
+using System.Text;
 using StudioStudio_Server.Services.AI.Models;
 
 
@@ -23,6 +24,23 @@ public partial class AIAgent
             var intent = AnalyzeIntent(userQuestion, context);
             reasoningSteps.Add($"[INTENT] {intent.Summary}");
 
+            if (intent.IsUnclearIntent)
+            {
+                var clarification = BuildClarificationQuestion(context);
+                reasoningSteps.Add("[INTENT] Unclear intent detected -> ask user to clarify");
+
+                return new AIAgentResult
+                {
+                    Answer = clarification,
+                    ReasoningSteps = reasoningSteps,
+                    ToolCalls = history.Calls,
+                    ProcessingTimeMs = sw.ElapsedMilliseconds,
+                    ToolCallCount = 0,
+                    Success = true,
+                    TokenUsage = _currentTokenUsage
+                };
+            }
+
             var paginationState = await GetTaskPaginationStateAsync(context);
             var isTaskFollowup = IsTaskPaginationFollowup(userQuestion);
 
@@ -34,11 +52,6 @@ public partial class AIAgent
             if (isTaskFollowup)
             {
                 await TryExecuteTaskFollowupAsync(userQuestion, context, history, reasoningSteps, paginationState, cancellationToken);
-            }
-
-            if (intent.IsDocumentIntent && !intent.IsTaskIntent)
-            {
-                await AutoFetchDocumentContextAsync(userQuestion, history, reasoningSteps, context, cancellationToken);
             }
 
             reasoningSteps.Add($"[ANALYZE] Question={userQuestion}");
@@ -84,7 +97,7 @@ public partial class AIAgent
                     continue;
                 }
 
-                var reviewed = await ReviewPlannedToolAsync(userQuestion, context, decision, cancellationToken);
+                var reviewed = await ReviewPlannedToolAsync(userQuestion, context, decision, history, cancellationToken);
                 decision.ToolParameters = reviewed.ToolParameters;
                 _logger.LogInformation(
                     "[AI-PARAM-REVIEW] state={State} tool={Tool} accepted={Accepted} note={Note} params={Params}",
@@ -112,6 +125,23 @@ public partial class AIAgent
                             ToolParameters = reviewed.SuggestedParameters
                         };
                         reasoningSteps.Add($"[REVIEW] Switching to suggested tool: {reviewed.SuggestedToolName}");
+                        continue;
+                    }
+
+                    if (reviewed.ToolParameters != null
+                        && IsNamedDocumentSearchWithoutResolvedId(userQuestion, decision, reviewed.ToolParameters))
+                    {
+                        reasoningSteps.Add("[REVIEW] Named document query still has no resolved document_id. Re-plan instead of broad search.");
+                        consecutiveDecideWithoutExec++;
+                        decision = await PlanNextActionAsync(
+                            userQuestion,
+                            systemPrompt,
+                            toolsManifest,
+                            history,
+                            context,
+                            cancellationToken,
+                            isContinuation: true,
+                            consecutiveDecideWithoutExecution: consecutiveDecideWithoutExec);
                         continue;
                     }
 
@@ -242,25 +272,6 @@ public partial class AIAgent
                 {
                     reasoningSteps.Add($"Tool '{decision.ToolName}' failed: {toolResult.ErrorMessage}");
 
-                    if (decision.ToolName == "search_documents" &&
-                        HasEmptyQuery(decision.ToolParameters!) &&
-                        history.Calls.Count(c => c.ToolName == "search_documents" && HasEmptyQuery(c.Parameters)) >= 2)
-                    {
-                        _logger.LogWarning(
-                            "[AI-DOCS-FIRST] search_documents failed {Count} times with empty query. "
-                            + "Redirecting to get_group_documents to get document list first.",
-                            history.Calls.Count(c => c.ToolName == "search_documents"));
-
-                        reasoningSteps.Add("Redirecting to get_group_documents - LLM does not know available documents");
-                        decision = new AgentDecision
-                        {
-                            ShouldCallTool = true,
-                            ToolName = "get_group_documents",
-                            ToolParameters = new System.Text.Json.Nodes.JsonObject()
-                        };
-                        continue;
-                    }
-
                     consecutiveDecideWithoutExec++;
                     decision = await DecideActionAsync(
                         userQuestion,
@@ -290,13 +301,19 @@ public partial class AIAgent
                 var synthesisSystemPrompt = BuildMarkdownSynthesisSystemPrompt(context.Language);
                 finalAnswer = await _llmService.GenerateTextResponseAsync(
                     synthesisSystemPrompt,
-                    decision.FinalAnswer,
+                    BuildPromptForSynthesis(decision.FinalAnswer, history),
                     string.Empty,
                     cancellationToken);
 
                 if (string.IsNullOrWhiteSpace(finalAnswer))
                 {
                     finalAnswer = decision.FinalAnswer;
+                }
+
+                if (history.Calls.Count == 0 && LooksLikePromptLeakage(finalAnswer))
+                {
+                    finalAnswer = BuildClarificationQuestion(context);
+                    reasoningSteps.Add("[GUARD] Prompt leakage detected with no tool data -> replaced with clarification question.");
                 }
 
                 _logger.LogInformation(
@@ -452,6 +469,27 @@ public partial class AIAgent
         var intent = AnalyzeIntent(userQuestion, context);
         reasoningSteps.Add($"[INTENT] {intent.Summary}");
 
+        if (intent.IsUnclearIntent)
+        {
+            var clarification = BuildClarificationQuestion(context);
+            reasoningSteps.Add("[INTENT] Unclear intent detected -> ask user to clarify");
+
+            chunks.Add(new AIStreamChunk
+            {
+                Type = "chunk",
+                Content = clarification
+            });
+            chunks.Add(new AIStreamChunk { Type = "done" });
+
+            return new AIStreamResult
+            {
+                ToolCount = 0,
+                ProcessingTimeMs = sw.ElapsedMilliseconds,
+                Chunks = chunks,
+                TokenUsage = _currentTokenUsage
+            };
+        }
+
         var paginationState = await GetTaskPaginationStateAsync(context);
         var isTaskFollowup = IsTaskPaginationFollowup(userQuestion);
 
@@ -459,11 +497,6 @@ public partial class AIAgent
         {
             reasoningSteps.Add("[FOLLOWUP] Detected task pagination follow-up. Use cached task state.");
             await TryExecuteTaskFollowupAsync(userQuestion, context, history, reasoningSteps, paginationState, cancellationToken);
-        }
-
-        if (intent.IsDocumentIntent && !intent.IsTaskIntent)
-        {
-            await AutoFetchDocumentContextAsync(userQuestion, history, reasoningSteps, context, cancellationToken);
         }
 
         reasoningSteps.Add($"[ANALYZE] Question={userQuestion}");
@@ -509,7 +542,7 @@ public partial class AIAgent
                 continue;
             }
 
-            var reviewed = await ReviewPlannedToolAsync(userQuestion, context, decision, cancellationToken);
+            var reviewed = await ReviewPlannedToolAsync(userQuestion, context, decision, history, cancellationToken);
             decision.ToolParameters = reviewed.ToolParameters;
 
             if (!reviewed.IsAccepted)
@@ -523,6 +556,22 @@ public partial class AIAgent
                         ToolName = reviewed.SuggestedToolName,
                         ToolParameters = reviewed.SuggestedParameters ?? reviewed.ToolParameters
                     };
+                    continue;
+                }
+
+                if (reviewed.ToolParameters != null
+                    && IsNamedDocumentSearchWithoutResolvedId(userQuestion, decision, reviewed.ToolParameters))
+                {
+                    reasoningSteps.Add("[REVIEW] Named document query still has no resolved document_id. Re-plan instead of broad search.");
+                    decision = await PlanNextActionAsync(
+                        userQuestion,
+                        systemPrompt,
+                        toolsManifest,
+                        history,
+                        context,
+                        cancellationToken,
+                        isContinuation: true,
+                        consecutiveDecideWithoutExecution: ++consecutiveDecideWithoutExec);
                     continue;
                 }
 
@@ -641,19 +690,6 @@ public partial class AIAgent
             {
                 reasoningSteps.Add($"Tool '{decision.ToolName}' failed: {toolResult.ErrorMessage}");
 
-                if (decision.ToolName == "search_documents" &&
-                    HasEmptyQuery(decision.ToolParameters!) &&
-                    history.Calls.Count(c => c.ToolName == "search_documents" && HasEmptyQuery(c.Parameters)) >= 2)
-                {
-                    decision = new AgentDecision
-                    {
-                        ShouldCallTool = true,
-                        ToolName = "get_group_documents",
-                        ToolParameters = new System.Text.Json.Nodes.JsonObject()
-                    };
-                    continue;
-                }
-
                 decision = await DecideActionAsync(
                     userQuestion,
                     systemPrompt,
@@ -674,19 +710,24 @@ public partial class AIAgent
             reasoningSteps.Add("[SYNTHESIS] Final answer from tool results - calling LLM to format response and suggest next steps");
 
             var synthesisSystemPrompt = BuildMarkdownSynthesisSystemPrompt(context.Language);
-            await foreach (var chunk in _llmService.GenerateAnswerStreamAsync(
+            var finalAnswer = await _llmService.GenerateTextResponseAsync(
                 synthesisSystemPrompt,
-                decision.FinalAnswer,
+                BuildPromptForSynthesis(decision.FinalAnswer, history),
                 string.Empty,
-                cancellationToken,
-                forceTextMode: true))
+                cancellationToken);
+
+            if (string.IsNullOrWhiteSpace(finalAnswer))
             {
-                if (!string.IsNullOrEmpty(chunk))
-                {
-                    chunks.Add(new AIStreamChunk { Type = "chunk", Content = chunk });
-                }
+                finalAnswer = decision.FinalAnswer;
             }
 
+            if (history.Calls.Count == 0 && LooksLikePromptLeakage(finalAnswer))
+            {
+                finalAnswer = BuildClarificationQuestion(context);
+                reasoningSteps.Add("[GUARD] Prompt leakage detected with no tool data -> replaced with clarification question.");
+            }
+
+            chunks.Add(new AIStreamChunk { Type = "chunk", Content = finalAnswer });
             chunks.Add(new AIStreamChunk { Type = "done" });
             return new AIStreamResult
             {
@@ -705,6 +746,7 @@ public partial class AIAgent
             "[LLM-STREAM] Starting streaming response. Question={Question}",
             userQuestion.Length > 50 ? userQuestion[..50] + "..." : userQuestion);
 
+        var streamedAnswerBuilder = new StringBuilder();
         await foreach (var chunk in _llmService.GenerateAnswerStreamAsync(
             systemPrompt,
             prompt,
@@ -714,8 +756,16 @@ public partial class AIAgent
         {
             if (!string.IsNullOrEmpty(chunk))
             {
-                    chunks.Add(new AIStreamChunk { Type = "chunk", Content = chunk });
+                chunks.Add(new AIStreamChunk { Type = "chunk", Content = chunk });
+                streamedAnswerBuilder.Append(chunk);
             }
+        }
+
+        if (history.Calls.Count == 0 && LooksLikePromptLeakage(streamedAnswerBuilder.ToString()))
+        {
+            chunks.Clear();
+            chunks.Add(new AIStreamChunk { Type = "chunk", Content = BuildClarificationQuestion(context) });
+            reasoningSteps.Add("[GUARD] Prompt leakage detected with no tool data -> replaced with clarification question.");
         }
 
         chunks.Add(new AIStreamChunk { Type = "done" });

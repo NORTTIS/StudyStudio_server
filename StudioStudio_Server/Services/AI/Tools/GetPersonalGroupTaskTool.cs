@@ -9,19 +9,19 @@ using StudioStudio_Server.Services.AI.Models;
 namespace StudioStudio_Server.Services.AI.Tools;
 
 /// <summary>
-/// Tool để lấy công việc cá nhân của user
+/// Tool để lấy công việc được assign từ các nhóm của user trong personal scope.
 /// Scope: Personal AI (UserId only)
 /// </summary>
-public class GetPersonalTasksTool(
+public class GetPersonalGroupTaskTool(
     ITaskRepository taskRepository,
-    ILogger<GetPersonalTasksTool> logger) : IAITool
+    ILogger<GetPersonalGroupTaskTool> logger) : IAITool
 {
     private const int DefaultPageSize = 10;
     private const int MaxPageSize = 20;
 
-    public string Name => "get_personal_tasks";
-    public string Description => "Lay danh sach cong viec ca nhan cua nguoi dung. Khong bao gom cong viec duoc assign tu nhom. Ho tro query/search de tim theo ten cong viec hoac mo ta.";
-    public string? PlanningHint => "Khi user hoi chi tiet cong viec ca nhan theo ten, tim task theo ten, hoac muon xem mot cong viec cu the trong danh sach cong viec ca nhan, hay dung query/search.";
+    public string Name => "get_personal_group_task";
+    public string Description => "Lay danh sach cong viec duoc assign tu tat ca cac nhom cua nguoi dung. Khong can group_id. Ho tro query/search de tim theo ten cong viec hoac mo ta.";
+    public string? PlanningHint => "Khi user hoi chi tiet cong viec duoc giao tu nhom theo ten, tim task theo ten, hoac muon xem mot cong viec cu the trong cac nhom, hay dung query/search.";
 
     public JsonObject ParametersSchema => new JsonObject
     {
@@ -83,30 +83,28 @@ public class GetPersonalTasksTool(
 
             var now = DateTime.UtcNow;
 
-            // Personal tasks with limit (OwnerId = userId, GroupId = null)
-            var personalTasks = await taskRepository.GetPersonalTasksByOwnerAsync(context.UserId);
+            var assignedTasks = await taskRepository.GetAssignedGroupTasksByUserAsync(context.UserId);
             if (!string.IsNullOrWhiteSpace(query))
             {
                 var normalizedQuery = NormalizeText(query).Trim();
-                personalTasks = personalTasks
+                assignedTasks = assignedTasks
                     .Where(t => MatchesSearch(t.Title, normalizedQuery) || MatchesSearch(t.Description, normalizedQuery))
                     .ToList();
             }
 
-            var totalPersonal = personalTasks.Count;
-            var totalPages = (int)Math.Ceiling(totalPersonal / (double)pageSize);
+            var totalAssigned = assignedTasks.Count;
+            var totalPages = (int)Math.Ceiling(totalAssigned / (double)pageSize);
             if (totalPages <= 0) totalPages = 1;
 
             if (page > totalPages) page = totalPages;
 
-            var pagedTasks = personalTasks
+            var pagedTasks = assignedTasks
                 .Skip((page - 1) * pageSize)
                 .Take(pageSize)
                 .ToList();
 
             var result = pagedTasks.Select(t =>
             {
-                // Dung Progress>=100 lam dinh nghia "hoan thanh" (thong nhat toan he thong)
                 var isCompleted = t.Progress >= 100;
 
                 return new JsonObject
@@ -114,15 +112,15 @@ public class GetPersonalTasksTool(
                     ["id"] = t.TaskId.ToString(),
                     ["title"] = t.Title,
                     ["description"] = t.Description ?? "",
-                    ["status"] = t.PersonalStatus?.StatusName ?? "Unknown",
+                    ["status"] = t.GroupStatus?.StatusName ?? "Unknown",
                     ["priority"] = t.Priority.ToString(),
                     ["progress"] = t.Progress,
                     ["due_date"] = t.DueDate?.ToString("yyyy-MM-dd HH:mm") ?? "",
                     ["is_completed"] = isCompleted,
                     ["completed_at"] = t.CompletedAt?.ToString("yyyy-MM-dd HH:mm") ?? "",
                     ["is_overdue"] = t.DueDate.HasValue && t.DueDate.Value < now && !isCompleted,
-                    ["source"] = "personal",
-                    ["group_name"] = "",
+                    ["source"] = "group",
+                    ["group_name"] = t.Group?.GroupName ?? "",
                     ["created_at"] = t.CreatedAt.ToString("yyyy-MM-dd HH:mm"),
                     ["severity"] = t.Severity.ToString(),
                     ["estimated_hours"] = t.EstimatedHours.HasValue ? JsonValue.Create(t.EstimatedHours.Value) : null,
@@ -140,9 +138,9 @@ public class GetPersonalTasksTool(
             return AIQueryResult.Success(new JsonObject
             {
                 ["tasks"] = tasksArray,
-                ["total"] = totalPersonal,
-                ["personal_count"] = totalPersonal,
-                ["group_count"] = 0,
+                ["total"] = totalAssigned,
+                ["group_count"] = totalAssigned,
+                ["personal_count"] = 0,
                 ["current_page"] = page,
                 ["page_size"] = pageSize,
                 ["total_pages"] = totalPages,
@@ -151,14 +149,14 @@ public class GetPersonalTasksTool(
                 ["returned"] = result.Count,
                 ["search_query"] = query ?? "",
                 ["summary"] = string.IsNullOrWhiteSpace(query)
-                    ? $"Ban co {totalPersonal} cong viec ca nhan. Hien thi {result.Count} / {totalPersonal} (trang {page}/{totalPages})."
-                    : $"Tim thay {totalPersonal} cong viec ca nhan phu hop voi tu khoa '{query}'. Hien thi {result.Count} / {totalPersonal} (trang {page}/{totalPages})."
+                    ? $"Ban co {totalAssigned} cong viec duoc assign tu cac nhom. Hien thi {result.Count} / {totalAssigned} (trang {page}/{totalPages})."
+                    : $"Tim thay {totalAssigned} cong viec duoc assign tu nhom phu hop voi tu khoa '{query}'. Hien thi {result.Count} / {totalAssigned} (trang {page}/{totalPages})."
             }, sw.ElapsedMilliseconds);
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "GetPersonalTasksTool error for UserId={UserId}", context.UserId);
-            return AIQueryResult.Error("Da xay ra loi khi lay danh sach cong viec.");
+            logger.LogError(ex, "GetPersonalGroupTaskTool error for UserId={UserId}", context.UserId);
+            return AIQueryResult.Error("Da xay ra loi khi lay danh sach cong viec tu nhom.");
         }
     }
 }

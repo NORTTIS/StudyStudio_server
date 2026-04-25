@@ -29,7 +29,6 @@ public static class AIServiceExtensions
         services.AddScoped<SearchStudioDocumentsTool>();
         services.AddScoped<GetStudioGroupsTool>();
         services.AddScoped<GetStudioAnalyticsTool>();
-        services.AddScoped<GetMemberPermissionsTool>();
         services.AddScoped<GetGroupDocumentsTool>();
         services.AddScoped<GetGroupPerformanceTool>();
         services.AddScoped<CompareGroupsTool>();
@@ -37,6 +36,7 @@ public static class AIServiceExtensions
         services.AddScoped<GetRiskGroupsTool>();
         services.AddScoped<GetGroupRiskTool>();
         services.AddScoped<GetPersonalTasksTool>();
+        services.AddScoped<GetPersonalGroupTaskTool>();
         services.AddScoped<GetPersonalDeadlinesTool>();
         services.AddScoped<GetPersonalStatsTool>();
 
@@ -63,7 +63,6 @@ public static class AIServiceExtensions
             typeof(SearchStudioDocumentsTool),
             typeof(GetStudioGroupsTool),
             typeof(GetStudioAnalyticsTool),
-            typeof(GetMemberPermissionsTool),
             typeof(GetGroupDocumentsTool),
             typeof(GetGroupPerformanceTool),
             typeof(CompareGroupsTool),
@@ -71,6 +70,7 @@ public static class AIServiceExtensions
             typeof(GetRiskGroupsTool),
             typeof(GetGroupRiskTool),
             typeof(GetPersonalTasksTool),
+            typeof(GetPersonalGroupTaskTool),
             typeof(GetPersonalDeadlinesTool),
             typeof(GetPersonalStatsTool)
         };

@@ -9,13 +9,14 @@ namespace StudioStudio_Server.Services.AI.Tools;
 public class GetMembersTool(IGroupParticipantRepository participantRepository, IUserRepository userRepository, ILogger<GetMembersTool> logger) : IAITool
 {
     public string Name => "get_members";
-    public string Description => "Lay danh sach thanh vien nhom. Khong can group_id (tu dong lay tu he thong). Optional: role (loc theo vai tro).";
+    public string Description => "Lay danh sach thanh vien cua nhom hien tai trong Group AI context. Khong can group_id (tu dong lay tu he thong). Optional: role (loc theo vai tro). Neu user chi dinh mot nhom khac nhu 'group 2' thi khong duoc map sang nhom hien tai.";
     public JsonObject ParametersSchema => new JsonObject
     {
         ["type"] = "object",
         ["properties"] = new JsonObject
         {
-            ["role"] = new JsonObject { ["type"] = "string", ["description"] = "Loc theo vai tro: Owner, Moderator, Member, Commenter, Viewer (optional)" }
+            ["role"] = new JsonObject { ["type"] = "string", ["description"] = "Loc theo vai tro: Owner, Moderator, Member, Commenter, Viewer (optional)" },
+            ["requested_group_reference"] = new JsonObject { ["type"] = "string", ["description"] = "System-inferred explicit group reference from the user's question. The LLM should not set this manually." }
         },
         ["required"] = new JsonArray()
     };
@@ -33,6 +34,13 @@ public class GetMembersTool(IGroupParticipantRepository participantRepository, I
 
             var groupId = context.GroupId.Value;
             var roleFilter = Js(parameters["role"]);
+            var requestedGroupReference = Js(parameters["requested_group_reference"]);
+
+            if (!string.IsNullOrWhiteSpace(requestedGroupReference))
+            {
+                return AIQueryResult.Error($"Ban dang chi dinh group '{requestedGroupReference}', nhung Group AI chi doc du lieu cua nhom hien tai trong context. Hay chuyen sang dung nhom do hoac dung Master AI neu ban muon xem nhom khac.");
+            }
+
             if (!await participantRepository.IsUserInGroupAsync(groupId, context.UserId))
                 return AIQueryResult.Error("Ban khong co quyen");
             var participants = await participantRepository.GetAllByGroupIdAsync(groupId);
