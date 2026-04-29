@@ -126,7 +126,7 @@ namespace StudioStudio_Server.Services
         /// Assign (change) role of member in group
         /// Validate:
         /// - Group must exist
-        /// - Only Owner can assign roles
+        /// - Only Owner/Moderator can assign roles
         /// - Cannot change your own role
         /// - Cannot assign Owner role (only 1 Owner allowed)
         /// - Only 1 Moderator allowed
@@ -150,7 +150,7 @@ namespace StudioStudio_Server.Services
                     StatusCodes.Status403Forbidden);
             }
 
-            await ValidateUserIsOwnerAsync(
+            await ValidateUserIsModeratorOrOwnerAsync(
                 request.GroupId,
                 currentUserId);
 
@@ -241,26 +241,6 @@ namespace StudioStudio_Server.Services
             if (participant == null ||
                 (participant.Role != GroupRole.Owner &&
                  participant.Role != GroupRole.Moderator))
-            {
-                throw new AppException(
-                    ErrorCodes.GroupPermissionDenied,
-                    StatusCodes.Status403Forbidden);
-            }
-
-            return participant;
-        }
-
-        /// <summary>
-        /// Validate user is Owner of group
-        /// </summary>
-        private async Task<GroupParticipant> ValidateUserIsOwnerAsync(
-            Guid groupId,
-            Guid userId)
-        {
-            var participant = await groupParticipantRepository
-                .GetByGroupAndUserAsync(groupId, userId);
-
-            if (participant == null || participant.Role != GroupRole.Owner)
             {
                 throw new AppException(
                     ErrorCodes.GroupPermissionDenied,
