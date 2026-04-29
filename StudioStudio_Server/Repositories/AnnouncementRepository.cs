@@ -58,20 +58,33 @@ namespace StudioStudio_Server.Repositories
         /// - Type 4-17: tất cả được mention, kèm IsRead
         /// Filter: PublishedAt must not be in the future
         /// </summary>
-        public async Task<List<Announcement>> GetAllForUserAsync(Guid userId)
+        public async Task<(List<Announcement> Announcements, int TotalCount)> GetAllForUserAsync(Guid userId, int page, int pageSize)
         {
-            return await context.Announcements
+            page = page <= 0 ? 1 : page;
+            pageSize = pageSize <= 0 ? 10 : pageSize;
+
+            var now = DateTime.UtcNow;
+
+            var query = context.Announcements
                 .Include(a => a.UserAnnouncements.Where(ua => ua.MentionedId == userId))
                 .Where(a => a.IsActive &&
-                       (a.PublishedAt == null || a.PublishedAt <= DateTime.UtcNow) &&
+                       (a.PublishedAt == null || a.PublishedAt <= now) &&
                        (
                     // Loại 1: Type 0-3
                     (a.Type >= AnnouncementType.Info && a.Type <= AnnouncementType.Promotion)
                     // Loại 2: Type 4-17 mà user được mention
                     || a.UserAnnouncements.Any(ua => ua.MentionedId == userId)))
+                .AsNoTracking();
+
+            var totalCount = await query.CountAsync();
+
+            var announcements = await query
                 .OrderByDescending(a => a.PublishedAt ?? a.CreatedAt)
-                .AsNoTracking()
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
                 .ToListAsync();
+
+            return (announcements, totalCount);
         }
 
 

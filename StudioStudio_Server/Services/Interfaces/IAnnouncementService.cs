@@ -7,7 +7,7 @@ namespace StudioStudio_Server.Services.Interfaces
     /// </summary>
     public interface IAnnouncementService
     {
-        Task<List<AnnouncementResponse>> GetAllActiveAnnouncementsAsync(Guid userId);
+        Task<AnnouncementListResponse> GetAllActiveAnnouncementsAsync(Guid userId, int page, int pageSize);
         Task<AnnouncementResponse> GetAnnouncementByIdAsync(Guid announcementId, Guid userId);
         Task MarkAnnouncementAsReadAsync(Guid announcementId, Guid userId);
         Task DeleteAnnouncementAsync(Guid announcementId, Guid userId);

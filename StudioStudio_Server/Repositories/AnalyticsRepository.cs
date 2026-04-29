@@ -551,7 +551,7 @@ namespace StudioStudio_Server.Repositories
                 .ToList();
         }
 
-        public async Task<List<(Guid? GroupId, Guid? TaskId, string Title, string GroupName, DateTime DueDate)>> GetUserOverdueTasksAsync(
+        public async Task<List<(Guid? GroupId, Guid? TaskId, string Title, string? GroupName, DateTime DueDate)>> GetUserOverdueTasksAsync(
             List<Guid> groupIds, Guid userId, int limit = 10)
         {
             var now = DateTime.UtcNow;
@@ -563,7 +563,7 @@ namespace StudioStudio_Server.Repositories
                     t.GroupId,
                     t.TaskId,
                     t.Title,
-                    GroupName = (string?)"Cá nhân",
+                    GroupName = (string?)null,
                     t.DueDate
                 })
                 .Take(limit)

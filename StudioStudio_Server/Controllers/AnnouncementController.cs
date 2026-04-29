@@ -55,13 +55,15 @@ namespace StudioStudio_Server.Controllers
         /// </summary>
         [HttpGet]
         [Authorize]
-        public async Task<ActionResult<ApiResponse<List<AnnouncementResponse>>>> GetAnnouncements()
+        public async Task<ActionResult<ApiResponse<AnnouncementListResponse>>> GetAnnouncements(
+            [FromQuery] int page = 1,
+            [FromQuery] int pageSize = 10)
         {
             var userId = ValidateAndGetUserId();
-            var response = await announcementService.GetAllActiveAnnouncementsAsync(userId);
+            var response = await announcementService.GetAllActiveAnnouncementsAsync(userId, page, pageSize);
             var message = messageService.GetMessage(ErrorCodes.SuccessGetData);
 
-            return Ok(ApiResponse<List<AnnouncementResponse>>.Success(
+            return Ok(ApiResponse<AnnouncementListResponse>.Success(
                 ErrorCodes.SuccessGetData,
                 message,
                 response));

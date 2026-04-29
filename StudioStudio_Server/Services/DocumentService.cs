@@ -26,9 +26,9 @@ namespace StudioStudio_Server.Services
     /// Flow: Request Upload → Upload to B2 → Complete → Queue → Background Processing → Qdrant
     /// </summary>
     public class DocumentService(
-        IGroupAttachmentRepository attachmentRepository,
+        IGroupAttachmentRepository attachmentRepo,
         IGroupParticipantRepository groupParticipantRepository,
-        IFileStorageService fileStorageService,
+        IFileStorageService storageService,
         IUserRepository userRepository,
         IEmbeddingQueue embeddingQueue,
         IDeleteQueue deleteQueue,
@@ -116,7 +116,7 @@ namespace StudioStudio_Server.Services
             long storageLimitBytes = storageLimit * 1024L * 1024L;
 
             // Get current storage used by group
-            long currentStorageUsed = await attachmentRepository.GetTotalStorageUsedByGroupAsync(request.GroupId);
+            long currentStorageUsed = await attachmentRepo.GetTotalStorageUsedByGroupAsync(request.GroupId);
 
             // Check if adding this file exceeds storage quota
             if (currentStorageUsed + request.FileSize > storageLimitBytes)
@@ -167,10 +167,10 @@ namespace StudioStudio_Server.Services
                 IsDeleted = false
             };
 
-            await attachmentRepository.CreateAsync(attachment);
+            await attachmentRepo.CreateAsync(attachment);
 
             // Generate presigned URL for frontend to upload directly to B2
-            string presignedUrl = await fileStorageService.GeneratePresignedUploadUrlAsync(
+            string presignedUrl = await storageService.GeneratePresignedUploadUrlAsync(
                 fileKey,
                 expirationMinutes: 60);
 
@@ -193,7 +193,7 @@ namespace StudioStudio_Server.Services
         /// </summary>
         public async Task CompleteUploadAsync(Guid userId, Guid attachmentId)
         {
-            GroupAttachment? attachment = await attachmentRepository.GetByIdAsync(attachmentId);
+            GroupAttachment? attachment = await attachmentRepo.GetByIdAsync(attachmentId);
 
             if (attachment == null || attachment.UploadedBy != userId)
             {
@@ -203,7 +203,7 @@ namespace StudioStudio_Server.Services
             }
 
             // Verify file was successfully uploaded to B2
-            bool fileExists = await fileStorageService.FileExistsAsync(attachment.FileUrl);
+            bool fileExists = await storageService.FileExistsAsync(attachment.FileUrl);
             if (!fileExists)
             {
                 throw new AppException(
@@ -212,7 +212,7 @@ namespace StudioStudio_Server.Services
 
             // Update status to Processing
             attachment.ProcessingStatus = DocumentStatus.Processing;
-            await attachmentRepository.UpdateAsync(attachment);
+            await attachmentRepo.UpdateAsync(attachment);
 
             // Estimate tokens based on file size
             // Rule of thumb: 1MB ≈ 20,000 characters ≈ 5,000 tokens
@@ -292,7 +292,7 @@ namespace StudioStudio_Server.Services
             IFileStorageService fileStorageService,
             IEmbeddingService embeddingService,
             IVectorDatabaseService vectorDbService,
-            ILogger logger)
+            ILogger log)
         {
             Stopwatch sw = Stopwatch.StartNew();
 
@@ -302,22 +302,22 @@ namespace StudioStudio_Server.Services
                 GroupAttachment? attachment = await attachmentRepository.GetByIdAsync(attachmentId);
                 if (attachment == null)
                 {
-                    logger.LogWarning("Attachment not found for processing: {AttachmentId}", attachmentId);
+                    log.LogWarning("Attachment not found for processing: {AttachmentId}", attachmentId);
                     return;
                 }
 
-                logger.LogInformation("Processing document: {AttachmentId}, File: {FileName}, Size: {FileSize} bytes",
+                log.LogInformation("Processing document: {AttachmentId}, File: {FileName}, Size: {FileSize} bytes",
                     attachmentId, attachment.FileName, attachment.FileSize);
 
                 // Download file from B2
-                logger.LogInformation("Downloading file from B2: {FileUrl}", attachment.FileUrl);
+                log.LogInformation("Downloading file from B2: {FileUrl}", attachment.FileUrl);
                 Stopwatch downloadSw = Stopwatch.StartNew();
                 Stream fileStream = await fileStorageService.DownloadFileAsync(attachment.FileUrl);
                 downloadSw.Stop();
-                logger.LogInformation("File downloaded in {Ms}ms", downloadSw.ElapsedMilliseconds);
+                log.LogInformation("File downloaded in {Ms}ms", downloadSw.ElapsedMilliseconds);
 
                 // Extract text from file
-                logger.LogInformation("Extracting text from {Extension} file", Path.GetExtension(attachment.FileName));
+                log.LogInformation("Extracting text from {Extension} file", Path.GetExtension(attachment.FileName));
                 Stopwatch extractSw = Stopwatch.StartNew();
                 string fullText = await ExtractTextAsync(fileStream, attachment.FileName);
                 extractSw.Stop();
@@ -326,7 +326,7 @@ namespace StudioStudio_Server.Services
                 // Validate extracted text
                 if (string.IsNullOrWhiteSpace(fullText))
                 {
-                    logger.LogWarning("Extracted text is empty for document: {AttachmentId}", attachmentId);
+                    log.LogWarning("Extracted text is empty for document: {AttachmentId}", attachmentId);
                     throw new InvalidOperationException("No text content could be extracted from the document");
                 }
 
@@ -335,7 +335,7 @@ namespace StudioStudio_Server.Services
                 int textLengthBytes = Encoding.UTF8.GetByteCount(fullText);
                 int estimatedTokens = EstimateTokenCount(fullText);
 
-                logger.LogInformation(
+                log.LogInformation(
                     "Text extraction completed in {Ms}ms. " +
                     "Text size: {Chars} characters, {Bytes} bytes, " +
                     "Estimated tokens: ~{Tokens} tokens (using 1 token ≈ 4 chars rule)",
@@ -345,7 +345,7 @@ namespace StudioStudio_Server.Services
                     estimatedTokens);
 
                 // Chunk text into smaller pieces (max 3000 chars ~ 750 tokens)
-                logger.LogInformation("Starting text chunking with max {MaxChars} chars per chunk", 3000);
+                log.LogInformation("Starting text chunking with max {MaxChars} chars per chunk", 3000);
                 Stopwatch chunkSw = Stopwatch.StartNew();
                 List<string> chunks = ChunkText(fullText, maxChars: 3000);
                 chunkSw.Stop();
@@ -362,7 +362,7 @@ namespace StudioStudio_Server.Services
                 int estimatedTokensPerChunk = avgChunkSize / 4;
                 int actualTotalTokens = chunks.Sum(c => c.Length / 4);
 
-                logger.LogInformation(
+                log.LogInformation(
                     "Text chunking completed in {Ms}ms. " +
                     "Total chunks: {ChunkCount}, " +
                     "Chunk size range: {Min}-{Max} chars, " +
@@ -377,12 +377,12 @@ namespace StudioStudio_Server.Services
                 // Validate chunks
                 if (chunks.Count == 0)
                 {
-                    logger.LogWarning("No chunks created for document: {AttachmentId}", attachmentId);
+                    log.LogWarning("No chunks created for document: {AttachmentId}", attachmentId);
                     throw new InvalidOperationException("Failed to create chunks from document text");
                 }
 
                 // Log detailed processing summary
-                logger.LogInformation(
+                log.LogInformation(
                     "Document processing summary:\n" +
                     "  Original file size: {FileSize} bytes\n" +
                     "  Extracted text: {TextChars} characters, {TextBytes} bytes ({TextTokens} estimated tokens)\n" +
@@ -403,7 +403,7 @@ namespace StudioStudio_Server.Services
                     chunks.Count);
 
                 // Generate embeddings for all chunks (sequential with progress updates)
-                logger.LogInformation("Starting embedding generation for {Count} chunks", chunks.Count);
+                log.LogInformation("Starting embedding generation for {Count} chunks", chunks.Count);
                 Stopwatch embeddingSw = Stopwatch.StartNew();
                 List<float[]> embeddings = new List<float[]>(chunks.Count);
 
@@ -423,7 +423,7 @@ namespace StudioStudio_Server.Services
                             i + 1,
                             chunks.Count);
 
-                        logger.LogInformation(
+                        log.LogInformation(
                             "Embedding progress: {Current}/{Total} ({Percent:F0}%)",
                             i + 1, chunks.Count, (i + 1) * 100.0 / chunks.Count);
                     }
@@ -434,19 +434,19 @@ namespace StudioStudio_Server.Services
                 // Validate embeddings
                 if (embeddings.Count != chunks.Count)
                 {
-                    logger.LogError("Embeddings count mismatch. Chunks: {ChunkCount}, Embeddings: {EmbeddingCount}",
+                    log.LogError("Embeddings count mismatch. Chunks: {ChunkCount}, Embeddings: {EmbeddingCount}",
                         chunks.Count, embeddings.Count);
                     throw new InvalidOperationException(
                         $"Embeddings count ({embeddings.Count}) does not match chunks count ({chunks.Count})");
                 }
 
-                logger.LogInformation(
+                log.LogInformation(
                     "Embedding generation completed in {Ms}ms. Average: {AvgMs}ms per chunk",
                     embeddingSw.ElapsedMilliseconds,
                     embeddingSw.ElapsedMilliseconds / chunks.Count);
 
                 // Upsert each chunk to Qdrant
-                logger.LogInformation("Starting vector upsert to Qdrant for {Count} chunks", chunks.Count);
+                log.LogInformation("Starting vector upsert to Qdrant for {Count} chunks", chunks.Count);
                 Stopwatch upsertSw = Stopwatch.StartNew();
 
                 for (int i = 0; i < chunks.Count; i++)
@@ -479,7 +479,7 @@ namespace StudioStudio_Server.Services
                 }
 
                 upsertSw.Stop();
-                logger.LogInformation(
+                log.LogInformation(
                     "Vector upsert completed in {Ms}ms. Average: {AvgMs}ms per vector",
                     upsertSw.ElapsedMilliseconds,
                     upsertSw.ElapsedMilliseconds / chunks.Count);
@@ -494,7 +494,7 @@ namespace StudioStudio_Server.Services
                 embeddingQueue.UpdateActualTokens(attachmentId, actualTotalTokens);
 
                 sw.Stop();
-                logger.LogInformation(
+                log.LogInformation(
                     "✅ Document processing completed successfully:\n" +
                     "  AttachmentId: {AttachmentId}\n" +
                     "  Total time: {TotalMs}ms ({TotalSeconds:F1}s)\n" +
@@ -514,7 +514,7 @@ namespace StudioStudio_Server.Services
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Failed to process document: {AttachmentId}", attachmentId);
+                log.LogError(ex, "Failed to process document: {AttachmentId}", attachmentId);
 
                 // Update status to Failed
                 GroupAttachment? attachment = await attachmentRepository.GetByIdAsync(attachmentId);
@@ -691,18 +691,15 @@ namespace StudioStudio_Server.Services
                     }
 
                     // Extract headers (all sections)
-                    if (wordDoc.MainDocumentPart.HeaderParts != null)
+                    foreach (var headerPart in wordDoc.MainDocumentPart.HeaderParts)
                     {
-                        foreach (var headerPart in wordDoc.MainDocumentPart.HeaderParts)
+                        if (headerPart.Header != null)
                         {
-                            if (headerPart.Header != null)
+                            string headerText = ExtractFromDocumentPartText(headerPart.Header);
+                            if (!string.IsNullOrWhiteSpace(headerText))
                             {
-                                string headerText = ExtractFromDocumentPartText(headerPart.Header);
-                                if (!string.IsNullOrWhiteSpace(headerText))
-                                {
-                                    text.AppendLine(headerText);
-                                    text.AppendLine();
-                                }
+                                text.AppendLine(headerText);
+                                text.AppendLine();
                             }
                         }
                     }
@@ -740,18 +737,15 @@ namespace StudioStudio_Server.Services
                     }
 
                     // FIX D: Extract footers (all sections)
-                    if (wordDoc.MainDocumentPart.FooterParts != null)
+                    foreach (var footerPart in wordDoc.MainDocumentPart.FooterParts)
                     {
-                        foreach (var footerPart in wordDoc.MainDocumentPart.FooterParts)
+                        if (footerPart.Footer != null)
                         {
-                            if (footerPart.Footer != null)
+                            string footerText = ExtractFromDocumentPartText(footerPart.Footer);
+                            if (!string.IsNullOrWhiteSpace(footerText))
                             {
-                                string footerText = ExtractFromDocumentPartText(footerPart.Footer);
-                                if (!string.IsNullOrWhiteSpace(footerText))
-                                {
-                                    text.AppendLine(footerText);
-                                    text.AppendLine();
-                                }
+                                text.AppendLine(footerText);
+                                text.AppendLine();
                             }
                         }
                     }
@@ -994,7 +988,7 @@ namespace StudioStudio_Server.Services
         /// </summary>
         public async Task<DocumentStatusResponse> GetDocumentStatusAsync(Guid userId, Guid attachmentId)
         {
-            GroupAttachment? attachment = await attachmentRepository.GetByIdAsync(attachmentId);
+            GroupAttachment? attachment = await attachmentRepo.GetByIdAsync(attachmentId);
 
             if (attachment == null)
             {
@@ -1018,35 +1012,16 @@ namespace StudioStudio_Server.Services
             // Check actual status from embedding queue
             var queueStatus = embeddingQueue.GetJobStatus(attachmentId);
 
-            // Calculate progress and status message
-            int? progress = null;
-            string message = string.Empty;
-
-            if (queueStatus != null)
-            {
-                // Job is in queue or being processed
-                progress = queueStatus.Status switch
+            int progress = queueStatus != null
+                ? queueStatus.Status switch
                 {
                     EmbeddingJobStatus.Queued => 10,
                     EmbeddingJobStatus.Processing when queueStatus.TotalChunks > 0 =>
                         10 + (int)((queueStatus.ProcessedChunks / (double)queueStatus.TotalChunks) * 90),
                     EmbeddingJobStatus.Completed => 100,
                     _ => 0
-                };
-
-                message = queueStatus.Status switch
-                {
-                    EmbeddingJobStatus.Queued => $"Queued for indexing (position: {embeddingQueue.GetQueueDepth()})",
-                    EmbeddingJobStatus.Processing => $"Indexing document ({queueStatus.ProcessedChunks}/{queueStatus.TotalChunks} chunks)",
-                    EmbeddingJobStatus.Completed => "Indexing completed",
-                    EmbeddingJobStatus.Failed => $"Indexing failed: {queueStatus.ErrorMessage}",
-                    _ => "Unknown status"
-                };
-            }
-            else
-            {
-                // If not found, use status from database
-                progress = attachment.ProcessingStatus switch
+                }
+                : attachment.ProcessingStatus switch
                 {
                     DocumentStatus.Uploading => 5,
                     DocumentStatus.Processing => 50,
@@ -1054,7 +1029,16 @@ namespace StudioStudio_Server.Services
                     _ => 0
                 };
 
-                message = attachment.ProcessingStatus switch
+            string message = queueStatus != null
+                ? queueStatus.Status switch
+                {
+                    EmbeddingJobStatus.Queued => $"Queued for indexing (position: {embeddingQueue.GetQueueDepth()})",
+                    EmbeddingJobStatus.Processing => $"Indexing document ({queueStatus.ProcessedChunks}/{queueStatus.TotalChunks} chunks)",
+                    EmbeddingJobStatus.Completed => "Indexing completed",
+                    EmbeddingJobStatus.Failed => $"Indexing failed: {queueStatus.ErrorMessage}",
+                    _ => "Unknown status"
+                }
+                : attachment.ProcessingStatus switch
                 {
                     DocumentStatus.Uploading => "Waiting for file upload",
                     DocumentStatus.Processing => $"Processing ({attachment.ChunkCount ?? 0} chunks)",
@@ -1062,7 +1046,6 @@ namespace StudioStudio_Server.Services
                     DocumentStatus.Failed => "Processing failed",
                     _ => "Unknown status"
                 };
-            }
 
             return new DocumentStatusResponse
             {
@@ -1096,7 +1079,7 @@ namespace StudioStudio_Server.Services
             }
 
             // Get all attachments for the group
-            List<GroupAttachment> attachments = await attachmentRepository.GetByGroupIdAsync(groupId);
+            List<GroupAttachment> attachments = await attachmentRepo.GetByGroupIdAsync(groupId);
 
             // Get uploader information
             List<Guid> uploaderIds = attachments.Select(a => a.UploadedBy).Distinct().ToList();
@@ -1142,7 +1125,7 @@ namespace StudioStudio_Server.Services
         /// </summary>
         public async Task DeleteDocumentAsync(Guid userId, Guid attachmentId)
         {
-            GroupAttachment? attachment = await attachmentRepository.GetByIdAsync(attachmentId);
+            GroupAttachment? attachment = await attachmentRepo.GetByIdAsync(attachmentId);
 
             if (attachment == null)
             {
@@ -1163,52 +1146,16 @@ namespace StudioStudio_Server.Services
                     StatusCodes.Status403Forbidden);
             }
 
-            // Delete B2 blob file
-            try
-            {
-                await fileStorageService.DeleteFileAsync(attachment.FileUrl);
-                logger.LogInformation(
-                    "B2 blob deleted: AttachmentId={AttachmentId}, FileKey={FileKey}",
-                    attachmentId, attachment.FileUrl);
-            }
-            catch (Exception ex)
-            {
-                logger.LogWarning(ex,
-                    "Failed to delete B2 blob for AttachmentId={AttachmentId}. Continuing with deletion.",
-                    attachmentId);
-            }
-
-            // Enqueue delete job for background processing (if document was processed)
-            if (attachment.ChunkCount.HasValue && attachment.ChunkCount.Value > 0)
-            {
-                var deleteJob = new DeleteJob
-                {
-                    AttachmentId = attachmentId,
-                    GroupId = attachment.GroupId,
-                    UserId = userId,
-                    FileName = attachment.FileName,
-                    ChunkCount = attachment.ChunkCount.Value,
-                    QueuedAt = DateTime.UtcNow,
-                    RetryCount = 0,
-                    MaxRetries = 3
-                };
-
-                await deleteQueue.EnqueueAsync(deleteJob);
-
-                logger.LogInformation(
-                    "Document deletion queued: AttachmentId={AttachmentId}, " +
-                    "ChunkCount={ChunkCount}, Queue depth={Depth}",
-                    attachmentId, attachment.ChunkCount, deleteQueue.GetQueueDepth());
-            }
+            await DeleteDocumentExternalDataAsync(attachment, userId);
 
             // Hard-delete DB record
-            await attachmentRepository.HardDeleteAsync(attachmentId);
+            await attachmentRepo.HardDeleteAsync(attachmentId);
 
             // Invalidate AI document cache so AI sees fresh document data immediately
             try
             {
                 await cacheService.InvalidateAIDocumentCacheAsync(userId, attachment.GroupId, null);
-                await cacheService.InvalidateAIDocumentCacheForGroupAsync(attachment.GroupId, null);
+                await cacheService.InvalidateAIDocumentCacheForGroupAsync(attachment.GroupId);
             }
             catch (Exception ex)
             {
@@ -1223,12 +1170,125 @@ namespace StudioStudio_Server.Services
         }
 
         /// <summary>
+        /// Delete third-party document assets and hard-delete attachment records.
+        /// Removes the B2 blob and enqueues Qdrant vector deletion when applicable.
+        /// </summary>
+        public async Task DeleteDocumentsExternalDataAsync(IEnumerable<Guid> groupIds)
+        {
+            List<Guid> distinctGroupIds = groupIds
+                .Where(groupId => groupId != Guid.Empty)
+                .Distinct()
+                .ToList();
+
+            foreach (Guid groupId in distinctGroupIds)
+            {
+                List<GroupAttachment> attachments = await attachmentRepo.GetByGroupIdAsync(groupId);
+
+                foreach (GroupAttachment attachment in attachments)
+                {
+                    await DeleteDocumentExternalDataAsync(attachment, attachment.UploadedBy, hardDeleteRecord: true, invalidateGroupCache: false);
+                }
+
+                try
+                {
+                    await cacheService.InvalidateAIDocumentCacheForGroupAsync(groupId);
+                }
+                catch (Exception ex)
+                {
+                    logger.LogWarning(ex, "Failed to invalidate AI document cache for group {GroupId}", groupId);
+                }
+            }
+        }
+
+        private async Task DeleteDocumentExternalDataAsync(
+            GroupAttachment attachment,
+            Guid userId,
+            bool hardDeleteRecord = false,
+            bool invalidateGroupCache = true)
+        {
+            // Delete B2 blob file
+            try
+            {
+                await storageService.DeleteFileAsync(attachment.FileUrl);
+                logger.LogInformation(
+                    "B2 blob deleted: AttachmentId={AttachmentId}, FileKey={FileKey}",
+                    attachment.GroupAttachmentId, attachment.FileUrl);
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex,
+                    "Failed to delete B2 blob for AttachmentId={AttachmentId}. Continuing with cleanup.",
+                    attachment.GroupAttachmentId);
+            }
+
+            // Enqueue delete job for background processing (if document was processed)
+            if (attachment.ChunkCount.HasValue && attachment.ChunkCount.Value > 0)
+            {
+                var deleteJob = new DeleteJob
+                {
+                    AttachmentId = attachment.GroupAttachmentId,
+                    GroupId = attachment.GroupId,
+                    UserId = userId,
+                    FileName = attachment.FileName,
+                    ChunkCount = attachment.ChunkCount.Value,
+                    QueuedAt = DateTime.UtcNow,
+                    RetryCount = 0,
+                    MaxRetries = 3
+                };
+
+                try
+                {
+                    await deleteQueue.EnqueueAsync(deleteJob);
+
+                    logger.LogInformation(
+                        "Document deletion queued: AttachmentId={AttachmentId}, ChunkCount={ChunkCount}, Queue depth={Depth}",
+                        attachment.GroupAttachmentId,
+                        attachment.ChunkCount,
+                        deleteQueue.GetQueueDepth());
+                }
+                catch (Exception ex)
+                {
+                    logger.LogWarning(
+                        ex,
+                        "Failed to queue Qdrant deletion for AttachmentId={AttachmentId}",
+                        attachment.GroupAttachmentId);
+                }
+            }
+
+            if (invalidateGroupCache)
+            {
+                try
+                {
+                    await cacheService.InvalidateAIDocumentCacheForGroupAsync(attachment.GroupId);
+                }
+                catch (Exception ex)
+                {
+                    logger.LogWarning(
+                        ex,
+                        "Failed to invalidate AI document cache after asset cleanup: AttachmentId={AttachmentId}, GroupId={GroupId}",
+                        attachment.GroupAttachmentId,
+                        attachment.GroupId);
+                }
+            }
+
+            logger.LogInformation(
+                "Document assets deleted: AttachmentId={AttachmentId}, FileSize={FileSize}",
+                attachment.GroupAttachmentId,
+                attachment.FileSize);
+
+            if (hardDeleteRecord)
+            {
+                await attachmentRepo.HardDeleteAsync(attachment.GroupAttachmentId);
+            }
+        }
+
+        /// <summary>
         /// Generate presigned download URL for document
         /// Validates user permission before generating URL
         /// </summary>
         public async Task<string> GetDocumentDownloadUrlAsync(Guid userId, Guid attachmentId, int expirationMinutes = 60)
         {
-            GroupAttachment? attachment = await attachmentRepository.GetByIdAsync(attachmentId);
+            GroupAttachment? attachment = await attachmentRepo.GetByIdAsync(attachmentId);
 
             if (attachment == null || attachment.IsDeleted)
             {
@@ -1250,7 +1310,7 @@ namespace StudioStudio_Server.Services
             }
 
             // Generate presigned download URL
-            string downloadUrl = await fileStorageService.GeneratePresignedDownloadUrlAsync(
+            string downloadUrl = await storageService.GeneratePresignedDownloadUrlAsync(
                 attachment.FileUrl,
                 expirationMinutes);
 

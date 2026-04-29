@@ -1,6 +1,5 @@
 using Microsoft.EntityFrameworkCore;
 using StudioStudio_Server.Data;
-using StudioStudio_Server.Repositories.Interfaces;
 
 namespace StudioStudio_Server.Services.BackgroundServices
 {
@@ -14,6 +13,11 @@ namespace StudioStudio_Server.Services.BackgroundServices
     {
         private static readonly TimeSpan Interval = TimeSpan.FromMinutes(10);
 
+        private sealed record GroupTaskSnapshot(
+            int TotalTasks,
+            int CompletedTasks,
+            int OverdueTasks);
+
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
             logger.LogInformation("Group Analytics Job started");
@@ -26,73 +30,125 @@ namespace StudioStudio_Server.Services.BackgroundServices
 
                     using var scope = serviceProvider.CreateScope();
                     var context = scope.ServiceProvider.GetRequiredService<StudioDbContext>();
-                    var analyticsRepository = scope.ServiceProvider
-                        .GetRequiredService<IAnalyticsRepository>();
 
                     logger.LogInformation("Starting group analytics aggregation...");
 
                     var to = DateTime.UtcNow;
                     var from = to.AddMinutes(-10);
-                    var today = DateOnly.FromDateTime(DateTime.UtcNow);
+                    var today = DateOnly.FromDateTime(to);
 
                     // Get all active, non-archived groups and studios
                     var groups = await context.Groups
                         .Where(g => g.IsActive && !g.IsArchived && (g.StudioId == null || !g.Studio!.IsArchived))
                         .Select(g => g.GroupId)
-                        .ToListAsync();
+                        .ToListAsync(stoppingToken);
+
+                    if (groups.Count == 0)
+                    {
+                        logger.LogInformation("No active groups found for group analytics aggregation");
+                        continue;
+                    }
+
+                    var taskMetrics = await context.Tasks
+                        .AsNoTracking()
+                        .Where(t => t.GroupId.HasValue && groups.Contains(t.GroupId.Value))
+                        .GroupBy(t => t.GroupId!.Value)
+                        .Select(g => new
+                        {
+                            GroupId = g.Key,
+                            TotalTasks = g.Count(),
+                            CompletedTasks = g.Count(t => t.Progress == 100),
+                            OverdueTasks = g.Count(t => t.DueDate.HasValue && t.DueDate.Value < to && t.Progress < 100)
+                        })
+                        .ToDictionaryAsync(x => x.GroupId, x => new GroupTaskSnapshot(
+                            x.TotalTasks,
+                            x.CompletedTasks,
+                            x.OverdueTasks), stoppingToken);
+
+                    var activeMembersByGroup = await context.ActivityLogs
+                        .AsNoTracking()
+                        .Where(a => a.GroupId.HasValue && groups.Contains(a.GroupId.Value) &&
+                                    a.CreatedAt >= from && a.CreatedAt <= to)
+                        .GroupBy(a => a.GroupId!.Value)
+                        .Select(g => new
+                        {
+                            GroupId = g.Key,
+                            Count = g.Select(x => x.UserId).Distinct().Count()
+                        })
+                        .ToDictionaryAsync(x => x.GroupId, x => x.Count, stoppingToken);
+
+                    var messagesByGroup = await context.GroupMessages
+                        .AsNoTracking()
+                        .Where(m => groups.Contains(m.GroupId) && m.CreatedAt >= from && m.CreatedAt <= to)
+                        .GroupBy(m => m.GroupId)
+                        .Select(g => new
+                        {
+                            GroupId = g.Key,
+                            Count = g.Count()
+                        })
+                        .ToDictionaryAsync(x => x.GroupId, x => x.Count, stoppingToken);
+
+                    var commentsByGroup = await context.TaskComments
+                        .AsNoTracking()
+                        .Where(c => c.CreatedAt >= from && c.CreatedAt <= to)
+                        .Join(
+                            context.Tasks.AsNoTracking(),
+                            comment => comment.TaskId,
+                            task => task.TaskId,
+                            (comment, task) => new { comment, task })
+                        .Where(x => x.task.GroupId.HasValue && groups.Contains(x.task.GroupId.Value))
+                        .GroupBy(x => x.task.GroupId!.Value)
+                        .Select(g => new
+                        {
+                            GroupId = g.Key,
+                            Count = g.Count()
+                        })
+                        .ToDictionaryAsync(x => x.GroupId, x => x.Count, stoppingToken);
+
+                    var existingAnalytics = await context.GroupAnalytics
+                        .Where(x => groups.Contains(x.GroupId) && x.Date == today)
+                        .ToDictionaryAsync(x => x.GroupId, stoppingToken);
 
                     foreach (var groupId in groups)
                     {
-                        // Get group metrics
-                        var totalTasks = await context.Tasks
-                            .Where(t => t.GroupId == groupId)
-                            .CountAsync();
+                        var taskSnapshot = taskMetrics.GetValueOrDefault(groupId, new GroupTaskSnapshot(0, 0, 0));
+                        var activeMembers = activeMembersByGroup.GetValueOrDefault(groupId, 0);
+                        var messagesCount = messagesByGroup.GetValueOrDefault(groupId, 0);
+                        var commentsCount = commentsByGroup.GetValueOrDefault(groupId, 0);
 
-                        var completedTasks = await context.Tasks
-                            .Where(t => t.GroupId == groupId && t.Progress == 100)
-                            .CountAsync();
-
-                        var overdueTasks = await context.Tasks
-                            .Where(t => t.GroupId == groupId && t.DueDate < to && t.Progress < 100)
-                            .CountAsync();
-
-                        // Get active members (users who performed activities in the period)
-                        var activeMembers = await context.ActivityLogs
-                            .Where(a => a.GroupId == groupId && a.CreatedAt >= from && a.CreatedAt <= to)
-                            .Select(a => a.UserId)
-                            .Distinct()
-                            .CountAsync();
-
-                        // Get messages count
-                        var messagesCount = await context.GroupMessages
-                            .Where(m => m.GroupId == groupId && m.CreatedAt >= from && m.CreatedAt <= to)
-                            .CountAsync();
-
-                        // Get comments count
-                        var commentsCount = await context.TaskComments
-                            .Where(c => c.Task.GroupId == groupId && c.CreatedAt >= from && c.CreatedAt <= to)
-                            .CountAsync();
-
-                        var completionRate = totalTasks > 0
-                            ? Math.Round((double)completedTasks / totalTasks * 100, 2)
+                        var completionRate = taskSnapshot.TotalTasks > 0
+                            ? Math.Round((double)taskSnapshot.CompletedTasks / taskSnapshot.TotalTasks * 100, 2)
                             : 0;
 
-                        var analytics = new Models.Entities.GroupAnalytics
+                        if (existingAnalytics.TryGetValue(groupId, out var existing))
+                        {
+                            existing.TotalTasks = taskSnapshot.TotalTasks;
+                            existing.CompletedTasks = taskSnapshot.CompletedTasks;
+                            existing.OverdueTasks = taskSnapshot.OverdueTasks;
+                            existing.ActiveMembers = activeMembers;
+                            existing.MessagesCount = messagesCount;
+                            existing.CommentsCount = commentsCount;
+                            existing.CompletionRate = completionRate;
+                            existing.UpdatedAt = DateTime.UtcNow;
+                            continue;
+                        }
+
+                        context.GroupAnalytics.Add(new Models.Entities.GroupAnalytics
                         {
                             Id = Guid.NewGuid(),
                             GroupId = groupId,
                             Date = today,
-                            TotalTasks = totalTasks,
-                            CompletedTasks = completedTasks,
-                            OverdueTasks = overdueTasks,
+                            TotalTasks = taskSnapshot.TotalTasks,
+                            CompletedTasks = taskSnapshot.CompletedTasks,
+                            OverdueTasks = taskSnapshot.OverdueTasks,
                             ActiveMembers = activeMembers,
                             MessagesCount = messagesCount,
                             CommentsCount = commentsCount,
                             CompletionRate = completionRate
-                        };
-
-                        await analyticsRepository.UpsertGroupAnalyticsAsync(analytics);
+                        });
                     }
+
+                    await context.SaveChangesAsync(stoppingToken);
 
                     logger.LogInformation("Group analytics aggregation completed. Processed {Count} groups", groups.Count);
                 }

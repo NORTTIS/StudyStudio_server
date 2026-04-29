@@ -1,8 +1,5 @@
 using Microsoft.AspNetCore.Hosting;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Logging;
 using Moq;
 using StudioStudio_Server.Exceptions;
 using StudioStudio_Server.Models.DTOs.Request;
@@ -11,9 +8,7 @@ using StudioStudio_Server.Models.Enums;
 using StudioStudio_Server.Repositories.Interfaces;
 using StudioStudio_Server.Services;
 using StudioStudio_Server.Services.Interfaces;
-using Xunit;
-
-namespace StudioStudio_Server.Tests.Services
+namespace StudyStudio_TestServer.Services
 {
     /// <summary>
     /// Unit tests cho UserService.
@@ -24,13 +19,13 @@ namespace StudioStudio_Server.Tests.Services
     {
         private readonly Mock<IUserRepository> _userRepoMock;
         private readonly Mock<IPasswordHasher<User>> _passwordHasherMock;
-        private readonly Mock<IConfiguration> _configMock;
-        private readonly Mock<IHttpContextAccessor> _httpContextAccessorMock;
-        private readonly Mock<IWebHostEnvironment> _environmentMock;
+        private readonly Mock<IStudioRepository> _studioRepositoryMock;
+        private readonly Mock<IGroupRepository> _groupRepositoryMock;
+        private readonly Mock<IDocumentService> _documentServiceMock;
         private readonly Mock<IUserSubscriptionRepository> _subscriptionRepoMock;
         private readonly Mock<IAIRequestLogRepository> _aiRequestLogRepoMock;
         private readonly Mock<ICacheService> _cacheServiceMock;
-        private UserService _service = null!;
+        private readonly UserService _service;
 
         private readonly Guid _userId = Guid.NewGuid();
 
@@ -38,12 +33,13 @@ namespace StudioStudio_Server.Tests.Services
         {
             _userRepoMock = new Mock<IUserRepository>();
             _passwordHasherMock = new Mock<IPasswordHasher<User>>();
-            _configMock = new Mock<IConfiguration>();
-            _httpContextAccessorMock = new Mock<IHttpContextAccessor>();
-            _environmentMock = new Mock<IWebHostEnvironment>();
+            _studioRepositoryMock = new Mock<IStudioRepository>();
+            _groupRepositoryMock = new Mock<IGroupRepository>();
+            _documentServiceMock = new Mock<IDocumentService>();
             _subscriptionRepoMock = new Mock<IUserSubscriptionRepository>();
             _aiRequestLogRepoMock = new Mock<IAIRequestLogRepository>();
             _cacheServiceMock = new Mock<ICacheService>();
+            var environmentMock = new Mock<IWebHostEnvironment>();
 
             // Setup cache key methods
             _cacheServiceMock.Setup(x => x.GetUserProfileKey(_userId))
@@ -53,24 +49,13 @@ namespace StudioStudio_Server.Tests.Services
             _cacheServiceMock.Setup(x => x.GetExpirationForKey(It.IsAny<string>()))
                 .Returns(TimeSpan.FromMinutes(5));
 
-            // Setup GetOrSetAsync to call factory when cache miss (User version)
-            _cacheServiceMock.Setup(x => x.GetOrSetAsync(
-                    It.IsAny<string>(),
-                    It.IsAny<Func<Task<User>>>(),
-                    It.IsAny<TimeSpan?>()))
-                .Returns(async (string key, Func<Task<User>> factory, TimeSpan? exp) => await factory());
-
-            // Setup GetOrSetAsync for SubscriptionPlan version
-            _cacheServiceMock.Setup(x => x.GetOrSetAsync(
-                    It.IsAny<string>(),
-                    It.IsAny<Func<Task<SubscriptionPlan>>>(),
-                    It.IsAny<TimeSpan?>()))
-                .Returns(async (string key, Func<Task<SubscriptionPlan>> factory, TimeSpan? exp) => await factory());
-
             _service = new UserService(
                 _userRepoMock.Object,
                 _passwordHasherMock.Object,
-                _environmentMock.Object,
+                environmentMock.Object,
+                _studioRepositoryMock.Object,
+                _groupRepositoryMock.Object,
+                _documentServiceMock.Object,
                 _subscriptionRepoMock.Object,
                 _aiRequestLogRepoMock.Object,
                 _cacheServiceMock.Object);
@@ -217,10 +202,28 @@ namespace StudioStudio_Server.Tests.Services
                 LastName = "Doe",
                 Status = UserStatus.Active
             };
+            var ownedStudio = new Studio { StudioId = Guid.NewGuid(), OwnerId = _userId, IsArchived = false };
+            var studioGroup = new Group { GroupId = Guid.NewGuid(), CreatedBy = Guid.NewGuid(), StudioId = ownedStudio.StudioId, IsArchived = false };
+            var standaloneGroup = new Group { GroupId = Guid.NewGuid(), CreatedBy = _userId, StudioId = null, IsArchived = false };
+
             _userRepoMock.Setup(x => x.GetByIdIncludingDeletedAsync(_userId))
                 .ReturnsAsync(user);
             _passwordHasherMock.Setup(x => x.HashPassword(user, It.IsAny<string>()))
                 .Returns("hashed_password");
+            _studioRepositoryMock.Setup(x => x.GetByOwnerIdAsync(_userId))
+                .ReturnsAsync(new List<Studio> { ownedStudio });
+            _studioRepositoryMock.Setup(x => x.UpdateStudioAsync(ownedStudio))
+                .Returns(Task.CompletedTask);
+            _groupRepositoryMock.Setup(x => x.GetStudioGroupsAsync(ownedStudio.StudioId))
+                .ReturnsAsync(new List<Group> { studioGroup });
+            _groupRepositoryMock.Setup(x => x.GetByCreatedByAsync(_userId))
+                .ReturnsAsync(new List<Group> { standaloneGroup });
+            _groupRepositoryMock.Setup(x => x.UpdateAsync(studioGroup))
+                .Returns(Task.CompletedTask);
+            _groupRepositoryMock.Setup(x => x.UpdateAsync(standaloneGroup))
+                .Returns(Task.CompletedTask);
+            _documentServiceMock.Setup(x => x.DeleteDocumentsExternalDataAsync(It.IsAny<IEnumerable<Guid>>()))
+                .Returns(Task.CompletedTask);
 
             await _service.DeleteAsync(_userId);
 
@@ -232,7 +235,16 @@ namespace StudioStudio_Server.Tests.Services
             Assert.Null(user.AvatarUrl);
             Assert.Null(user.GoogleId);
             Assert.NotNull(user.PasswordHash);
+            Assert.True(ownedStudio.IsArchived);
+            Assert.True(studioGroup.IsArchived);
+            Assert.True(standaloneGroup.IsArchived);
             _userRepoMock.Verify(x => x.UpdateAsync(user), Times.Once);
+            _studioRepositoryMock.Verify(x => x.UpdateStudioAsync(ownedStudio), Times.Once);
+            _groupRepositoryMock.Verify(x => x.UpdateAsync(studioGroup), Times.Once);
+            _groupRepositoryMock.Verify(x => x.UpdateAsync(standaloneGroup), Times.Once);
+            _documentServiceMock.Verify(x => x.DeleteDocumentsExternalDataAsync(
+                It.Is<IEnumerable<Guid>>(ids => ids.ToHashSet().SetEquals(new[] { studioGroup.GroupId, standaloneGroup.GroupId }))),
+                Times.Once);
             _cacheServiceMock.Verify(x => x.InvalidateUserCacheAsync(_userId), Times.Once);
         }
 
@@ -597,7 +609,7 @@ namespace StudioStudio_Server.Tests.Services
         }
 
         /// <summary>
-        /// Branch: calls cache service → GetOrSetAsync invoked
+        /// Branch: cache hit returns subscription plan directly
         /// Ref: UserService.GetUserSubscriptionPlan:345-350
         /// </summary>
         [Fact]
@@ -609,15 +621,14 @@ namespace StudioStudio_Server.Tests.Services
                 PlanName = "Test",
                 MaxAiRequestsPerDay = 50
             };
-            _subscriptionRepoMock.Setup(x => x.GetSubscriptionPlanByUserIdAsync(_userId))
+            _cacheServiceMock.Setup(x => x.GetAsync<SubscriptionPlan>(_cacheServiceMock.Object.GetUserSubscriptionKey(_userId)))
                 .ReturnsAsync(plan);
 
             await _service.GetUserSubscriptionPlan(_userId);
 
-            _cacheServiceMock.Verify(x => x.GetOrSetAsync(
-                _cacheServiceMock.Object.GetUserSubscriptionKey(_userId),
-                It.IsAny<Func<Task<SubscriptionPlan>>>(),
-                It.IsAny<TimeSpan?>()), Times.Once);
+            _cacheServiceMock.Verify(x => x.GetAsync<SubscriptionPlan>(
+                _cacheServiceMock.Object.GetUserSubscriptionKey(_userId)), Times.Once);
+            _subscriptionRepoMock.Verify(x => x.GetSubscriptionPlanByUserIdAsync(It.IsAny<Guid>()), Times.Never);
         }
 
         #endregion

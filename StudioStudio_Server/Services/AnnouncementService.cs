@@ -22,13 +22,25 @@ namespace StudioStudio_Server.Services
         /// - Type 4-17: only mentioned, with IsRead
         /// NO CACHE: Direct repository call for real-time filtering
         /// </summary>
-        public async Task<List<AnnouncementResponse>> GetAllActiveAnnouncementsAsync(Guid userId)
+        public async Task<AnnouncementListResponse> GetAllActiveAnnouncementsAsync(Guid userId, int page, int pageSize)
         {
-            var announcements = await announcementRepository.GetAllForUserAsync(userId);
+            page = page <= 0 ? 1 : page;
+            pageSize = pageSize <= 0 ? 10 : Math.Min(pageSize, 50);
 
-            return announcements?
+            var (announcements, totalCount) = await announcementRepository.GetAllForUserAsync(userId, page, pageSize);
+            var items = announcements
                 .Select(a => MapToAnnouncementResponse(a, userId))
-                .ToList() ?? new List<AnnouncementResponse>();
+                .ToList();
+            var totalPages = totalCount == 0 ? 0 : (int)Math.Ceiling(totalCount / (double)pageSize);
+
+            return new AnnouncementListResponse
+            {
+                Items = items,
+                TotalCount = totalCount,
+                Page = page,
+                PageSize = pageSize,
+                TotalPages = totalPages
+            };
         }
 
         /// <summary>
@@ -112,7 +124,7 @@ namespace StudioStudio_Server.Services
         /// </summary>
         private AnnouncementResponse MapToAnnouncementResponse(Announcement a, Guid userId)
         {
-            var ua = a.UserAnnouncements?.FirstOrDefault(u => u.MentionedId == userId);
+            var ua = a.UserAnnouncements.FirstOrDefault(u => u.MentionedId == userId);
 
             return new AnnouncementResponse
             {

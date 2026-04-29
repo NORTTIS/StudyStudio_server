@@ -132,7 +132,7 @@ namespace StudioStudio_Server.Models.DTOs.Response
         public string Type { get; set; } = string.Empty; // "overdue" | "due_soon" | "stuck"
         public string Title { get; set; } = string.Empty;
         public string Description { get; set; } = string.Empty; // human-readable
-        public string Group { get; set; } = string.Empty;
+        public string? Group { get; set; }
         public Guid? TaskId { get; set; }
         public string? DueDate { get; set; }             // ISO date for due_soon
     }

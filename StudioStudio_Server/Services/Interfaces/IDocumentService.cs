@@ -14,6 +14,7 @@ namespace StudioStudio_Server.Services.Interfaces
         Task<DocumentStatusResponse> GetDocumentStatusAsync(Guid userId, Guid attachmentId);
         Task<GroupDocumentsResponse> GetGroupDocumentsAsync(Guid userId, Guid groupId);
         Task DeleteDocumentAsync(Guid userId, Guid attachmentId);
+        Task DeleteDocumentsExternalDataAsync(IEnumerable<Guid> groupIds);
         Task<string> GetDocumentDownloadUrlAsync(Guid userId, Guid attachmentId, int expirationMinutes = 60);
         
         /// <summary>

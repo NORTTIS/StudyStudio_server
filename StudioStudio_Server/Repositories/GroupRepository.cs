@@ -97,6 +97,18 @@ namespace StudioStudio_Server.Repositories
         }
 
         /// <summary>
+        /// Get groups created by a specific user
+        /// Condition: CreatedBy = {creatorId} AND IsActive = true
+        /// </summary>
+        public async Task<List<Group>> GetByCreatedByAsync(Guid creatorId)
+        {
+            return await db.Groups
+                .Where(g => g.CreatedBy == creatorId && g.IsActive)
+                .OrderByDescending(g => g.CreatedAt)
+                .ToListAsync();
+        }
+
+        /// <summary>
         /// Get list of groups in studio
         /// Condition: StudioId = {studioId} AND IsActive = true
         /// Order by: GroupName DESC, then CreatedAt DESC

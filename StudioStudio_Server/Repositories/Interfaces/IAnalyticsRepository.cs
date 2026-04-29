@@ -71,7 +71,7 @@ namespace StudioStudio_Server.Repositories.Interfaces
         /// <summary>
         /// Get user's overdue tasks across all groups + personal
         /// </summary>
-        Task<List<(Guid? GroupId, Guid? TaskId, string Title, string GroupName, DateTime DueDate)>> GetUserOverdueTasksAsync(
+        Task<List<(Guid? GroupId, Guid? TaskId, string Title, string? GroupName, DateTime DueDate)>> GetUserOverdueTasksAsync(
             List<Guid> groupIds, Guid userId, int limit = 10);
 
         /// <summary>

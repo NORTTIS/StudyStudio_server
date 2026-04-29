@@ -14,4 +14,14 @@ namespace StudioStudio_Server.Models.DTOs.Response
         public Guid? GroupId { get; set; }
         public string? SourceType { get; set; }
     }
+
+    public class AnnouncementListResponse
+    {
+        public List<AnnouncementResponse> Items { get; set; } = new();
+        public int TotalCount { get; set; }
+        public int Page { get; set; }
+        public int PageSize { get; set; }
+        public int TotalPages { get; set; }
+        public bool HasMore => Page < TotalPages;
+    }
 }

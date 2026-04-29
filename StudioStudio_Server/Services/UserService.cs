@@ -20,6 +20,9 @@ namespace StudioStudio_Server.Services
         IUserRepository userRepository,
         IPasswordHasher<User> passwordHasher,
         IWebHostEnvironment environment,
+        IStudioRepository studioRepository,
+        IGroupRepository groupRepository,
+        IDocumentService documentService,
         IUserSubscriptionRepository userSubscriptionRepository,
         IAIRequestLogRepository aiRequestLogRepository,
         ICacheService cacheService) : IUserService
@@ -35,12 +38,20 @@ namespace StudioStudio_Server.Services
         public async Task<User?> GetByIdAsync(Guid userId)
         {
             var cacheKey = cacheService.GetUserProfileKey(userId);
-            
-            return await cacheService.GetOrSetAsync(
-                cacheKey,
-                async () => await userRepository.GetByIdAsync(userId),
-                cacheService.GetExpirationForKey(cacheKey)
-            );
+
+            var cachedUser = await cacheService.GetAsync<User>(cacheKey);
+            if (cachedUser != null)
+            {
+                return cachedUser;
+            }
+
+            var user = await userRepository.GetByIdAsync(userId);
+            if (user != null)
+            {
+                await cacheService.SetAsync(cacheKey, user, cacheService.GetExpirationForKey(cacheKey));
+            }
+
+            return user;
         }
 
         /// <summary>
@@ -89,6 +100,46 @@ namespace StudioStudio_Server.Services
                 throw new AppException(ErrorCodes.UserAccountAlreadyDeleted);
             }
 
+            var now = DateTime.UtcNow;
+            var affectedGroupIds = new HashSet<Guid>();
+
+            var ownedStudios = await studioRepository.GetByOwnerIdAsync(userId);
+            foreach (var studio in ownedStudios)
+            {
+                if (!studio.IsArchived)
+                {
+                    studio.IsArchived = true;
+                    studio.UpdatedAt = now;
+                    await studioRepository.UpdateStudioAsync(studio);
+                }
+
+                var studioGroups = await groupRepository.GetStudioGroupsAsync(studio.StudioId);
+                foreach (var group in studioGroups)
+                {
+                    affectedGroupIds.Add(group.GroupId);
+
+                    if (!group.IsArchived)
+                    {
+                        group.IsArchived = true;
+                        group.UpdatedAt = now;
+                        await groupRepository.UpdateAsync(group);
+                    }
+                }
+            }
+
+            var createdGroups = await groupRepository.GetByCreatedByAsync(userId);
+            foreach (var group in createdGroups)
+            {
+                affectedGroupIds.Add(group.GroupId);
+
+                if (!group.IsArchived)
+                {
+                    group.IsArchived = true;
+                    group.UpdatedAt = now;
+                    await groupRepository.UpdateAsync(group);
+                }
+            }
+
             // Apply ghostUser: anonymize user data
             // Note: Email is kept as-is because the unique index only applies to non-deleted users
             // This allows the original email to be reused after the user is restored (if needed)
@@ -105,6 +156,11 @@ namespace StudioStudio_Server.Services
             user.UpdatedAt = DateTime.UtcNow;
 
             await userRepository.UpdateAsync(user);
+
+            if (affectedGroupIds.Count > 0)
+            {
+                await documentService.DeleteDocumentsExternalDataAsync(affectedGroupIds);
+            }
 
             // Invalidate all user-related cache
             await cacheService.InvalidateUserCacheAsync(userId);
@@ -129,7 +185,7 @@ namespace StudioStudio_Server.Services
             }
 
             // Verify current password
-            var verifyResult = passwordHasher.VerifyHashedPassword(user, user.PasswordHash!, request.CurrentPassword);
+            var verifyResult = passwordHasher.VerifyHashedPassword(user, user.PasswordHash ?? string.Empty, request.CurrentPassword);
             if (verifyResult != PasswordVerificationResult.Success)
             {
                 throw new AppException(ErrorCodes.AuthIncorrectCurrentPassword);
@@ -150,7 +206,7 @@ namespace StudioStudio_Server.Services
 
 
             // Check if new password is the same as current password
-            var isSamePassword = passwordHasher.VerifyHashedPassword(user, user.PasswordHash, request.NewPassword);
+            var isSamePassword = passwordHasher.VerifyHashedPassword(user, user.PasswordHash ?? string.Empty, request.NewPassword);
             if (isSamePassword == PasswordVerificationResult.Success)
             {
                 throw new AppException(ErrorCodes.ValidationNewPasswordSameAsCurrent);
@@ -302,11 +358,18 @@ namespace StudioStudio_Server.Services
 
             // Cache subscription plan with proper expiration
             var subscriptionKey = cacheService.GetUserSubscriptionKey(userId);
-            SubscriptionPlan? subscriptionPlan = await cacheService.GetOrSetAsync(
-                subscriptionKey,
-                async () => await userSubscriptionRepository.GetSubscriptionPlanByUserIdAsync(userId),
-                cacheService.GetExpirationForKey(subscriptionKey)
-            );
+            var subscriptionPlan = await cacheService.GetAsync<SubscriptionPlan>(subscriptionKey);
+            if (subscriptionPlan == null)
+            {
+                subscriptionPlan = await userSubscriptionRepository.GetSubscriptionPlanByUserIdAsync(userId);
+                if (subscriptionPlan != null)
+                {
+                    await cacheService.SetAsync(
+                        subscriptionKey,
+                        subscriptionPlan,
+                        cacheService.GetExpirationForKey(subscriptionKey));
+                }
+            }
 
             int dailyLimit = subscriptionPlan?.MaxAiRequestsPerDay ?? 20; // Default: Free Plan = 20
 
@@ -317,16 +380,28 @@ namespace StudioStudio_Server.Services
         {
             // Cache subscription plan with proper expiration
             var subscriptionKey = cacheService.GetUserSubscriptionKey(userId);
-            SubscriptionPlan? subscriptionPlan = await cacheService.GetOrSetAsync(
-                subscriptionKey,
-                async () => await userSubscriptionRepository.GetSubscriptionPlanByUserIdAsync(userId),
-                cacheService.GetExpirationForKey(subscriptionKey)
-            );
+            var subscriptionPlan = await cacheService.GetAsync<SubscriptionPlan>(subscriptionKey);
+            if (subscriptionPlan == null)
+            {
+                subscriptionPlan = await userSubscriptionRepository.GetSubscriptionPlanByUserIdAsync(userId);
+                if (subscriptionPlan != null)
+                {
+                    await cacheService.SetAsync(
+                        subscriptionKey,
+                        subscriptionPlan,
+                        cacheService.GetExpirationForKey(subscriptionKey));
+                }
+            }
+
+            if (subscriptionPlan == null)
+            {
+                throw new AppException(ErrorCodes.SubscriptionPlanNotFound, StatusCodes.Status404NotFound);
+            }
 
             return new SubscriptionPlanItem
             {
-                PlanId = subscriptionPlan!.PlanId,
-                PlanName = subscriptionPlan!.PlanName,
+                PlanId = subscriptionPlan.PlanId,
+                PlanName = subscriptionPlan.PlanName,
                 Price = subscriptionPlan.Price,
                 BillingCycle = subscriptionPlan.BillingCycle,
                 Description = subscriptionPlan.Description,

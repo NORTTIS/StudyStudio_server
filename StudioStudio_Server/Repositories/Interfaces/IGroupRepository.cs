@@ -9,6 +9,7 @@ namespace StudioStudio_Server.Repositories.Interfaces
         Task<List<Group>> GetUserGroupsAsync(Guid userId);
         Task<Group?> GetByIdAsync(Guid groupId);
         Task<Group?> GetGroupWithDetailsAsync(Guid groupId);
+        Task<List<Group>> GetByCreatedByAsync(Guid creatorId);
         Task<bool> GroupNameExistsInStudioAsync(Guid? studioId, string groupName, Guid? userId);
         Task<int> CountGroupsCreatedByUserAsync(Guid userId);
         Task AddAsync(Group group);
