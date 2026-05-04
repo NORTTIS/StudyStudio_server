@@ -14,8 +14,7 @@ namespace StudioStudio_Server.Services
         {
             try
             {
-                var startDate = request.StartDate ?? DateTime.MinValue;
-                var endDate = request.EndDate ?? DateTime.UtcNow;
+                var (startDate, endDate) = NormalizeDateRange(request.StartDate, request.EndDate);
 
                 // Get user login activity data grouped by hour and day of week (excluding admin accounts)
                 // Data is obtained from RefreshToken creation time (when user logs in)
@@ -49,8 +48,7 @@ namespace StudioStudio_Server.Services
         {
             try
             {
-                var startDate = request.StartDate ?? DateTime.MinValue;
-                var endDate = request.EndDate ?? DateTime.UtcNow;
+                var (startDate, endDate) = NormalizeDateRange(request.StartDate, request.EndDate);
 
                 // Get all reports in date range (excluding reports from admin accounts)
                 var reports = await repository.GetReportsAsync(startDate, endDate);
@@ -95,8 +93,7 @@ namespace StudioStudio_Server.Services
         {
             try
             {
-                var startDate = request.StartDate ?? DateTime.MinValue;
-                var endDate = request.EndDate ?? DateTime.UtcNow;
+                var (startDate, endDate) = NormalizeDateRange(request.StartDate, request.EndDate);
 
                 // Query users created in date range (excluding admin accounts)
                 var users = await repository.GetUsersAsync(startDate, endDate);
@@ -140,8 +137,7 @@ namespace StudioStudio_Server.Services
         {
             try
             {
-                var startDate = request.StartDate ?? DateTime.MinValue;
-                var endDate = request.EndDate ?? DateTime.UtcNow;
+                var (startDate, endDate) = NormalizeDateRange(request.StartDate, request.EndDate);
 
                 // Get all ACTIVE users in date range
                 var users = await repository.GetUsersAsync(startDate, endDate);
@@ -196,8 +192,7 @@ namespace StudioStudio_Server.Services
         {
             try
             {
-                var startDate = request.StartDate ?? DateTime.MinValue;
-                var endDate = request.EndDate ?? DateTime.UtcNow;
+                var (startDate, endDate) = NormalizeDateRange(request.StartDate, request.EndDate);
                 var itemCount = request.ItemCount;
 
                 var activities = new List<RecentActivityItem>();
@@ -311,8 +306,7 @@ namespace StudioStudio_Server.Services
         {
             try
             {
-                var startDate = request.StartDate ?? DateTime.MinValue;
-                var endDate = request.EndDate ?? DateTime.UtcNow;
+                var (startDate, endDate) = NormalizeDateRange(request.StartDate, request.EndDate);
                 var topCount = request.TopCount;
 
                 var topGroups = await repository.GetTopActiveGroupsAsync(startDate, endDate, topCount);
@@ -358,6 +352,29 @@ namespace StudioStudio_Server.Services
                 5 => "T6",
                 6 => "T7",
                 _ => ""
+            };
+        }
+
+        private static (DateTime StartDate, DateTime EndDate) NormalizeDateRange(DateTime? startDate, DateTime? endDate)
+        {
+            var start = startDate.HasValue
+                ? ToUtc(startDate.Value.Date)
+                : ToUtc(DateTime.MinValue);
+
+            var end = endDate.HasValue
+                ? ToUtc(endDate.Value.Date.AddDays(1).AddTicks(-1))
+                : DateTime.UtcNow;
+
+            return (start, end);
+        }
+
+        private static DateTime ToUtc(DateTime dateTime)
+        {
+            return dateTime.Kind switch
+            {
+                DateTimeKind.Utc => dateTime,
+                DateTimeKind.Local => dateTime.ToUniversalTime(),
+                _ => DateTime.SpecifyKind(dateTime, DateTimeKind.Utc)
             };
         }
     }
