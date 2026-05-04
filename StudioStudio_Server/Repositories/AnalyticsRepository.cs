@@ -196,15 +196,37 @@ namespace StudioStudio_Server.Repositories
                             && t.CompletedAt.HasValue
                             && t.CompletedAt >= startDateTime
                             && t.CompletedAt <= endDateTime)
-                .Select(t => new { t.OwnerId, t.CompletedAt })
+                .Select(t => new { t.TaskId, t.OwnerId, t.CompletedAt })
                 .ToListAsync();
 
-            var completedTasks = rawCompleted
-                .Select(t => new { t.OwnerId, CompletedDate = ToLocalDate(t.CompletedAt!.Value) })
-                .ToList();
+            var taskIds = rawCompleted.Select(t => t.TaskId).Distinct().ToList();
+            var assignments = await context.TaskAssignments
+                .AsNoTracking()
+                .Where(a => taskIds.Contains(a.TaskId))
+                .Select(a => new { a.TaskId, a.AssignedTo })
+                .ToListAsync();
+
+            var assigneeLookup = assignments
+                .GroupBy(a => a.TaskId)
+                .ToDictionary(g => g.Key, g => g.Select(a => a.AssignedTo).ToList());
+
+            var completedTasks = new List<(Guid UserId, DateOnly CompletedDate)>();
+            foreach (var task in rawCompleted)
+            {
+                var completedDate = ToLocalDate(task.CompletedAt!.Value);
+                if (assigneeLookup.TryGetValue(task.TaskId, out var assignees) && assignees.Count > 0)
+                {
+                    foreach (var assignee in assignees)
+                        completedTasks.Add((assignee, completedDate));
+                }
+                else
+                {
+                    completedTasks.Add((task.OwnerId, completedDate));
+                }
+            }
 
             var result = completedTasks
-                .GroupBy(t => t.OwnerId)
+                .GroupBy(t => t.UserId)
                 .ToDictionary(
                     g => g.Key,
                     g => g
@@ -212,16 +234,16 @@ namespace StudioStudio_Server.Repositories
                         .ToDictionary(g2 => g2.Key, g2 => g2.Count()));
 
             // Ensure all members have entries for all dates (fill with 0)
-            var ownerIds = completedTasks.Select(t => t.OwnerId).Distinct().ToList();
-            foreach (var ownerId in ownerIds)
+            var userIds = completedTasks.Select(t => t.UserId).Distinct().ToList();
+            foreach (var userId in userIds)
             {
-                if (!result.ContainsKey(ownerId))
-                    result[ownerId] = new Dictionary<DateOnly, int>();
+                if (!result.ContainsKey(userId))
+                    result[userId] = new Dictionary<DateOnly, int>();
 
                 for (var date = startDate; date <= endDate; date = date.AddDays(1))
                 {
-                    if (!result[ownerId].ContainsKey(date))
-                        result[ownerId][date] = 0;
+                    if (!result[userId].ContainsKey(date))
+                        result[userId][date] = 0;
                 }
             }
 
