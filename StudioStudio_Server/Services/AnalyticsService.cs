@@ -731,7 +731,8 @@ namespace StudioStudio_Server.Services
 
         /// Lấy xu hướng hoàn thành theo nhóm theo thời gian (có bộ lọc ngày)
         /// Cho Chart 3 (Line Chart)
-        /// Công thức: tasksCompleted×4 + tasksCreated×3 + tasksUpdated×2 + commentsCreated×1 + messagesSent×1
+        /// Trả về: Số lượng task hoàn thành tích lũy (cumulative) cho từng nhóm mỗi ngày
+        /// Ví dụ: Ngày 3/5 → 10 task, Ngày 4/5 → +1 task → cumulative = 11
         public async Task<StudioCompletionTrendResponse> GetStudioCompletionTrendAsync(
             Guid studioId,
             DateOnly? startDate,
@@ -758,14 +759,15 @@ namespace StudioStudio_Server.Services
             var startDateTime = DateTime.SpecifyKind(start.ToDateTime(TimeOnly.MinValue), DateTimeKind.Utc);
             var endDateTime = DateTime.SpecifyKind(end.ToDateTime(TimeOnly.MaxValue), DateTimeKind.Utc);
 
-            // Lấy công việc hoàn thành theo nhóm theo ngày
+            // Lấy tất cả công việc hoàn thành từ đầu thời gian để tính cumulative đúng
+            // (không chỉ từ startDate, để đảm bảo giá trị tích lũy từ quá khứ)
             var completedTasks = await context.Tasks
                 .Where(t => t.GroupId.HasValue && validGroupIds.Contains(t.GroupId.Value) &&
-                           t.CompletedAt.HasValue && t.CompletedAt >= startDateTime && t.CompletedAt <= endDateTime)
+                           t.CompletedAt.HasValue && t.CompletedAt <= endDateTime)
                 .Select(t => new { t.GroupId, Date = DateOnly.FromDateTime(t.CompletedAt!.Value) })
                 .ToListAsync();
 
-            // Tính điểm tích lũy cho từng nhóm
+            // Tính số lượng task hoàn thành tích lũy cho từng nhóm
             var result = groups.Select(g =>
             {
                 var groupCompletions = completedTasks
@@ -774,7 +776,9 @@ namespace StudioStudio_Server.Services
                     .ToDictionary(g => g.Key, g => g.Count());
 
                 var points = new List<StudioTrendPoint>();
-                var cumulative = 0;
+                // Tính cumulative ban đầu: tổng số task hoàn thành trước ngày `start`
+                var preCumulative = groupCompletions.Where(kv => kv.Key < start).Sum(kv => kv.Value);
+                var cumulative = preCumulative;
 
                 for (var date = start; date <= end; date = date.AddDays(1))
                 {
