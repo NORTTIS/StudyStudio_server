@@ -9,6 +9,7 @@ namespace StudioStudio_Server.Services.AI.Tools;
 [DebuggerStepThrough]
 public class GetStudioAnalyticsTool(
     IStudioRepository studioRepository,
+    IStudioParticipantRepository studioParticipantRepository,
     IAnalyticsRepository analyticsRepository,
     ITaskRepository taskRepository,
     ILogger<GetStudioAnalyticsTool> logger) : IAITool
@@ -48,6 +49,7 @@ public class GetStudioAnalyticsTool(
             if (studio == null)
                 return AIQueryResult.Error("Khong tim thay Studio");
 
+            var studioMembers = await studioParticipantRepository.GetParticipantsByStudioIdAsync(studioId);
             var groups = await studioRepository.GetGroupsByStudioIdAsync(studioId);
             var totalGroups = groups.Count;
             var allGroupIds = groups.Select(g => g.GroupId).ToList();
@@ -57,7 +59,7 @@ public class GetStudioAnalyticsTool(
                 ? await taskRepository.GetGroupTaskStatisticsBatchAsync(allGroupIds)
                 : new Dictionary<Guid, global::StudioStudio_Server.Models.DTOs.Response.TaskSummaryResponse>();
 
-            int totalMembers = 0;
+            var totalMembers = studioMembers.Count;
             int totalTasks = 0;
             int completedTasks = 0;
             int overdueTasks = 0;
@@ -76,6 +78,21 @@ public class GetStudioAnalyticsTool(
                 ? Math.Round((double)completedTasks / totalTasks * 100, 2)
                 : 0.0;
 
+            var studioMembersJson = new JsonArray();
+            foreach (var member in studioMembers)
+            {
+                studioMembersJson.Add(new JsonObject
+                {
+                    ["participant_id"] = member.ParticipantId.ToString(),
+                    ["user_id"] = member.UserId.ToString(),
+                    ["full_name"] = $"{member.User.FirstName} {member.User.LastName}".Trim(),
+                    ["email"] = member.User.Email,
+                    ["role"] = member.Role.ToString(),
+                    ["is_approved"] = member.IsApproved,
+                    ["avatar_url"] = member.User.AvatarUrl
+                });
+            }
+
             var result = new JsonObject
             {
                 ["studio_id"] = studioId.ToString(),
@@ -91,6 +108,7 @@ public class GetStudioAnalyticsTool(
                     ["completion_rate"] = completionRate,
                     ["pending_tasks"] = totalTasks - completedTasks
                 },
+                ["studio_members"] = studioMembersJson,
                 ["generated_at"] = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss")
             };
 
@@ -104,8 +122,6 @@ public class GetStudioAnalyticsTool(
                     fromDate = DateTime.UtcNow.AddDays(-30);
 
                 var toDate = DateTime.UtcNow;
-                var groupIds = groups.Select(g => g.GroupId).ToList();
-
                 // Aggregate tasks created and completed across all groups
                 var tasksCreatedTotal = 0;
                 var tasksCompletedTotal = 0;
